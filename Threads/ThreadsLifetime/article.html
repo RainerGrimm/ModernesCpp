@@ -1,0 +1,143 @@
+<p>The creator of has to take care of his child. This simple sentence has big consequences for a thread. The following program starts a thread, that shows his ID on the screen.</p>
+<hr id="system-readmore" />
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+	<pre style="margin: 0px; line-height: 125%;"><span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;thread&gt;</span>
+
+<span style="color: #2b91af;">int</span> main(){
+
+  std::<span style="color: #0000ff;">thread</span> t([]{std::cout &lt;&lt; std::this_thread::get_id() &lt;&lt; std::endl;});
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>But the program will not produce the expected result.</p>
+<p>&nbsp;<img src="images/blog/Threads/LebenszeitVonThreads/threadForgetJoin.png" alt="threadForgetJoin" />&nbsp;</p>
+<p>What's the reason?</p>
+<h2>join and detach</h2>
+<p>The lifetime of the created thread t ends with his callable unit. The creator has two choices. First, he waits, until his child is done (<span style="font-family: courier new,courier;">t.join()</span>), second his detach himself from his child: <span style="font-family: courier new,courier;">t.detach()</span>. A thread t with callable unit (you can create threads without callable unit) is joinable, in case there were no t.join() or t.detach invocation on the thread. A joinable thread calls&nbsp; in his destructor the exception <span style="font-family: courier new,courier;">std::terminate</span>. The result is, the program terminates. That is the reason, the actual run terminated.</p>
+<p>The solution for this problem is simple. By calling <span style="font-family: courier new,courier;">t.join(),</span> the program behaves well defined.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+	<pre style="margin: 0px; line-height: 125%;"><span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;thread&gt;</span>
+
+<span style="color: #2b91af;">int</span> main(){
+
+  std::<span style="color: #0000ff;">thread</span> t([]{std::cout &lt;&lt; std::this_thread::get_id() &lt;&lt; std::endl;});
+
+  t.join(); 
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p><img src="images/blog/Threads/LebenszeitVonThreads/threadJoin.png" alt="threadJoin" /></p>
+<h3><span style="background-color: #ffffff; color: #3366ff;"><span style="color: #000000;">A short side mark: The challenges of detach</span><br /></span>
+</h3>
+<p>Of course, you can use t.detach() instead of t.join() in the program above. So the thread t is not joinable any more and his destructor didn't call <span style="font-family: courier new,courier;">std::terminate</span>. Bad to say. But now the program is undefined, because the lifetime of the object <span style="font-family: courier new,courier;">std::cout</span> is not ensured. The execution of the program seems to be a little bit odd.</p>
+<p><span style="background-color: #ffffff; color: #3366ff;">&nbsp; </span></p>
+<p><span style="color: #3366ff; background-color: #ffffff;"><img src="images/blog/Threads/LebenszeitVonThreads/threadDetach.png" alt="threadDetach" width="450" height="172" /></span></p>
+<p><span style="color: #3366ff;"><span style="color: #000000;"><span style="background-color: #c0c0c0;"><span style="background-color: #ffffff;"><span style="color: #3366ff;"><span style="color: #000000;">I will elaborate more on this issue in the next article.</span><br /></span>
+	</span>
+	</span>
+	</span>
+	</span>
+</p>
+<h2>Moving threads&nbsp;</h2>
+<p>Until now, it was quite easy. But that has not to be forever.</p>
+<p>It is not possible, to copy a thread (copy semantic), you can only move (<a href="http://thbecker.net/articles/rvalue_references/section_02.html">move semantic</a>) him. In case a thread will be moved, it's is a lot more difficult to deal with the lifetime of him in the right way.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+	<pre style="margin: 0px; line-height: 125%;"><span style="color: #0000ff;">#include &lt;iostream&gt; </span>
+<span style="color: #0000ff;">#include &lt;thread&gt; </span>
+<span style="color: #0000ff;">#include &lt;utility&gt;</span>
+
+<span style="color: #2b91af;">int</span> main(){ 
+
+  std::<span style="color: #0000ff;">thread</span> t([]{std::cout &lt;&lt; std::this_thread::get_id();}); 
+  std::<span style="color: #0000ff;">thread</span> t2([]{std::cout &lt;&lt; std::this_thread::get_id();}); 
+  
+  t= std::move(t2); 
+  t.join(); 
+  t2.join(); 
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The both threads t1 and t2 should do a simple job. Print there ID on the screen. In addition to that, Thread t2 will be moved to t: <span style="font-family: courier new,courier;">t= std::move(t2).</span> At the end, the <span style="font-family: courier new,courier;">main</span>-thread take care of his children and joins them. But wait. That's far away from my expectations.</p>
+<p>&nbsp;<img src="images/blog/Threads/LebenszeitVonThreads/threadMove.png" alt="threadMove" /></p>
+<p>What is going wrong? We have two issues:</p>
+<ol>
+	<li>By moving the thread t2, t get a new callable unit and his destructor will be called. The result is, that the destructor of t calls <span style="font-family: courier new,courier;">std::terminate</span>, because he is still joinable.</li>
+	<li>Thread t2 has no associated callable unit. The invocation of join on a thread without callable unit leads to the exception <span style="font-family: courier new,courier;">std::system_error</span>.</li>
+</ol>
+<p>I fixed both errors.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+	<pre style="margin: 0px; line-height: 125%;"><span style="color: #0000ff;">#include &lt;iostream&gt; </span>
+<span style="color: #0000ff;">#include &lt;thread&gt; </span>
+<span style="color: #0000ff;">#include &lt;utility&gt;</span>
+
+<span style="color: #2b91af;">int</span> main(){ 
+
+  std::<span style="color: #0000ff;">thread</span> t([]{std::cout &lt;&lt; std::this_thread::get_id() &lt;&lt; std::endl;}); 
+  std::<span style="color: #0000ff;">thread</span> t2([]{std::cout &lt;&lt; std::this_thread::get_id() &lt;&lt; std::endl;}); 
+  
+  t.join();
+  t= std::move(t2); 
+  t.join(); 
+  
+  std::cout &lt;&lt; <span style="color: #a31515;">"\n"</span>;
+  std::cout &lt;&lt; std::boolalpha &lt;&lt; <span style="color: #a31515;">"t2.joinable(): "</span> &lt;&lt; t2.joinable() &lt;&lt; std::endl;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>As a result, thread t2 is not joinable any more.<span style="font-family: courier new,courier;"></span><em></em></p>
+<p><img src="images/blog/Threads/LebenszeitVonThreads/threadMoveRight.png" alt="threadMoveRight" /></p>
+<h2>scoped_thread</h2>
+<p>In case it is a too big deal for you to take care of the lifetime of your threads, you can encapsulate a <span style="font-family: courier new,courier;">std::thread</span> in a own class. This class should automatically call join in his destructor. Of course, you can go the other way around and call detach. But you know, there are a few issues with detach.</p>
+<p><a href="https://www.justsoftwaresolutions.co.uk/blog/">Anthony Williams</a> created such a enriched&nbsp;class. He called it <span style="font-family: courier new,courier;">scoped_thread</span>. He checks in the constructor, that the thread is joinable and joins it finally in the destructor. Because the copy constructor and copy assignment operator are declares as <span style="font-family: courier new,courier;">delete</span>, objects of <span style="font-family: courier new,courier;">scoped_thread</span><span id="transmark"></span> can not be copied to or assigned from.</p>
+<p><span style="color: #3366ff;"><!-- HTML generated using hilite.me --></span></p>
+<div style="background: #ffffff none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+	<pre style="margin: 0px; line-height: 125%;"><span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;thread&gt;</span>
+<span style="color: #0000ff;">#include &lt;utility&gt;</span>
+
+
+<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">scoped_thread</span>{
+  std::<span style="color: #0000ff;">thread</span> t;
+public:
+  <span style="color: #0000ff;">explicit</span> scoped_thread(std::<span style="color: #0000ff;">thread</span> t_): t(std::move(t_)){
+    <span style="color: #0000ff;">if</span> ( !t.joinable()) <span style="color: #0000ff;">throw</span> std::logic_error(<span style="color: #a31515;">"No thread"</span>);
+  }
+  ~scoped_thread(){
+    t.join();
+  }
+  scoped_thread(scoped_thread&amp;)= <span style="color: #0000ff;">delete</span>;
+  scoped_thread&amp; <span style="color: #0000ff;">operator</span>=(scoped_thread <span style="color: #0000ff;">const</span> &amp;)= <span style="color: #0000ff;">delete</span>;
+};
+
+<span style="color: #2b91af;">int</span> main(){
+
+  scoped_thread t(std::<span style="color: #0000ff;">thread</span>([]{std::cout &lt;&lt; std::this_thread::get_id() &lt;&lt; std::endl;}));
+
+}
+</pre>
+</div>
+<h2>What's next?</h2>
+<p>In the next article I deal with the transfer of data to the threads.</p>
+<p>&nbsp;</p>
+<p>Would you like to have all articles for the weekend? Source included.</p>
+<p>{loadmodule mod_acymailing,Neue Artikel zum Wochenende}</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
