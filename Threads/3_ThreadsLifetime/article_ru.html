@@ -1,0 +1,137 @@
+<p>Родитель должен заботиться о своем ребенке. Эта простая идея имеет большие последствия для жизни потока. Следующая программа запускает поток, который должен вывести на экран свой ID</p>
+<hr id="system-readmore" /><!-- HTML generated using hilite.me -->
+<div style="background: #ffffff none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;thread&gt;</span>
+
+<span style="color: #2b91af;">int</span> main(){
+
+  std::<span style="color: #0000ff;">thread</span> t([]{std::cout &lt;&lt; std::this_thread::get_id() &lt;&lt; std::endl;});
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Но программа выдает неожиданный результат</p>
+<p>&nbsp;<img src="images/blog/Threads/LebenszeitVonThreads/threadForgetJoin.png" alt="threadForgetJoin" />&nbsp;</p>
+<p>В чем причина?</p>
+<h2>join и detach</h2>
+<p>Жизнь нового потока t заканчивается вместе с его выполняемым объектом. У родителя два выбора: Первый - он ждет, пока его потомок не закончит (t.join()), второй - он отсоединяется от потомка &nbsp;(&nbsp;<span style="font-family: courier new,courier;">t.detach() )</span>. &nbsp;К потоку&nbsp;<span style="font-family: 'courier new', courier;">t</span> с исполняемым объектом (вы можете создать поток и без исполняемого объекта) можно присоединиться, если &nbsp;не было вызовов &nbsp;методов t.join() или t.detach. &nbsp;Деструктор потока, к которому можно присоединиться, выбрасывает исключение std::terminate. Программа прерывает выполнение. Вот причина по которой запуск завершился с неожиданным результатом</p>
+<p>Решить эту проблему просто. Вызывав&nbsp;<span style="font-family: courier new,courier;">t.join()</span>&nbsp;программа ведет себя как положено.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;thread&gt;</span>
+
+<span style="color: #2b91af;">int</span> main(){
+
+  std::<span style="color: #0000ff;">thread</span> t([]{std::cout &lt;&lt; std::this_thread::get_id() &lt;&lt; std::endl;});
+
+  t.join(); 
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p><img src="images/blog/Threads/LebenszeitVonThreads/threadJoin.png" alt="threadJoin" /></p>
+<h3><span style="background-color: #ffffff; color: #3366ff;"><span style="color: #000000;">Небольшое замечание: проблемы с detach()</span><br /></span></h3>
+<p>Конечно, вы можете использовать t.detach() вместо t.join() в этом коде. К поток t больше нельзя присоедениться и деструктор не вызывает&nbsp;<span style="font-family: courier new,courier;">std::terminate</span>. Это плохо,поскольку поведение программы теперь неопределено, из-за того что неопределена продолжительность жизни объекта std::cout. Запуск программы выглядит слегка странно.</p>
+<p><span style="background-color: #ffffff; color: #3366ff;">&nbsp; </span></p>
+<p><span style="color: #3366ff; background-color: #ffffff;"><img src="images/blog/Threads/LebenszeitVonThreads/threadDetach.png" alt="threadDetach" width="450" height="172" /></span></p>
+<p><span style="color: #3366ff;"><span style="color: #000000;"><span style="background-color: #c0c0c0;"><span style="background-color: #ffffff;"><span style="color: #3366ff;"><span style="color: #000000;">В следующей статье я расскажу об этом побольше.</span><br /></span> </span> </span> </span> </span></p>
+<h2>Двигая потоки</h2>
+<p>Пока все было очень просто. Но так будет не всегда.</p>
+<p>Поток скопировать&nbsp;(семантика копирования) &nbsp;невозможно , его можно только переместить (<a href="http://thbecker.net/articles/rvalue_references/section_02.html">move semantic</a>). А когда поток перемещают, управлять временем его жизни становится гораздо труднее .</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0000ff;">#include &lt;iostream&gt; </span>
+<span style="color: #0000ff;">#include &lt;thread&gt; </span>
+<span style="color: #0000ff;">#include &lt;utility&gt;</span>
+
+<span style="color: #2b91af;">int</span> main(){ 
+
+  std::<span style="color: #0000ff;">thread</span> t([]{std::cout &lt;&lt; std::this_thread::get_id();}); 
+  std::<span style="color: #0000ff;">thread</span> t2([]{std::cout &lt;&lt; std::this_thread::get_id();}); 
+  
+  t= std::move(t2); 
+  t.join(); 
+  t2.join(); 
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Оба потока - t1 и t2 должны выполнить простую задачу: показать их ID. Дополнительно, &nbsp;поток &nbsp;t2 &nbsp;будет перемещен в t: <span style="font-family: courier new,courier;">t= std::move(t2).</span>&nbsp;В конце, поток &nbsp;<span style="font-family: courier new,courier;">main&nbsp;</span>проявляет заботу о своих потомках и присоединяет их. Но погоди-ка, вот этого мы совсем не ждали:</p>
+<p>&nbsp;<img src="images/blog/Threads/LebenszeitVonThreads/threadMove.png" alt="threadMove" /></p>
+<p>Что пошло не так? У нас две проблемы:</p>
+<ol>
+<li>Перемещая (забирая право владения - овладевая звучит смешно) поток t2, t получает новый выполняемый объект чей деструктор будет вызван. Деструктор, в свою очеред, вызовет&nbsp;<span style="font-family: courier new,courier;">std::terminate</span>, поскольку к t все еще можно присоединиться.</li>
+<li>У потока &nbsp;t2 нет выполняемого объекта. Вызов join() у потока без выполняемого объекта приводит к выбросу исключения&nbsp;<span style="font-family: courier new,courier;">std::system_error</span>.</li>
+</ol>
+<p>Я исправил обе ошибки.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0000ff;">#include &lt;iostream&gt; </span>
+<span style="color: #0000ff;">#include &lt;thread&gt; </span>
+<span style="color: #0000ff;">#include &lt;utility&gt;</span>
+
+<span style="color: #2b91af;">int</span> main(){ 
+
+  std::<span style="color: #0000ff;">thread</span> t([]{std::cout &lt;&lt; std::this_thread::get_id() &lt;&lt; std::endl;}); 
+  std::<span style="color: #0000ff;">thread</span> t2([]{std::cout &lt;&lt; std::this_thread::get_id() &lt;&lt; std::endl;}); 
+  
+  t.join();
+  t= std::move(t2); 
+  t.join(); 
+  
+  std::cout &lt;&lt; <span style="color: #a31515;">"\n"</span>;
+  std::cout &lt;&lt; std::boolalpha &lt;&lt; <span style="color: #a31515;">"t2.joinable(): "</span> &lt;&lt; t2.joinable() &lt;&lt; std::endl;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>В результате, к потоку t2 больше нельзя присоединиться</p>
+<p>&nbsp;</p>
+<p><img src="images/blog/Threads/LebenszeitVonThreads/threadMoveRight.png" alt="threadMoveRight" /></p>
+<h2>scoped_thread</h2>
+<p>Если для вас слишком проблематично вручную разбираться со временем выполнения потоков , вы можете инкапсулировать &nbsp;<span style="font-family: courier new,courier;">std::thread</span> в ваш класс-обертку. Этот класс должен автоматически вызвать &nbsp; join в своем деструкторе. Конечно, вы можете пойти в обход и вызвать detach(). Но с detach() есть некоторые проблемы.</p>
+<p><a href="https://www.justsoftwaresolutions.co.uk/blog/">Anthony Williams</a> создал такой класс и назвал его&nbsp;<span style="font-family: courier new,courier;">scoped_thread</span>. В конструкторе он проверяет, присоединяем ли поток, и, наконец присоединяет его в деструкторе. Поскольку копирующий конструктор и копирующее присваивание объявлены с атрибутом delete, объекты scoped_thread нельзя копировать или присваивать.</p>
+<p><span style="color: #3366ff;"><!-- HTML generated using hilite.me --></span></p>
+<div style="background: #ffffff none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;thread&gt;</span>
+<span style="color: #0000ff;">#include &lt;utility&gt;</span>
+
+
+<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">scoped_thread</span>{
+  std::<span style="color: #0000ff;">thread</span> t;
+public:
+  <span style="color: #0000ff;">explicit</span> scoped_thread(std::<span style="color: #0000ff;">thread</span> t_): t(std::move(t_)){
+    <span style="color: #0000ff;">if</span> ( !t.joinable()) <span style="color: #0000ff;">throw</span> std::logic_error(<span style="color: #a31515;">"No thread"</span>);
+  }
+  ~scoped_thread(){
+    t.join();
+  }
+  scoped_thread(scoped_thread&amp;)= <span style="color: #0000ff;">delete</span>;
+  scoped_thread&amp; <span style="color: #0000ff;">operator</span>=(scoped_thread <span style="color: #0000ff;">const</span> &amp;)= <span style="color: #0000ff;">delete</span>;
+};
+
+<span style="color: #2b91af;">int</span> main(){
+
+  scoped_thread t(std::<span style="color: #0000ff;">thread</span>([]{std::cout &lt;&lt; std::this_thread::get_id() &lt;&lt; std::endl;}));
+
+}
+</pre>
+</div>
+<h2>Что дальше?</h2>
+<p>В следующей статье будет рассказано о передаче данных в потоки</p>
+<p>&nbsp;</p>
+<p>Would you like to have all articles for the weekend? Source included.</p>
+<p>{loadmodule mod_acymailing,Neue Artikel zum Wochenende}</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
