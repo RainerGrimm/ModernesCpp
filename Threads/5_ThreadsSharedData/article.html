@@ -1,0 +1,281 @@
+<p>The big challenge of threads begins, if the threads share data, which is not constant.</p>
+<hr id="system-readmore" />
+<h2>Race condition and critical section</h2>
+<p>In the context of threads, using shared data, you often hear the expressions race condition and critical section. But, what's that?&nbsp;</p>
+<dl>
+	<dt>Race Condition</dt>
+	<dd>&nbsp;&nbsp;&nbsp; A race condition is a state, in which at least two threads access a shared data at the same time, at least on the threads is a writer.</dd>
+	<dt>Critical Section</dt>
+	<dd>&nbsp;&nbsp;&nbsp; A critical section is a section of the code, which not more than one thread should access at any point in time.</dd>
+	<dd></dd>
+	<dd>
+		<p>&nbsp;</p>
+		<p>In case the program has a race condition, the program behaviour is undefined. Or to say it differently, each result can happen.</p>
+		<p>A nice way to visualize a race condition is, to let a few threads write to <span style="font-family: courier new,courier;">std::cou</span>t. <span style="font-family: courier new,courier;">std::cout</span> is the shared data, that should be protected from simultaneous access by more threads.</p>
+		<!-- HTML generated using hilite.me -->
+		<div style="background: #ffffff none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+			<table>
+				<tbody>
+					<tr>
+						<td>
+							<pre style="margin: 0px; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47</pre>
+						</td>
+						<td>
+							<pre style="margin: 0px; line-height: 125%;"><span style="color: #0000ff;">#include &lt;chrono&gt;</span>
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;thread&gt;</span>
+
+<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">Worker</span>{
+public:
+  Worker(std::string n):name(n){};
+  
+    <span style="color: #2b91af;">void</span> operator() (){
+      <span style="color: #0000ff;">for</span> (<span style="color: #2b91af;">int</span> i= 1; i &lt;= 3; ++i){
+	<span style="color: #008000;">// begin work</span>
+	std::this_thread::sleep_for(std::chrono::milliseconds(200));
+	<span style="color: #008000;">// end work</span>
+	std::cout &lt;&lt; name &lt;&lt; <span style="color: #a31515;">": "</span> &lt;&lt; <span style="color: #a31515;">"Work "</span> &lt;&lt; i &lt;&lt; <span style="color: #a31515;">" done !!!"</span> &lt;&lt; std::endl;
+      }
+      
+    }
+private:
+  std::string name;
+};
+
+
+<span style="color: #2b91af;">int</span> main(){
+
+  std::cout &lt;&lt; std::endl;
+  
+  std::cout &lt;&lt; <span style="color: #a31515;">"Boss: Let's start working.\n\n"</span>;
+ 
+  std::<span style="color: #0000ff;">thread</span> herb= std::<span style="color: #0000ff;">thread</span>(Worker(<span style="color: #a31515;">"Herb"</span>));
+  std::<span style="color: #0000ff;">thread</span> andrei= std::<span style="color: #0000ff;">thread</span>(Worker(<span style="color: #a31515;">"  Andrei"</span>));
+  std::<span style="color: #0000ff;">thread</span> scott= std::<span style="color: #0000ff;">thread</span>(Worker(<span style="color: #a31515;">"    Scott"</span>));
+  std::<span style="color: #0000ff;">thread</span> bjarne= std::<span style="color: #0000ff;">thread</span>(Worker(<span style="color: #a31515;">"      Bjarne"</span>));
+  std::<span style="color: #0000ff;">thread</span> andrew= std::<span style="color: #0000ff;">thread</span>(Worker(<span style="color: #a31515;">"        Andrew"</span>));
+  std::<span style="color: #0000ff;">thread</span> david= std::<span style="color: #0000ff;">thread</span>(Worker(<span style="color: #a31515;">"          David"</span>));
+  
+  herb.join();
+  andrei.join();
+  scott.join();
+  bjarne.join();
+  andrew.join();
+  david.join();
+  
+  std::cout &lt;&lt; <span style="color: #a31515;">"\n"</span> &lt;&lt; <span style="color: #a31515;">"Boss: Let's go home."</span> &lt;&lt; std::endl;
+  
+  std::cout &lt;&lt; std::endl;
+
+}
+</pre>
+						</td>
+					</tr>
+				</tbody>
+			</table>
+		</div>
+		<p>&nbsp;</p>
+		<p>The boss assigns to each of his six workers (line 29 - 34) in the lines 9 - 15 three work packages. In case the worker is done with his work package, he screams out loud&nbsp;the boss (line 14). In case the boss gets all notifications from his workers, he sends them home (line 43).<span style="font-family: courier new,courier;"></span></p>
+		<p>&nbsp;<strong>What a mess!</strong></p>
+		<p>&nbsp;<img src="images/blog/Threads/ThreadsTeilenDaten/bossWorker.png" alt="bossWorker" /></p>
+		<p>The same mess the next day. The workers screams out loudly. Totally unsynchronized.</p>
+		<p><img src="images/blog/Threads/ThreadsTeilenDaten/bossWorker1.png" alt="bossWorker1" /></p>
+	</dd>
+	<dd></dd>
+	<dd></dd>
+	<dd></dd>
+	<dd></dd>
+	<dd></dd>
+	<dd></dd>
+	<dd>
+		<p>The first solution is a mutex. A mutex ensures, that each thread exclusively accesses the shared variable <span style="font-family: courier new,courier;">std::cout</span>. <span style="font-family: courier new,courier;"></span></p>
+		<h3><span style="font-family: arial,helvetica,sans-serif; color: #000000;">A side note: <span style="font-family: courier new,courier;">std::cout</span> is thread safe<br /></span>
+		</h3>
+	</dd>
+	<dd>The C++11 standard guarantees, that you must not protect the single characters, written to <span style="font-family: courier new,courier;">std::cout.</span> Each character will atomically be written. Of course, it is possible, that more output statements like in the example will interleave. But that is only an <em>optical</em> issue. The program is well defined. The remark is valid for all input and output streams.</dd>
+	<dd>
+		<h2>Mutex</h2>
+		<p>Mutex stand for <strong>mut</strong>ual<strong> ex</strong>clusion. It ensures, that only one thread can access a critical section.</p>
+		<p>&nbsp;</p>
+		<!-- HTML generated using hilite.me -->
+		<div style="background: #ffffff none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+			<table>
+				<tbody>
+					<tr>
+						<td>
+							<pre style="margin: 0px; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51</pre>
+						</td>
+						<td>
+							<pre style="margin: 0px; line-height: 125%;"><span style="color: #0000ff;">#include &lt;chrono&gt;</span>
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;mutex&gt;</span>
+<span style="color: #0000ff;">#include &lt;thread&gt;</span>
+
+std::mutex coutMutex;
+
+<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">Worker</span>{
+public:
+  Worker(std::string n):name(n){};
+ 
+    <span style="color: #2b91af;">void</span> operator() (){
+      <span style="color: #0000ff;">for</span> (<span style="color: #2b91af;">int</span> i= 1; i &lt;= 3; ++i){
+	<span style="color: #008000;">// begin work</span>
+	std::this_thread::sleep_for(std::chrono::milliseconds(200));
+	<span style="color: #008000;">// end work</span>
+	coutMutex.lock();
+	std::cout &lt;&lt; name &lt;&lt; <span style="color: #a31515;">": "</span> &lt;&lt; <span style="color: #a31515;">"Work "</span> &lt;&lt; i &lt;&lt; <span style="color: #a31515;">" done !!!"</span> &lt;&lt; std::endl;
+	coutMutex.unlock();
+      }
+    }
+private:
+  std::string name;
+};
+
+
+<span style="color: #2b91af;">int</span> main(){
+
+  std::cout &lt;&lt; std::endl;
+  
+  std::cout &lt;&lt; <span style="color: #a31515;">"Boss: Let's start working."</span> &lt;&lt; <span style="color: #a31515;">"\n\n"</span>;
+ 
+  std::<span style="color: #0000ff;">thread</span> herb= std::<span style="color: #0000ff;">thread</span>(Worker(<span style="color: #a31515;">"Herb"</span>));
+  std::<span style="color: #0000ff;">thread</span> andrei= std::<span style="color: #0000ff;">thread</span>(Worker(<span style="color: #a31515;">"  Andrei"</span>));
+  std::<span style="color: #0000ff;">thread</span> scott= std::<span style="color: #0000ff;">thread</span>(Worker(<span style="color: #a31515;">"    Scott"</span>));
+  std::<span style="color: #0000ff;">thread</span> bjarne= std::<span style="color: #0000ff;">thread</span>(Worker(<span style="color: #a31515;">"      Bjarne"</span>));
+  std::<span style="color: #0000ff;">thread</span> andrew= std::<span style="color: #0000ff;">thread</span>(Worker(<span style="color: #a31515;">"        Andrew"</span>));
+  std::<span style="color: #0000ff;">thread</span> david= std::<span style="color: #0000ff;">thread</span>(Worker(<span style="color: #a31515;">"          David"</span>));
+  
+  herb.join();
+  andrei.join();
+  scott.join();
+  bjarne.join();
+  andrew.join();
+  david.join();
+  
+  std::cout &lt;&lt; <span style="color: #a31515;">"\n"</span> &lt;&lt; <span style="color: #a31515;">"Boss: Let's go home."</span> &lt;&lt; std::endl;
+  
+  std::cout &lt;&lt; std::endl;
+
+}</pre>
+						</td>
+					</tr>
+				</tbody>
+			</table>
+		</div>
+		<p>&nbsp;</p>
+		<p>The key difference to the first example are the lines 17 to 19. By invoking the methods <span style="font-family: courier new,courier;">coutMutex.lock()</span> and <span style="font-family: courier new,courier;">coutMutex.unlock()</span>, you define the exclusive section. This section can only be accessed by at most one thread. The result is, that the access to <span style="font-family: courier new,courier;">std::cout</span> is synchronized and the mess gets harmony.</p>
+		<p><img src="images/blog/Threads/ThreadsTeilenDaten/bossWorkerSynchonized.png" alt="bossWorkerSynchonized" /></p>
+		<p>&nbsp;</p>
+		<h2>What's next?</h2>
+		<p>Mutex have a lot of issues. But for that, you have to wait for the next post.<span id="transmark"></span></p>
+		<p>&nbsp;</p>
+		<p>&nbsp;</p>
+		<p>Would you like to have all articles for the weekend? Source included.</p>
+		<p>{loadmodule mod_acymailing,Neue Artikel zum Wochenende}</p>
+		<p>&nbsp;</p>
+		<br style="color: #333333;" />
+		<p>&nbsp;</p>
+		<p>&nbsp;</p>
+		<p>&nbsp;</p>
+		<p>&nbsp;</p>
+		<p>&nbsp;</p>
+	</dd>
+	<dd></dd>
+</dl>
+<p>&nbsp;</p>
