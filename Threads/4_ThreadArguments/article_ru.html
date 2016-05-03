@@ -1,0 +1,126 @@
+<p>Поток получает исходные данные (аргументы) по значению (копируя данные) или по ссылке. По умолчанию, передавайте данные копированием. Почему? Если поток получает данные по ссылке, нужно быть очень осторожным и принимать во внимание время жизни аргументов.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<h2>Аргументы потока</h2>
+<p>Поток - это &nbsp;вариативный шаблон (<a href="https://en.wikipedia.org/wiki/Variadic_template">variadic template</a>), поэтому он может принимать любое количество аргументов.</p>
+<p>Давайте посмотрим на разницу между передачей аргументов по значению и по ссылке:</p>
+<p>&nbsp;</p>
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">std::string s{<span style="color: #a31515;">"C++11"</span>}
+
+std::<span style="color: #0000ff;">thread</span> t([=]{ std::cout &lt;&lt; s &lt;&lt; std::endl;});
+t.join();
+
+std::<span style="color: #0000ff;">thread</span> t2([&amp;]{ std::cout &lt;&lt; s &lt;&lt; std::endl;});
+t2.detach()
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Строго говоря, аргументы получает не поток, а лямбда-функция, но сейчас это не делает разницы. &nbsp;Первый поток - t1 - принимает аругмент по значению (<span style="font-family: courier new,courier;">[=]</span>), а второй поток - &nbsp;t2 - по ссылке (<span style="font-family: courier new,courier;">[&amp;]</span>).</p>
+<p>Какие ошибки могут встретиться в этом коде? Поток t2 получает строку (string) s по ссылке и после этого отсоединяется от родительского потока. С одной стороны время жизни строки привязано к времени жизни вызывающего контекста, а с другой стороны, время жизни глобального объекта std::cout привязано к времени жизни родительского потока - main(). Может случится так, что время жизни строки s или std::cout окажется короче времени жизни потока t2. Теперь мы зашли далеко вглубь области Неопределенного Поведения.&nbsp;</p>
+<p>Не верите? Посмотрим поближе, как может выглядеть Неопределенное Поведение:</p>
+<p>&nbsp;</p>
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">#include &lt;chrono&gt;</span>
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;thread&gt;</span>
+
+<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">Sleeper</span>{
+  public:
+    Sleeper(<span style="color: #2b91af;">int</span>&amp; i_):i{i_}{};
+    <span style="color: #2b91af;">void</span> operator() (<span style="color: #2b91af;">int</span> k){
+      <span style="color: #0000ff;">for</span> (<span style="color: #2b91af;">unsigned</span> <span style="color: #2b91af;">int</span> j= 0; j &lt;= 5; ++j){
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        i += k;
+      }
+      std::cout &lt;&lt; std::this_thread::get_id() &lt;&lt; std::endl;
+    }
+  private:
+    <span style="color: #2b91af;">int</span>&amp; i;
+};
+
+
+<span style="color: #2b91af;">int</span> main(){
+
+  std::cout &lt;&lt; std::endl;
+
+  <span style="color: #2b91af;">int</span> valSleeper= 1000;
+  std::<span style="color: #0000ff;">thread</span> t(Sleeper(valSleeper),5);
+  t.detach();
+  std::cout &lt;&lt; <span style="color: #a31515;">"valSleeper = "</span> &lt;&lt; valSleeper &lt;&lt; std::endl;
+
+  std::cout &lt;&lt; std::endl;
+
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Вопрос - какое значение&nbsp;<span style="font-family: courier new,courier;">valSleeper</span>&nbsp;имеет в строке 27? <span style="font-family: courier new,courier;">valSleeper</span>&nbsp;- глобальная переменная. Поток t получает аргументом функциональный объект типа &nbsp;<span style="font-family: courier new,courier;">Sleeper</span>&nbsp;с переменной&nbsp;<span style="font-family: courier new,courier;">valSleeper</span>&nbsp;и числом 5 (линия 25). Важно заметить, что поток получае &nbsp;<span style="font-family: courier new,courier;">valSleeper</span>&nbsp;по ссылке &nbsp;(линия 7) и отсоедеинится от основного потока (линия 26). Далее он запустит оператор вызова() функтора &nbsp;(линии 8 - 14). В этом методе, поток считает от 0 до 5, и в каждой итерации спит &nbsp;1/10 секунды, увеличивая &nbsp;счетчик i на число k. В завершение он выводит свой ID. Согласно старой немецкой поговорке, <em>по Адаму Ризе</em>, результатом вычисления будет 1000 +&nbsp; 6 * 5 = 1030.</p>
+<p>Но что случилось? Что-то пошло полностью неправильно.</p>
+<p><img src="images/blog/Threads/DatenuebergabeAnThreads/Sleeper.png" alt="Sleeper" style="margin: 15px;" /></p>
+<p>Проблем две - &nbsp;с одной стороны,&nbsp;<span style="font-family: courier new,courier;">valSleeper</span>&nbsp;равен 1000, а &nbsp;ID отсутствует в выводе. Виновато неопределенное поведение. Причина в том, что время жизни основного потока (main) заканчивается прежде чем поток-наследник выполнил вычисления или вывел ID в std::cout.</p>
+<p>В следующем примере основной поток, используя&nbsp;<span style="font-family: 'courier new', courier;">&nbsp;t.join(),&nbsp;</span>&nbsp;ждет пока наследник не сделает свою работу, и мы получаем ожидаемый результат:</p>
+<p>&nbsp;</p>
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #2b91af;">int</span> main(){
+
+  std::cout &lt;&lt; std::endl;
+
+  <span style="color: #2b91af;">int</span> valSleeper= 1000;
+  std::<span style="color: #0000ff;">thread</span> t(Sleeper(valSleeper),5);
+  t.join();
+  std::cout &lt;&lt; <span style="color: #a31515;">"valSleeper = "</span> &lt;&lt; valSleeper &lt;&lt; std::endl;
+
+  std::cout &lt;&lt; std::endl;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p><img src="images/blog/Threads/DatenuebergabeAnThreads/Sleeper2.png" alt="Sleeper2" style="margin: 15px;" /></p>
+<h2>Что дальше?</h2>
+<p>Необходимость задумываться о времени жизни потока далеко не единственная проблема с потоками. Оба потока, и родитель и потомок делят между собой два объекта -&nbsp;<span style="font-family: courier new,courier;">std::cout</span>&nbsp;и переменную&nbsp;<span style="font-family: courier new,courier;">valSleeper.</span> Это классический рецепт для гонки данных, другими словами &nbsp;- для неопределенного поведения. В следующем посте мы поговорим &nbsp;об общих для потоков переменных.</p>
+<p>&nbsp;</p>
+<p>Would you like to have all articles for the weekend? Source included.</p>
+<p>{loadmodule mod_acymailing,Neue Artikel zum Wochenende}</p>
