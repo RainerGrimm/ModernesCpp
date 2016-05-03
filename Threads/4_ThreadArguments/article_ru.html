@@ -1,12 +1,12 @@
-<p>A thread gets his data per copy or per reference. Per default, you should use per copy. Why? In case your thread gets his data per reference, you have to be extremely careful about the lifetime of the arguments.</p>
+<p>Поток получает исходные данные (аргументы) по значению (копируя данные) или по ссылке. По умолчанию, передавайте данные копированием. Почему? Если поток получает данные по ссылке, нужно быть очень осторожным и принимать во внимание время жизни аргументов.</p>
 <hr id="system-readmore" />
 <p>&nbsp;</p>
-<h2>Thread arguments</h2>
-<p>A thread is a <a href="https://en.wikipedia.org/wiki/Variadic_template">variadic template</a>. So he can get an arbitrary number of arguments.&nbsp;</p>
-<p>But now to the difference between getting the argument per copy or per reference.</p>
+<h2>Аргументы потока</h2>
+<p>Поток - это &nbsp;вариативный шаблон (<a href="https://en.wikipedia.org/wiki/Variadic_template">variadic template</a>), поэтому он может принимать любое количество аргументов.</p>
+<p>Давайте посмотрим на разницу между передачей аргументов по значению и по ссылке:</p>
 <p>&nbsp;</p>
 <div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
-	<pre style="margin: 0; line-height: 125%;">std::string s{<span style="color: #a31515;">"C++11"</span>}
+<pre style="margin: 0; line-height: 125%;">std::string s{<span style="color: #a31515;">"C++11"</span>}
 
 std::<span style="color: #0000ff;">thread</span> t([=]{ std::cout &lt;&lt; s &lt;&lt; std::endl;});
 t.join();
@@ -16,16 +16,16 @@ t2.detach()
 </pre>
 </div>
 <p>&nbsp;</p>
-<p>Precisely said, not the thread gets his arguments in this example, but the lambda function. But that makes no difference for my argumentation. So the first Thread t1 gets his data per copy (<span style="font-family: courier new,courier;">[=]</span>), so the second Thread t2 his data per reference (<span style="font-family: courier new,courier;">[&amp;]</span>).</p>
-<p>What dangers are hidden in are this lines? Thread t2 gets his string s per reference and is afterwards detached from the lifetime of his creator. At first, the lifetime of the string is bound to the lifetime of the invocation context, and at second, the lifetime of the global object<span style="font-family: courier new,courier;"> std::cout</span> is bound the lifetime of<span style="font-family: courier new,courier;"> the main </span>thread. So it may happen, that the lifetime of the string s or the lifetime of <span style="font-family: courier new,courier;">std::cout</span> is shorter than the lifetime of the thread t2. Now we are deep in the area of undefined behaviour.</p>
-<p>Not convinced? Let's have a closer look, how undefined behaviour may look like.</p>
+<p>Строго говоря, аргументы получает не поток, а лямбда-функция, но сейчас это не делает разницы. &nbsp;Первый поток - t1 - принимает аругмент по значению (<span style="font-family: courier new,courier;">[=]</span>), а второй поток - &nbsp;t2 - по ссылке (<span style="font-family: courier new,courier;">[&amp;]</span>).</p>
+<p>Какие ошибки могут встретиться в этом коде? Поток t2 получает строку (string) s по ссылке и после этого отсоединяется от родительского потока. С одной стороны время жизни строки привязано к времени жизни вызывающего контекста, а с другой стороны, время жизни глобального объекта std::cout привязано к времени жизни родительского потока - main(). Может случится так, что время жизни строки s или std::cout окажется короче времени жизни потока t2. Теперь мы зашли далеко вглубь области Неопределенного Поведения.&nbsp;</p>
+<p>Не верите? Посмотрим поближе, как может выглядеть Неопределенное Поведение:</p>
 <p>&nbsp;</p>
 <div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
-	<table>
-		<tbody>
-			<tr>
-				<td>
-					<pre style="margin: 0; line-height: 125%;"> 1
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
  2
  3
  4
@@ -56,9 +56,9 @@ t2.detach()
 29
 30
 31</pre>
-				</td>
-				<td>
-					<pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">#include &lt;chrono&gt;</span>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">#include &lt;chrono&gt;</span>
 <span style="color: #0000ff;">#include &lt;iostream&gt;</span>
 <span style="color: #0000ff;">#include &lt;thread&gt;</span>
 
@@ -90,20 +90,20 @@ t2.detach()
 
 }
 </pre>
-				</td>
-			</tr>
-		</tbody>
-	</table>
+</td>
+</tr>
+</tbody>
+</table>
 </div>
 <p>&nbsp;</p>
-<p>The question is. Which value has <span style="font-family: courier new,courier;">valSleeper</span> in line 27? <span style="font-family: courier new,courier;">valSleeper</span> is a global variable. The thread t gets as work package a function objekt of type <span style="font-family: courier new,courier;">Sleeper</span> together with the variable <span style="font-family: courier new,courier;">valSleeper</span> and the number 5 (line 25). The crucial observation is, that the thread gets <span style="font-family: courier new,courier;">valSleeper</span> by reference (line 7) and will be detached from the lifetime of the main thread (line 26). Then he will execute the call operator of the function object (line 8 - 14). In this method, he counts from 0 to 5, sleeps in each iteration 1/10 of a second and increments i by k. At the end, he displays his ID on the screen. After Adam Riese (a German proverb), the result must be 1000 +&nbsp; 6 * 5 = 1030.</p>
-<p>But, what happened. Something is going totally wrong.&nbsp;</p>
+<p>Вопрос - какое значение&nbsp;<span style="font-family: courier new,courier;">valSleeper</span>&nbsp;имеет в строке 27? <span style="font-family: courier new,courier;">valSleeper</span>&nbsp;- глобальная переменная. Поток t получает аргументом функциональный объект типа &nbsp;<span style="font-family: courier new,courier;">Sleeper</span>&nbsp;с переменной&nbsp;<span style="font-family: courier new,courier;">valSleeper</span>&nbsp;и числом 5 (линия 25). Важно заметить, что поток получае &nbsp;<span style="font-family: courier new,courier;">valSleeper</span>&nbsp;по ссылке &nbsp;(линия 7) и отсоедеинится от основного потока (линия 26). Далее он запустит оператор вызова() функтора &nbsp;(линии 8 - 14). В этом методе, поток считает от 0 до 5, и в каждой итерации спит &nbsp;1/10 секунды, увеличивая &nbsp;счетчик i на число k. В завершение он выводит свой ID. Согласно старой немецкой поговорке, <em>по Адаму Ризе</em>, результатом вычисления будет 1000 +&nbsp; 6 * 5 = 1030.</p>
+<p>Но что случилось? Что-то пошло полностью неправильно.</p>
 <p><img src="images/blog/Threads/DatenuebergabeAnThreads/Sleeper.png" alt="Sleeper" style="margin: 15px;" /></p>
-<p>There are two issues. At the one hand, <span style="font-family: courier new,courier;">valSleeper</span> is 1000, at the other hand, the ID is missing on the console. So, that is undefined behaviour. The reason is, that the lifetime of the main thread ends, before the child thread has performed his calculation or written his ID to <span style="font-family: courier new,courier;">std::cout</span>.</p>
-<p>In case, the main thread waits via<span style="font-family: courier new,courier;"> t.join()</span> until this child thread is done with his work, we get the expected result.</p>
+<p>Проблем две - &nbsp;с одной стороны,&nbsp;<span style="font-family: courier new,courier;">valSleeper</span>&nbsp;равен 1000, а &nbsp;ID отсутствует в выводе. Виновато неопределенное поведение. Причина в том, что время жизни основного потока (main) заканчивается прежде чем поток-наследник выполнил вычисления или вывел ID в std::cout.</p>
+<p>В следующем примере основной поток, используя&nbsp;<span style="font-family: 'courier new', courier;">&nbsp;t.join(),&nbsp;</span>&nbsp;ждет пока наследник не сделает свою работу, и мы получаем ожидаемый результат:</p>
 <p>&nbsp;</p>
 <div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
-	<pre style="margin: 0; line-height: 125%;"><span style="color: #2b91af;">int</span> main(){
+<pre style="margin: 0; line-height: 125%;"><span style="color: #2b91af;">int</span> main(){
 
   std::cout &lt;&lt; std::endl;
 
@@ -119,8 +119,8 @@ t2.detach()
 </div>
 <p>&nbsp;</p>
 <p><img src="images/blog/Threads/DatenuebergabeAnThreads/Sleeper2.png" alt="Sleeper2" style="margin: 15px;" /></p>
-<h2>What's next?</h2>
-<p>Thinking about the lifetime of the threads is by far not the only issue with threads. Both threads, the main thread and the child thread share two objects. That is <span style="font-family: courier new,courier;">std::cout</span> and the variable <span style="font-family: courier new,courier;">valSleeper.</span> Now, I described the classical recipe for a data race or - to say it differently -for undefined beha<span id="transmark"></span>viour. In the next post I deal with shared variables between threads.</p>
+<h2>Что дальше?</h2>
+<p>Необходимость задумываться о времени жизни потока далеко не единственная проблема с потоками. Оба потока, и родитель и потомок делят между собой два объекта -&nbsp;<span style="font-family: courier new,courier;">std::cout</span>&nbsp;и переменную&nbsp;<span style="font-family: courier new,courier;">valSleeper.</span> Это классический рецепт для гонки данных, другими словами &nbsp;- для неопределенного поведения. В следующем посте мы поговорим &nbsp;об общих для потоков переменных.</p>
 <p>&nbsp;</p>
 <p>Would you like to have all articles for the weekend? Source included.</p>
 <p>{loadmodule mod_acymailing,Neue Artikel zum Wochenende}</p>
