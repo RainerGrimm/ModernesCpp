@@ -1,0 +1,359 @@
+<p>In case the data is not modified, that is been shared between threads, the story is simple. The data has only to be initialized in the thread safe way. <strong>It is not necessary to use an expensive lock for each access.</strong></p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p>There are three ways in C++, to ensure, that the data is initialized in a thread safe way.</p>
+<ol>
+    <li>Constant expressions</li>
+    <li>The function<span style="font-family: courier new,courier;"> std::call_once</span> in combination with the flag <span style="font-family: courier new,courier;">std::once_flag</span></li>
+    <li>Static variables with block scope</li>
+</ol>
+<h2>Constant expressions<span id="transmark"></span></h2>
+<p>Constant expressions are expressions, which the compiler can initialize during compile time. So, they are implicit thread safe. By using the key word <span style="font-family: courier new,courier;">constexpr</span> in front of the type, the expressions becomes a constant expression.</p>
+<p>constexpr <span style="color: #2b91af;">double</span> pi=3.14;&nbsp;</p>
+<p>In addition to that, user defined types can also be constant expressions. For those types, there are a few restrictions in order to initialize them at compile time.</p>
+<ul>
+    <li>They must not have virtual methods or a virtual base class.</li>
+    <li>The constructor must be empty and itself a constant expression.</li>
+    <li>The methods, which should be callable at compile time, must be constant expressions.</li>
+</ul>
+<p>My type <span style="font-family: courier new,courier;">MyDouble</span> satisfies all requirements. So it is possible, to instantiate objects of <span style="font-family: courier new,courier;">MyDouble</span> at compile time. This instantiation is thread safe.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+    <pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">struct</span> MyDouble{
+  constexpr MyDouble(<span style="color: #2b91af;">double</span> v): val(v){}
+  constexpr <span style="color: #2b91af;">double</span> getValue(){ <span style="color: #0000ff;">return</span> val; }
+private:
+  <span style="color: #2b91af;">double</span> val
+};
+
+constexpr MyDouble myDouble(10.5);
+std::cout &lt;&lt; myDouble.getValue() &lt;&lt; std::endl;
+</pre>
+</div>
+<h2>The function <span style="font-family: courier new,courier;">call_once</span> in combination with the <span style="font-family: courier new,courier;">once_flag</span></h2>
+<p>By using the <span style="font-family: courier new,courier;">std::call_once</span> function, you can register all callable. The<span style="font-family: courier new,courier;"> std::once_flag</span> ensures, that only one registered function will be invoked. So, you can register more different functions via the <span style="font-family: courier new,courier;">once_flag</span>. Only one function is called.</p>
+<p>The short example shows&nbsp; the application of <span style="font-family: courier new,courier;">std::call_once</span> and <span style="font-family: courier new,courier;">std::once_flag.</span></p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+    <table>
+        <tbody>
+            <tr>
+                <td>
+                    <pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29</pre>
+                </td>
+                <td>
+                    <pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// callOnce.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;thread&gt;</span>
+<span style="color: #0000ff;">#include &lt;mutex&gt;</span>
+ 
+std::once_flag onceFlag;
+ 
+<span style="color: #2b91af;">void</span> do_once(){
+  std::call_once(onceFlag, [](){ std::cout &lt;&lt; <span style="color: #a31515;">"Only once."</span> &lt;&lt; std::endl; });
+}
+ 
+<span style="color: #2b91af;">int</span> main(){
+  
+  std::cout &lt;&lt; std::endl;
+  
+  std::<span style="color: #0000ff;">thread</span> t1(do_once);
+  std::<span style="color: #0000ff;">thread</span> t2(do_once);
+  std::<span style="color: #0000ff;">thread</span> t3(do_once);
+  std::<span style="color: #0000ff;">thread</span> t4(do_once);
+ 
+  t1.join();
+  t2.join();
+  t3.join();
+  t4.join();
+  
+  std::cout &lt;&lt; std::endl;
+
+}
+</pre>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+<p>&nbsp;</p>
+<p>The program starts four threads (line 17 - 20). Each of the threads should invoke the function <span style="font-family: courier new,courier;">do_once</span>. The expected result is, that the string "only once" is displayed only once.</p>
+<p><span style="color: #ff0000;"><img src="images/blog/Threads/SicheresInitialisierenDerDaten/callOnce.png" alt="callOnce" /><br /></span></p>
+<p>The <a href="https://de.wikipedia.org/wiki/Singleton_(Entwurfsmuster)">singleton pattern </a>is legendary. It guarantees, that only one instance of an object will be created. That is a challenging task in multithreading environment. But because of <span style="font-family: courier new,courier;">std:.call_once </span>and <span style="font-family: courier new,courier;">std:once_flag</span> the job is a piece of cake. Now the singleton is initialized in a thread safe way.&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+    <table>
+        <tbody>
+            <tr>
+                <td>
+                    <pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41</pre>
+                </td>
+                <td>
+                    <pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// singletonCallOnce.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;mutex&gt;</span>
+
+<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">MySingleton</span>{
+
+  private:
+    <span style="color: #0000ff;">static</span> std::once_flag initInstanceFlag;
+    <span style="color: #0000ff;">static</span> MySingleton* instance;
+    MySingleton()= <span style="color: #0000ff;">default</span>;
+    ~MySingleton()= <span style="color: #0000ff;">default</span>;
+
+  public:
+    MySingleton(<span style="color: #0000ff;">const</span> MySingleton&amp;)= <span style="color: #0000ff;">delete</span>;
+    MySingleton&amp; <span style="color: #0000ff;">operator</span>=(<span style="color: #0000ff;">const</span> MySingleton&amp;)= <span style="color: #0000ff;">delete</span>;
+
+    <span style="color: #0000ff;">static</span> MySingleton* getInstance(){
+      std::call_once(initInstanceFlag,MySingleton::initSingleton);
+      <span style="color: #0000ff;">return</span> instance;
+    }
+
+    <span style="color: #0000ff;">static</span> <span style="color: #2b91af;">void</span> initSingleton(){
+      instance= <span style="color: #0000ff;">new</span> MySingleton();
+    }
+};
+
+MySingleton* MySingleton::instance= nullptr;
+std::once_flag MySingleton::initInstanceFlag;
+
+
+<span style="color: #2b91af;">int</span> main(){
+
+  std::cout &lt;&lt; std::endl;
+
+  std::cout &lt;&lt; <span style="color: #a31515;">"MySingleton::getInstance(): "</span>&lt;&lt; MySingleton::getInstance() &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"MySingleton::getInstance(): "</span>&lt;&lt; MySingleton::getInstance() &lt;&lt; std::endl;
+
+  std::cout &lt;&lt; std::endl;
+
+}
+</pre>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+<p>&nbsp;</p>
+<p>At first the static<span style="font-family: courier new,courier;"> std::once_fla</span>g. This is in the line 9 declared and initialized in the line 29. The static method<span style="font-family: courier new,courier;"> getInstance</span> (line 28 - 21) uses the flag in order to ensures, that the static method<span style="font-family: courier new,courier;"> initSingleton</span> (line 23 - 25) is executed exactly once. In the body of the method, the singleton is created.</p>
+<p>The output of the program is not so thrilling. The <span style="font-family: courier new,courier;">MySingleton::getIstance() </span>method displays the address of the singleton.</p>
+<p><span style="color: #ff0000;"><img src="images/blog/Threads/SicheresInitialisierenDerDaten/singletonCallOnce.png" alt="singletonCallOnce" /><br /></span></p>
+<p>The static story goes on.</p>
+<h2>Static variables with block scope</h2>
+<p>Static variables with block scope will be created exactly once. This characteristic is the base of the so called Meyers Singleton, named after <a href="https://en.wikipedia.org/wiki/Scott_Meyers">Scott Meyers.&nbsp;</a> This is by far the most elegant implementation of the singleton pattern.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+    <pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">#include &lt;thread&gt;</span>
+
+<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">MySingleton</span>{
+public:
+  <span style="color: #0000ff;">static</span> MySingleton&amp; getInstance(){
+    <span style="color: #0000ff;">static</span> MySingleton instance;
+    <span style="color: #0000ff;">return</span> instance;
+  }
+private:
+  MySingleton();
+  ~MySingleton();
+  MySingleton(<span style="color: #0000ff;">const</span> MySingleton&amp;)= <span style="color: #0000ff;">delete</span>;
+  MySingleton&amp; <span style="color: #0000ff;">operator</span>=(<span style="color: #0000ff;">const</span> MySingleton&amp;)= <span style="color: #0000ff;">delete</span>;
+
+};
+
+MySingleton::MySingleton()= <span style="color: #0000ff;">default</span>;
+MySingleton::~MySingleton()= <span style="color: #0000ff;">default</span>;
+
+<span style="color: #2b91af;">int</span> main(){
+
+  MySingleton::getInstance();
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>By using the keyword <span style="font-family: courier new,courier;">default,</span> you can request special methods from the compiler. Special methods, because these methods can be created by the compiler. With <span style="font-family: courier new,courier;">delete,</span> the result is, that the automatically generated methods from the compiler can not be used. So you get an error during compile time. What's the story of the meyers singleton in multithreading programs? The meyers singleton is thread safe.</p>
+<h2>A side note: Double-checked locking pattern</h2>
+<p>Who believes, an additional way for the thread safe initialization of a singleton in a multithreading environment is the double-checked locking pattern, is wrong. The double-checked locking pattern is in general no safe way to initialize a singleton. It assumes guarantees in the classical implementation, which aren't be given by the Java, C# or C++ memory model. The assumption is, that the access of the singleton is atomic.</p>
+<p>But, what is the double-checked locking pattern? The first idea to implement the singleton pattern in a thread safe way, is it, to protected the initialization of the singleton by a lock.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+    <table>
+        <tbody>
+            <tr>
+                <td>
+                    <pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19</pre>
+                </td>
+                <td>
+                    <pre style="margin: 0; line-height: 125%;">mutex myMutex;
+
+<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">MySingleton</span>{
+public:  
+  <span style="color: #0000ff;">static</span> MySingleton&amp; getInstance(){    
+    lock_guard&lt;mutex&gt; myLock(myMutex);      
+    <span style="color: #0000ff;">if</span>( !instance ) instance= <span style="color: #0000ff;">new</span> MySingleton();    
+    <span style="color: #0000ff;">return</span> *instance;  
+  }
+private:  
+  MySingleton();  
+  ~MySingleton();  
+  MySingleton(<span style="color: #0000ff;">const</span> MySingleton&amp;)= <span style="color: #0000ff;">delete</span>;  
+  MySingleton&amp; <span style="color: #0000ff;">operator</span>=(<span style="color: #0000ff;">const</span> MySingleton&amp;)= <span style="color: #0000ff;">delete</span>;
+  <span style="color: #0000ff;">static</span> MySingleton* instance;
+};
+MySingleton::MySingleton()= <span style="color: #0000ff;">default</span>;
+MySingleton::~MySingleton()= <span style="color: #0000ff;">default</span>;
+MySingleton* MySingleton::instance= nullptr;
+</pre>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+<p>&nbsp;</p>
+<p>Any issues? Yes and no. The implementation is thread safe. But there is a great performance penalty. Each access of the singleton in line 6 is protected by an expansive lock. That applies also for the reading access. The most time, that is not necessary. Here comes the double-checked locking pattern to our rescue.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+    <table>
+        <tbody>
+            <tr>
+                <td>
+                    <pre style="margin: 0; line-height: 125%;">1
+2
+3
+4
+5
+6
+7</pre>
+                </td>
+                <td>
+                    <pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">static</span> MySingleton&amp; getInstance(){    
+  <span style="color: #0000ff;">if</span> ( !instance ){      
+    lock_guard&lt;mutex&gt; myLock(myMutex);      
+    <span style="color: #0000ff;">if</span>( !instance ) instance= <span style="color: #0000ff;">new</span> MySingleton();    
+    <span style="color: #0000ff;">return</span> *instance;  
+  }
+}
+</pre>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+<p>&nbsp;</p>
+<p>I use In the line 2 instead of an expensive lock a inexpensive pointer comparison. Only in case I get a null pointer, I apply the expensive lock on the singleton (line 3). Because there is the possibility, that another thread can initialize the singleton between the pointer comparison (line 2) and the lock (line3), I have to perform an additional pointer comparison the tine line 4. So the name is clear. Two times a check and one time a lock.</p>
+<p>Smart? Yes. Thread safe? No.</p>
+<p>What is the problem? The call instance= new MySingleton() in line 4 consists of at least three steps.</p>
+<ol>
+    <li>Allocate memory for <span style="font-family: courier new,courier;">MySingleton</span></li>
+    <li>Create the <span style="font-family: courier new,courier;">MySingleton</span> object in the memory</li>
+    <li>Let <span style="font-family: courier new,courier;">instance</span> refer to the <span style="font-family: courier new,courier;">MySingleton</span> object</li>
+</ol>
+<p>The problem is. There is no guarantee about exactly that sequence of steps. For example, out of optimization reasons, the processor can reorder the steps to the sequence 1,3 and 2. So, in the first step the memory will be allocated and in the second step, instance refers to an incomplete singleton. If at that point in time another thread tries to access the singleton, it compares the pointer and gets the answer <span style="font-family: courier new,courier;">true</span>. So, the other thread has the illusion, that it is dealing with a complete singleton.</p>
+<p>The consequence is simple. The program behaviour is undefined.</p>
+<h2>What's next?</h2>
+<p>To initialize a singleton in a thread safe way, there are a lot of variations. From the conceptual view, there are three kinds of classes.</p>
+<ol>
+    <li>Guarantees by the C++11 standard.</li>
+    <li>Locks</li>
+    <li>Atomic operations</li>
+</ol>
+<p>So, the question is. Which strategy is the best? I have no answer, but I can help to find the answer. I present in the next post a few variations, how you can initialize a singleton in a thread safe way. Aside of that, I'm very interested about the performance implications.&nbsp;</p>
+<h3>Disclaimer</h3>
+<p>I know, it will not help. But at least, I try it. I'm not encouraging you to use the singleton pattern. The singleton pattern is from my perspective the classical use case for the thread safe initialization of an object, which can after the initialization be used without protection.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>Do you want to get the source code? <a href="index.php/source-code-repository">Source code repository</a></p>
+<p>Would you like to have all articles for the weekend?&nbsp;
+    <a href="index.php/source-code-repository"></a>
+</p>
+<p>{loadmodule mod_acymailing,Neue Artikel zum Wochenende}</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
