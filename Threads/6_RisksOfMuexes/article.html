@@ -1,45 +1,35 @@
-<p>The usage of mutexes sound extremely simple. There is a critical region in the code, which can only be entered by at most one thread at one time. This is ensured by a mutex <span style="font-family: courier new,courier;">m</span>. The calls <span style="font-family: courier new,courier;">m.lock()</span> and <span style="font-family: courier new,courier;">m.unlock()</span> guarantees this exclusivity. But, the devil is in the details.</p>
+<p>Usage of mutexes seems extremely simple. There is a critical section in the code, which can only be accessed by a single thread at any point &nbsp;of time. It's ensured by a mutex <span style="font-family: courier new,courier;">m</span>. The calls <span style="font-family: courier new,courier;">m.lock()</span> and <span style="font-family: courier new,courier;">m.unlock()</span> guarantee this exclusivity. But, the devil is in the details.</p>
 <hr id="system-readmore" />
 <h2>Deadlock</h2>
-<p>The different names for deadlocks are frightening. Some call them deadly embrace or kiss of death. But wait, what is a deadlock?</p>
-<dl>
-	<dt>Deadlock</dt>
-	<dd>&nbsp;&nbsp;&nbsp;A deadlock is a state, in which at least two threads are blocked, because each thread is waiting for the release of a resource of the other thread, before it releases its own resource.</dd>
-	<dd></dd>
-	<dd></dd>
-	<dd></dd>
-	<dd></dd>
-	<dd>
-		<p>The result of a deadlock is total standstill. The Thread and usually the whole program is <strong>blocked forever</strong>. It is easy to produce a deadlock. Curious?</p>
-		<h3>Exceptions and unknown code</h3>
-		<!-- HTML generated using hilite.me -->
-		<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
-			<pre style="margin: 0; line-height: 125%;">std::mutex m;
+<p>The different names for deadlocks are frightening. Some call them deadly embrace &nbsp;(hug of death :-)? or kiss of death. But wait, what is a deadlock?</p>
+<dl><dt>Deadlock</dt><dd>&nbsp;&nbsp;&nbsp;A deadlock is a state, in which at least two threads are blocked, because each thread is waiting for release of some resource with which other thread works, before it releases its own resource.</dd><dd></dd><dd></dd><dd></dd><dd></dd><dd>
+<p>The result of a deadlock is total standstill. The Thread and usually the whole program is <strong>blocked forever</strong>. It is easy to produce a deadlock. Curious?</p>
+<h3>Exceptions and unknown code</h3>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">std::mutex m;
 m.lock();
 sharedVariable= getVar();
 m.unlock();
 </pre>
-		</div>
-		<p>&nbsp;</p>
-		<p>In case the unknown code in the function<span style="font-family: courier new,courier;"> getVar()</span> throws an exception,&nbsp;<span style="font-family: courier new,courier;">m.unlock()</span> will not be performed. Each try, to ask for the mutex <span style="font-family: courier new,courier;">m</span>, will fail. The program will block in this case forever. But, that is not the only issue with that piece of code. It calls the unknown functio<span style="font-family: courier new,courier;">n get.Var()</span>, while <span style="font-family: courier new,courier;">m.lock()</span> is active. So, what will happen, if the function <span style="font-family: courier new,courier;">getVar()</span> tries to get the same lock? Of course, you know it. A deadlock.</p>
-		<p>Do you want to have a more visual example?</p>
-		<h3>Lock mutexes in different order</h3>
-	</dd>
-	<dd></dd>
-	<dd></dd>
-</dl>
+</div>
+<p>&nbsp;</p>
+<p>In case the unknown code in the function<span style="font-family: courier new,courier;"> getVar()</span> throws an exception,&nbsp;<span style="font-family: courier new,courier;">m.unlock()</span> will not be called. Every attempt to to ask for the mutex <span style="font-family: courier new,courier;">m</span>&nbsp;will fail and&nbsp;the program will block. Forever. But that is not the only issue with that piece of code. It calls some (unknown to us) function<span style="font-family: courier new,courier;">&nbsp;get.Var()</span>, while <span style="font-family: courier new,courier;">m.lock()</span> is active. What will happen if the function <span style="font-family: courier new,courier;">getVar()</span> tries to get the same lock? Of course, you know it. A deadlock.</p>
+<p>Do you want to have a more visual example?</p>
+<h3>Lock mutexes in different order</h3>
+</dd><dd></dd><dd></dd></dl>
 <p><img src="images/blog/Threads/GefahrenVonMutexen/Deadlock.png" alt="Deadlock" width="600" height="417" /></p>
 <p>&nbsp;</p>
-<p>Thread 1 und thread 2 needs access to two resources in order to finish their work. Unfortunately, they ask for the resources, which are protected by two mutexes in different order. In case the thread executions will interleave in such a way, that thread 1 gets mutex 1, then thread 2 gets mutex 2, we have a standstill. Each thread wants to get the other mutex. For this, it has to wait for the release of the resource.</p>
+<p>Thread 1 and Thread 2 needs access to two resources in order to finish their work. Unfortunately, they ask for the resources, which are protected by two mutexes in different order. In case the thread executions will interleave in such a way, that thread 1 gets mutex 1, then thread 2 gets mutex 2, we have a standstill. Each thread wants to get the other mutex. For this, it has to wait for the release of the resource.</p>
 <p>&nbsp;</p>
 <p>It's easy to express the picture in code.</p>
 <!-- HTML generated using hilite.me -->
 <div style="background: #ffffff; overflow: auto; width: auto; border-width: .1em .1em .1em .8em; padding: .2em .6em;">
-	<table>
-		<tbody>
-			<tr>
-				<td>
-					<pre style="margin: 0; line-height: 125%;"> 1
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
  2
  3
  4
@@ -75,9 +65,9 @@ m.unlock();
 34
 35
 36</pre>
-				</td>
-				<td>
-					<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// deadlock.cpp</span>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// deadlock.cpp</span>
 
 <span style="color: #0000ff;">#include &lt;iostream&gt;</span>
 <span style="color: #0000ff;">#include &lt;chrono&gt;</span>
@@ -114,18 +104,18 @@ m.unlock();
 
 }
 </pre>
-				</td>
-			</tr>
-		</tbody>
-	</table>
+</td>
+</tr>
+</tbody>
+</table>
 </div>
 <p>&nbsp;</p>
-<p>Thread<span style="font-family: courier new,courier;"> t1</span> and thread <span style="font-family: courier new,courier;">t2</span> call the function <span style="font-family: courier new,courier;">deadlock</span> (line 12 - 20). To process <span style="font-family: courier new,courier;">deadlock</span>, both functions needs the data Critical data<span style="font-family: courier new,courier;"> c1</span> and <span style="font-family: courier new,courier;">c2</span> (line 27 and 28). Because the objects<span style="font-family: courier new,courier;"> c1</span> and <span style="font-family: courier new,courier;">c2</span> must be protected from shared access, the objects have a mutex. Only due to the simplicity, <span style="font-family: courier new,courier;">c1</span> and <span style="font-family: courier new,courier;">c2</span> doesn't have a functionality.</p>
-<p>Only a sleep about 1 Millisecond in line 16<span style="font-family: courier new,courier;"></span>,<span id="transmark"></span> and we have the deadlock.<span style="font-family: arial,helvetica,sans-serif;"></span><br />&nbsp;</p>
+<p>Thread<span style="font-family: courier new,courier;"> t1</span> and thread <span style="font-family: courier new,courier;">t2</span> call the function <span style="font-family: courier new,courier;">deadlock</span> (line 12 - 20). To process <span style="font-family: courier new,courier;">deadlock</span>, both functions need the &nbsp;<span style="font-family: 'courier new', courier;">CriticalData</span><span style="font-family: courier new,courier;"> c1</span> and <span style="font-family: courier new,courier;">c2</span> (line 27 and 28). Because the objects<span style="font-family: courier new,courier;"> c1</span> and <span style="font-family: courier new,courier;">c2</span> must be protected from shared access, they &nbsp;have a mutex (to keep this example code short and simple <span style="font-family: 'courier new', courier;">CriticalData&nbsp;</span>doesn't have any other methods or members apart from mutex)</p>
+<p>Only a sleep about 1 Millisecond in line 16,<span id="transmark"></span> and we have the deadlock.<span style="font-family: arial,helvetica,sans-serif;"></span><br />&nbsp;</p>
 <p><img src="images/blog/Threads/GefahrenVonMutexen/deadlockCode.png" alt="deadlockCode" /></p>
-<p>The only choice now is the press CTRL C to kill the process.</p>
+<p>The only choice now is the press CTRL+C to kill the process.</p>
 <h2>What's next?</h2>
-<p>Honestly, the example will not boost your confidence in writing multithreading programs. Additionally, the complexity will increase to the power of 2 which each new mutex. The solution to the problem are locks, which will encapsulate mutexes in a safely way.</p>
+<p>Honestly, the example will not boost your confidence in writing multithreading programs. Additionally, the complexity will increase to the power of 2 which each new mutex. The solution to the problem are locks, because they encapsulate mutexes in a safe manner.</p>
 <p>&nbsp;</p>
 <p>&nbsp;</p>
 <p>&nbsp;</p>
