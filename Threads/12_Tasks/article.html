@@ -1,0 +1,40 @@
+<p>Tasks were one of the last addition to the C++11 standard. They give you a better abstraction than threads. In the general case, they should be your first choice.&nbsp;</p>
+<hr id="system-readmore" />
+<h2><span style="font-family: arial,helvetica,sans-serif;">&nbsp;Tasks as data channels<br /></span></h2>
+<p><img src="images/blog/Threads/Tasks/tasksEng.png" alt="tasksEng" width="600" height="269" style="margin: 15px;" /></p>
+<p>Tasks behave like data channels. On one side, the sender sets a value. On the other side, the receiver picks up the value. The sender is called promise, the receiver future. Or to say it in different word. The sender promise to provide a value, which the receiver can pick up in the future.</p>
+<p>A few more details. The sender can provide the value for more than one future. Beside of a value, the sender can also provide a notification or an exception. The get call of the future blocks. That means. In case the future calls wait, it must wait until the promise puts the value into the channel. Tasks are available in three variations. As asynchronous function call with<span style="font-family: courier new,courier;"> std::async</span>, as simple wrapper for a callable with <span style="font-family: courier new,courier;">std::packaged_task</span> and as the explicit pair <span style="font-family: courier new,courier;">std::promise</span> and <span style="font-family: courier new,courier;">std::future</span>.</p>
+<p>The best way to get the differences between threads and tasks, is, to compare them.</p>
+<h2>Threads versus Tasks</h2>
+<p>The small code piece should be our illustrative example.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+	<pre style="margin: 0; line-height: 125%;"><span style="color: #2b91af;">int</span> res;
+std::<span style="color: #0000ff;">thread</span> t([&amp;]{res= 3+4;});
+t.join();
+std::cout &lt;&lt; res &lt;&lt; std:::endl;
+
+<span style="color: #0000ff;">auto</span> fut=std::async([]{<span style="color: #0000ff;">return</span> 3+4;});
+std::cout &lt;&lt; fut.get() &lt;&lt; std::endl;
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Both the child thread and the promise calculate the sum of 3+4 and returns the result. The call<span style="font-family: courier new,courier;"> std::async</span> generates a data channel with the both endpoint's <span style="font-family: courier new,courier;">fut</span> and std::<span style="font-family: courier new,courier;">async.</span> <span style="font-family: courier new,courier;">fut</span> is the future, std::async the promise. The future gets the value with the call fut.get. This value is produced by the promise. The future can act at a later point in time.</p>
+<p>What are the differences?</p>
+<p><img src="images/blog/Threads/Tasks/TaskThreadCompareEng.png" alt="TaskThreadCompareEng" width="600" height="321" style="margin: 15px;" /></p>
+<p>At first, the thread need the header <span style="font-family: courier new,courier;">&lt;thread&gt;</span>, the task the header <span style="font-family: courier new,courier;">&lt;future&gt;</span>. The participants of the threads are the creator and the child thread, of the task the promise and the future. The shared variable <span style="font-family: courier new,courier;">r</span>es is the mean for the child to transfer the result of the calculation to the creator. In opposite to that, promise and future use a common data channel. The call <span style="font-family: courier new,courier;">std::async</span> creates the data channel.<span style="font-family: courier new,courier;"> </span>By <span style="font-family: courier new,courier;">fut.get</span> the future gets the result. In case of the threads you have to protect the shared variable with a lock. But there is implicit no possibility of a <a href="index.php?option=com_content&amp;view=article&amp;id=157:threads-sharing-data&amp;catid=35:c&amp;Itemid=239#RaceCondition">race condition </a>for the promise and the future. The creator of the threads waits with its<span style="font-family: courier new,courier;"> t.join</span> call, until its child is done. On the other side, the <span style="font-family: courier new,courier;">fut.get</span> call is blocks<span id="transmark"></span>. In case there is an exception in the child thread, the child thread and the creator thread terminates. So at the end the whole program terminates. The promise can deliver an exception to the future. The future has to handle the exception. While the child thread is only able to provide values for the creator thread, the promise is able to send values, exceptions and notifications to the associated future.&nbsp;</p>
+<p>One point is key for the difference of threads versus tasks and emphasises the higher abstraction of tasks. A task will not automatically generate a thread. To be precise. The C++ runtime decides on there one, if a thread should be created. Basis for the decision may be. How difficult is the work package? How many cores are available? How is the load of the system?</p>
+<h2>What's next?</h2>
+<p>So, that was the fundament for the next posts about task. The next one is about <span style="font-family: courier new,courier;">std::async.</span><a href="index.php/blog/asynchrone-funktionsaufrufe"><span style="font-family: courier new,courier;"></span></a></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>Do you want to get the source code? <a href="index.php/source-code-repository">Source code repository</a></p>
+<p>Would you like to have all posts for the weekend?&nbsp;
+	<a href="index.php/source-code-repository"></a>
+</p>
+<p>{loadmodule mod_acymailing,Neue Artikel zum Wochenende}</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
