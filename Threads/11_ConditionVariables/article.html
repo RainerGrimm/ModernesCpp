@@ -1,0 +1,237 @@
+<p>Condition variables enables it, to synchronize threads via notifications. So, you can implement workflows like sender/receiver or producer/consumer. In such a workflow, the receiver is waiting for the notification of the sender. In case the receiver gets the notification, it continues its work.</p>
+<hr id="system-readmore" />
+<h2>std::condition_variable</h2>
+<p>The condition variable can fulfil the role of a sender or a receiver. As a sender, it can notify one or more receivers.</p>
+<p>That's all you have to know to use condition variables.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+	<table>
+		<tbody>
+			<tr>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41</pre>
+				</td>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// conditionVariable.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;condition_variable&gt;</span>
+<span style="color: #0000ff;">#include &lt;mutex&gt;</span>
+<span style="color: #0000ff;">#include &lt;thread&gt;</span>
+
+std::mutex mutex_;
+std::condition_variable condVar;
+
+<span style="color: #2b91af;">void</span> doTheWork(){
+  std::cout &lt;&lt; <span style="color: #a31515;">"Processing shared data."</span> &lt;&lt; std::endl;
+}
+
+<span style="color: #2b91af;">void</span> waitingForWork(){
+    std::cout &lt;&lt; <span style="color: #a31515;">"Worker: Waiting for work."</span> &lt;&lt; std::endl;
+
+    std::unique_lock&lt;std::mutex&gt; lck(mutex_);
+    condVar.wait(lck);
+    doTheWork();
+    std::cout &lt;&lt; <span style="color: #a31515;">"Work done."</span> &lt;&lt; std::endl;
+}
+
+<span style="color: #2b91af;">void</span> setDataReady(){
+    std::cout &lt;&lt; <span style="color: #a31515;">"Sender: Data is ready."</span>  &lt;&lt; std::endl;
+    condVar.notify_one();
+}
+
+<span style="color: #2b91af;">int</span> main(){
+
+  std::cout &lt;&lt; std::endl;
+
+  std::<span style="color: #0000ff;">thread</span> t1(waitingForWork);
+  std::<span style="color: #0000ff;">thread</span> t2(setDataReady);
+
+  t1.join();
+  t2.join();
+
+  std::cout &lt;&lt; std::endl;
+  
+}
+</pre>
+				</td>
+			</tr>
+		</tbody>
+	</table>
+</div>
+<p>&nbsp;</p>
+<p>The program has two child threads<span style="font-family: courier new,courier;"> t1</span> and <span style="font-family: courier new,courier;">t2</span>. They get their work package <span style="font-family: courier new,courier;">waitingForWork</span> and <span style="font-family: courier new,courier;">setDataReady</span> in line 33 and 34. The function <span style="font-family: courier new,courier;">setDataReady</span> notifies by the condition variable <span style="font-family: courier new,courier;">condVar,</span> that it is done with the preparation of the work: <span style="font-family: courier new,courier;">condVar.notify_one()</span>. While holding the lock, thread <span style="font-family: courier new,courier;">t2</span> is waiting for its notification: <span style="font-family: courier new,courier;">condVar.wait(lck)</span>. The waiting thread is always performing the same steps. It wakes up, tries to get the lock, checks, while it is holding the lock, if the notifications arrived and puts himself in case of failure back to sleep. In case of success, the thread leaves the endless loop and continues with its work.</p>
+<p>&nbsp;</p>
+<p>The output of the program is not so thrilling. That was my first impression. But wait.&nbsp;</p>
+<h2><img src="images/blog/Threads/Bedingungsvariablen/conditionVariable.png" alt="conditionVariable" /><span id="transmark"></span></h2>
+<h2>Spurious wakeup</h2>
+<p>The devil is in the detail. In fact, it can happen, that the&nbsp;receiver finished its work package before the sender has sent its notification. How is that possible? The receiver is susceptible for spurious wakeups. So the receiver wakes up, although no notification happens. To protect himself of these phenomena, I have to add a predicate to the <span style="font-family: courier new,courier;">wait</span> method. That have I exactly done in the next example</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+	<table>
+		<tbody>
+			<tr>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45</pre>
+				</td>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// conditionVariableFixed.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;condition_variable&gt;</span>
+<span style="color: #0000ff;">#include &lt;mutex&gt;</span>
+<span style="color: #0000ff;">#include &lt;thread&gt;</span>
+
+std::mutex mutex_;
+std::condition_variable condVar;
+
+<span style="color: #2b91af;">bool</span> dataReady;
+
+<span style="color: #2b91af;">void</span> doTheWork(){
+  std::cout &lt;&lt; <span style="color: #a31515;">"Processing shared data."</span> &lt;&lt; std::endl;
+}
+
+<span style="color: #2b91af;">void</span> waitingForWork(){
+    std::cout &lt;&lt; <span style="color: #a31515;">"Worker: Waiting for work."</span> &lt;&lt; std::endl;
+
+    std::unique_lock&lt;std::mutex&gt; lck(mutex_);
+    condVar.wait(lck,[]{<span style="color: #0000ff;">return</span> dataReady;});
+    doTheWork();
+    std::cout &lt;&lt; <span style="color: #a31515;">"Work done."</span> &lt;&lt; std::endl;
+}
+
+<span style="color: #2b91af;">void</span> setDataReady(){
+    std::lock_guard&lt;std::mutex&gt; lck(mutex_);
+    dataReady=true;
+    std::cout &lt;&lt; <span style="color: #a31515;">"Sender: Data is ready."</span>  &lt;&lt; std::endl;
+    condVar.notify_one();
+}
+
+<span style="color: #2b91af;">int</span> main(){
+
+  std::cout &lt;&lt; std::endl;
+
+  std::<span style="color: #0000ff;">thread</span> t1(waitingForWork);
+  std::<span style="color: #0000ff;">thread</span> t2(setDataReady);
+
+  t1.join();
+  t2.join();
+
+  std::cout &lt;&lt; std::endl;
+  
+}
+</pre>
+				</td>
+			</tr>
+		</tbody>
+	</table>
+</div>
+<p>&nbsp;</p>
+<p>The key difference to the first example <span style="font-family: courier new,courier;">conditionVariable.cpp</span> is, that the bool variable<span style="font-family: courier new,courier;"> dataReady</span> is used in line 11 as an additional condition. <span style="font-family: courier new,courier;">dataReady</span> is set to <span style="font-family: courier new,courier;">true</span> in line 28. Exactly that value is checked&nbsp;in the function <span style="font-family: courier new,courier;">waitingForWork: condVar.waint(lck,[]return dataReady;})</span>. The wait method has for this reason an additional overload, accepting a predicate. A predicate is a callable, that always return <span style="font-family: courier new,courier;">true</span> or <span style="font-family: courier new,courier;">false.</span> In this example the callable is a lambda function. So, the condition variable check two&nbsp;conditions. At first, if the predicate is <span style="font-family: courier new,courier;">true</span> and at second, if the notification happened.</p>
+<p>A short remark to <span style="font-family: courier new,courier;">dataReady.</span> <span style="font-family: courier new,courier;">dataReady</span> is a shared variable, which will be changed. So I have to protected it with a lock. Because thread <span style="font-family: courier new,courier;">t1</span> only once sets and releases the lock, <span style="font-family: courier new,courier;">std::lock_guard</span> is fine for that job. That will not hold for thread<span style="font-family: courier new,courier;"> t2</span>. The wait method will continuously lock and unlock the mutex. So I need the more powerful lock <span style="font-family: courier new,courier;">std::unique_lock.</span></p>
+<p>But that not all. Condition variables have a lot of challenges. They must be locked and are susceptible for spurious wakeups. The most use cases are easier to solve with tasks. More about tasks in the next post.</p>
+<h2><span style="color: #000000;"> <a id="LostWakeup" style="color: #000000;">Lost wakeup</a></span></h2>
+<p>&nbsp;</p>
+<p>The meanness of condition variables goes on. Circa at each 10th execution of the program in the file&nbsp; <span style="font-family: courier new,courier;">conditionVariable.cpp,</span> something strange happens. The program blocks.<span style="color: #000000;"><br /> </span></p>
+<p><img src="images/blog/Threads/Bedingungsvariablen/conditionVariableWithoutPredicate.png" alt="conditionVariableWithoutPredicate" /></p>
+<p>I have no idea, what's going on. This phenomenon contradicts totally my intuition of condition variables. Did I mention, that I don't like condition variables? With the support of <a href="https://www.justsoftwaresolutions.co.uk/">Anthony Williams</a>, I solved the riddle.</p>
+<p>The issue is, if the sender sends its notification before the receiver is in the wait state, the notification gets lost.&nbsp;The C++ standard describes condition variables as synchronization mechanism at the same time :&nbsp;<span class="hiddenGrammarError">"</span><span class="hiddenSpellError">The</span> <span class="hiddenSpellError">condition</span>_variable <span class="hiddenSpellError">class</span> <span class="hiddenSpellError">is</span> a <span class="hiddenSpellError">synchronization</span> primitive <span class="hiddenSpellError">that</span> <span class="hiddenSpellError">can</span> <span class="hiddenSpellError">be</span> <span class="hiddenSpellError">used</span> <span class="hiddenSpellError">to</span> block a <span class="hiddenSpellError">thread</span>, <span class="hiddenSpellError">or</span> multiple <span class="hiddenSpellError">threads</span> <span class="hiddenSpellError">at</span> <span class="hiddenSpellError">the</span> <span class="hiddenSpellError">same</span> time, <span class="hiddenGrammarError">...</span><span class="hiddenGrammarError">"</span>. So the notfication gets lost and the receiver is waiting and waiting and ... .</p>
+<p>How can this issue be solved? The cure predicate to get ride of spurious wakeups will also help for lost wakeups. In case the predicate is <span style="font-family: courier new,courier;">true,</span> the receiver is able to continue its work independently of the notification of the sender. The variable <span style="font-family: courier new,courier;">dataReady</span> is a kind of&nbsp;memory. Because as far as the variable data in line 28 is set to <span style="font-family: courier new,courier;">true,</span> the receiver assumes in line 21, that the notification was delivered.</p>
+<h2>What's next?</h2>
+<p>With tasks&nbsp;mulitithreading in C++ get a lot easier. Stay tuned for the next post.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>Do you want to get the source code? <a href="index.php/source-code-repository">Source code repository</a></p>
+<p>Would you like to have all posts for the weekend?&nbsp;
+	<a href="index.php/source-code-repository"></a>
+</p>
+<p>{loadmodule mod_acymailing,Neue Artikel zum Wochenende}</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
