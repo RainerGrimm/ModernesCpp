@@ -1,0 +1,336 @@
+<p><span style="font-family: courier new,courier;">std::packaged_task</span> enables you to write a simple wrapper for a callable, which you can invoke later.</p>
+<hr id="system-readmore" />
+<h2>std::packaged_task</h2>
+<p>To deal with<span style="font-family: courier new,courier;"> std::packaged_task,</span> you have to perform typically four steps:</p>
+<ol>
+	<li>Wrap the task</li>
+	<li>Create the future</li>
+	<li>Perform the calculation</li>
+	<li>Pick up the result</li>
+</ol>
+<p>These steps are easy to get with an example.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+	<table>
+		<tbody>
+			<tr>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+55
+56
+57
+58
+59
+60
+61
+62
+63
+64
+65
+66
+67</pre>
+				</td>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// packagedTask.cpp</span>
+<span id="transmark"></span>
+<span style="color: #0000ff;">#include &lt;utility&gt;</span>
+<span style="color: #0000ff;">#include &lt;future&gt;</span>
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;thread&gt;</span>
+<span style="color: #0000ff;">#include &lt;deque&gt;</span>
+
+<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">SumUp</span>{
+  public:
+    <span style="color: #2b91af;">int</span> <span style="color: #0000ff;">operator</span>()(<span style="color: #2b91af;">int</span> beg, <span style="color: #2b91af;">int</span> end){
+      <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">int</span> sum{0};
+      <span style="color: #0000ff;">for</span> (<span style="color: #2b91af;">int</span> i= beg; i &lt; end; ++i ) sum += i;
+      <span style="color: #0000ff;">return</span> sum;
+    }
+};
+
+<span style="color: #2b91af;">int</span> main(){
+
+  std::cout &lt;&lt; std::endl;
+
+  SumUp sumUp1;
+  SumUp sumUp2;
+  SumUp sumUp3;
+  SumUp sumUp4;
+
+  <span style="color: #008000;">// define the tasks</span>
+  std::packaged_task&lt;<span style="color: #2b91af;">int</span>(<span style="color: #2b91af;">int</span>,<span style="color: #2b91af;">int</span>)&gt; sumTask1(sumUp1);
+  std::packaged_task&lt;<span style="color: #2b91af;">int</span>(<span style="color: #2b91af;">int</span>,<span style="color: #2b91af;">int</span>)&gt; sumTask2(sumUp2);
+  std::packaged_task&lt;<span style="color: #2b91af;">int</span>(<span style="color: #2b91af;">int</span>,<span style="color: #2b91af;">int</span>)&gt; sumTask3(sumUp3);
+  std::packaged_task&lt;<span style="color: #2b91af;">int</span>(<span style="color: #2b91af;">int</span>,<span style="color: #2b91af;">int</span>)&gt; sumTask4(sumUp4);
+
+  <span style="color: #008000;">// get the futures</span>
+  std::future&lt;<span style="color: #2b91af;">int</span>&gt; sumResult1= sumTask1.get_future();
+  std::future&lt;<span style="color: #2b91af;">int</span>&gt; sumResult2= sumTask2.get_future();
+  std::future&lt;<span style="color: #2b91af;">int</span>&gt; sumResult3= sumTask3.get_future();
+  std::future&lt;<span style="color: #2b91af;">int</span>&gt; sumResult4= sumTask4.get_future();
+
+  <span style="color: #008000;">// push the tasks on the container</span>
+  std::deque&lt; std::packaged_task&lt;<span style="color: #2b91af;">int</span>(<span style="color: #2b91af;">int</span>,<span style="color: #2b91af;">int</span>)&gt; &gt; allTasks;
+  allTasks.push_back(std::move(sumTask1));
+  allTasks.push_back(std::move(sumTask2));
+  allTasks.push_back(std::move(sumTask3));
+  allTasks.push_back(std::move(sumTask4));
+  
+  <span style="color: #2b91af;">int</span> begin{1};
+  <span style="color: #2b91af;">int</span> increment{2500};
+  <span style="color: #2b91af;">int</span> end= begin + increment;
+
+  <span style="color: #008000;">// execute each task in a separate thread</span>
+  <span style="color: #0000ff;">while</span> ( not allTasks.empty() ){
+    std::packaged_task&lt;<span style="color: #2b91af;">int</span>(<span style="color: #2b91af;">int</span>,<span style="color: #2b91af;">int</span>)&gt; myTask= std::move(allTasks.front());
+    allTasks.pop_front();
+    std::<span style="color: #0000ff;">thread</span> sumThread(std::move(myTask),begin,end);
+    begin= end;
+    end += increment;
+    sumThread.detach();
+  }
+
+  <span style="color: #008000;">// get the results</span>
+  <span style="color: #0000ff;">auto</span> sum= sumResult1.get() + sumResult2.get() + sumResult3.get() + sumResult4.get();
+
+  std::cout &lt;&lt; <span style="color: #a31515;">"sum of 0 .. 10000 = "</span> &lt;&lt; sum &lt;&lt; std::endl;
+
+  std::cout &lt;&lt; std::endl;
+
+}
+</pre>
+				</td>
+			</tr>
+		</tbody>
+	</table>
+</div>
+<p>&nbsp;</p>
+<p>The job of the program is not so hard. Calculate the sum from 0 to 10000 with the help of four threads and sum up the results with the associated futures. Of course, you can use the&nbsp;<a href="https://de.wikipedia.org/wiki/Gau%C3%9Fsche_Summenformel">Gaußschen Summenformel</a>. (Strange, there is no English page, describing this famous algorithm. But math is international.).</p>
+<p>In the<strong> first step</strong>, I pack the work packages in<span style="font-family: courier new,courier;"> std::packaged_task</span> (line 28 - 31) objects. Work packages are instances of the class<span style="font-family: courier new,courier;"> SumUp</span> (line 9 - 16). The current work is done in the call operator (line 11-15). The call operator sums up all numbers from <span style="font-family: courier new,courier;">beg</span> to <span style="font-family: courier new,courier;">end</span> and returns the <span style="font-family: courier new,courier;">sum</span> as result. std::packaged_task in line 28 - 31 can deal with callables, that need two ints and return an int.</p>
+<p>Now, I have to create in the <strong>second step</strong> the future objects with the help of <span style="font-family: courier new,courier;">std::packaged_task</span> objects. Exactly that is done in the lines 34 to 37. The packaged_task is the promise in the <a href="index.php/tasks">communication channel</a>. I define in these lines explicitly the type of the future: <span style="font-family: courier new,courier;">std::future&lt;int&gt; sumResult1= sumTask1.get_future(</span>), but of course, I can do it also&nbsp;implicitly: <span style="font-family: courier new,courier;">auto sumResult1= sumTask1.get_future()</span>.</p>
+<p>In the <strong>third step</strong>, the work takes place. The packaged_task are moved onto the <span style="font-family: courier new,courier;">std::deque</span> (line 40 -44). In the while loop, each packaged_task (line 51-58) is executed. For doing that, I move the head of the <span style="font-family: courier new,courier;">std::deque</span> in a <span style="font-family: courier new,courier;">std::packaged_task</span> (line 52), move the packaged_task in a new thread (line 54) and let it run in the background (line 56). <span style="font-family: courier new,courier;">std::packaged_task</span> object are not copyable. That's the reason, why I used move semantic in the lines 52 and 54. These restriction holds for all promises, but also futures and threads. There is one exception to this rule: std:.shared_future.</p>
+<p>In the <strong>fourth and last step</strong>, the four futures ask with the get call for the results and sum them up (line 61).</p>
+<p>Honestly, <span style="font-family: courier new,courier;">std::packaged_task</span> was not made for simple use case like<span style="font-family: courier new,courier;"> std::async</span>. But the result is simple.</p>
+<p><img src="images/blog/Threads/AufrufbareWrapper/packagedTask.png" alt="packagedTask" /></p>
+<h3>Optimization potential</h3>
+<p>C++11 has a function <span style="font-family: courier new,courier;">std::thread_hardware_concurrency</span>. This function provides a hint for the numbers of cores on your system. In case the C++ runtime has no glue, it's conforming to the standard to return 0. So you should verify that value in your program (line 29). With the current GCC, clang or Microsoft compiler, I get the right answer 4. I use this number of cores In the variation of the program<span style="font-family: courier new,courier;"> packagedTask.cpp</span>, to adjust the software to my hardware. So, my hardware is fully utilized.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+	<table>
+		<tbody>
+			<tr>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+55
+56
+57
+58
+59
+60
+61
+62
+63
+64
+65
+66
+67
+68
+69
+70</pre>
+				</td>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">#include &lt;algorithm&gt;</span>
+<span style="color: #0000ff;">#include &lt;future&gt;</span>
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;thread&gt;</span>
+<span style="color: #0000ff;">#include &lt;deque&gt;</span>
+<span style="color: #0000ff;">#include &lt;vector&gt;</span>
+
+<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">SumUp</span>{
+public:
+  SumUp(<span style="color: #2b91af;">int</span> b, <span style="color: #2b91af;">int</span> e): beg(b),end(e){}
+  <span style="color: #2b91af;">int</span> <span style="color: #0000ff;">operator</span>()(){
+    <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">int</span> sum{0};
+    <span style="color: #0000ff;">for</span> (<span style="color: #2b91af;">int</span> i= beg; i &lt; end; ++i ) sum += i;
+    <span style="color: #0000ff;">return</span> sum;
+  }
+private:
+    <span style="color: #2b91af;">int</span> beg;
+    <span style="color: #2b91af;">int</span> end;
+};
+
+<span style="color: #0000ff;">static</span> <span style="color: #0000ff;">const</span> <span style="color: #2b91af;">unsigned</span> <span style="color: #2b91af;">int</span> hwGuess= 4;
+<span style="color: #0000ff;">static</span> <span style="color: #0000ff;">const</span> <span style="color: #2b91af;">unsigned</span> <span style="color: #2b91af;">int</span> numbers= 10001;
+
+<span style="color: #2b91af;">int</span> main(){
+
+  std::cout &lt;&lt; std::endl;
+
+  <span style="color: #2b91af;">unsigned</span> <span style="color: #2b91af;">int</span> hw= std::<span style="color: #0000ff;">thread</span>::hardware_concurrency();
+  <span style="color: #2b91af;">unsigned</span> <span style="color: #2b91af;">int</span> hwConcurr= (hw != 0)? hw : hwGuess;
+
+  <span style="color: #008000;">// define the functors</span>
+  std::vector&lt;SumUp&gt; sumUp;
+  <span style="color: #0000ff;">for</span> ( <span style="color: #2b91af;">unsigned</span> <span style="color: #2b91af;">int</span> i= 0; i &lt; hwConcurr; ++i){
+    <span style="color: #2b91af;">int</span> begin= (i*numbers)/hwConcurr;
+    <span style="color: #2b91af;">int</span> end= (i+1)*numbers/hwConcurr;
+    sumUp.push_back(SumUp(begin ,end));
+  }
+
+  <span style="color: #008000;">// define the tasks</span>
+  std::deque&lt;std::packaged_task&lt;<span style="color: #2b91af;">int</span>()&gt;&gt; sumTask;
+  <span style="color: #0000ff;">for</span> ( <span style="color: #2b91af;">unsigned</span> <span style="color: #2b91af;">int</span> i= 0; i &lt; hwConcurr; ++i){
+    std::packaged_task&lt;<span style="color: #2b91af;">int</span>()&gt; SumTask(sumUp[i]);
+    sumTask.push_back(std::move(SumTask));
+  }
+
+  <span style="color: #008000;">// get the futures</span>
+  std::vector&lt; std::future&lt;<span style="color: #2b91af;">int</span>&gt;&gt; sumResult;
+  <span style="color: #0000ff;">for</span> ( <span style="color: #2b91af;">unsigned</span> <span style="color: #2b91af;">int</span> i= 0; i &lt; hwConcurr; ++i){
+    sumResult.push_back(sumTask[i].get_future());
+  }
+
+  <span style="color: #008000;">// execute each task in a separate thread</span>
+  <span style="color: #0000ff;">while</span> ( not sumTask.empty() ){
+    std::packaged_task&lt;<span style="color: #2b91af;">int</span>()&gt; myTask= std::move(sumTask.front());
+    sumTask.pop_front();
+    std::<span style="color: #0000ff;">thread</span> sumThread(std::move(myTask));
+    sumThread.detach();
+  }
+
+  <span style="color: #008000;">// get the results</span>
+  <span style="color: #2b91af;">int</span> sum= 0;
+  <span style="color: #0000ff;">for</span> ( <span style="color: #2b91af;">unsigned</span> <span style="color: #2b91af;">int</span> i= 0; i &lt; hwConcurr; ++i){
+    sum += sumResult[i].get();
+  }
+
+  std::cout &lt;&lt; <span style="color: #a31515;">"sum of 0 .. 100000 = "</span> &lt;&lt; sum &lt;&lt; std::endl;
+
+  std::cout &lt;&lt; std::endl;
+
+}
+</pre>
+				</td>
+			</tr>
+		</tbody>
+	</table>
+</div>
+<p>&nbsp;</p>
+<h2>What's next?</h2>
+<p>The next post will be about futures and promises.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>Do you want to get the source code? <a href="index.php/source-code-repository">Source code repository</a></p>
+<p>Would you like to have all posts for the weekend?&nbsp;
+	<a href="index.php/source-code-repository"></a>
+</p>
+<p>{loadmodule mod_acymailing,Neue Artikel zum Wochenende}</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
