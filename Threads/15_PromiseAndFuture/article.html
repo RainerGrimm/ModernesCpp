@@ -1,0 +1,330 @@
+<p>With<span style="font-family: courier new,courier;"> std::promise</span> and<span style="font-family: courier new,courier;"> std::future, </span>you have the full control over the task.</p>
+<hr id="system-readmore" />
+<h2>Full control over the task</h2>
+<p>A <span style="font-family: courier new,courier;">std::promise</span> permits</p>
+<ul>
+	<li>to set a value, a notification or an exception. That result can in addition delayed be provided by the promise.</li>
+</ul>
+<p><span style="font-family: courier new,courier;"><span style="font-family: arial,helvetica,sans-serif;">A</span> std::future</span> permits to</p>
+<ul>
+	<li>pick up the value from the promise.</li>
+	<li>asks the promise, if the value is available.</li>
+	<li>wait for the notification of the promise. That waiting can be done with a relative time duration or an absolute time point. =&gt; Replacement for <a href="index.php/condition-variables">condition variables. </a></li>
+	<li>create a shared future (<span style="font-family: courier new,courier;">std::shared_future</span>).</li>
+</ul>
+<p>&nbsp;</p>
+<p>Both <a href="index.php/tasks">communication endpoints</a> promise and future can be moved in a separate thread. So the communication is taking place between threads.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+	<table>
+		<tbody>
+			<tr>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50</pre>
+				</td>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// promiseFuture.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;future&gt;</span>
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;thread&gt;</span>
+<span style="color: #0000ff;">#include &lt;utility&gt;</span>
+
+<span style="color: #2b91af;">void</span> product(std::promise&lt;<span style="color: #2b91af;">int</span>&gt;&amp;&amp; intPromise, <span style="color: #2b91af;">int</span> a, <span style="color: #2b91af;">int</span> b){
+  intPromise.set_value(a*b);
+}
+
+<span style="color: #0000ff;">struct</span> Div{
+
+  <span style="color: #2b91af;">void</span> <span style="color: #0000ff;">operator</span>() (std::promise&lt;<span style="color: #2b91af;">int</span>&gt;&amp;&amp; intPromise, <span style="color: #2b91af;">int</span> a, <span style="color: #2b91af;">int</span> b) <span style="color: #0000ff;">const</span> {
+    intPromise.set_value(a/b);
+  }
+
+};
+
+<span style="color: #2b91af;">int</span> main(){
+
+  <span style="color: #2b91af;">int</span> a= 20;
+  <span style="color: #2b91af;">int</span> b= 10;
+
+  std::cout &lt;&lt; std::endl;
+
+  <span style="color: #008000;">// define the promises</span>
+  std::promise&lt;<span style="color: #2b91af;">int</span>&gt; prodPromise;
+  std::promise&lt;<span style="color: #2b91af;">int</span>&gt; divPromise;
+
+  <span style="color: #008000;">// get the futures</span>
+  std::future&lt;<span style="color: #2b91af;">int</span>&gt; prodResult= prodPromise.get_future();
+  std::future&lt;<span style="color: #2b91af;">int</span>&gt; divResult= divPromise.get_future();
+
+  <span style="color: #008000;">// calculate the result in a separat thread</span>
+  std::<span style="color: #0000ff;">thread</span> prodThread(product,std::move(prodPromise),a,b);
+  Div div;
+  std::<span style="color: #0000ff;">thread</span> divThread(div,std::move(divPromise),a,b);
+
+  <span style="color: #008000;">// get the result</span>
+  std::cout &lt;&lt; <span style="color: #a31515;">"20*10= "</span> &lt;&lt; prodResult.get() &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"20/10= "</span> &lt;&lt; divResult.get() &lt;&lt; std::endl;
+
+  prodThread.join();
+  
+  divThread.join();
+
+  std::cout &lt;&lt; std::endl;
+
+}
+</pre>
+				</td>
+			</tr>
+		</tbody>
+	</table>
+</div>
+<p>&nbsp;</p>
+<p>The thread <span style="font-family: courier new,courier;">prodThread</span> (line 36) uses the function <span style="font-family: courier new,courier;">product</span> (line 8 -10), the <span style="font-family: courier new,courier;">prodPromise</span> (line 32) and the numbers a and b. To understand the arguments of the thread <span style="font-family: courier new,courier;">prodThread,</span> you have to look at the signature of the function. <span style="font-family: courier new,courier;">prodThread</span> needs as first argument a callable. This is the already mentioned function <span style="font-family: courier new,courier;">product.</span> <span style="font-family: courier new,courier;">product</span> needs a promise of the kind rvalue reference (<span style="font-family: courier new,courier;">std::promise&lt;int&gt;&amp;&amp; intPromise</span>) and two numbers. These are exactly the last three arguments of the thread <span style="font-family: courier new,courier;">prodThread.</span>&nbsp;<span style="font-family: courier new,courier;">std::move</span>&nbsp;in line 36 creates the rvalue reference. The rest is a piece of cake. The thread <span style="font-family: courier new,courier;">divThread</span> (line38) divides the two numbers a and b. For is job, it uses the instances <span style="font-family: courier new,courier;">div</span> of the class <span style="font-family: courier new,courier;">Div</span> (line 12 - 18). <span style="font-family: courier new,courier;">div</span> is a function object.</p>
+<p>The futures picks up the results by the calls<span style="font-family: courier new,courier;"> prodResult.get()</span> and <span style="font-family: courier new,courier;">divResult.get()</span>.&nbsp;</p>
+<p><img src="images/blog/Threads/PromiseFuture/promiseFuture.png" alt="promiseFuture" /></p>
+<p>Per default, there is a one-to-one relation between the promise and the future. But <span style="font-family: courier new,courier;">std::shared_future</span> supports a one-to-many relations between a promise and many futures.</p>
+<h2>std::shared_future</h2>
+<p>A <span style="font-family: courier new,courier;">std::shared_future&nbsp; <br /></span></p>
+<ul>
+	<li>permits you to ask the promise independent of the other associated futures.</li>
+	<li>has the same interface as a <span style="font-family: courier new,courier;">std::future</span>.</li>
+	<li>can be created by a <span style="font-family: courier new,courier;">std::future fut </span>with the call<span style="font-family: courier new,courier;"> fut.share()</span>.</li>
+	<li>can be created by a&nbsp;<span style="font-family: courier new,courier;">std::promise&nbsp;divPromise <span style="font-family: arial,helvetica,sans-serif;">with the call </span>std::shared_future&lt;int&gt; divResult= divPromise.get_future().</span>
+	</li>
+</ul>
+<p>The managing of <span style="font-family: courier new,courier;">std::shared_future</span> is special.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+	<table>
+		<tbody>
+			<tr>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+55
+56
+57
+58
+59
+60
+61
+62
+63
+64
+65
+66
+67
+68
+69
+70
+71
+72
+73
+74
+75
+76
+77</pre>
+				</td>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// sharedFuture.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;exception&gt;</span>
+<span style="color: #0000ff;">#include &lt;future&gt;</span>
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;thread&gt;</span>
+<span style="color: #0000ff;">#include &lt;utility&gt;</span>
+
+std::mutex coutMutex;
+
+<span style="color: #0000ff;">struct</span> Div{
+
+  <span style="color: #2b91af;">void</span> <span style="color: #0000ff;">operator</span>()(std::promise&lt;<span style="color: #2b91af;">int</span>&gt;&amp;&amp; intPromise, <span style="color: #2b91af;">int</span> a, <span style="color: #2b91af;">int</span> b){
+    try{
+      <span style="color: #0000ff;">if</span> ( b==0 ) <span style="color: #0000ff;">throw</span> std::runtime_error(<span style="color: #a31515;">"illegal division by zero"</span>);
+      intPromise.set_value(a/b);
+    }
+    <span style="color: #0000ff;">catch</span> (...){
+      intPromise.set_exception(std::current_exception());
+    }
+  }
+
+};
+
+<span style="color: #0000ff;">struct</span> Requestor{
+
+  <span style="color: #2b91af;">void</span> <span style="color: #0000ff;">operator</span> ()(std::shared_future&lt;<span style="color: #2b91af;">int</span>&gt; shaFut){
+
+    <span style="color: #008000;">// lock std::cout</span>
+    std::lock_guard&lt;std::mutex&gt; coutGuard(coutMutex);
+
+    <span style="color: #008000;">// get the thread id</span>
+    std::cout &lt;&lt; <span style="color: #a31515;">"threadId("</span> &lt;&lt; std::this_thread::get_id() &lt;&lt; <span style="color: #a31515;">"): "</span> ;
+
+    <span style="color: #008000;">// get the result</span>
+    try{
+      std::cout &lt;&lt; <span style="color: #a31515;">"20/10= "</span> &lt;&lt; shaFut.get() &lt;&lt; std::endl;
+    }
+    <span style="color: #0000ff;">catch</span> (std::runtime_error&amp; e){
+      std::cout &lt;&lt; e.what() &lt;&lt; std::endl;
+    }
+  }
+
+};
+
+<span style="color: #2b91af;">int</span> main(){
+
+  std::cout &lt;&lt; std::endl;
+
+  <span style="color: #008000;">// define the promises</span>
+  std::promise&lt;<span style="color: #2b91af;">int</span>&gt; divPromise;
+
+  <span style="color: #008000;">// get the futures</span>
+  std::shared_future&lt;<span style="color: #2b91af;">int</span>&gt; divResult= divPromise.get_future();
+
+  <span style="color: #008000;">// calculate the result in a separat thread</span>
+  Div div;
+  std::<span style="color: #0000ff;">thread</span> divThread(div,std::move(divPromise),20,10);
+
+  Requestor req;
+  std::<span style="color: #0000ff;">thread</span> sharedThread1(req,divResult);
+  std::<span style="color: #0000ff;">thread</span> sharedThread2(req,divResult);
+  std::<span style="color: #0000ff;">thread</span> sharedThread3(req,divResult);
+  std::<span style="color: #0000ff;">thread</span> sharedThread4(req,divResult);
+  std::<span style="color: #0000ff;">thread</span> sharedThread5(req,divResult);
+
+  divThread.join();
+
+  sharedThread1.join();
+  sharedThread2.join();
+  sharedThread3.join();
+  sharedThread4.join();
+  sharedThread5.join();
+
+  std::cout &lt;&lt; std::endl;
+
+}
+</pre>
+				</td>
+			</tr>
+		</tbody>
+	</table>
+</div>
+<p>&nbsp;</p>
+<p>Both work packages of the promise and the future are in this current example function objects. In case you divide to numbers, you have to take care of the denominator. It must not be 0. If is is 0, you get an exception. The promise deals with this issue by catching the exception (line 18 - 20) and rethrowing it to the future. The <span style="font-family: courier new,courier;">std::future</span> catches the exception and displays it in line 40. In line 58, <span style="font-family: courier new,courier;">divPromise</span> will be moved and executed in <span style="font-family: courier new,courier;">divThread</span>. Accordingly, the <span style="font-family: courier new,courier;">std::shared_future's</span> are <strong>copied</strong> in the five threads. I will emphasis this once more. In opposite to a <span style="font-family: courier new,courier;">std::future</span> object, which can only be moved, you can copy a <span style="font-family: courier new,courier;">std::shared_future</span> object.</p>
+<p>The main thread waits In the line 69 to 73 <span id="transmark"></span>for its child´s and shows the results.</p>
+<p><img src="images/blog/Threads/PromiseFuture/sharedFuture.png" alt="sharedFuture" /></p>
+<h2>What's next?</h2>
+<p>There is one oddity with <span style="font-family: courier new,courier;">std::async</span>, which you should know. The by <span style="font-family: courier new,courier;">std::async</span> created future blocks in its destructor until the associated promise is done. Curious? Read the next post.</p>
+<p>&nbsp;</p>
+<dl>
+	<dt>
+		<p>&nbsp;</p>
+	</dt>
+</dl>
+<p>Do you want to get the source code? <a href="index.php/source-code-repository">Source code repository</a></p>
+<p>Would you like to have all posts for the weekend?&nbsp;
+	<a href="index.php/source-code-repository"></a>
+</p>
+<p>{loadmodule mod_acymailing,Neue Artikel zum Wochenende}&nbsp;</p>
