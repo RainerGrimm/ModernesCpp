@@ -1,0 +1,192 @@
+<p>The Creator of a thread has to take care of its child. The creator can wait, until its child is done or detach itself from its child. But that is not realaly new. But that will not hold for <span style="font-family: courier new,courier;">std::async</span>. The big charm of<span style="font-family: courier new,courier;"> std::async</span> is, that the creator has not take to care of its child.</p>
+<hr id="system-readmore" />
+<h2>Fire and forget</h2>
+<p>std::async creates special futures. These futures wait in its destructor, until the work of the associated promise is done. That is the reason, why the creator has not to take care of its child. But it gets even better. You can execute a <span style="font-family: courier new,courier;">std::future</span> as a fire and forget job. The by <span style="font-family: courier new,courier;">std::async</span> created future will be executed just in place. Because the <span style="font-family: courier new,courier;">std::future fut</span> is in this case not bound to a variable, it's not possible to invoke<span style="font-family: courier new,courier;"> fut.get()</span> or <span style="font-family: courier new,courier;">fut.wait()</span> on the future to get the result of the promise.</p>
+<p>Maybe, my last sentences were a bit to confusing. So I will compare an ordinary future with a fire and forget future. It is necessary for a fire and forget future, that the promise runs in a separate thread to start immediately with its work. This is done by the std::launch::async policy. You can read the details to the launch policy in the post <a href="index.php/asynchronous-function-calls">asynchronous function calls</a>.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+	<pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">auto</span> fut= std::async([]{<span style="color: #0000ff;">return</span> 2011;});<span id="transmark"></span>
+std::cout &lt;&lt; fut.get() &lt;&lt; std::endl; <span style="color: #008000;">/// 2011</span>
+  
+std::async(std::launch::async,[]{std::cout &lt;&lt; <span style="color: #a31515;">"fire and forget"</span> &lt;&lt; std::endl;});  <span style="color: #008000;">// fire and forget</span>
+  
+</pre>
+</div>
+<p>The fire and forget futures have a big charm. They will run in place and execute there work package, without the creator taking care of them. The simple example shows the described behaviour.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+	<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// async.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;future&gt;</span>
+
+<span style="color: #2b91af;">int</span> main() {
+
+    std::cout &lt;&lt; std::endl;
+    std::async([](){std::cout &lt;&lt; <span style="color: #a31515;">"fire and forget"</span> &lt;&lt; std::endl;});
+    std::cout &lt;&lt; <span style="color: #a31515;">"main done "</span> &lt;&lt; std::endl;
+}
+  
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Without further ado, the output.</p>
+<p>&nbsp;<img src="images/blog/Threads/DieBesonderenFutures/async.PNG" alt="async" width="500" height="124" /></p>
+<p>&nbsp;</p>
+<p>The praise for the behaviour is high. To high.</p>
+<h2>One after the other</h2>
+<p>The future, that is created by <span style="font-family: courier new,courier;">std::async</span>, waits in its destructor, until its work is done. An other word for waiting is blocking. The future blocks the progress of the program in its destructor. The becomes obvious, in case you use fire and forget futures.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+	<table>
+		<tbody>
+			<tr>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24</pre>
+				</td>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// blocking.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;chrono&gt;</span>
+<span style="color: #0000ff;">#include &lt;future&gt;</span>
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;thread&gt;</span>
+
+<span style="color: #2b91af;">int</span> main(){
+
+  std::cout &lt;&lt; std::endl;
+
+  std::async(std::launch::async,[]{
+    std::this_thread::sleep_for(std::chrono::seconds(2));
+    std::cout &lt;&lt; <span style="color: #a31515;">"first thread"</span> &lt;&lt; std::endl;
+    });
+    
+  std::async(std::launch::async,[]{
+    std::this_thread::sleep_for(std::chrono::seconds(1));  
+    std::cout &lt;&lt; <span style="color: #a31515;">"second thread"</span> &lt;&lt; std::endl;}
+    );
+  
+  std::cout &lt;&lt; <span style="color: #a31515;">"main thread"</span> &lt;&lt; std::endl;  
+
+}
+</pre>
+				</td>
+			</tr>
+		</tbody>
+	</table>
+</div>
+<p>&nbsp;</p>
+<p>The program executes two promise in their own thread. The resulting futures are fire and forget futures. These futures block in their destructor until the associated promise is done. The result is, that the promise will be executed with high probability in that sequence, in which you find them in the source code. That is exactly the behaviour you see in the output of the program.</p>
+<p>&nbsp;</p>
+<p><img src="images/blog/Threads/DieBesonderenFutures/blocking.PNG" alt="blocking" width="500" height="137" /></p>
+<p>I want to stress this point once more. Although I create in the <span style="font-family: courier new,courier;">main</span>-thread two promises, which are executed in separate threads, the threads run in sequence one after the other. That is the reason, why the thread with the more time consuming work package (line 12) finishes first. Wow, that was disappointing. Instead of three threads running concurrently, each thread will be executed after the other.</p>
+<p>The key issue is, that the by <span style="font-family: courier new,courier;">std::async</span> created thread is waiting in its destructor until the associated promise is done, can not&nbsp; be solved. The problem can only be mitigated. In case you bind the future to a variable, the blocking will take place at the time point, when the variable goes out of scope. That is the behaviour, you can observe in the next example.</p>
+<p>&nbsp;&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+	<table>
+		<tbody>
+			<tr>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24</pre>
+				</td>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// notBlocking.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;chrono&gt;</span>
+<span style="color: #0000ff;">#include &lt;future&gt;</span>
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;thread&gt;</span>
+
+<span style="color: #2b91af;">int</span> main(){
+
+  std::cout &lt;&lt; std::endl;
+
+  <span style="color: #0000ff;">auto</span> first= std::async(std::launch::async,[]{
+    std::this_thread::sleep_for(std::chrono::seconds(2));
+    std::cout &lt;&lt; <span style="color: #a31515;">"first thread"</span> &lt;&lt; std::endl;
+    });
+    
+  <span style="color: #0000ff;">auto</span> second= std::async(std::launch::async,[]{
+    std::this_thread::sleep_for(std::chrono::seconds(1));  
+    std::cout &lt;&lt; <span style="color: #a31515;">"second thread"</span> &lt;&lt; std::endl;}
+    );
+  
+  std::cout &lt;&lt; <span style="color: #a31515;">"main thread"</span> &lt;&lt; std::endl;  
+
+}
+</pre>
+				</td>
+			</tr>
+		</tbody>
+	</table>
+</div>
+<p>&nbsp;</p>
+<p>Now, the output of the program matches our intuition, because the three threads are executed in parallel. The future first (line 12) and second (line 17) are valid until the end of the <span style="font-family: courier new,courier;">main</span>-function (line 24). So, the destructor will perhaps blocks at this time point. The result is, that the threads with the smallest work package is the fastest one.</p>
+<p>&nbsp;</p>
+<p><img src="images/blog/Threads/DieBesonderenFutures/notBlocking.PNG" alt="notBlocking" width="500" height="137" />&nbsp;</p>
+<h2>It's not so bad</h2>
+<p>I have to admit.&nbsp; I used the by <span style="font-family: courier new,courier;">std::async</span> created futures very contrived. At first, the futures were not bound to a variable. At second, I didn't use the future to pick up the result from the promise by a <span style="font-family: courier new,courier;">get</span> or <span style="font-family: courier new,courier;">wait</span> call. Exactly in that situation, we can observe the strange behaviour, that the future blocks in its destructor.</p>
+<p>The key reason for these posts was it, to show, that a fire and forget future, that is not bound to a variable, must be handled with great care. But this point did not hold for futures, which are created by <span style="font-family: courier new,courier;">std::packaged_task</span> or <span style="font-family: courier new,courier;">std::promise.</span></p>
+<h2>Whats's next?</h2>
+<p>I guess, you know it. I'm not the big fan of <a href="index.php/condition-variables">condition variable</a>s. So I want to compare condition variables with tasks to synchronize threads. Because I believe, tasks are the most times the less error prone and therefore the better choice. So, stay tuned for the next post.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>Do you want to get the source code? <a href="index.php/source-code-repository">Source code repository</a></p>
+<p>Would you like to have all posts for the weekend?&nbsp;
+	<a href="index.php/source-code-repository"></a>
+</p>
+<p>{loadmodule mod_acymailing,Neue Artikel zum Wochenende}</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
