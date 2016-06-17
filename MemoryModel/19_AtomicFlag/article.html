@@ -1,0 +1,261 @@
+<p>Atomics guarantees two characteristics. At one hand they are atomic, at the other hand they provide synchronization and order constraints on the program execution.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p>I introduced in the last post the sequential consistency as the default behaviour of atomic operations. But, what does that mean? You can specify for each atomic operation the memory order. If not specified, <span style="font-family: courier new,courier;">std::memory_order_seq_cst</span> is used.</p>
+<p>So the piece of code</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+	<pre style="margin: 0; line-height: 125%;">x.store(1);
+res= x.load();
+</pre>
+</div>
+<p>is equivalent to the following piece of code.<span id="transmark"></span></p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+	<pre style="margin: 0; line-height: 125%;">x.store(1,std::memory_order_seq_cst);
+res= x.load(std::memory_order_seq_cst);<span style="font-family: arial,helvetica,sans-serif;"></span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>For simplicity reasons I will use the first spelling in this post.</p>
+<h2>std::atomic_flag</h2>
+<p><span style="font-family: courier new,courier;">std::atomic_flag</span> has a simple interface. It's method <span style="font-family: courier new,courier;">clear</span> enables you the set its value to <span style="font-family: courier new,courier;">false,</span> with <span style="font-family: courier new,courier;">test_and_set</span> back to <span style="font-family: courier new,courier;">true. </span>In case you use <span style="font-family: courier new,courier;">test_and_set</span> you get the old value back. To use <span style="font-family: courier new,courier;">std::atomic_flag</span> it must be initialized to <span style="font-family: courier new,courier;">false</span> with the constant ATOMIC_FLAG_INIT<span style="font-family: courier new,courier;">.</span> That is not so thrilling. But <span style="font-family: courier new,courier;">std::atomic_flag</span> has two very interesting properties.&nbsp;</p>
+<p><strong><span style="font-family: courier new,courier;">std::atomic_flag</span></strong> is&nbsp;</p>
+<ul>
+	<li>the only lock-free atomic.</li>
+	<li>the building block for higher thread abstractions.</li>
+</ul>
+<p>The only lock-free atomic? The remaining more powerful atomics can provide their functionality by using a <a href="index.php/the-risk-of-mutexes">mutex.</a> That is according to the C++ standard.&nbsp; So these atomics have a method <span style="font-family: courier new,courier;">is_lock_free</span> to check, if the atomic use internally a mutex. On the popular platforms I always get the answer <span style="font-family: courier new,courier;">false.</span> But you should be aware of that.</p>
+<p>The interface of a std::atomic_flag is sufficient to build a spinlock. With a spinlock you can protect a <a href="index.php?option=com_content&amp;view=article&amp;id=157:threads-sharing-data&amp;catid=35:c&amp;Itemid=239#CriticalSection">critical section</a> similar to a mutex. But the spinlock will not passively wait in opposite to a mutex until it gets it mutex. It will eagerly ask for the critical section. So it saves the expensive context change in the wait state but it fully utilizes the CPU:</p>
+<p>The example shows the implementation of a spinlock with the help of <span style="font-family: courier new,courier;">std::atomic_flag.</span></p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+	<table>
+		<tbody>
+			<tr>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37</pre>
+				</td>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// spinLock.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;atomic&gt;</span>
+<span style="color: #0000ff;">#include &lt;thread&gt;</span>
+
+<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">Spinlock</span>{
+  std::atomic_flag flag;
+public:
+  Spinlock(): flag(ATOMIC_FLAG_INIT) {}
+
+  <span style="color: #2b91af;">void</span> lock(){
+    <span style="color: #0000ff;">while</span>( flag.test_and_set() );
+  }
+
+  <span style="color: #2b91af;">void</span> unlock(){
+    flag.clear();
+  }
+};
+
+Spinlock spin;
+
+<span style="color: #2b91af;">void</span> workOnResource(){
+  spin.lock();
+  <span style="color: #008000;">// shared resource</span>
+  spin.unlock();
+}
+
+
+<span style="color: #2b91af;">int</span> main(){
+
+  std::<span style="color: #0000ff;">thread</span> t(workOnResource);
+  std::<span style="color: #0000ff;">thread</span> t2(workOnResource);
+
+  t.join();
+  t2.join();
+
+}
+</pre>
+				</td>
+			</tr>
+		</tbody>
+	</table>
+</div>
+<p>&nbsp;</p>
+<p>The both threads t and t2 (line 31 and 32) are fighting for the critical section. For simplicity reasons the critical section in line 24 consists only of a comment. How does it work? The class <span style="font-family: courier new,courier;">Spinlock</span> has - similar to a mutex - the two methods <span style="font-family: courier new,courier;">lock</span> and <span style="font-family: courier new,courier;">unlock.</span> In addition to that the constructor of <span style="font-family: courier new,courier;">Spinlock</span> initializes in line 9 the <span style="font-family: courier new,courier;">std::atomic_flag</span> to <span style="font-family: courier new,courier;">false.</span> In case thread t wants to execute the function <span style="font-family: courier new,courier;">workOnRessource</span> two scenarios can happen.</p>
+<p><strong>First</strong> the thread t gets the lock. So the lock invocation was successful. The lock invocation is successful, if the initial value of the flag in line 12 is <span style="font-family: courier new,courier;">false.</span> In this case thread t sets it in an atomic operation to <span style="font-family: courier new,courier;">true.</span> That value <span style="font-family: courier new,courier;">true</span> is the value, the while loop returns to the other thread t2, if it tries to get the lock. So thread t2 is caught in the rat race. Thread t2 has no possibility to set the value of the flag to <span style="font-family: courier new,courier;">false.</span> So t2 must eagerly wait until thread t1 executes the <span style="font-family: courier new,courier;">unlock</span> method and sets the flag to <span style="font-family: courier new,courier;">false</span> (line 15 - 17).</p>
+<p><strong>Second</strong> the thread t don't get the lock. So we are in scenario 1 with changed roles.</p>
+<p>It's very interesting to compare the active waiting of a spinlock with the passive waiting of a mutex.</p>
+<h2>Spinlock versus Mutex</h2>
+<p>What is happening to the CPU load, if the function <span style="font-family: courier new,courier;">workOnRessoucre</span> locks the spinlock für 2 seconds (line 23 - 25)?</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+	<table>
+		<tbody>
+			<tr>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37</pre>
+				</td>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// spinLockSleep.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;atomic&gt;</span>
+<span style="color: #0000ff;">#include &lt;thread&gt;</span>
+
+<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">Spinlock</span>{
+  std::atomic_flag flag;
+public:
+  Spinlock(): flag(ATOMIC_FLAG_INIT) {}
+
+  <span style="color: #2b91af;">void</span> lock(){
+    <span style="color: #0000ff;">while</span>( flag.test_and_set() );
+  }
+
+  <span style="color: #2b91af;">void</span> unlock(){
+    flag.clear();
+  }
+};
+
+Spinlock spin;
+
+<span style="color: #2b91af;">void</span> workOnResource(){
+  spin.lock();
+  std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+  spin.unlock();
+}
+
+
+<span style="color: #2b91af;">int</span> main(){
+
+  std::<span style="color: #0000ff;">thread</span> t(workOnResource);
+  std::<span style="color: #0000ff;">thread</span> t2(workOnResource);
+
+  t.join();
+  t2.join();
+
+}
+</pre>
+				</td>
+			</tr>
+		</tbody>
+	</table>
+</div>
+<p>&nbsp;</p>
+<p>In case the theory is right, one of the four cores of my PC must be fully utilized. Exactly that&nbsp;can you observe in the screenshot.</p>
+<p>&nbsp;<img src="images/blog/Speichermodell/atomic_flag/spinLockSleep.png" alt="spinLockSleep" /></p>
+<p>&nbsp;</p>
+<p>The screenshot shows in a nice way, that the load of one core gets 100%. But my PC is fair. Each time a different core has to perform the busy waiting.</p>
+<p>I use in the next concise program a mutex instead of a spinlock.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+	<pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">#include &lt;mutex&gt;</span>
+<span style="color: #0000ff;">#include &lt;thread&gt;</span>
+
+std::mutex mut;
+
+<span style="color: #2b91af;">void</span> workOnResource(){
+  mut.lock();
+  std::this_thread::sleep_for(std::chrono::milliseconds(5000));
+  mut.unlock();
+}
+
+<span style="color: #2b91af;">int</span> main(){
+
+  std::<span style="color: #0000ff;">thread</span> t(workOnResource);
+  std::<span style="color: #0000ff;">thread</span> t2(workOnResource);
+
+  t.join();
+  t2.join();
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Although I execute the program several times, I can not observe a higher load of the cores.</p>
+<p>&nbsp;</p>
+<p><img src="images/blog/Speichermodell/atomic_flag/mutex.png" alt="mutex" /></p>
+<p>&nbsp;</p>
+<h2>What's next?</h2>
+<p>The next post will be about the class template <span style="font-family: courier new,courier;">std::atomic</span>. The various specializations for bools, integral types and pointers provide a more powerful interface than std::atomic_flag.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>Do you want to get the source code? <a href="index.php/source-code-repository">Source code repository</a></p>
+<p>Would you like to have all posts for the weekend?&nbsp;
+	<a href="index.php/source-code-repository"></a>
+</p>
+<p>{loadmodule mod_acymailing,Neue Artikel zum Wochenende}</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
