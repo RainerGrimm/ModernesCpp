@@ -1,0 +1,110 @@
+<p>With the acquire-release semantic the memory model gets very thrilling. Because now, we have not to reason about the synchronization of threads, now we have to reason about the synchronization of the same atomic in different threads.</p>
+<hr id="system-readmore" />
+<h2>Synchronization and ordering constraints</h2>
+<p>The acquire-release semantic is based on one key idea. A release operation synchronizes with an acquire operation on the same atomic and establishes in addition an ordering constraint. So, all read and write operations can not be moved before an acquire operation, all read and write operations can not be move behind a release operation. But what is an acquire or release operation? The reading of an atomic variable with <span style="font-family: courier new,courier;">load</span> or <span style="font-family: courier new,courier;">test_and_set</span> is an acquire operation. But in addition the acquiring of a lock. Of course the opposite is also true. The releasing of a lock is a release operation. Accordingly, a <span style="font-family: courier new,courier;">store</span> or <span style="font-family: courier new,courier;">clear</span> operation on an atomic variable.</p>
+<p>It's worth to reason once more on the few last sentences from a different perspective. The lock of a mutex is an acquire operation, the unlock of a mutex a release operation. Figuratively speaking that implies, that an operation on a variable can not moved outside of a <a href="index.php/threads-sharing-data">critical section</a>. That hold for both directions. On the other side, a variable can be moved inside of a criticial section. Because the variable moves from the not protected<span id="transmark"></span> to the protected area. Now with a little delay the picture.</p>
+<p>&nbsp;</p>
+<p><img src="images/blog/Speichermodell/AcquireReleaseSemantik/criticalRegion.png" alt="criticalRegion" /></p>
+<p>Have I not promised it? The acquire-release semantic helps a lot to better understand the lock and unlock operation of a mutex. The same reasoning will&nbsp;hold for the <a href="index.php/thread-creation">starting of a thread</a> or the <span style="font-family: courier new,courier;">join</span>-call on a thread. Both are release operations. But that story goes on with the <span style="font-family: courier new,courier;">wait</span> and<span style="font-family: courier new,courier;"> notify_one</span>-call on a <a href="index.php/condition-variables">condition variable</a>. <span style="font-family: courier new,courier;">wait</span> is this case is the acquire, <span style="font-family: courier new,courier;">notify_one</span> the release operation. But what is about <span style="font-family: courier new,courier;">notify_all</span>? Of course you can already guess it. That is a release operation.</p>
+<p>Because of the theory, I can write the spinlock from the post <a href="index.php/the-atomic-flag">The atomic flag</a> more efficient, because the synchronization takes place on the atomic variable <span style="font-family: courier new,courier;">flag.</span></p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+	<table>
+		<tbody>
+			<tr>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37</pre>
+				</td>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// spinlockAcquireRelease.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;atomic&gt;</span>
+<span style="color: #0000ff;">#include &lt;thread&gt;</span>
+
+<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">Spinlock</span>{
+  std::atomic_flag flag;
+public:
+  Spinlock(): flag(ATOMIC_FLAG_INIT) {}
+
+  <span style="color: #2b91af;">void</span> lock(){
+    <span style="color: #0000ff;">while</span>(flag.test_and_set(std::memory_order_acquire) );
+  }
+
+  <span style="color: #2b91af;">void</span> unlock(){
+    flag.clear(std::memory_order_release);
+  }
+};
+
+Spinlock spin;
+
+<span style="color: #2b91af;">void</span> workOnResource(){
+  spin.lock();
+  <span style="color: #008000;">// shared resource</span>
+  spin.unlock();
+}
+
+
+<span style="color: #2b91af;">int</span> main(){
+
+  std::<span style="color: #0000ff;">thread</span> t(workOnResource);
+  std::<span style="color: #0000ff;">thread</span> t2(workOnResource);
+
+  t.join();
+  t2.join();
+
+}
+</pre>
+				</td>
+			</tr>
+		</tbody>
+	</table>
+</div>
+<p>&nbsp;</p>
+<p>The flag.clear-call in line 16 is a release, the flag.test_and_set-call in line 12 an acquire-operation. And - but that is boring - the acquire synchronizes with the release operation. So the heavyweight synchronization&nbsp; with sequencial consistency <span style="font-family: courier new,courier;">(std::memory_order_seq_cst</span>) of two threads is replaced with the lightweight and more performant acquire-release semantic (<span style="font-family: courier new,courier;">std::memory_order_acquire </span>and<span style="font-family: courier new,courier;"> std::memory_order_release</span>). The behaviour is unchanged.</p>
+<p>In case more than two threads uses the spinlock, the acquire semantic of the lock method is not sufficient. Now the lock method is an acquire-release operation. So the memory model in line 12 has to be changed to<span style="font-family: courier new,courier;"> std::memory_order_acq_rel. </span>But that is still cheaper than the default: <span style="font-family: courier new,courier;">std::memory_order_seq_cst.</span><span style="font-family: courier new,courier;"> </span></p>
+<p>&nbsp;</p>
+<h2>What's next?</h2>
+<p>Our journey through the memory model continues in the next post with the transitivity of the acquire-release semantic. So you can synchronize threads, which share no atomic.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;Do you want to get the source code? <a href="index.php/source-code-repository">Source code repository</a></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
