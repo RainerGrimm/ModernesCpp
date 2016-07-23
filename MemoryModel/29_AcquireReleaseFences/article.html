@@ -1,0 +1,254 @@
+<p>Acquire and release fences guarantees similar <a href="index.php/synchronization-and-ordering-constraints">synchronization and ordering constraints</a> as atomics with <a href="index.php/acquire-release-semantic">acquire-release semantic</a>. Similar, because the differences are in the details.</p>
+<hr id="system-readmore" />
+<p>The most obvious difference between acquire and release memory barriers (fences) and atomics with acquire-release semantic is, that memory barriers needs no operations on atomics. But there is a more subtle difference. The acquire and release memory barriers are more heavyweight.</p>
+<h2>Atomic operations versus memory barriers</h2>
+<p>To make my job of writing simpler, I will now simply speak of acquire operations, if I use memory barriers or atomic operations with acquire semantic. The same will hold for release operations.</p>
+<p>The key idea of an acquire and a release operation is, that it establishes synchronizations and ordering constraints between thread. This will also hold for atomic operations with relaxed semantic or non atomic operations. So you see, the acquire and release operations come in pairs. In addition, for the operations on atomic variables with acquire-release semantic must hold, that these act on the same atomic variable. Said that, I&nbsp;will in the first step look at these operations in isolation.</p>
+<p>I start with the acquire operation.</p>
+<h3>Acquire operation</h3>
+<p>A read operation on an atomic variable attached with <span style="font-family: courier new,courier;">std::memory_order_acquire</span> is an acquire operation.</p>
+<p>&nbsp;</p>
+<p><img src="images/blog/Speichermodell/AcquireUndReleaseFences/acquireOperation.png" alt="acquireOperation" width="400" height="80" style="margin: 15px;" />&nbsp;</p>
+<p>In opposite to that there is the <span style="font-family: courier new,courier;">std::atomic_thread_fence</span> with acquire semantic.</p>
+<p><img src="images/blog/Speichermodell/AcquireUndReleaseFences/acquireFence.png" alt="acquireFence" width="500" height="118" style="margin: 15px;" /></p>
+<p>This comparison emphasis two points.</p>
+<ol>
+	<li>A memory barrier with acquire semantic establishes stronger ordering constraints. Although the acquire operation on an atomic and on a memory barrier requires, that no read or write operation can be moved before the acquire operation, there is an additional guarantee with the acquire memory barrier. No read operation can be moved after the acquire memory barrier.</li>
+	<li>The relaxed semantic is sufficient for the reading of the atomic variable <span style="font-family: courier new,courier;">var</span>. The <span style="font-family: courier new,courier;">std::atomc_thread_fence(std::memory_order_acquire)</span> ensures, that this operation can not be moved after the acquire fence.</li>
+</ol>
+<p>The similar statement holds for the release memory barrier.</p>
+<h3>Release operation</h3>
+<p>The write operation on an atomic variable attached with the memory model std::memory_order_release is a release operation.</p>
+<p>&nbsp;<img src="images/blog/Speichermodell/AcquireUndReleaseFences/releaseOperation.png" alt="releaseOperation" width="400" height="105" style="margin: 15px;" /></p>
+<p>And further the release memory barrier.</p>
+<p><img src="images/blog/Speichermodell/AcquireUndReleaseFences/releaseFence.png" alt="releaseFence" width="6ßß" height="NaN" style="margin: 15px;" /><img src="images/blog/Speichermodell/AcquireUndReleaseFences/releaseFence.png" alt="releaseFence" width="600" height="168" style="margin: 15px;" /></p>
+<p>In addition to the release operation on an atomic variable var, the release barrier guarantees two points:<span style="font-family: courier new,courier;"></span></p>
+<ol>
+	<li>Store operations can't be moved before the memory barrier.</li>
+	<li>It's sufficient for the variable var to have relaxed semantic.<span style="font-family: courier new,courier;"></span></li>
+</ol>
+<p>In case you want a simple overview of memory barriers, please read the last post in this blog. But now, I want to go one step further and build a program out of the presented components.</p>
+<h2>Synchronization with atomic operations versus memory barriers</h2>
+<p>I implement as starting point for my comparison a typical consumer-producer workflow with acquire-release semantic. I will do this job with atomics and memory barriers.</p>
+<p>Let's start with atomics, because the most of us are&nbsp;comfortable with them. That will not hold for memory barriers. They are almost complete ignored in the literature to the C++ memory model.</p>
+<h3>Atomare Operationen</h3>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+	<table>
+		<tbody>
+			<tr>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39</pre>
+				</td>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// acquireRelease.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;atomic&gt;</span>
+<span style="color: #0000ff;">#include &lt;thread&gt;</span>
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;string&gt;</span>
+ 
+std::atomic&lt;std::string*&gt; ptr;
+<span style="color: #2b91af;">int</span> data;
+std::atomic&lt;<span style="color: #2b91af;">int</span>&gt; atoData;
+ 
+<span style="color: #2b91af;">void</span> producer(){
+    std::string* p  = <span style="color: #0000ff;">new</span> std::string(<span style="color: #a31515;">"C++11"</span>);
+    data = 2011;
+    atoData.store(2014,std::memory_order_relaxed);
+    ptr.store(p, std::memory_order_release);
+}
+ 
+<span style="color: #2b91af;">void</span> consumer(){
+    std::string* p2;
+    <span style="color: #0000ff;">while</span> (!(p2 = ptr.load(std::memory_order_acquire)));
+    std::cout &lt;&lt; <span style="color: #a31515;">"*p2: "</span> &lt;&lt; *p2 &lt;&lt; std::endl;
+    std::cout &lt;&lt; <span style="color: #a31515;">"data: "</span> &lt;&lt; data &lt;&lt; std::endl;
+    std::cout &lt;&lt; <span style="color: #a31515;">"atoData: "</span> &lt;&lt; atoData.load(std::memory_order_relaxed) &lt;&lt; std::endl;
+}
+ 
+<span style="color: #2b91af;">int</span> main(){
+    
+    std::cout &lt;&lt; std::endl;
+    
+    std::<span style="color: #0000ff;">thread</span> t1(producer);
+    std::<span style="color: #0000ff;">thread</span> t2(consumer);
+    
+    t1.join();
+    t2.join();
+    
+    std::cout &lt;&lt; std::endl;
+    
+}
+</pre>
+				</td>
+			</tr>
+		</tbody>
+	</table>
+</div>
+<p>&nbsp;</p>
+<p>I hope, this program looks familiar to you. That my classic, that I used in the post to<a href="index.php/tag/memory-order-consume"> memory_order_consume</a>. The graphic goes directly to the point, why the consumer thread t2 sees all values from the producer thread t1.</p>
+<p><img src="images/blog/Speichermodell/AcquireUndReleaseFences/acquireRelease.png" alt="acquireRelease" style="margin: 15px;" /></p>
+<p>The program is well defined, because the <em>happens-before</em> relation is transitive. I have only to combine the three <span style="font-family: courier new,courier;">happens-before</span> relations:</p>
+<ol>
+	<li>Line 13 - 15 <em>happens-before</em>&nbsp;line 16<span style="font-family: courier new,courier;"> (ptr.store(p,std::memory_order_release)</span>.</li>
+	<li>Line 21<span style="font-family: courier new,courier;"> while(!(p2= ptrl.load(std::memory_order_acquire)))</span><em> happens-before&nbsp;</em>the lines 22 - 24.</li>
+	<li>Line 16 <em>synchronizes-with</em> line 21.<strong><span style="color: #ff0000;"> =&gt;</span></strong> Line 16<em> happens-before</em> line 21.</li>
+</ol>
+<p>&nbsp;</p>
+<p>But now the story get's more thrilling. How can I adjust the workflow to memory barriers?</p>
+<h3>Memory barriers</h3>
+<p>It's straightforward to port the program to memory barriers.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+	<table>
+		<tbody>
+			<tr>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41</pre>
+				</td>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// acquireReleaseFences.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;atomic&gt;</span>
+<span style="color: #0000ff;">#include &lt;thread&gt;</span>
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;string&gt;</span>
+ 
+std::atomic&lt;std::string*&gt; ptr;
+<span style="color: #2b91af;">int</span> data;
+std::atomic&lt;<span style="color: #2b91af;">int</span>&gt; atoData;
+ 
+<span style="color: #2b91af;">void</span> producer(){
+    std::string* p  = <span style="color: #0000ff;">new</span> std::string(<span style="color: #a31515;">"C++11"</span>);
+    data = 2011;
+    atoData.store(2014,std::memory_order_relaxed);
+    std::atomic_thread_fence(std::memory_order_release);
+    ptr.store(p, std::memory_order_relaxed);
+}
+ 
+<span style="color: #2b91af;">void</span> consumer(){
+    std::string* p2;
+    <span style="color: #0000ff;">while</span> (!(p2 = ptr.load(std::memory_order_relaxed)));
+    std::atomic_thread_fence(std::memory_order_acquire);
+    std::cout &lt;&lt; <span style="color: #a31515;">"*p2: "</span> &lt;&lt; *p2 &lt;&lt; std::endl;
+    std::cout &lt;&lt; <span style="color: #a31515;">"data: "</span> &lt;&lt; data &lt;&lt; std::endl;
+    std::cout &lt;&lt; <span style="color: #a31515;">"atoData: "</span> &lt;&lt; atoData.load(std::memory_order_relaxed) &lt;&lt; std::endl;
+}
+ 
+<span style="color: #2b91af;">int</span> main(){
+    
+    std::cout &lt;&lt; std::endl;
+    
+    std::<span style="color: #0000ff;">thread</span> t1(producer);
+    std::<span style="color: #0000ff;">thread</span> t2(consumer);
+    
+    t1.join();
+    t2.join();
+    
+    std::cout &lt;&lt; std::endl;
+    
+}
+</pre>
+				</td>
+			</tr>
+		</tbody>
+	</table>
+</div>
+<p>&nbsp;</p>
+<p>The first step is to insert just in place of the operations with acquire and release semantic the corresponding memory barriers with acquire and release semantic (line 16 and 23). In the next step I change the atomic operations with acquire or release semantic to relaxed semantic (line 17 and 22). That was already mechanically. Of course, I can only replace one acquire or release operation with the corresponding memory barrier. The key point is, that the release operation establishes with the acquire operation a <em>synchronize-with</em> relation and therefore a <em>happens-before</em> relation.</p>
+<p>For the more visual reader, the whole description in&nbsp;a picture.</p>
+<p><img src="images/blog/Speichermodell/AcquireUndReleaseFences/acquireReleaseFences.png" alt="acquireReleaseFences" style="margin: 15px;" /></p>
+<p>The key question is. Why do the operations after the acquire memory barrier sees the effects of the operations before the release memory barrier? Because <span style="font-family: courier new,courier;">data</span> is a non atomic variable and <span style="font-family: courier new,courier;">atoData</span> is used with relaxed semantic, both can be reordered. But that's not possible. The std::atomic_thread_fence(std::memory_order_release) as a release operation in combination with the std::atomic_thread_fence(std::memory_order_acquire) forbid the partial reordering. To follow my reasoning in detail, read the analysis of the memory barriers at the beginning of the post.</p>
+<p>For clarity, the whole reasoning to the point.</p>
+<ol>
+	<li>The acquire and release memory barriers prevents the reordering of the atomic and non atomic operations across the memory barriers.</li>
+	<li>The consumer thread <span style="font-family: courier new,courier;">t2</span> is waiting in the <span style="font-family: courier new,courier;">while (!(p2= ptr.load(std::memory_order_relaxed)))</span> loop, until the pointer&nbsp;<span style="font-family: courier new,courier;">ptr.stor(p,std::memory_order_relaxed) </span>is set in the producer thread t1.<span style="font-family: courier new,courier;"><br /></span></li>
+	<li>The release memory barrier<em> synchronizes-with</em> the acquire memory barrier.</li>
+</ol>
+<p>Finally, the output of the programs.</p>
+<p><img src="images/blog/Speichermodell/AcquireUndReleaseFences/acquireReleaseAcquireReleaseFences.png" alt="acquireReleaseAcquireReleaseFences" style="margin: 15px;" /></p>
+<h2>What's next?</h2>
+<p>But now, to the wea<span id="transmark"></span>kest memory model. The relaxed semantic will be the topic of the next post. There are no ordering constraints.&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>Do you want to get the source code? <a href="index.php/source-code-repository">Source code repository</a></p>
+<p>&nbsp;</p>
