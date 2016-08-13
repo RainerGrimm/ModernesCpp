@@ -1,0 +1,153 @@
+<p>With atomic data types you can tailor your program to your needs and therefore optimize it. But now we are in the domain of the multithreading experts.</p>
+<hr id="system-readmore" />
+<h2>Sequential consistency</h2>
+<p>If you don't specify the <a href="index.php/c-memory-model">memory model</a>, the <a href="index.php/sequential-consistency">sequential consistency</a> will be used. The sequential consistency guarantees two properties. Each thread executes its instructions in source code order and all threads follow a global order.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; border-width: .1em .1em .1em .8em; padding: .2em .6em;">
+	<table>
+		<tbody>
+			<tr>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18</pre>
+				</td>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// OngoingOptimizationSequentialConsistency.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;atomic&gt;</span>
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;thread&gt;</span>
+
+std::atomic&lt;<span style="color: #2b91af;">int</span>&gt; x{0};
+std::atomic&lt;<span style="color: #2b91af;">int</span>&gt; y{0};
+
+<span style="color: #2b91af;">void</span> writing(){  
+  x.store(2000);  
+  y.store(11);
+}
+
+<span style="color: #2b91af;">void</span> reading(){  
+  std::cout &lt;&lt; y.load() &lt;&lt; <span style="color: #a31515;">" "</span>;  
+  std::cout &lt;&lt; x.load() &lt;&lt; std::endl;
+}
+</pre>
+				</td>
+			</tr>
+		</tbody>
+	</table>
+</div>
+<p>&nbsp;</p>
+<p>This knowledge is suffficient to analyse the program. Because x and y are atomic, the program has no <a href="index.php/threads-sharing-data">race condition</a>. So there is only the question. What values are possible for x and y? But the question is <em>easy</em> to answer. Because of the sequential consistency, all threads have to follow a global order.</p>
+<p>&nbsp;</p>
+<p>It holds:</p>
+<ol>
+	<li><span style="font-family: courier new,courier;">x.store(2000); </span><strong>happens-before</strong> <span style="font-family: courier new,courier;">y.store(11);</span></li>
+	<li><span style="font-family: courier new,courier;">std::cout &lt;&lt; y.load() &lt;&lt; " ";</span> <strong>happens-before</strong> <span style="font-family: courier new,courier;">std::cout &lt;&lt; x.load() &lt;&lt; std::endl;</span></li>
+</ol>
+<p>Therefor: <span style="font-family: courier new,courier;">x.load()</span> can not have 0, if <span style="font-family: courier new,courier;">y.load()</span> is 11, because<span style="font-family: courier new,courier;"> x.store(2000)</span> happens before<span style="font-family: courier new,courier;"> y.store(11)</span>.</p>
+<p>All other values for x and y are possible. Here are three possible interleavings, producing the three different results for x and y.</p>
+<ol>
+	<li><span style="font-family: courier new,courier;">thread1</span> will completely executed beforel <span style="font-family: courier new,courier;">thread2</span>.</li>
+	<li><span style="font-family: courier new,courier;">thread2</span> will completely executed before <span style="font-family: courier new,courier;">thread1</span>.</li>
+	<li><span style="font-family: courier new,courier;">thread1</span> executes the first instruction <span style="font-family: courier new,courier;"> x.store(2000)</span>, before <span style="font-family: courier new,courier;">thread2</span>&nbsp;will be completely executed.</li>
+</ol>
+<p>Here all values for x and y.&nbsp;</p>
+<p><img src="images/blog/Speichermodell/SukzessiveOptimierungSequentielleKonsistenz/sukzessiveOptimierungSequenzielleKonsistenzEng.png" alt="sukzessiveOptimierungSequenzielleKonsistenzEng" style="margin: 15px;" /></p>
+<p>So how does this look like in <a href="index.php/cppmem-an-overview">CppMem</a>.</p>
+<h2>CppMem</h2>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+	<table>
+		<tbody>
+			<tr>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13</pre>
+				</td>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"><span style="color: #2b91af;">int</span> main(){
+  atomic_int x= 0; 
+  atomic_int y= 0;
+  {{{ { 
+      x.store(2000);
+      y.store(11);
+      }
+  ||| {
+      y.load();
+      x.load();
+      } 
+  }}}
+}
+</pre>
+				</td>
+			</tr>
+		</tbody>
+	</table>
+</div>
+<p>&nbsp;</p>
+<p>At first a little bit syntax of CppMem. CppMem uses in line 2 and 3 the&nbsp;<span style="font-family: courier new,courier;">typedef atomic_int</span> for <span style="font-family: courier new,courier;">std::atomic&lt;int&gt;</span>.</p>
+<p>If I execute the program, I'm overwhelmed by the sheer number of execution candidates.</p>
+<p><img src="images/blog/Speichermodell/SukzessiveOptimierungSequentielleKonsistenz/SequenzielleKonsistenz.png" alt="SequenzielleKonsistenz" width="800" height="615" style="margin: 15px;" /></p>
+<p>384 (<span style="color: #ff0000;"><strong>1</strong></span>) possible execution candidates, only 6 of them are consistent. No candidate has a <a href="index.php/threads-sharing-data">data race</a>. How does that work?&nbsp;</p>
+<p>But I'm only interested in the consistent executions. I use the interface (<strong><span style="color: #ff0000;">2</span></strong>) to analyse the six annotated graphs. The other (378) are not consistent. That means for example, they do not respect the <a href="http://en.cppreference.com/w/cpp/atomic/memory_order">modification order</a>. So I totally ignore them.</p>
+<p>We know already, that all values for x and y are possible, except for y= 11 and x= 0. That's because of the default memory model.</p>
+<p><img src="images/blog/Speichermodell/SukzessiveOptimierungSequentielleKonsistenz/sukzessiveOptimierungSequenzielleKonsistenzEng.png" alt="sukzessiveOptimierungSequenzielleKonsistenzEng" style="margin: 15px;" /></p>
+<p>Now the questions is. Which interleavings of the threads produces which values for x and y? I already introduces the symbols in the annotated graph (<a href="index.php/cppmem-an-overview">CppMem - An overview</a>), therefore I will concentrate my analysis on the results for x and y.</p>
+<h3>Execution for (y= 0, x= 0)</h3>
+<p><img src="images/blog/Speichermodell/SukzessiveOptimierungSequentielleKonsistenz/first.png" alt="first" style="margin: 15px;" /></p>
+<h3>Executions for (y= 0, x= 2000)</h3>
+<p><img src="images/blog/Speichermodell/SukzessiveOptimierungSequentielleKonsistenz/second.png" alt="second" style="margin: 15px;" /><img src="images/blog/Speichermodell/SukzessiveOptimierungSequentielleKonsistenz/third.png" alt="third" style="margin: 15px;" /></p>
+<h3><img src="images/blog/Speichermodell/SukzessiveOptimierungSequentielleKonsistenz/four.png" alt="four" style="margin: 15px;" /><img src="images/blog/Speichermodell/SukzessiveOptimierungSequentielleKonsistenz/five.png" alt="five" style="margin: 15px;" /></h3>
+<h3>&nbsp;</h3>
+<h3>Execution for (y= 11, x= 2000)</h3>
+<p><img src="images/blog/Speichermodell/SukzessiveOptimierungSequentielleKonsistenz/six.png" alt="six" style="margin: 15px;" /></p>
+<p>Do you have an idea, why I used the red numbers in the graphs? I have, because I'm not done with my analysis.&nbsp;</p>
+<h3>Deeper insights</h3>
+<p>If I look at the 6 different interleavings of thread in the following graphic, I have the question? Which sequence of instructions corresponds to which graph? Here is the solution. I have assigned to each sequence of instructions the corresponding graph.</p>
+<p>&nbsp;</p>
+<h4>Sequences of&nbsp;instructions</h4>
+<p><img src="images/blog/Speichermodell/SukzessiveOptimierungSequentielleKonsistenz/atomicInterleavingEng.png" alt="atomicInterleavingEng" width="700" height="525" style="margin: 15px;" /></p>
+<p>I start with the simpler cases:</p>
+<ul>
+	<li><strong><span style="color: #ff0000;">(1)</span></strong>: It's quite simple to assign the graph (1) to the sequence (1)<span id="transmark"></span>. In the sequence (1) have x and y the values&nbsp;0, because<span style="font-family: courier new,courier;"> y.load()</span> and <span style="font-family: courier new,courier;">x.load()</span> are executed before the operations <span style="font-family: courier new,courier;">x.store(2000)</span> and<span style="font-family: courier new,courier;"> y.store(11)</span>.</li>
+	<li><strong><span style="color: #ff0000;">(6)</span></strong>: The argumentation for the execution (6) is accordingly. y has the value 11 and y the value 2000, if all load operations happens after all store operations.&nbsp;</li>
+	<li><strong><span style="color: #ff0000;">(2),(3),(4),(5): </span></strong><span style="color: #000000;">Now to the more interesting cases, in which y has den value 0 and x has the value 2000. The yellow arrows (sc) are the key for my reasoning, because they stand for the sequence of instructions. For example lets look at execution <strong><span style="color: #ff0000;">(2)</span></strong>.</span>
+		<ul>
+			<li><strong><span style="color: #ff0000;">(2)</span></strong>: The sequence of the yellow arrows (sc) in the graph <strong><span style="color: #ff0000;">(2)</span></strong> is: Write x= 2000 =&gt; Read y= 0 =&gt; Write y= 11 =&gt; Read x= 2000. This sequence corresponds to the sequence of instructions of the second interleaving of threads <strong><span style="color: #ff0000;">(2)</span></strong>.&nbsp;</li>
+		</ul>
+		<p>&nbsp;</p>
+	</li>
+</ul>
+<h2>What's next?</h2>
+<p>In the next post I will break the sequential consistency. So what will happen, if a base my optimization on the acquire-release semantic.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>Do you want to get the source code? <a href="index.php/source-code-repository">Source code repository</a></p>
