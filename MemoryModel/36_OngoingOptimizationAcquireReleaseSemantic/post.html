@@ -1,0 +1,123 @@
+<p>With the acquire-releae semantic, we break the sequential consistency. In the acquire-release semantic the synchronization takes place between atomic operations on the same atomic and not between threads.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<h2>Acquire-release semantic<span id="transmark"></span></h2>
+<p>The acquire-release semantic is more lightweight and therefore faster than the <a href="index.php/sequential-consistency">sequential consistency</a>, because the synchronization only takes place between atomic operations. But although the intellectual challenge increases.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; border-width: .1em .1em .1em .8em; padding: .2em .6em;">
+	<table>
+		<tbody>
+			<tr>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25</pre>
+				</td>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// ongoingOptimizationAcquireRelease.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;atomic&gt;</span>
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;thread&gt;</span>
+
+std::atomic&lt;<span style="color: #2b91af;">int</span>&gt; x{0};
+std::atomic&lt;<span style="color: #2b91af;">int</span>&gt; y{0};
+
+<span style="color: #2b91af;">void</span> writing(){  
+  x.store(2000,std::memory_order_relaxed);  
+  y.store(11,std::memory_order_release);
+}
+
+<span style="color: #2b91af;">void</span> reading(){  
+  std::cout &lt;&lt; y.load(std::memory_order_acquire) &lt;&lt; <span style="color: #a31515;">" "</span>;  
+  std::cout &lt;&lt; x.load(std::memory_order_relaxed) &lt;&lt; std::endl;
+}
+
+<span style="color: #2b91af;">int</span> main(){
+  std::<span style="color: #0000ff;">thread</span> thread1(writing);
+  std::<span style="color: #0000ff;">thread</span> thread2(reading);
+  thread1.join();
+  thread2.join();
+};
+</pre>
+				</td>
+			</tr>
+		</tbody>
+	</table>
+</div>
+<p>&nbsp;</p>
+<p>On the first glance you will notice, that all operations are atomic. So the program is well defined. But the second glance shows more. The atomic operations on y are attached with the flag<span style="font-family: courier new,courier;"> std::memory_order_release</span> (line 12) and <span style="font-family: courier new,courier;">std::memory_order_acquire </span>(line 16). In opposite to that, the atomic operations on x are annotated with <span style="font-family: courier new,courier;">std::memory_order_relaxed</span>. So there is no <a href="index.php/synchronization-and-ordering-constraints">synchronization and ordering constraints</a> for x. The key for the possible values for x and y can only be answered by y.</p>
+<p>It holds:</p>
+<ol>
+	<li><span style="font-family: courier new,courier;">y.store(11,std::memory_order_release)</span> <strong>synchronizes-with</strong> <span style="font-family: courier new,courier;">y.load(std::memory_order_acquire)</span></li>
+	<li><span style="font-family: courier new,courier;">x.store(2000,std::memory_order_relaxed</span><strong> is visible before </strong> <span style="font-family: courier new,courier;">y.store(11,std::memory_order_release)</span></li>
+	<li>y<span style="font-family: courier new,courier;">.load(std::memory_order_acquire)</span> <strong>is visible before </strong> <span style="font-family: courier new,courier;">x.load(std::memory_order_relaxed)</span></li>
+</ol>
+<p>I will elaborate a little bit more on these three statements. The key idea is, that the store of y in line 10 synchronizes with the load of y in line 16. The reason is, that the operations takes place on the same atomic and they follow the acquire-release semantic. So y uses <span style="font-family: courier new,courier;">std::memory_order_release </span>in line 12 and <span style="font-family: courier new,courier;">std::memory_order_acquire </span>in line 16. But the pairwise operations on y have another very interesting property. They establish a kind of barrier relative to y. So&nbsp;<span style="font-family: courier new,courier;">x.store(2000,std::memory_order_relaxed)</span> can not be executed <strong>after </strong><span style="font-family: courier new,courier;">y.store(std::memory_order_release)</span>, so&nbsp;<span style="font-family: courier new,courier;">x.load()&nbsp;</span>can not be executed <strong>before</strong><span style="font-family: courier new,courier;"> y.load()</span>. &nbsp; <span style="font-family: courier new,courier;"></span></p>
+<p>The reasoning was in the case of the acquire-release semantic a more sophisticated than in the case of the<a href="index.php/sequential-consistency"> sequential consistency</a>. But the possible values for x and y are the same. Only the combination y == 11 and x == 0 is no possible.</p>
+<p>There&nbsp;are three different interleavings of the threads&nbsp;possible, which produces in the three different combinations of the values x and y.</p>
+<ol>
+	<li><span style="font-family: courier new,courier;">thread1</span> will be executed before <span style="font-family: courier new,courier;">thread2</span>.</li>
+	<li><span style="font-family: courier new,courier;">thread2</span> will be executed before <span style="font-family: courier new,courier;">thread1</span>.</li>
+	<li><span style="font-family: courier new,courier;">thread1</span> executes<span style="font-family: courier new,courier;"> x.store(2000)</span>, before <span style="font-family: courier new,courier;">thread2</span> will be&nbsp;exectued. <span style="font-family: courier new,courier;"></span></li>
+</ol>
+<p>&nbsp;</p>
+<p>At the end the table.</p>
+<p><img src="images/blog/Speichermodell/SukzessiveOptimierungAcquireReleaseSemantik/sukzessiveOptimierungSequenzielleKonsistenzEng.png" alt="sukzessiveOptimierungSequenzielleKonsistenzEng" style="margin: 15px;" /></p>
+<h3>CppMem</h3>
+<p>At first, the program once more with <a href="http://svr-pes20-cppmem.cl.cam.ac.uk/cppmem/">CppMem</a>.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+	<pre style="margin: 0; line-height: 125%;"><span style="color: #2b91af;">int</span> main(){
+  atomic_int x= 0; 
+  atomic_int y= 0;
+  {{{ { 
+      x.store(2000,memory_order_relaxed);
+      y.store(11,memory_order_release);
+      }
+  ||| {
+      y.load(memory_order_acquire);
+      x.load(memory_order_relaxed);
+      } 
+  }}}
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>We already know, all results except of&nbsp;(y=11, x=0) are possible.</p>
+<h3>Possible executions</h3>
+<p>Have a look at the three graphs, with the consistent execution. The graphs show, that there is an acquire-release semantic between the store-release of y and the load-acquire from y. It makes no difference, if the reading of y (<strong><span style="color: #ff0000;">rf</span></strong>) takes places in the main thread or in a separate thread. The graphs show the synchronizes-with relation with a <span style="color: #a23ff3;">sw </span>arrow.</p>
+<p>&nbsp;</p>
+<h4>Execution for (y=0, x= 0)</h4>
+<p><img src="images/blog/Speichermodell/SukzessiveOptimierungAcquireReleaseSemantik/first.png" alt="first" style="margin: 15px;" /></p>
+<h4>Execution for (y= 0, x= 2000)</h4>
+<p><img src="images/blog/Speichermodell/SukzessiveOptimierungAcquireReleaseSemantik/second.png" alt="second" style="margin: 15px;" /></p>
+<h4>Execution for (y=11, x= 2000)</h4>
+<p><img src="images/blog/Speichermodell/SukzessiveOptimierungAcquireReleaseSemantik/third.png" alt="third" style="margin: 15px;" /></p>
+<h2>Whats's next?</h2>
+<p>But we can do better. Why should x be an atomic? There is no reason. That was my first, but incorrect assumption. Why? You will read in the next post.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>Do you want to get the source code? <a href="index.php/source-code-repository">Source code repository</a></p>
