@@ -1,0 +1,101 @@
+<p>But we can do better and further improve the acquire-release semantic of the<a href="index.php/ongoing-optimization-acquire-release-semantic-with-cppmem"> last post</a>. Why should x be an atomic? There is no reason. That was my first, but incorrect assumption. See why?</p>
+<hr id="system-readmore" />
+<p>A<a href="index.php/acquire-release-semantic-the-typical-misunderstanding">&nbsp;typical misunderstanding</a> in the application of the acquire-release semantic is, to assume, that the acquire operation is waiting for the release operation. So based on this assumption you may think, that x has not to be an atomic variable. So we can further optimize the program.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; border-width: .1em .1em .1em .8em; padding: .2em .6em;">
+	<table>
+		<tbody>
+			<tr>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25</pre>
+				</td>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// ongoingOptimizationAcquireReleaseBroken.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;atomic&gt;</span>
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;thread&gt;</span>
+
+<span style="color: #2b91af;">int</span> x= 0;
+std::atomic&lt;<span style="color: #2b91af;">int</span>&gt; y{0};
+
+<span style="color: #2b91af;">void</span> writing(){  
+  x= 2000;  
+  y.store(11,std::memory_order_release);
+}
+<span id="transmark"></span>
+<span style="color: #2b91af;">void</span> reading(){  
+  std::cout &lt;&lt; y.load(std::memory_order_acquire) &lt;&lt; <span style="color: #a31515;">" "</span>;  
+  std::cout &lt;&lt; x &lt;&lt; std::endl;
+}
+
+<span style="color: #2b91af;">int</span> main(){
+  std::<span style="color: #0000ff;">thread</span> thread1(writing);
+  std::<span style="color: #0000ff;">thread</span> thread2(reading);
+  thread1.join();
+  thread2.join();
+};
+</pre>
+				</td>
+			</tr>
+		</tbody>
+	</table>
+</div>
+<p>&nbsp;</p>
+<p>The program has a <a href="index.php/threads-sharing-data">data race</a> on x and has therefore undefined behaviour. If <span style="font-family: courier new,courier;">y.store(11,std::memory_order_release)</span> (line 12) is executed before <span style="font-family: courier new,courier;">y.store(11,std::memory_order_release)</span> (line 16), the acquire-release semantic guarantees, that <span style="font-family: courier new,courier;">x= 2000</span> (line 11) is executed before the reading of x in line 17. But if not. In this case, the reading of x will be executed at the same time as the writing of x. So we have&nbsp;concurrent access on a shared variable, one of them is a write. That's per definition a data race.&nbsp;<span style="font-family: courier new,courier;"> </span></p>
+<p>The table puts it in a nutshell.</p>
+<p><img src="images/blog/Speichermodell/SukzessiveOptimierungAcquireReleaseSemantik/undefinedEng.png" alt="undefinedEng" style="margin: 15px;" /></p>
+<p>&nbsp;</p>
+<p>I made this mistake in my presentation "<a href="index.php?option=com_content&amp;view=article&amp;id=12:oeffentliche-vortraege&amp;catid=27:vortraege&amp;Itemid=201">Mulithreading done right?</a>" in<a href="index.php?option=com_content&amp;view=article&amp;id=12:oeffentliche-vortraege&amp;catid=27:vortraege&amp;Itemid=201#MultithreadingDoneRightBerlin"> Berlin</a>. In <a href="index.php?option=com_content&amp;view=article&amp;id=12:oeffentliche-vortraege&amp;catid=27:vortraege&amp;Itemid=201#MultithreadingDoneRightMoskau">Moscow</a>, I did it right. I never claimed, that the C++ memory model is a piece of cake.</p>
+<p>Now its time for CppMem. Let's see, what CppMem finds out.</p>
+<h3>CppMem</h3>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+	<pre style="margin: 0; line-height: 125%;"><span style="color: #2b91af;">int</span> main(){
+  <span style="color: #2b91af;">int</span> x= 0;
+  atomic_int y= 0;
+  {{{ { 
+      x= 2000;
+      y.store(11,memory_order_release);
+      }
+  ||| {
+      y.load(memory_order_acquire);
+      x;
+      }
+  }}}
+}
+</pre>
+</div>
+<p>The&nbsp;<a href="index.php?option=com_content&amp;view=article&amp;id=70:threads-teilen-daten&amp;catid=35:c&amp;Itemid=101#KritischerWettlauf">data race</a> occurs, if one thread is writing x= 2000 and the other thread is reading x. In the graph, we get a <span style="color: #ddb70e;"><strong>dr</strong></span> symbol (data race) on the arrow. <em></em></p>
+<p><img src="images/blog/Speichermodell/SukzessiveOptimierungAcquireReleaseSemantik/raceAcquireRelease.png" alt="raceAcquireRelease" style="margin: 15px;" /></p>
+<h2>What's next?</h2>
+<p>The ultimate step in the process of ongoing optimization is still missing. In the next post, I will use the relaxed semantic.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>Do you want to get the source code? <a href="index.php/source-code-repository">Source code repository</a></p>
