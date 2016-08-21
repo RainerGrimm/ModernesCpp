@@ -1,0 +1,104 @@
+<p>With the relaxed semantic, we have no synchronisations and ordering constraints on atomic operations.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<h2>Relaxed semantic</h2>
+<p>With the relaxed semantic, there is only the atomicity of the operations on atomics left.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+	<table>
+		<tbody>
+			<tr>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25</pre>
+				</td>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// ongoingOptimizationRelaxedSemantic.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;atomic&gt;</span>
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;thread&gt;</span>
+
+std::atomic&lt;<span style="color: #2b91af;">int</span>&gt; x{0};
+std::atomic&lt;<span style="color: #2b91af;">int</span>&gt; y{0};
+
+<span style="color: #2b91af;">void</span> writing(){  
+  x.store(2000,std::memory_order_relaxed);  
+  y.store(11,std::memory_order_relaxed);
+}
+
+<span style="color: #2b91af;">void</span> reading(){  
+  std::cout &lt;&lt; y.load(std::memory_order_relaxed) &lt;&lt; <span style="color: #a31515;">" "</span>;  
+  std::cout &lt;&lt; x.load(std::memory_order_relaxed) &lt;&lt; std::endl;
+}
+
+<span style="color: #2b91af;">int</span> main(){
+  std::<span style="color: #0000ff;">thread</span> thread1(writing);
+  std::<span style="color: #0000ff;">thread</span> thread2(reading);
+  thread1.join();
+  thread2.join();
+};
+</pre>
+				</td>
+			</tr>
+		</tbody>
+	</table>
+</div>
+<p>&nbsp;</p>
+<p>Now, the questions are very easy to answer. Does the program have well defined behaviour? Which values for x and y are possible? At the one hand, all operations on x and y are atomic. So the program is well defined. On the other hand, there are no restrictions on the interleavings of the threads. In the end, thread 2 can see the operations on thread 1 in different order. So this is the first time in our process of ongoing optimizations, that thread 2 can display x == 0 and y == 1. All combinations of x and y are&nbsp;possible.</p>
+<p><img src="images/blog/Speichermodell/SukzessiveOptimierungRelaxedSemantik/sukzessiveOptimierungRelaxedSemantikEng.png" alt="sukzessiveOptimierungRelaxedSemantikEng" /></p>
+<p>&nbsp;I'm curious, how the graph of CppMem will look like for x == 0 and y == 1?</p>
+<h3>CppMem</h3>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+	<pre style="margin: 0; line-height: 125%;"><span style="color: #2b91af;">int</span> main(){
+  atomic_int x= 0;
+  atomic_int y= 0;
+  {{{ { 
+      x.store(2000, memory_order_relaxed);
+      y.store(11,memory_order_relaxed);
+      }
+  ||| {
+      y.load(memory_order_relaxed);
+      x.load(memory_order_relaxed);
+      }
+  }}}
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>That was the CppMem program. Now to the graph.</p>
+<h3>Execution for (y=0,x=2000)</h3>
+<p>The graph shows crystal clear the unintuitive behaviour.</p>
+<p><img src="images/blog/Speichermodell/SukzessiveOptimierungRelaxedSemantik/relaxed.png" alt="relaxed" style="margin: 15px;" /></p>
+<p>x reads the value 2000 from the writing thread, but y reads the value 0 from the main thread. That happens, although the reading of y is sequenced before the reading of x. Sequenced before exactly means, that the operation <strong> e:Rrix</strong> <strong>sb</strong>&nbsp; is <em>sequenced-before </em>the operation <strong>f:Rrix</strong>.</p>
+<h2>What's next?</h2>
+<p>This was the last post in my mini seri<span id="transmark"></span>es about <a href="index.php/tag/ongoingoptimization">ongoing optimization</a>. So, what's next?&nbsp;There are a lot of issues with the singleton pattern. I'm totally aware of that. But the singleton pattern is an ideal use case for a variable, which has to be initialized in a thread safe way. From that point on, you can use it without synchronization. <br />So in the next post, I discuss different ways to initialize a singleton in a multithreading envrironment. You get the performance numbers and can reason about your uses cases for the thread safe initialization of a variable.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>Do you want to get the source code? <a href="index.php/source-code-repository">Source code repository</a></p>
