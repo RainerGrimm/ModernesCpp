@@ -1,0 +1,544 @@
+<p>What is the fastest way to add the elements of a <span style="font-family: courier new,courier;">std::vector</span>?. A question which I will pursue in the next posts. I use the addition in one thread as reference value. In further posts I discuss atomics, locks, and thread local data.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<h2>My strategy</h2>
+<p>My plan is to fill a std::vector with one hundred million arbitrary numbers between 1 and 10. I apply the normal distribution to get the numbers. The task is it to calculate the sum of all values.&nbsp;</p>
+<p>As usual I use my Linux desktop and my Windows laptop to get the numbers. The Linux PC has four, my Windows PC two cores. Here are details to my compilers: <a href="index.php/thread-safe-initialization-of-a-singleton">Thread safe initialization of a singleton</a>. I will measure the performance with and without maximum optimization.</p>
+<h2>A simple loop</h2>
+<p>The obvious strategy is it to add the numbers in a range-based for lop.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+	<table>
+		<tbody>
+			<tr>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34</pre>
+				</td>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// calculateWithLoop.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;chrono&gt;</span>
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;random&gt;</span>
+<span style="color: #0000ff;">#include &lt;vector&gt;</span>
+
+constexpr <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span> size= 100000000;
+
+<span style="color: #2b91af;">int</span> main(){
+
+  std::cout &lt;&lt; std::endl;
+
+  std::vector&lt;<span style="color: #2b91af;">int</span>&gt; randValues;
+  randValues.reserve(size);
+
+  <span style="color: #008000;">// random values</span>
+  std::random_device seed;
+  std::mt19937 engine(seed());
+  std::uniform_int_distribution&lt;&gt; uniformDist(1,10);
+  <span style="color: #0000ff;">for</span> ( <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span> i=0 ; i&lt; size ; ++i) randValues.push_back(uniformDist(engine));
+ 
+  <span style="color: #0000ff;">auto</span> start = std::chrono::system_clock::now();
+  
+  <span style="color: #2b91af;">unsigned</span> <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span> add= {};
+  <span style="color: #0000ff;">for</span> (<span style="color: #0000ff;">auto</span> n: randValues) add+= n;
+ 
+  std::chrono::duration&lt;<span style="color: #2b91af;">double</span>&gt; dur= std::chrono::system_clock::now() - start;
+  std::cout &lt;&lt; <span style="color: #a31515;">"Time for addition "</span> &lt;&lt; dur.count() &lt;&lt; <span style="color: #a31515;">" seconds"</span> &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"Result: "</span> &lt;&lt; add &lt;&lt; std::endl;
+
+  std::cout &lt;&lt; std::endl;
+
+}
+</pre>
+				</td>
+			</tr>
+		</tbody>
+	</table>
+</div>
+<p>&nbsp;</p>
+<p>The&nbsp;calculation takes place in line 26. How fast are my computers?&nbsp;</p>
+<h3>Without optimization</h3>
+<p>&nbsp;<img src="images/blog/Speichermodell/AdditionInEinemThread/CalculateWithLoop.png" alt="CalculateWithLoop" width="350" height="174" style="margin: 15px;" /><img src="images/blog/Speichermodell/AdditionInEinemThread/CalculateWithLoop_win.PNG" alt="CalculateWithLoop win" width="350" height="145" /></p>
+<h3>Maximum optimization</h3>
+<p>&nbsp;<img src="images/blog/Speichermodell/AdditionInEinemThread/CalculateWithLoopOpt.png" alt="CalculateWithLoopOpt" width="350" height="174" style="margin: 15px;" /><img src="images/blog/Speichermodell/AdditionInEinemThread/CalculateWithLoopOpt_win.PNG" alt="CalculateWithLoopOpt win" width="350" height="145" /></p>
+<p>You should not use explicit loops. A rule which in particular hold true for Windows. That's simple therefore I have to look in the Standard Template Library (STL).&nbsp;</p>
+<h2>The STL with std::accumulate</h2>
+<p><span style="font-family: courier new,courier;">std::accumulate</span> is the standard way to calculate the sum.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+	<table>
+		<tbody>
+			<tr>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35</pre>
+				</td>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// calculateWithStd.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;algorithm&gt;</span>
+<span style="color: #0000ff;">#include &lt;chrono&gt;</span>
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;numeric&gt;</span>
+<span style="color: #0000ff;">#include &lt;random&gt;</span>
+<span style="color: #0000ff;">#include &lt;vector&gt;</span>
+
+constexpr <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span> size= 100000000;
+
+<span style="color: #2b91af;">int</span> main(){
+
+  std::cout &lt;&lt; std::endl;
+
+  std::vector&lt;<span style="color: #2b91af;">int</span>&gt; randValues;
+  randValues.reserve(size);
+
+  <span style="color: #008000;">// random values</span>
+  std::random_device seed;
+  std::mt19937 engine(seed());
+  std::uniform_int_distribution&lt;&gt; uniformDist(1,10);
+  <span style="color: #0000ff;">for</span> ( <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span> i=0 ; i&lt; size ; ++i) randValues.push_back(uniformDist(engine));
+ 
+  <span style="color: #0000ff;">auto</span> start = std::chrono::system_clock::now();
+  
+  <span style="color: #2b91af;">unsigned</span> <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span> add= std::accumulate(randValues.begin(),randValues.end(),0);
+ 
+  std::chrono::duration&lt;<span style="color: #2b91af;">double</span>&gt; dur= std::chrono::system_clock::now() - start;
+  std::cout &lt;&lt; <span style="color: #a31515;">"Time for addition "</span> &lt;&lt; dur.count() &lt;&lt; <span style="color: #a31515;">" seconds"</span> &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"Result: "</span> &lt;&lt; add &lt;&lt; std::endl;
+
+  std::cout &lt;&lt; std::endl;
+
+}
+</pre>
+				</td>
+			</tr>
+		</tbody>
+	</table>
+</div>
+<p>&nbsp;</p>
+<p>The key lines is line 27. The performance of<span style="font-family: courier new,courier;"> std::acummulate</span> corresponds to the performance of the range-based for loop. But not for Windows.</p>
+<h3>Without optimization</h3>
+<h3>&nbsp;<img src="images/blog/Speichermodell/AdditionInEinemThread/CalculateWithStd.png" alt="CalculateWithStd" width="350" height="NaN" style="margin: 15px;" /><img src="images/blog/Speichermodell/AdditionInEinemThread/CalculateWithStd_win.PNG" alt="CalculateWithStd win" width="350" height="145" /></h3>
+<h3>Maximum optimization</h3>
+<p>&nbsp;<img src="images/blog/Speichermodell/AdditionInEinemThread/CalculateWithStdOpt.png" alt="CalculateWithStdOpt" width="350" height="174" style="margin: 15px;" /><img src="images/blog/Speichermodell/AdditionInEinemThread/CalculateWithStdOpt_win.PNG" alt="CalculateWithStdOpt win" width="350" height="145" /></p>
+<p>That was all. I have my numbers to compare the single threaded with the multithreading program. Really? I'm very curious to protect the summation with a lock or use an atomic. So we get the overhead of protection.</p>
+<h2>Protection by a lock</h2>
+<p>If I protect the access to the summation variable with a lock, I get the answers to my two questions.<span style="font-family: courier new,courier;"></span></p>
+<ol>
+	<li>How expensive is the synchronization of a lock?</li>
+	<li>How fast can a lock be if no concurrent access to a variable takes place?</li>
+</ol>
+<p>Of course I can rephrase point 2. If more the one thread access the shared variable, the access time decreases.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+	<table>
+		<tbody>
+			<tr>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41</pre>
+				</td>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// calculateWithLock.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;chrono&gt;</span>
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;mutex&gt;</span>
+<span style="color: #0000ff;">#include &lt;numeric&gt;</span>
+<span style="color: #0000ff;">#include &lt;random&gt;</span>
+<span style="color: #0000ff;">#include &lt;vector&gt;</span>
+
+constexpr <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span> size= 100000000;
+
+<span style="color: #2b91af;">int</span> main(){
+
+  std::cout &lt;&lt; std::endl;
+
+  std::vector&lt;<span style="color: #2b91af;">int</span>&gt; randValues;
+  randValues.reserve(size);
+
+  <span style="color: #008000;">// random values</span>
+  std::random_device seed;
+  std::mt19937 engine(seed());
+  std::uniform_int_distribution&lt;&gt; uniformDist(1,10);
+  <span style="color: #0000ff;">for</span> ( <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span> i=0 ; i&lt; size ; ++i) randValues.push_back(uniformDist(engine));
+
+  std::mutex myMutex;
+ 
+  <span style="color: #2b91af;">unsigned</span> <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">int</span> add= 0;
+  <span style="color: #0000ff;">auto</span> start = std::chrono::system_clock::now();
+  
+  <span style="color: #0000ff;">for</span> (<span style="color: #0000ff;">auto</span> i: randValues){
+      std::lock_guard&lt;std::mutex&gt; myLockGuard(myMutex);
+      add+= i;
+  }
+ 
+  std::chrono::duration&lt;<span style="color: #2b91af;">double</span>&gt; dur= std::chrono::system_clock::now() - start;
+  std::cout &lt;&lt; <span style="color: #a31515;">"Time for addition "</span> &lt;&lt; dur.count() &lt;&lt; <span style="color: #a31515;">" seconds"</span> &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"Result: "</span> &lt;&lt; add &lt;&lt; std::endl;
+    
+  std::cout &lt;&lt; std::endl;
+
+}
+</pre>
+				</td>
+			</tr>
+		</tbody>
+	</table>
+</div>
+<p>&nbsp;</p>
+<p>That's the result I assumed. The access on the protected variable <span style="font-family: courier new,courier;">add</span> is slower.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+	<table>
+		<tbody>
+			<tr>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41</pre>
+				</td>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// calculateWithLock.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;chrono&gt;</span>
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;mutex&gt;</span>
+<span style="color: #0000ff;">#include &lt;numeric&gt;</span>
+<span style="color: #0000ff;">#include &lt;random&gt;</span>
+<span style="color: #0000ff;">#include &lt;vector&gt;</span>
+
+constexpr <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span> size= 100000000;
+
+<span style="color: #2b91af;">int</span> main(){
+
+  std::cout &lt;&lt; std::endl;
+
+  std::vector&lt;<span style="color: #2b91af;">int</span>&gt; randValues;
+  randValues.reserve(size);
+
+  <span style="color: #008000;">// random values</span>
+  std::random_device seed;
+  std::mt19937 engine(seed());
+  std::uniform_int_distribution&lt;&gt; uniformDist(1,10);
+  <span style="color: #0000ff;">for</span> ( <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span> i=0 ; i&lt; size ; ++i) randValues.push_back(uniformDist(engine));
+
+  std::mutex myMutex;
+ 
+  <span style="color: #2b91af;">unsigned</span> <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">int</span> add= 0;
+  <span style="color: #0000ff;">auto</span> start = std::chrono::system_clock::now();
+  
+  <span style="color: #0000ff;">for</span> (<span style="color: #0000ff;">auto</span> i: randValues){
+      std::lock_guard&lt;std::mutex&gt; myLockGuard(myMutex);
+      add+= i;
+  }
+ 
+  std::chrono::duration&lt;<span style="color: #2b91af;">double</span>&gt; dur= std::chrono::system_clock::now() - start;
+  std::cout &lt;&lt; <span style="color: #a31515;">"Time for addition "</span> &lt;&lt; dur.count() &lt;&lt; <span style="color: #a31515;">" seconds"</span> &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"Result: "</span> &lt;&lt; add &lt;&lt; std::endl;
+    
+  std::cout &lt;&lt; std::endl;
+
+}
+</pre>
+				</td>
+			</tr>
+		</tbody>
+	</table>
+</div>
+<p>&nbsp;</p>
+<h3>Without optimization</h3>
+<p><img src="images/blog/Speichermodell/AdditionInEinemThread/CalculateWithLock.png" alt="CalculateWithLock" width="350" height="174" style="margin: 15px;" /><img src="images/blog/Speichermodell/AdditionInEinemThread/CalculateWithLock_win.PNG" alt="CalculateWithLock win" width="350" height="145" /></p>
+<h3>Maximum optimization</h3>
+<p><img src="images/blog/Speichermodell/AdditionInEinemThread/CalculateWithLockOpt.png" alt="CalculateWithLockOpt" width="350" height="174" style="margin: 15px;" /><img src="images/blog/Speichermodell/AdditionInEinemThread/CalculateWithLockOpt_win.PNG" alt="CalculateWithLockOpt win" width="350" height="145" /></p>
+<p>The non-optimized version with the lock is 4 - 12 times slower as the maximum optimized. The maximum optimized about 10 - 40 times slower thant <span style="font-family: courier new,courier;">std::accumulate.</span></p>
+<p>Finally&nbsp; atomics.</p>
+<h2>Protection by an atomic</h2>
+<p>The same question for locks holds also for atomics.</p>
+<ol>
+	<li>How expensive is the synchronization of a lock?</li>
+	<li>How fast can a lock be if no concurrent access to a variable takes place?</li>
+</ol>
+<p>But there is an additional question. How is the performance difference between an atomic and a lock?</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+	<table>
+		<tbody>
+			<tr>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50</pre>
+				</td>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// calculateWithAtomic.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;atomic&gt;</span>
+<span style="color: #0000ff;">#include &lt;chrono&gt;</span>
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;numeric&gt;</span>
+<span style="color: #0000ff;">#include &lt;random&gt;</span>
+<span style="color: #0000ff;">#include &lt;vector&gt;</span>
+
+constexpr <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span> size= 100000000;
+
+<span style="color: #2b91af;">int</span> main(){
+
+  std::cout &lt;&lt; std::endl;
+
+  std::vector&lt;<span style="color: #2b91af;">int</span>&gt; randValues;
+  randValues.reserve(size);
+
+  <span style="color: #008000;">// random values</span>
+  std::random_device seed;
+  std::mt19937 engine(seed());
+  std::uniform_int_distribution&lt;&gt; uniformDist(1,10);
+  <span style="color: #0000ff;">for</span> ( <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span> i=0 ; i&lt; size ; ++i) randValues.push_back(uniformDist(engine));
+  
+  std::atomic&lt;<span style="color: #2b91af;">unsigned</span> <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span>&gt; add={};
+  std::cout &lt;&lt; std::boolalpha &lt;&lt; <span style="color: #a31515;">"add.is_lock_free(): "</span> &lt;&lt; add.is_lock_free() &lt;&lt; std::endl;
+  std::cout &lt;&lt; std::endl;
+ 
+  <span style="color: #0000ff;">auto</span> start = std::chrono::system_clock::now();
+  
+  <span style="color: #0000ff;">for</span> (<span style="color: #0000ff;">auto</span> i: randValues) add+= i;
+ 
+  std::chrono::duration&lt;<span style="color: #2b91af;">double</span>&gt; dur= std::chrono::system_clock::now() - start;
+  std::cout &lt;&lt; <span style="color: #a31515;">"Time for addition "</span> &lt;&lt; dur.count() &lt;&lt; <span style="color: #a31515;">" seconds"</span> &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"Result: "</span> &lt;&lt; add &lt;&lt; std::endl;
+    
+  std::cout &lt;&lt; std::endl;
+  
+  add=0;
+  start = std::chrono::system_clock::now();
+  
+  <span style="color: #0000ff;">for</span> (<span style="color: #0000ff;">auto</span> i: randValues) add.fetch_add(i,std::memory_order_relaxed);
+  
+  dur= std::chrono::system_clock::now() - start;
+  std::cout &lt;&lt; <span style="color: #a31515;">"Time for addition "</span> &lt;&lt; dur.count() &lt;&lt; <span style="color: #a31515;">" seconds"</span> &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"Result: "</span> &lt;&lt; add &lt;&lt; std::endl;
+    
+  std::cout &lt;&lt; std::endl;
+
+}
+</pre>
+				</td>
+			</tr>
+		</tbody>
+	</table>
+</div>
+<p>&nbsp;</p>
+<p>The program is special. First I ask in line 26, if the atomic has a lock. That is crucial, because otherwise, there is not difference between the usage of locks and atomics. On all mainstream platforms I knew atomics use no lock. Second I calculate the sum in two ways. I use in line 31 the += oper<span id="transmark"></span>ator, in line 42 the method <span style="font-family: courier new,courier;">fetch_add</span>. Both variants have in the single threaded case a comparable performance but I can explicitly specify in the case of <span style="font-family: courier new,courier;">fetch_add</span> the memory model. More about that point in the next post.</p>
+<p>&nbsp;</p>
+<p>But now the numbers.</p>
+<h3>Without optimization</h3>
+<p>&nbsp;<img src="images/blog/Speichermodell/AdditionInEinemThread/CalculateWithAtomic.png" alt="CalculateWithAtomic" width="350" height="242" style="margin: 15px;" /><img src="images/blog/Speichermodell/AdditionInEinemThread/CalculateWithAtomic_win.PNG" alt="CalculateWithAtomic win" width="350" height="220" /></p>
+<h3>Maximum optimization</h3>
+<p><img src="images/blog/Speichermodell/AdditionInEinemThread/CalculateWithAtomicOpt.png" alt="CalculateWithAtomicOpt" width="350" height="242" style="margin: 15px;" /><img src="images/blog/Speichermodell/AdditionInEinemThread/CalculateWithAtomicOpt_win.PNG" alt="CalculateWithAtomicOpt win" width="350" height="220" /></p>
+<p>The atomics are in the case of Linux 1.5 times faster, in the case of windows 8 times faster than the <span style="font-family: courier new,courier;">std::accumulate</span> algorithm. That changes even more in the case of optimization. Now Linux is 15 times, Windows is 50 times faster.</p>
+<p>I want to stress two points.</p>
+<ol>
+	<li>Atomics are 2 - 3 times faster on Linux and Windows than locks.</li>
+	<li>Linux is in particular for atomics 2 times faster than Windows.</li>
+</ol>
+<h2>All numbers compact</h2>
+<p>How lost the orientation because of the number. Here is the overview in seconds.</p>
+<p><img src="images/blog/Speichermodell/AdditionInEinemThread/SingleThreadedAdditionEng.png" alt="SingleThreadedAdditionEng" style="margin: 10px;" /></p>
+<h2>What's next?</h2>
+<p>Singlethreaded becomes mulithreaded. The summation variable <span style="font-family: courier new,courier;">add</span> becomes in the first step a shared variable used by four threads. In the second step <span style="font-family: courier new,courier;">add</span> will be an atomic.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>Do you want to get the source code? <a href="index.php/source-code-repository">Source code repository</a></p>
+<p>&nbsp;</p>
