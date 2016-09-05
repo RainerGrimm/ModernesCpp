@@ -1,0 +1,557 @@
+<p>My goal is it to sum up all elements of a vector. I used in the<a href="index.php/single-threaded-sum-of-the-elements-of-a-vector"> last post</a> a single thread. In this post I use multiple threads and therefore the full power of my PC. The addition will be done on a shared variable. What at first glance seems like a good idea is a very naive strategy. The synchronization overhead of the summation variable is&nbsp;higher than the performance benefit of my four or two cores.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<h2>The strategy<span id="transmark"></span></h2>
+<p>I sum up 100 000 000 million random numbers between 1 and 10 In accordance with my <a href="index.php/single-threaded-sum-of-the-elements-of-a-vector">last post</a>. To be sure that my calculation is right I reduce the randomness. So I use no seed and I get each time the same random numbers on my two architectures. Therefore it's easy to verify my total result. Both calculations will run on my 4 CPU Linux and my 2 CPU Windows PC. As ever with maximum and without optimization. On Windows I was very puzzled.&nbsp;</p>
+<p>What are the interesting questions?</p>
+<ol>
+	<li>How differs locks and atomics?</li>
+	<li>What's the difference between the <a href="index.php/single-threaded-sum-of-the-elements-of-a-vector">single threaded </a>and the multithreading execution of <span style="font-family: courier new,courier;">std::accumulate</span>?</li>
+</ol>
+<h2>Protection of the shared variable with the std::lock_guard</h2>
+<p>The simplest way to protect a shared variable is to wrap a mutex in a lock.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+	<table>
+		<tbody>
+			<tr>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+55
+56
+57</pre>
+				</td>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// synchronizationWithLock.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;chrono&gt;</span>
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;mutex&gt;</span>
+<span style="color: #0000ff;">#include &lt;random&gt;</span>
+<span style="color: #0000ff;">#include &lt;thread&gt;</span>
+<span style="color: #0000ff;">#include &lt;utility&gt;</span>
+<span style="color: #0000ff;">#include &lt;vector&gt;</span>
+
+constexpr <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span> size= 100000000;   
+
+constexpr <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span> firBound=  25000000;
+constexpr <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span> secBound=  50000000;
+constexpr <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span> thiBound=  75000000;
+constexpr <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span> fouBound= 100000000;
+
+std::mutex myMutex;
+
+<span style="color: #2b91af;">void</span> sumUp(<span style="color: #2b91af;">unsigned</span> <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span>&amp; sum, <span style="color: #0000ff;">const</span> std::vector&lt;<span style="color: #2b91af;">int</span>&gt;&amp; val, <span style="color: #2b91af;">unsigned</span> <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span> beg, <span style="color: #2b91af;">unsigned</span> <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span> end){
+    <span style="color: #0000ff;">for</span> (<span style="color: #0000ff;">auto</span> it= beg; it &lt; end; ++it){
+        std::lock_guard&lt;std::mutex&gt; myLock(myMutex);
+        sum+= val[it];
+    }
+}
+
+<span style="color: #2b91af;">int</span> main(){
+
+  std::cout &lt;&lt; std::endl;
+
+  std::vector&lt;<span style="color: #2b91af;">int</span>&gt; randValues;
+  randValues.reserve(size);
+
+  std::mt19937 engine;
+  std::uniform_int_distribution&lt;&gt; uniformDist(1,10);
+  <span style="color: #0000ff;">for</span> ( <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span> i=0 ; i&lt; size ; ++i) randValues.push_back(uniformDist(engine));
+ 
+  <span style="color: #2b91af;">unsigned</span> <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span> sum= 0;
+  <span style="color: #0000ff;">auto</span> start = std::chrono::system_clock::now();
+  
+  std::<span style="color: #0000ff;">thread</span> t1(sumUp,std::ref(sum),std::ref(randValues),0,firBound);
+  std::<span style="color: #0000ff;">thread</span> t2(sumUp,std::ref(sum),std::ref(randValues),firBound,secBound);
+  std::<span style="color: #0000ff;">thread</span> t3(sumUp,std::ref(sum),std::ref(randValues),secBound,thiBound);
+  std::<span style="color: #0000ff;">thread</span> t4(sumUp,std::ref(sum),std::ref(randValues),thiBound,fouBound);   
+  
+ 
+  t1.join();
+  t2.join();
+  t3.join();
+  t4.join();
+  std::chrono::duration&lt;<span style="color: #2b91af;">double</span>&gt; dur= std::chrono::system_clock::now() - start;
+  std::cout &lt;&lt; <span style="color: #a31515;">"Time for addition "</span> &lt;&lt; dur.count() &lt;&lt; <span style="color: #a31515;">" seconds"</span> &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"Result: "</span> &lt;&lt; sum &lt;&lt; std::endl;
+
+  std::cout &lt;&lt; std::endl;
+
+}
+</pre>
+				</td>
+			</tr>
+		</tbody>
+	</table>
+</div>
+<p>&nbsp;</p>
+<p>The program is easy to explain. The function <span style="font-family: courier new,courier;">sumUp</span> (line 20 - 25) is the work package, each thread has to perform. This work package consists of the summation variable <span style="font-family: courier new,courier;">sum</span> and the <span style="font-family: courier new,courier;">std::vector val</span>, both getting by reference. beg and end limit the range on which the summation takes place. As already mentioned I use a <span style="font-family: courier new,courier;">std::lock_guard </span>(line 22) to protect the shared variable. Each thread line 41 - 44 does a quarter of the work.&nbsp;</p>
+<p>Here are the numbers of the program.</p>
+<h3>Without optimization</h3>
+<p><img src="images/blog/Speichermodell/AdditionMitEinerGeteiltenVariablen/synchronizeWithLock.png" alt="synchronizeWithLock" width="400" height="175" style="margin: 15px;" /><img src="images/blog/Speichermodell/AdditionMitEinerGeteiltenVariablen/synchronizeWithLock_win.png" alt="synchronizeWithLock win" width="450" height="158" /></p>
+<h3>Maximum optimization</h3>
+<p><img src="images/blog/Speichermodell/AdditionMitEinerGeteiltenVariablen/synchronizeWithLockOpt.png" alt="synchronizeWithLockOpt" width="400" height="175" style="margin: 15px;" /><img src="images/blog/Speichermodell/AdditionMitEinerGeteiltenVariablen/synchronizeWithLockOpt_win.png" alt="synchronizeWithLockOpt win" width="450" height="158" /></p>
+<p>The bottleneck of the program is the shared variable, expensive protected by a <span style="font-family: courier new,courier;">std::lock_guard. </span>Therefore the obvious solution is to replace the heavyweight lock by a lightweight atomic.<span style="font-family: courier new,courier;"> </span></p>
+<h2>Addition with an atomic</h2>
+<p>The variable <span style="font-family: courier new,courier;">sum</span> is atomic. So I can skip the <span style="font-family: courier new,courier;">std::lock_guard</span> in the function <span style="font-family: courier new,courier;">sumUp</span> (line 18 - 22). That was all.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+	<table>
+		<tbody>
+			<tr>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54</pre>
+				</td>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// synchronizationWithAtomic.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;atomic&gt;</span>
+<span style="color: #0000ff;">#include &lt;chrono&gt;</span>
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;random&gt;</span>
+<span style="color: #0000ff;">#include &lt;thread&gt;</span>
+<span style="color: #0000ff;">#include &lt;utility&gt;</span>
+<span style="color: #0000ff;">#include &lt;vector&gt;</span>
+
+constexpr <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span> size= 100000000;   
+
+constexpr <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span> firBound=  25000000;
+constexpr <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span> secBound=  50000000;
+constexpr <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span> thiBound=  75000000;
+constexpr <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span> fouBound= 100000000;
+
+<span style="color: #2b91af;">void</span> sumUp(std::atomic&lt;<span style="color: #2b91af;">unsigned</span> <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span>&gt;&amp; sum, <span style="color: #0000ff;">const</span> std::vector&lt;<span style="color: #2b91af;">int</span>&gt;&amp; val, <span style="color: #2b91af;">unsigned</span> <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span> beg, <span style="color: #2b91af;">unsigned</span> <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span> end){
+    <span style="color: #0000ff;">for</span> (<span style="color: #0000ff;">auto</span> it= beg; it &lt; end; ++it){
+        sum+= val[it];
+    }
+}
+
+<span style="color: #2b91af;">int</span> main(){
+
+  std::cout &lt;&lt; std::endl;
+
+  std::vector&lt;<span style="color: #2b91af;">int</span>&gt; randValues;
+  randValues.reserve(size);
+
+  std::mt19937 engine;
+  std::uniform_int_distribution&lt;&gt; uniformDist(1,10);
+  <span style="color: #0000ff;">for</span> ( <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span> i=0 ; i&lt; size ; ++i) randValues.push_back(uniformDist(engine));
+ 
+  std::atomic&lt;<span style="color: #2b91af;">unsigned</span> <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span>&gt; sum(0);
+  <span style="color: #0000ff;">auto</span> start = std::chrono::system_clock::now();
+  
+  std::<span style="color: #0000ff;">thread</span> t1(sumUp,std::ref(sum),std::ref(randValues),0,firBound);
+  std::<span style="color: #0000ff;">thread</span> t2(sumUp,std::ref(sum),std::ref(randValues),firBound,secBound);
+  std::<span style="color: #0000ff;">thread</span> t3(sumUp,std::ref(sum),std::ref(randValues),secBound,thiBound);
+  std::<span style="color: #0000ff;">thread</span> t4(sumUp,std::ref(sum),std::ref(randValues),thiBound,fouBound);   
+  
+ 
+  t1.join();
+  t2.join();
+  t3.join();
+  t4.join();
+  std::chrono::duration&lt;<span style="color: #2b91af;">double</span>&gt; dur= std::chrono::system_clock::now() - start;
+  std::cout &lt;&lt; <span style="color: #a31515;">"Time for addition "</span> &lt;&lt; dur.count() &lt;&lt; <span style="color: #a31515;">" seconds"</span> &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"Result: "</span> &lt;&lt; sum &lt;&lt; std::endl;
+
+  std::cout &lt;&lt; std::endl;
+
+}
+</pre>
+				</td>
+			</tr>
+		</tbody>
+	</table>
+</div>
+<p>&nbsp;</p>
+<h3>Without optimization</h3>
+<p><img src="images/blog/Speichermodell/AdditionMitEinerGeteiltenVariablen/synchronizeWithAtomic.png" alt="synchronizeWithAtomic" width="400" height="175" style="margin: 15px;" /><img src="images/blog/Speichermodell/AdditionMitEinerGeteiltenVariablen/synchronizeWithAtomic_win.png" alt="synchronizeWithAtomic win" width="450" height="158" /></p>
+<h3>Maximum optimization</h3>
+<p><img src="images/blog/Speichermodell/AdditionMitEinerGeteiltenVariablen/synchronizeWithAtomicOpt.png" alt="synchronizeWithAtomicOpt" width="400" height="175" style="margin: 15px;" /><img src="images/blog/Speichermodell/AdditionMitEinerGeteiltenVariablen/synchronizeWithAtomicOpt_win.png" alt="synchronizeWithAtomicOpt win" width="450" height="158" /></p>
+<h2>A strange phenomenon</h2>
+<p>If you study the numbers carefully you will notice a strange phenomenon on Windows. The maximum optimized program is slower than the non-optimized. That observation will also hold for the next two variations. This puzzled me.&nbsp;I executed the program in addition on a virtualized Windows 8 PC with only one core. Here the optimized version was faster. Something strange is going on with my Windows 10 PC and atomics.</p>
+<p>Beside += there is a further way to calculate the sum of an atomic with fetch_add. Let's try it out. The numbers should be similar.</p>
+<p>&nbsp;</p>
+<h2>Addition with fetch_add</h2>
+<p>The change in the source code is minimal. I have only to touch the line 20.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+	<table>
+		<tbody>
+			<tr>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54</pre>
+				</td>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// synchronizationWithFetchAdd.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;atomic&gt;</span>
+<span style="color: #0000ff;">#include &lt;chrono&gt;</span>
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;random&gt;</span>
+<span style="color: #0000ff;">#include &lt;thread&gt;</span>
+<span style="color: #0000ff;">#include &lt;utility&gt;</span>
+<span style="color: #0000ff;">#include &lt;vector&gt;</span>
+
+constexpr <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span> size= 100000000;   
+
+constexpr <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span> firBound=  25000000;
+constexpr <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span> secBound=  50000000;
+constexpr <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span> thiBound=  75000000;
+constexpr <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span> fouBound= 100000000;
+
+<span style="color: #2b91af;">void</span> sumUp(std::atomic&lt;<span style="color: #2b91af;">unsigned</span> <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span>&gt;&amp; sum, <span style="color: #0000ff;">const</span> std::vector&lt;<span style="color: #2b91af;">int</span>&gt;&amp; val, <span style="color: #2b91af;">unsigned</span> <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span> beg, <span style="color: #2b91af;">unsigned</span> <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span> end){
+    <span style="color: #0000ff;">for</span> (<span style="color: #0000ff;">auto</span> it= beg; it &lt; end; ++it){
+		sum.fetch_add(val[it]);
+    }
+}
+
+<span style="color: #2b91af;">int</span> main(){
+
+  std::cout &lt;&lt; std::endl;
+
+  std::vector&lt;<span style="color: #2b91af;">int</span>&gt; randValues;
+  randValues.reserve(size);
+
+  std::mt19937 engine;
+  std::uniform_int_distribution&lt;&gt; uniformDist(1,10);
+  <span style="color: #0000ff;">for</span> ( <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span> i=0 ; i&lt; size ; ++i) randValues.push_back(uniformDist(engine));
+ 
+  std::atomic&lt;<span style="color: #2b91af;">unsigned</span> <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span>&gt; sum(0);
+  <span style="color: #0000ff;">auto</span> start = std::chrono::system_clock::now();
+  
+  std::<span style="color: #0000ff;">thread</span> t1(sumUp,std::ref(sum),std::ref(randValues),0,firBound);
+  std::<span style="color: #0000ff;">thread</span> t2(sumUp,std::ref(sum),std::ref(randValues),firBound,secBound);
+  std::<span style="color: #0000ff;">thread</span> t3(sumUp,std::ref(sum),std::ref(randValues),secBound,thiBound);
+  std::<span style="color: #0000ff;">thread</span> t4(sumUp,std::ref(sum),std::ref(randValues),thiBound,fouBound);   
+  
+ 
+  t1.join();
+  t2.join();
+  t3.join();
+  t4.join();
+  std::chrono::duration&lt;<span style="color: #2b91af;">double</span>&gt; dur= std::chrono::system_clock::now() - start;
+  std::cout &lt;&lt; <span style="color: #a31515;">"Time for addition "</span> &lt;&lt; dur.count() &lt;&lt; <span style="color: #a31515;">" seconds"</span> &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"Result: "</span> &lt;&lt; sum &lt;&lt; std::endl;
+
+  std::cout &lt;&lt; std::endl;
+
+}
+</pre>
+				</td>
+			</tr>
+		</tbody>
+	</table>
+</div>
+<h3>&nbsp;</h3>
+<h3>Without optimization</h3>
+<p><img src="images/blog/Speichermodell/AdditionMitEinerGeteiltenVariablen/synchronizeWithFetchAdd.png" alt="synchronizeWithFetchAdd" width="400" height="175" style="margin: 15px;" /><strong><img src="images/blog/Speichermodell/AdditionMitEinerGeteiltenVariablen/synchronizeWithFetchAdd_win.png" alt="synchronizeWithFetchAdd win" width="450" height="158" /></strong></p>
+<h3>Maximum optimization</h3>
+<p><img src="images/blog/Speichermodell/AdditionMitEinerGeteiltenVariablen/synchronizeWithFetchAddOpt.png" alt="synchronizeWithFetchAddOpt" width="400" height="175" style="margin: 15px;" /><img src="images/blog/Speichermodell/AdditionMitEinerGeteiltenVariablen/synchronizeWithFetchAddOpt_win.png" alt="synchronizeWithFetchAddOpt win" width="450" height="158" /></p>
+<p>Strictly speaking is the <span style="font-family: courier new,courier;">fetch_add</span> variation no improvement to the += variation but the contrary. The += variation is more intuitive. But wait there is a small difference.</p>
+<h2>Addition with fetch_add and relaxed semantic</h2>
+<p>The default behaviour for atomics is <a href="index.php/sequential-consistency">sequential consistency</a>. This statement is true for the addition and assignment of an atomic and of course for the fetch_add variant. But we can do better. Let's adjust the memory model with the<a href="index.php/atomics"> fetch variations</a>. That's the final step in my optimization. You see it in line 20.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+	<table>
+		<tbody>
+			<tr>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54</pre>
+				</td>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// synchronizationWithFetchAddRelaxed.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;atomic&gt;</span>
+<span style="color: #0000ff;">#include &lt;chrono&gt;</span>
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;random&gt;</span>
+<span style="color: #0000ff;">#include &lt;thread&gt;</span>
+<span style="color: #0000ff;">#include &lt;utility&gt;</span>
+<span style="color: #0000ff;">#include &lt;vector&gt;</span>
+
+constexpr <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span> size= 100000000;   
+
+constexpr <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span> firBound=  25000000;
+constexpr <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span> secBound=  50000000;
+constexpr <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span> thiBound=  75000000;
+constexpr <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span> fouBound= 100000000;
+
+<span style="color: #2b91af;">void</span> sumUp(std::atomic&lt;<span style="color: #2b91af;">unsigned</span> <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span>&gt;&amp; sum, <span style="color: #0000ff;">const</span> std::vector&lt;<span style="color: #2b91af;">int</span>&gt;&amp; val, <span style="color: #2b91af;">unsigned</span> <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span> beg, <span style="color: #2b91af;">unsigned</span> <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span> end){
+    <span style="color: #0000ff;">for</span> (<span style="color: #0000ff;">auto</span> it= beg; it &lt; end; ++it){
+		sum.fetch_add(val[it],std::memory_order_relaxed);
+    }
+}
+
+<span style="color: #2b91af;">int</span> main(){
+
+  std::cout &lt;&lt; std::endl;
+
+  std::vector&lt;<span style="color: #2b91af;">int</span>&gt; randValues;
+  randValues.reserve(size);
+
+  std::mt19937 engine;
+  std::uniform_int_distribution&lt;&gt; uniformDist(1,10);
+  <span style="color: #0000ff;">for</span> ( <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span> i=0 ; i&lt; size ; ++i) randValues.push_back(uniformDist(engine));
+ 
+  std::atomic&lt;<span style="color: #2b91af;">unsigned</span> <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span>&gt; sum(0);
+  <span style="color: #0000ff;">auto</span> start = std::chrono::system_clock::now();
+  
+  std::<span style="color: #0000ff;">thread</span> t1(sumUp,std::ref(sum),std::ref(randValues),0,firBound);
+  std::<span style="color: #0000ff;">thread</span> t2(sumUp,std::ref(sum),std::ref(randValues),firBound,secBound);
+  std::<span style="color: #0000ff;">thread</span> t3(sumUp,std::ref(sum),std::ref(randValues),secBound,thiBound);
+  std::<span style="color: #0000ff;">thread</span> t4(sumUp,std::ref(sum),std::ref(randValues),thiBound,fouBound);   
+  
+ 
+  t1.join();
+  t2.join();
+  t3.join();
+  t4.join();
+  std::chrono::duration&lt;<span style="color: #2b91af;">double</span>&gt; dur= std::chrono::system_clock::now() - start;
+  std::cout &lt;&lt; <span style="color: #a31515;">"Time for addition "</span> &lt;&lt; dur.count() &lt;&lt; <span style="color: #a31515;">" seconds"</span> &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"Result: "</span> &lt;&lt; sum &lt;&lt; std::endl;
+
+  std::cout &lt;&lt; std::endl;
+
+}
+</pre>
+				</td>
+			</tr>
+		</tbody>
+	</table>
+</div>
+<p>&nbsp;</p>
+<p>The question is. Why is it ok to use the <a href="index.php/relaxed-semantic">relaxed-semantic</a> in line 20? relaxed-semantic will not guarantee that one threads sees the operation in another thread in the same order. But this is not necessary. Necessary is only that each addition is atomically performed.&nbsp;</p>
+<p>Does the optimization pay off?</p>
+<h3>Without optimization</h3>
+<p><img src="images/blog/Speichermodell/AdditionMitEinerGeteiltenVariablen/synchronizeWithFetchAddRelaxed.png" alt="synchronizeWithFetchAddRelaxed" width="400" height="175" style="margin: 15px;" /><img src="images/blog/Speichermodell/AdditionMitEinerGeteiltenVariablen/synchronizeWithFetchAddRelaxed_win.png" alt="synchronizeWithFetchAddRelaxed win" width="450" height="143" /></p>
+<h3>Maximum optimization</h3>
+<p><img src="images/blog/Speichermodell/AdditionMitEinerGeteiltenVariablen/synchronizeWithFetchAddRelaxedOpt.png" alt="synchronizeWithFetchAddRelaxedOpt" width="400" height="158" style="margin: 15px;" /><img src="images/blog/Speichermodell/AdditionMitEinerGeteiltenVariablen/synchronizeWithFetchAddRelaxedOpt_win.png" alt="synchronizeWithFetchAddRelaxedOpt win" width="450" height="143" /></p>
+<p>As expected, for Linux and GCC is the <span style="font-family: courier new,courier;">fetch_add</span> variant with relaxed-semantic the fastest one. I'm still puzzled with Windows.</p>
+<p>At the end all numbers together in a table.</p>
+<h2>The overview</h2>
+<p>Although I have successively optimized the access to the shared variable and improved accordingly the performance, the results are not very promising. The addition in the <a href="index.php/single-threaded-sum-of-the-elements-of-a-vector">single threaded </a>case with <span style="font-family: courier new,courier;">std::accumulate</span> is far faster. To say it precisely <strong>40 times.</strong></p>
+<p><img src="images/blog/Speichermodell/AdditionMitEinerGeteiltenVariablen/MultithraedeSharedVariableEng.png" alt="MultithraedeSharedVariableEng" width="700" height="186" style="margin: 15px;" /></p>
+<h2>What's next?</h2>
+<p>I will combine in the next post the best out of the two worlds. I combine the non-synchronized summation in one thread with the power of many threads. Let's see, if I beat the performance of the single thread variant of <span style="font-family: courier new,courier;">std::accumulate</span>.</p>
+<p>&nbsp;</p>
+<p>Do you want to get the source code? <a href="index.php/source-code-repository">Source code repository</a></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
