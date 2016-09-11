@@ -1,0 +1,35 @@
+<p>After I've calculated in three different ways the sum of a <span style="font-family: courier new,courier;">std::vector</span> I want to make my conclusions.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<h2>The three strategies</h2>
+<p>At first, all numbers in an overview. First, the <a href="index.php/single-threaded-sum-of-the-elements-of-a-vector">single threaded </a>variant; second, the <a href="index.php/multithreaded-summation-of-a-vector">multiple threads with a shared summation variable</a>; last, the <a href="index.php/multithreaded-summation-with-minimal-synchronization">multiple threads with minimal synchronization</a>. I have to admit that I was astonished be the last variant.</p>
+<h3><span style="color: #3366ff;"></span>Single threaded<span style="color: #3366ff;"><a href="index.php/blog/schnelle-addition-in-einem-thread"> (1)</a></span></h3>
+<p><img src="images/blog/Speichermodell/AdditionInEinemThread/SingleThreadedAdditionEng.png" alt="SingleThreadedAdditionEng" /></p>
+<h3><span style="color: #3366ff;"></span>Multiple threads with a shared summation variable <span style="color: #3366ff;"><a href="index.php/blog/multithreaded-additon-mit-einer-geteilten-variable">(2)</a></span></h3>
+<p><img src="images/blog/Speichermodell/AdditionMitEinerGeteiltenVariablen/MultithraedeSharedVariableEng.png" alt="MultithraedeSharedVariableEng" width="700" height="186" /></p>
+<h3><span style="color: #3366ff;"></span>Multiple threads with minimal synchronization <span style="color: #3366ff;"><a href="index.php/blog/multithreaded-addition-in-unabhaengigen-threads">(3)</a></span></h3>
+<p><img src="images/blog/Speichermodell/AdditionInMehrerenThreads/MultipleThreadsEng.png" alt="MultipleThreadsEng" width="700" height="196" /></p>
+<h2>My observations</h2>
+<p>For simplicity reasons I will only reason about Linux. Thanks to Andreas Schäfer (<a href="https://plus.google.com/u/0/+AndreasSch%C3%A4fer_gentryx" class="moz-txt-link-freetext">https://plus.google.com/u/0/+AndreasSch%C3%A4fer_gentryx</a>) who gave me deeper insight.&nbsp;<span id="transmark"></span></p>
+<h3>Single threaded</h3>
+<p>The range-based for-loop and the STL algorithm std::accumulate are in the same league. This observation holds for the maximal optimized and non-optimized program. It's very interesting that the maximal optimized versions is about 30 times faster than the non-optimized version. The compiler uses for the summation in case of the optimized version&nbsp;vectorized instruction (SSE or AVX). Therefore, the loop counter will be increased by 2 (<a href="https://en.wikipedia.org/wiki/Streaming_SIMD_Extensions">SSE</a>) or 4 (AVC).</p>
+<h3>Multiple threads with a shared summation variable</h3>
+<p>The synchronization on each access to the shared variable <span style="color: #3366ff;"><strong>(2)</strong></span> shows on point: Synchronization is expensive. Although I break the sequential consistency with the relaxed semantic the program is about 40 times slower than the pendants <span style="color: #3366ff;"><strong>(1)</strong> </span>or <span style="color: #3366ff;"><strong>(3). </strong><span style="color: #000000;">Not only out of performance reasons it must be our goal to minimize the synchronization of the shared variable.</span></span>
+</p>
+<h3>Multiple threads with minimal synchronization</h3>
+<p>The summation with minimal synchronized threads (4 atomic operations or locks) <span style="color: #3366ff;"><strong>(3)</strong></span>&nbsp;is hardly faster as the range-based for-loop or <span style="font-family: courier new,courier;">std::accumulate <span style="color: #3366ff;"><strong>(1)</strong></span></span>. That holds although in the multithreading variant where four threads can work independently on four cores. That surprised me because I was expecting a nearly fourfold improvement. But what surprised me even more, was that my four cores were not fully utilized.</p>
+<p>&nbsp;</p>
+<p><img src="images/blog/Speichermodell/AdditionFazit/threadUtilization.png" alt="threadUtilization" width="800" height="169" /></p>
+<p>&nbsp;</p>
+<p>The reason is simple. The cores can't get the data fast enough from the memory. Or to say it the other way around. The memory slows down the cores.</p>
+<h2>My conclusion</h2>
+<p>My conclusion from the performance measurements is to use for such a simple operation std::accumulate. That's for two reasons. First, the <em>performance boost</em> of variant <span style="color: #00ccff;"><strong><span style="color: #3366ff;">(3) </span></strong><span style="color: #3366ff;"><span style="color: #000000;">doesn't justify the expense; second, C++ will have in C++17 a parallel version of <span style="font-family: courier new,courier;">std::accumulate. </span>Therefore, it's very easy to switch from the sequential to the parallel version.&nbsp; </span>
+	</span><span style="color: #3366ff;"> </span></span>
+</p>
+<h2>What's next?</h2>
+<p>The time library does not belong to the multithreading library but its an import component of the multithreading capabilities of C++. For example you have to wait for an absolute time for a lock or put your thread for a relative time to sleep. So in the next post I write about time.</p>
+<p>&nbsp;</p>
+<p>.&nbsp;</p>
+<p>&nbsp;</p>
+<p>Do you want to get the source code? <a href="index.php/source-code-repository">Source code repository</a></p>
+<p>&nbsp;</p>
