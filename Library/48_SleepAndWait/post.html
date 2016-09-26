@@ -1,0 +1,266 @@
+<p>The new time library is an important component of the threading interface. As well threads, locks, condition variables as future have an understanding of time. All four have in common that they can sleep, wait or block until a time point or for a time duration.</p>
+<hr id="system-readmore" />
+<h2>Convention</h2>
+<p>The methods for the handling of time in multithreading programs follow a simple convention. Methods ending with <span style="font-family: courier new,courier;">_for</span> have to be parametrized by a time duration; methods ending with <span style="font-family: courier new,courier;">_until</span> by a time point. I presented&nbsp;<a href="index.php/time-duration">time duration </a>and <a href="index.php/time-point">time point </a>in separate posts. Here is a concise overview of the methods dealing with sleeping, blocking, and waiting.</p>
+<p><img src="images/blog/Bibliotheken/SchlafenUndWarten/untilAndForEng.png" alt="untilAndForEng" width="700" height="161" style="margin: 15px;" /><span id="transmark"></span></p>
+<p><span style="font-family: courier new,courier;">in2min</span> stand for a time 2 minutes in the future.<span style="font-family: courier new,courier;"> 2s</span> is a time duration of 2 seconds. Although I use <span style="font-family: courier new,courier;">auto</span> it's very verbose to define the time point <span style="font-family: courier new,courier;">in2min:</span> <span style="font-family: courier new,courier;">auto in2min= std::chrono::steady_clock::now() + std::chrono::minutes(2). </span>To the rescue we have time literals in C++14<span style="font-family: courier new,courier;"> <span style="font-family: courier new,courier;">2s</span> </span>is valid C++14.<span style="font-family: courier new,courier;"> </span> C++14 has more literals for <a href="http://en.cppreference.com/w/cpp/chrono/duration">typical time durations. </a></p>
+<p>Now the practice.</p>
+<h2>Various waiting strategies</h2>
+<p>First, I want to describe the various waiting strategies.</p>
+<p>The key idea of the program is that the promise provides its result for four shared futures. That's possible because I used std::shared_future. Each future has a different waiting strategy. All promise and future will be executed in different threads. For the sake of simplicity I will in the rest of the posts only speak about a waiting thread although the future is indeed waiting. You can read the details about promise and future <a href="index.php/promise-and-future">here.</a></p>
+<p>&nbsp;</p>
+<ul>
+<li><strong><span style="font-family: courier new,courier;">consumeThread1:</span></strong> Waits up to 4 seconds for the result of the promise.</li>
+<li><strong><span style="font-family: courier new,courier;">consumeThread2:</span></strong> Waits up to 20 seconds for the result of the promise.</li>
+<li><strong><span style="font-family: courier new,courier;">consumeThread3:</span></strong> Asks the promise for the result and goes back to sleep for 700 milliseconds.</li>
+<li><strong><span style="font-family: comic sans ms,sans-serif;"><span style="font-family: courier new,courier;">consumeThread4:</span></span></strong> Asks the promise for the result and goes back to sleep. It's sleep duration starts with 1 millisecond and doubles each time.</li>
+</ul>
+<p>Here is the program.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;">  1
+  2
+  3
+  4
+  5
+  6
+  7
+  8
+  9
+ 10
+ 11
+ 12
+ 13
+ 14
+ 15
+ 16
+ 17
+ 18
+ 19
+ 20
+ 21
+ 22
+ 23
+ 24
+ 25
+ 26
+ 27
+ 28
+ 29
+ 30
+ 31
+ 32
+ 33
+ 34
+ 35
+ 36
+ 37
+ 38
+ 39
+ 40
+ 41
+ 42
+ 43
+ 44
+ 45
+ 46
+ 47
+ 48
+ 49
+ 50
+ 51
+ 52
+ 53
+ 54
+ 55
+ 56
+ 57
+ 58
+ 59
+ 60
+ 61
+ 62
+ 63
+ 64
+ 65
+ 66
+ 67
+ 68
+ 69
+ 70
+ 71
+ 72
+ 73
+ 74
+ 75
+ 76
+ 77
+ 78
+ 79
+ 80
+ 81
+ 82
+ 83
+ 84
+ 85
+ 86
+ 87
+ 88
+ 89
+ 90
+ 91
+ 92
+ 93
+ 94
+ 95
+ 96
+ 97
+ 98
+ 99
+100
+101
+102</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// sleepAndWait.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;utility&gt;</span>
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;future&gt;</span>
+<span style="color: #0000ff;">#include &lt;thread&gt;</span>
+<span style="color: #0000ff;">#include &lt;utility&gt;</span>
+
+std::mutex coutMutex;
+
+<span style="color: #2b91af;">long</span> <span style="color: #2b91af;">double</span> getDifference(<span style="color: #0000ff;">const</span> std::chrono::steady_clock::time_point&amp; tp1,<span style="color: #0000ff;">const</span> std::chrono::steady_clock::time_point&amp; tp2){
+    <span style="color: #0000ff;">auto</span> diff= tp2- tp1;
+    <span style="color: #0000ff;">auto</span> res= std::chrono::duration &lt;<span style="color: #2b91af;">double</span>, std::milli&gt; (diff).count();
+    <span style="color: #0000ff;">return</span> res;
+}
+
+<span style="color: #2b91af;">void</span>producer(std::promise&lt;<span style="color: #2b91af;">int</span>&gt;&amp;&amp; prom){
+    std::cout &lt;&lt; <span style="color: #a31515;">"PRODUCING THE VALUE 2011\n\n"</span>; 
+    std::this_thread::sleep_for(std::chrono::seconds(5));
+    prom.set_value(2011);
+}
+
+<span style="color: #2b91af;">void</span> consumer(std::shared_future&lt;<span style="color: #2b91af;">int</span>&gt; fut,std::chrono::steady_clock::duration dur){
+    <span style="color: #0000ff;">auto</span> start = std::chrono::steady_clock::now();
+    std::future_status status= fut.wait_until(std::chrono::steady_clock::now() + dur);
+    <span style="color: #0000ff;">if</span> ( status == std::future_status::ready ){
+        std::lock_guard&lt;std::mutex&gt; lockCout(coutMutex);
+        std::cout &lt;&lt; std::this_thread::get_id() &lt;&lt; <span style="color: #a31515;">" ready =&gt; Result: "</span> &lt;&lt; fut.get() &lt;&lt; std::endl;
+    }
+    <span style="color: #0000ff;">else</span>{
+        std::lock_guard&lt;std::mutex&gt; lockCout(coutMutex);
+        std::cout &lt;&lt; std::this_thread::get_id() &lt;&lt; <span style="color: #a31515;">" stopped waiting."</span> &lt;&lt; std::endl;
+    }
+    <span style="color: #0000ff;">auto</span> end= std::chrono::steady_clock::now();
+    std::lock_guard&lt;std::mutex&gt; lockCout(coutMutex);
+    std::cout &lt;&lt; std::this_thread::get_id() &lt;&lt; <span style="color: #a31515;">" waiting time: "</span> &lt;&lt; getDifference(start,end) &lt;&lt; <span style="color: #a31515;">" ms"</span> &lt;&lt; std::endl;
+}
+
+<span style="color: #2b91af;">void</span> consumePeriodically(std::shared_future&lt;<span style="color: #2b91af;">int</span>&gt; fut){
+    <span style="color: #0000ff;">auto</span> start = std::chrono::steady_clock::now();
+    std::future_status status;
+    <span style="color: #0000ff;">do</span> {
+        std::this_thread::sleep_for(std::chrono::milliseconds(700));
+        status = fut.wait_for(std::chrono::seconds(0));
+        <span style="color: #0000ff;">if</span> (status == std::future_status::timeout) {
+            std::lock_guard&lt;std::mutex&gt; lockCout(coutMutex);
+            std::cout &lt;&lt; <span style="color: #a31515;">"     "</span> &lt;&lt; std::this_thread::get_id() &lt;&lt; <span style="color: #a31515;">" still waiting."</span> &lt;&lt; std::endl;
+        }
+        <span style="color: #0000ff;">else</span> <span style="color: #0000ff;">if</span> (status == std::future_status::ready) {
+            std::lock_guard&lt;std::mutex&gt; lockCout(coutMutex);
+            std::cout &lt;&lt; <span style="color: #a31515;">"     "</span> &lt;&lt; std::this_thread::get_id() &lt;&lt; <span style="color: #a31515;">" waiting done =&gt; Result: "</span> &lt;&lt; fut.get() &lt;&lt; std::endl;
+        }
+    } <span style="color: #0000ff;">while</span> (status != std::future_status::ready); 
+    <span style="color: #0000ff;">auto</span> end= std::chrono::steady_clock::now();
+    std::lock_guard&lt;std::mutex&gt; lockCout(coutMutex);
+    std::cout &lt;&lt; <span style="color: #a31515;">"     "</span> &lt;&lt; std::this_thread::get_id() &lt;&lt; <span style="color: #a31515;">" waiting time: "</span> &lt;&lt; getDifference(start,end) &lt;&lt; <span style="color: #a31515;">" ms"</span> &lt;&lt; std::endl;
+}
+
+<span style="color: #2b91af;">void</span> consumeWithBackoff(std::shared_future&lt;<span style="color: #2b91af;">int</span>&gt; fut){
+    <span style="color: #0000ff;">auto</span> start = std::chrono::steady_clock::now();
+    std::future_status status;
+    <span style="color: #0000ff;">auto</span> dur= std::chrono::milliseconds(1);
+    <span style="color: #0000ff;">do</span> {
+        std::this_thread::sleep_for(dur);
+        status = fut.wait_for(std::chrono::seconds(0));
+        dur *= 2;
+        <span style="color: #0000ff;">if</span> (status == std::future_status::timeout) {
+            std::lock_guard&lt;std::mutex&gt; lockCout(coutMutex);
+            std::cout &lt;&lt; <span style="color: #a31515;">"         "</span> &lt;&lt; std::this_thread::get_id() &lt;&lt; <span style="color: #a31515;">" still waiting."</span> &lt;&lt; std::endl;
+        }
+        <span style="color: #0000ff;">else</span> <span style="color: #0000ff;">if</span> (status == std::future_status::ready) {
+            std::lock_guard&lt;std::mutex&gt; lockCout(coutMutex);
+            std::cout &lt;&lt; <span style="color: #a31515;">"         "</span> &lt;&lt; std::this_thread::get_id() &lt;&lt; <span style="color: #a31515;">" waiting done =&gt; Result: "</span> &lt;&lt; fut.get() &lt;&lt; std::endl;
+        }
+    } <span style="color: #0000ff;">while</span> (status != std::future_status::ready);
+    <span style="color: #0000ff;">auto</span> end= std::chrono::steady_clock::now();
+    std::lock_guard&lt;std::mutex&gt; lockCout(coutMutex);
+    std::cout &lt;&lt; <span style="color: #a31515;">"         "</span> &lt;&lt; std::this_thread::get_id() &lt;&lt; <span style="color: #a31515;">" waiting time: "</span> &lt;&lt; getDifference(start,end) &lt;&lt; <span style="color: #a31515;">" ms"</span> &lt;&lt; std::endl;
+}
+
+<span style="color: #2b91af;">int</span> main(){
+    
+    std::cout &lt;&lt; std::endl;
+
+    std::promise&lt;<span style="color: #2b91af;">int</span>&gt; prom;
+    std::shared_future&lt;<span style="color: #2b91af;">int</span>&gt; future= prom.get_future();
+    std::<span style="color: #0000ff;">thread</span> producerThread(producer,std::move(prom));
+    
+    std::<span style="color: #0000ff;">thread</span> consumerThread1(consumer,future,std::chrono::seconds(4));
+    std::<span style="color: #0000ff;">thread</span> consumerThread2(consumer,future,std::chrono::seconds(20));
+    std::<span style="color: #0000ff;">thread</span> consumerThread3(consumePeriodically,future);
+    std::<span style="color: #0000ff;">thread</span> consumerThread4(consumeWithBackoff,future);
+    
+    consumerThread1.join();
+    consumerThread2.join();
+    consumerThread3.join();
+    consumerThread4.join();
+    producerThread.join();
+    
+    std::cout &lt;&lt; std::endl;
+
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>I create in the main function (line 85) the promise, use the promise to create the associated future (line 86) and move the promise in a separate thread (line 87). I have to move the promise in the thread&nbsp;because it doesn't support copy semantic. That will not hold for the shared futures (lines 89 - 92). They support copy semantic and can therefore be copied.</p>
+<p>Before I talk about the work package of the thread, let me say a few words about the auxiliary function <span style="font-family: courier new,courier;">getDifference</span> (line 11 - 15). The function takes two time points and returns the time duration in milliseconds. I will use the function a few times.&nbsp;</p>
+<p>What's about the threads?</p>
+<ul>
+<li><span style="font-family: courier new,courier;"><strong>producerThread</strong>: </span>Executes the function<span style="font-family: courier new,courier;"> producer </span>(line 17 - 21) and publishes its result 2011 after a 5 seconds of sleeping. This is the result the futures are waiting for.</li>
+<li><span style="font-family: courier new,courier;"><strong>consumerThread1:</strong></span> Executes the function <span style="font-family: courier new,courier;">consumer</span> (line 23 - 37). The thread is waiting for at most 4 seconds (line 25) before it continues with its work. This waiting period is not long enough to get the result for the promise.</li>
+<li><span style="font-family: courier new,courier;"><strong>consumerThread2:</strong></span> Executes the function <span style="font-family: courier new,courier;">consumer</span> (line 23 - 37). The thread is waiting at most 20 seconds before it continues with its work.</li>
+<li><span style="font-family: courier new,courier;"><strong>consumerThread3:</strong></span>Executes the function <span style="font-family: courier new,courier;">consumePeriodically</span> (line 39 - 57). It sleeps for 700 milliseconds (line 43) and asks for the result of the promise (line 44). Because of the 0 seconds in line 44 (<span style="font-family: courier new,courier;">std::chrono::seconds(0)</span>) there is&nbsp;no waiting. If the result of the calculation is available, it will be displayed in line 73.</li>
+<li><span style="font-family: courier new,courier;"><strong>consumerThread4:</strong></span>Executes the function <span style="font-family: courier new,courier;">consumeWithBackoff</span> (line 59 - 79). It sleeps in the first iteration 1 second and doubles by each further iteration its sleeping period. Otherwise, its strategy is similar to&nbsp;<span style="font-family: courier new,courier;">consumerThread3.</span> <span style="font-family: courier new,courier;"></span></li>
+</ul>
+<p>Now to the synchronization of the program. As well the clock for determining the current time as <span style="font-family: courier new,courier;">std::cout</span> are shared variables. But I need no synchronization. First, the method call <span style="font-family: courier new,courier;">std::chrono::steady_clock::now()</span> is thread-safe (for example in line 24 and 34), second, the C++ runtime guarantees that the characters will be written thread-safe to <span style="font-family: courier new,courier;">std::cout</span>. Only for visual reason I used a <span style="font-family: courier new,courier;">std::lock_guard</span> to wrap <span style="font-family: courier new,courier;">std::cout</span> (for example in line 27,31, and 35).</p>
+<p><br />Although the threads write one after the other to <span style="font-family: courier new,courier;">std::cout</span> the output is not easy to understand.</p>
+<p><br /><span style="font-family: courier new,courier;"></span></p>
+<p><img src="images/blog/Bibliotheken/SchlafenUndWarten/sleepAndWait.png" alt="sleepAndWait" style="margin: 15px;" /></p>
+<p>The first output is from the promise. The remaining outputs from the futures. At first <span style="font-family: courier new,courier;">consumerThread4 </span>asks for the result. The output is indented by 8 characters. consumerThread4 also displays its ID. consumerThread3 is immediately following. Its output is indented by 4 characters. <span style="font-family: courier new,courier;"></span>The output of <span style="font-family: courier new,courier;">consumerThread1</span> and <span style="font-family: courier new,courier;">consumerThread2</span> is not indented.</p>
+<ul>
+<li><span style="font-family: courier new,courier;"><strong>consumeThread1:</strong> </span>Waits unsuccessfully 4000.18 ms seconds without getting the result.</li>
+<li><span style="font-family: courier new,courier;"><strong>consumeThread2:</strong> </span>Gets the result after 5000.3 ms although it's waiting duration is up to 20 seconds.</li>
+<li><span style="font-family: courier new,courier;"><strong>consumeThread3:</strong> </span>Gets the result after 5601.76 ms. That's about 5600 milliseconds= 8*7000 milliseconds.</li>
+<li><span style="font-family: courier new,courier;"><strong>consumeThread4: </strong></span>Gets the result after 8193.81 ms. To say it differently. It waits 3 seconds to long.&nbsp;<span style="font-family: courier new,courier;"> </span></li>
+</ul>
+<h2>What's next?</h2>
+<p>This posts finishes my miniseries about the time library. In the next post I will write about embedded programming with modern C++. Here is the overview of <a href="index.php/der-einstieg-in-modernes-c">my plan.</a></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>Do you want to get the source code? <a href="index.php/source-code-repository">Source code repository</a></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
