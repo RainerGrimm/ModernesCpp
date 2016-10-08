@@ -1,0 +1,450 @@
+<p>Probably the most frequently used feature of C++11 is <span style="font-family: courier new,courier;">auto</span>. Thanks to auto the compiler determines the type of a variable from its initializer. But what is the point with safety critical software?&nbsp;</p>
+<hr id="system-readmore" />
+<p>&nbsp;<span id="transmark"></span></p>
+<h2>The facts of <span style="font-family: courier new,courier;">auto</span></h2>
+<p>Automatic type deduction with auto is extremely convenient. First, you save a lot of unnecessary typing, in particular with challenging template expressions; second, the compiler is never - in opposite to the programmer - wrong.&nbsp;</p>
+<p>I compare in the next listing the explicit and the deduced types.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+	<table>
+		<tbody>
+			<tr>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24</pre>
+				</td>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">#include &lt;vector&gt;</span>
+
+<span style="color: #2b91af;">int</span> myAdd(<span style="color: #2b91af;">int</span> a,<span style="color: #2b91af;">int</span> b){ <span style="color: #0000ff;">return</span> a+b; }
+
+<span style="color: #2b91af;">int</span> main(){
+
+  <span style="color: #008000;">// define an int-value</span>
+  <span style="color: #2b91af;">int</span> i= 5;                                  <span style="color: #008000;">// explicit</span>
+  <span style="color: #0000ff;">auto</span> i1= 5;                                <span style="color: #008000;">// auto</span>
+ 
+  <span style="color: #008000;">// define a reference to an int</span>
+  <span style="color: #2b91af;">int</span>&amp; b= i;                                 <span style="color: #008000;">// explicit</span>
+  <span style="color: #0000ff;">auto</span>&amp; b1= i;                               <span style="color: #008000;">// auto</span>
+ 
+  <span style="color: #008000;">// define a pointer to a function</span>
+  <span style="color: #2b91af;">int</span> (*add)(<span style="color: #2b91af;">int</span>,<span style="color: #2b91af;">int</span>)= myAdd;               <span style="color: #008000;">// explicit</span>
+  <span style="color: #0000ff;">auto</span> add1= myAdd;                         <span style="color: #008000;">// auto</span>
+  
+  <span style="color: #008000;">// iterate through a vector</span>
+  std::vector&lt;<span style="color: #2b91af;">int</span>&gt; vec;
+  <span style="color: #0000ff;">for</span> (std::vector&lt;<span style="color: #2b91af;">int</span>&gt;::iterator it= vec.begin(); it != vec.end(); ++it){} 
+  <span style="color: #0000ff;">for</span> (<span style="color: #0000ff;">auto</span> it1= vec.begin(); it1 != vec.end(); ++it1) {}
+
+}
+</pre>
+				</td>
+			</tr>
+		</tbody>
+	</table>
+</div>
+<p>&nbsp;</p>
+<p>The compiler uses the rules for <a href="http://en.cppreference.com/w/cpp/language/template_argument_deduction">template argument deduction </a>for getting the type of the variable. Therefore, the outer&nbsp;<span style="font-family: courier new,courier;">const </span>or <span style="font-family: courier new,courier;">volatile</span> qualifier and references are removed. The next example shows this behaviour for constant and references.&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+	<table>
+		<tbody>
+			<tr>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10</pre>
+				</td>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"><span style="color: #2b91af;">int</span> main(){
+  
+  <span style="color: #2b91af;">int</span> i= 2011;
+  <span style="color: #0000ff;">const</span> <span style="color: #2b91af;">int</span> i2= 2014;
+  <span style="color: #0000ff;">const</span> <span style="color: #2b91af;">int</span>&amp; i3= i2;
+  
+  <span style="color: #0000ff;">auto</span> a2= i2;     <span style="color: #008000;">// int</span>
+  <span style="color: #0000ff;">auto</span> a3= i3;     <span style="color: #008000;">// int</span>
+  
+}
+</pre>
+				</td>
+			</tr>
+		</tbody>
+	</table>
+</div>
+<p>&nbsp;</p>
+<p>But how can I be sure that<span style="font-family: courier new,courier;"> a2</span> or <span style="font-family: courier new,courier;">a</span>3 are of type <span style="font-family: courier new,courier;">int</span> although I used a variable of type<span style="font-family: courier new,courier;"> const int</span> or <span style="font-family: courier new,courier;">const int&amp;</span> to initialize them? Sometimes I deduce it wrong. The answer is simple. The compiler knows the truth. The only declared class template GetType helps me a lot.&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+	<pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">template</span> &lt;<span style="color: #0000ff;">typename</span> T&gt;
+<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">GetType</span>; 
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>If I use the only declared class template, the compiler will immediately complain. The definition is missing. That the characteristic I need. The compiler tells me exactly the type of the class template which can not be instantiated. At first to the extended source code. I disabled in the following source code the try to instantiate the only declared class template.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+	<table>
+		<tbody>
+			<tr>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16</pre>
+				</td>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">#include &lt;get_type.hpp&gt;</span>
+
+<span style="color: #2b91af;">int</span> main(){
+  
+  <span style="color: #2b91af;">int</span> i= 2011;
+  <span style="color: #0000ff;">const</span> <span style="color: #2b91af;">int</span> i2= 2014;
+  <span style="color: #008000;">// GetType&lt;decltype(i2)&gt; myType;</span>
+  <span style="color: #0000ff;">const</span> <span style="color: #2b91af;">int</span>&amp; i3= i2;
+  <span style="color: #008000;">// GetType&lt;decltype(i3)&gt; myType;</span>
+  
+  <span style="color: #0000ff;">auto</span> a2= i2; 
+  <span style="color: #008000;">// GetType&lt;decltype(a2)&gt; myType;</span>
+  <span style="color: #0000ff;">auto</span> a3= i3;
+  <span style="color: #008000;">// GetType&lt;decltype(a3)&gt; myType;</span>
+  
+}
+</pre>
+				</td>
+			</tr>
+		</tbody>
+	</table>
+</div>
+<p>&nbsp;</p>
+<p>The GetType call in the lines 7,9, 12, and 14 uses the specifier <span style="font-family: courier new,courier;">decltype,</span> which give you the exact type of the declared variable. The rest is only hard work. I successively commented out each <span style="font-family: courier new,courier;">GetType</span> expression. A deep look into the error messages of the g++ compilers is very interesting.</p>
+<p>&nbsp;</p>
+<p>&nbsp;<img src="images/blog/EmbeddedProgrammierung/AutomatischInitialisiert/autoGetType.png" alt="autoGetType" width="800" height="364" /></p>
+<p>&nbsp;</p>
+<p>The key expressions of the error message have a red line. Impressed? But once more. What is the point with safety critical software?</p>
+<h2>Initialize me!</h2>
+<p><span style="font-family: courier new,courier;">auto</span> determines its type from an&nbsp;initializer. That simply means. Without an initializer there is no type and therefore no variable. To say it positive. The compiler takes care that each type is initialized. That is a nice side effect of <span style="font-family: courier new,courier;">auto</span> that is mentioned too rarely.&nbsp;</p>
+<p>It makes no difference, whether you forgot to initialize a variable or didn't make it beacause of a wrong understanding of the language. The result is simply the same: undefined behaviour. With <span style="font-family: courier new,courier;">auto</span> you can overcome this nasty errors. Be honest. Do you know all rules for the initialization of a variable? If yes, congratulations. If not, read the article <a href="http://en.cppreference.com/w/cpp/language/default_initialization">default initialization</a> and all referenced article in this article. I have no glue why they used the following statement: "objects with automatic storage duration (and their subobjects) are initialized to indeterminate values". This formulation causes more harm than good. Local variables will not be defaultl initialized.</p>
+<p>I modified the second program of <a href="http://en.cppreference.com/w/cpp/language/default_initialization">default initialization </a>to make the undefined behaviour more obvious.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+	<table>
+		<tbody>
+			<tr>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32</pre>
+				</td>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// init.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;string&gt;</span>
+ 
+<span style="color: #0000ff;">struct</span> T1 {};
+ 
+<span style="color: #0000ff;">struct</span> T2{
+    <span style="color: #2b91af;">int</span> mem;     <span style="color: #008000;">// Not ok: indeterminate value</span>
+ public:
+    T2() {} 
+};
+ 
+<span style="color: #2b91af;">int</span> n;          <span style="color: #008000;">//  ok: initialized to 0</span>
+ 
+<span style="color: #2b91af;">int</span> main(){
+  
+  std::cout &lt;&lt; std::endl;
+  
+  <span style="color: #2b91af;">int</span> n;               <span style="color: #008000;">// Not ok: indeterminate value</span>
+  std::string s;       <span style="color: #008000;">// ok: Invocation of the default constructor; initialized to "" </span>
+  T1 t1;               <span style="color: #008000;">// ok: Invocation of the default constructor </span>
+  T2 t2;               <span style="color: #008000;">// ok: Invocation of the default constructor</span>
+    
+  std::cout &lt;&lt; <span style="color: #a31515;">"::n "</span> &lt;&lt; ::n &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"n: "</span> &lt;&lt; n &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"s: "</span> &lt;&lt; s &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"T2().mem: "</span> &lt;&lt; T2().mem &lt;&lt; std::endl;
+  
+  std::cout &lt;&lt; std::endl;
+                      
+}
+</pre>
+				</td>
+			</tr>
+		</tbody>
+	</table>
+</div>
+<p>&nbsp;</p>
+<p>At first to the scope resolutions operator <span style="font-family: courier new,courier;">::</span> in line 25. <span style="font-family: courier new,courier;">:</span>: addresses the global scope. In our case the variable n in line 14. Curiously enough, the automatic variable<span style="font-family: courier new,courier;"> n</span> in line 25 has the value<span style="font-family: courier new,courier;"> 0. n</span> has an undefined value and therefore the program has undefined behaviour. That will not hold for the variable <span style="font-family: courier new,courier;">mem</span> of the class <span style="font-family: courier new,courier;">T2</span>. <span style="font-family: courier new,courier;">mem</span> returns an undefined value.</p>
+<p>&nbsp;<img src="images/blog/EmbeddedProgrammierung/AutomatischInitialisiert/init.png" alt="init" /></p>
+<p>Now, I rewrite the program with the help of <span style="font-family: courier new,courier;">auto</span>.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+	<table>
+		<tbody>
+			<tr>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34</pre>
+				</td>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// initAuto.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;string&gt;</span>
+ 
+<span style="color: #0000ff;">struct</span> T1 {};
+ 
+<span style="color: #0000ff;">struct</span> T2{
+    <span style="color: #2b91af;">int</span> mem= 0;  <span style="color: #008000;">// auto mem= 0 is an error</span>
+ public:
+    T2() {}
+};
+ 
+<span style="color: #0000ff;">auto</span> n= 0;
+ 
+<span style="color: #2b91af;">int</span> main(){
+  
+  std::cout &lt;&lt; std::endl;
+  
+  <span style="color: #0000ff;">using</span> <span style="color: #0000ff;">namespace</span> std::string_literals;
+  
+  <span style="color: #0000ff;">auto</span> n= 0;
+  <span style="color: #0000ff;">auto</span> s=<span style="color: #a31515;">""</span>s;      
+  <span style="color: #0000ff;">auto</span> t1= T1();               
+  <span style="color: #0000ff;">auto</span> t2= T2();
+    
+  std::cout &lt;&lt; <span style="color: #a31515;">"::n "</span> &lt;&lt; ::n &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"n: "</span> &lt;&lt; n &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"s: "</span> &lt;&lt; s &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"T2().mem: "</span> &lt;&lt; T2().mem &lt;&lt; std::endl;
+  
+  std::cout &lt;&lt; std::endl;
+                      
+}
+</pre>
+				</td>
+			</tr>
+		</tbody>
+	</table>
+</div>
+<p>&nbsp;</p>
+<p>Two lines in the source code are especially interesting. First, the line 9. The current standard forbid it to initialize non-constant members of a class with auto. Therefore, I have to use the explicit type. This is from my perspective contra intuitive. Here is a discussion of the C++ standardization committee about this issue: article <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2014/n3897.html">3897.pdf.</a> Second, the line 23. C++14 gets C++ string literals. You build them by using a C string literal (<span style="font-family: courier new,courier;">""</span>) and add the suffix s (<span style="font-family: courier new,courier;">""s</span>). For convenience I imported the in line 20: <span style="font-family: courier new,courier;">using namespace std::string_literals</span>.&nbsp;</p>
+<p>The output of the program is not so thrilling. Only for completeness. <span style="font-family: courier new,courier;">T2().mem</span> has the value 0.&nbsp;</p>
+<p>&nbsp;<img src="images/blog/EmbeddedProgrammierung/AutomatischInitialisiert/initAuto.png" alt="initAuto" /></p>
+<h2>Refactorization</h2>
+<p>Just at the moment I want to conclude the post a new use case of <span style="font-family: courier new,courier;">auto</span> come in my mind. <span style="font-family: courier new,courier;">auto</span> very well supports the refactorization of your code. First, it's very easy to restructure your code if there is no type information. Second, the compiler takes automatically care of the right types. What does that mean? I give the answer in the form of a code snippet. At first, the code without <span style="font-family: courier new,courier;">a</span>uto.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+	<pre style="margin: 0; line-height: 125%;"><span style="color: #2b91af;">int</span> a= 5;
+<span style="color: #2b91af;">int</span> b= 10;
+<span style="color: #2b91af;">int</span> sum=  a * b * 3;
+<span style="color: #2b91af;">int</span> res= sum + 10; 
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>When I replace the variable b of type in by a double 10.5, I have to adjust all dependant types. That is laborious and dangerous. I have to use the right types and to take care of narrowing and other <em>intelligent phenomenons</em> in C++.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+	<pre style="margin: 0; line-height: 125%;"><span style="color: #2b91af;">int</span> a2= 5;
+<span style="color: #2b91af;">double</span> b2= 10.5;
+<span style="color: #2b91af;">double</span> sum2= a2 * b2 * 3;
+<span style="color: #2b91af;">double</span> res2= sum2 * 10.5;
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>This danger is not present in case of <span style="font-family: courier new,courier;">auto.</span> Everything happens <span style="font-family: courier new,courier;">auto</span>-matically.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+	<table>
+		<tbody>
+			<tr>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30</pre>
+				</td>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// refactAuto.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;typeinfo&gt;</span>
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+
+<span style="color: #2b91af;">int</span> main(){
+  
+  std::cout &lt;&lt; std::endl;
+
+  <span style="color: #0000ff;">auto</span> a= 5;
+  <span style="color: #0000ff;">auto</span> b= 10;
+  <span style="color: #0000ff;">auto</span> sum=  a * b * 3;
+  <span style="color: #0000ff;">auto</span> res= sum + 10; 
+  std::cout &lt;&lt; <span style="color: #a31515;">"typeid(res).name(): "</span> &lt;&lt; <span style="color: #0000ff;">typeid</span>(res).name() &lt;&lt; std::endl;
+  
+  <span style="color: #0000ff;">auto</span> a2= 5;
+  <span style="color: #0000ff;">auto</span> b2= 10.5;
+  <span style="color: #0000ff;">auto</span> sum2= a2 * b2 * 3;
+  <span style="color: #0000ff;">auto</span> res2= sum2 * 10;  
+  std::cout &lt;&lt; <span style="color: #a31515;">"typeid(res2).name(): "</span> &lt;&lt; <span style="color: #0000ff;">typeid</span>(res2).name() &lt;&lt; std::endl;
+  
+  <span style="color: #0000ff;">auto</span> a3= 5;
+  <span style="color: #0000ff;">auto</span> b3= 10;
+  <span style="color: #0000ff;">auto</span> sum3= a3 * b3 * 3.1f;
+  <span style="color: #0000ff;">auto</span> res3= sum3 * 10;  
+  std::cout &lt;&lt; <span style="color: #a31515;">"typeid(res3).name(): "</span> &lt;&lt; <span style="color: #0000ff;">typeid</span>(res3).name() &lt;&lt; std::endl;
+  
+  std::cout &lt;&lt; std::endl;
+   
+}
+</pre>
+				</td>
+			</tr>
+		</tbody>
+	</table>
+</div>
+<p>&nbsp;</p>
+<p>The small variations of the code snippet always determines the right type of res, res2, or res3. That's the job of the compiler. The variable b2 in line 17 is of type <span style="font-family: courier new,courier;">double</span> and therefore also <span style="font-family: courier new,courier;">res2;</span> the variable <span style="font-family: courier new,courier;">sum3</span> in line 24 becomes due to the multiplication with the <span style="font-family: courier new,courier;">float</span> literal 3.1f a float type and therefore also the finale result <span style="font-family: courier new,courier;">res3.</span> To get the type from the compiler I use the <span style="font-family: courier new,courier;">typeid</span> operator that is defined in the header <span style="font-family: courier new,courier;">typeinfo.</span></p>
+<p>Here you get the results black on yellow.</p>
+<p>&nbsp;</p>
+<p>&nbsp;<img src="images/blog/EmbeddedProgrammierung/AutomatischInitialisiert/autoRefact.png" alt="autoRefact" /></p>
+<p>Impressed? Me too.</p>
+<h2>What's next?</h2>
+<p>The initialization with curly braces {} has a lot in common with auto. It is used similarly often, helps to read the code, and makes your code safer. How? You will see in the next post.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>Do you want to get the source code? <a href="index.php/source-code-repository">Source code repository</a></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
