@@ -1,0 +1,372 @@
+<p>The initialization of variables was unified in C++11. The rule is quite simple. {}-Initialization is always applicable.&nbsp;</p>
+<hr id="system-readmore" />
+<h2>Always applicable</h2>
+<p>For simplicity reasons I will speak in the rest of the post about {}-Initialization, although I mean unified inititialization with {}. But before I speak about two important implications of the {}-Initialization in safety-critical software I will show a few special use cases. This uses cases require C++11.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+	<table>
+		<tbody>
+			<tr>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+55</pre>
+				</td>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// uniformInitialization.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;map&gt;</span>
+<span style="color: #0000ff;">#include &lt;vector&gt;</span>
+<span style="color: #0000ff;">#include &lt;string&gt;</span>
+
+<span style="color: #008000;">// Initialization of a C-Array as attribute of a class</span>
+<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">Array</span>{
+  public:
+    Array(): myData{1,2,3,4,5}{}    
+  <span style="color: #0000ff;">private</span>:
+    <span style="color: #2b91af;">int</span> myData[5];
+};
+
+<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">MyClass</span>{			
+  <span style="color: #0000ff;">public</span>: 
+    <span style="color: #2b91af;">int</span> x;<span id="transmark"></span>
+    <span style="color: #2b91af;">double</span> y;
+};
+
+<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">MyClass2</span>{		
+  <span style="color: #0000ff;">public</span>:
+    MyClass2(<span style="color: #2b91af;">int</span> fir, <span style="color: #2b91af;">double</span> sec):x{fir},y{sec} {};
+  private: 
+    <span style="color: #2b91af;">int</span> x;
+    <span style="color: #2b91af;">double</span> y;
+};
+
+<span style="color: #2b91af;">int</span> main(){
+
+  <span style="color: #008000;">// Direct Initialization of a standard container</span>
+  <span style="color: #2b91af;">int</span> intArray[]= {1,2,3,4,5};   
+  std::vector&lt;<span style="color: #2b91af;">int</span>&gt; intArray1{1,2,3,4,5};  
+  std::map&lt;std::string,<span style="color: #2b91af;">int</span>&gt; myMap{{<span style="color: #a31515;">"Scott"</span>,1976}, {<span style="color: #a31515;">"Dijkstra"</span>,1972}};
+
+  <span style="color: #008000;">// Initialization of a const heap array</span>
+  <span style="color: #0000ff;">const</span> <span style="color: #2b91af;">float</span>* pData= <span style="color: #0000ff;">new</span> <span style="color: #0000ff;">const</span> <span style="color: #2b91af;">float</span>[3]{1.1,2.2,3.3};
+
+  Array arr;
+
+  <span style="color: #008000;">// Defaut Initialization of a arbitrary object   </span>
+  <span style="color: #2b91af;">int</span> i{};                <span style="color: #008000;">// i becomes 0</span>
+  std::string s{};        <span style="color: #008000;">// s becomes ""</span>
+  std::vector&lt;<span style="color: #2b91af;">float</span>&gt; v{}; <span style="color: #008000;">// v becomes an empty vector</span>
+  <span style="color: #2b91af;">double</span> d{};             <span style="color: #008000;">// d becomes 0.0</span>
+	
+  <span style="color: #008000;">// Initializations of an arbitrary object using public attributes	</span>
+  MyClass myClass{2011,3.14};      
+  MyClass myClass1= {2011,3.14};    
+
+  <span style="color: #008000;">// Initializations of an arbitrary object using the constructor</span>
+  MyClass2 myClass2{2011,3.14};     
+  MyClass2 myClass3= {2011,3.14};   
+
+}
+</pre>
+				</td>
+			</tr>
+		</tbody>
+	</table>
+</div>
+<p>&nbsp;</p>
+<p>First things first. The direct initialization of the C array, the <span style="font-family: courier new,courier;">std::vector,</span> and the <span style="font-family: courier new,courier;">std::map</span> (line 32 - 34) is quite easy. In&nbsp;case of the <span style="font-family: courier new,courier;">std::map</span> the inner {}-pairs are the key and value pairs. The next special use case is the direct initialization of a <span style="font-family: courier new,courier;">const</span> C array on the heap (line 36). Special about the array <span style="font-family: courier new,courier;">arr&nbsp;</span> in line 39 is that C arrays can be directly initialized in the constructor initializer (line 10). The default initialization in the lines 42 to 45 looks quite innocent. But if I use round brackets instead of curly brackets, the most vexing parse will happen. That does not sound good. Why? Wait a for the next section. I directly initialize in the line 48 and 49 the public attributes of the objects. It's also possible to call the constructor with curly braces (line 52 and 53).</p>
+<h2>Most vexing parse</h2>
+<p>But what does that mean? Seems to be a well-known expression: <a href="https://en.wikipedia.org/wiki/Most_vexing_parse">https://en.wikipedia.org/wiki/Most_vexing_parse</a>.&nbsp; The story is quickly told. The most C++ developers knows them personally.
+	<a href="https://en.wikipedia.org/wiki/Most_vexing_parse"> </a>
+</p>
+<p>At first, a small program that shows the issue.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+	<table>
+		<tbody>
+			<tr>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20</pre>
+				</td>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// parse.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+
+<span style="color: #0000ff;">struct</span> MyInt{
+  MyInt(<span style="color: #2b91af;">int</span> i):i(i){}
+  MyInt():i(0){}
+  <span style="color: #2b91af;">int</span> i;
+};
+
+
+<span style="color: #2b91af;">int</span> main(){
+
+  MyInt myInt(2011);
+  MyInt myInt2();
+  
+  std::cout &lt;&lt; myInt.i &lt;&lt; std::endl;
+  std::cout &lt;&lt; myInt2.i &lt;&lt; std::endl;
+ 
+}
+</pre>
+				</td>
+			</tr>
+		</tbody>
+	</table>
+</div>
+<p>&nbsp;</p>
+<p><span style="font-family: courier new,courier;">MyInt</span> in line 5 - 9 is a simple wrapper for the natural number i. The constructor in line 6 sets i to an explicit value. On opposite, the default constructor in line 7 sets i to 0. So far so good. I use in the lines 14 and 15 both constructors and display the values of i. Compile and run, that's all I have to do.</p>
+<p>But wait. The program does not compile.</p>
+<p>&nbsp;<img src="images/blog/EmbeddedProgrammierung/GeschweifteKlammerInitialisierung/parse.png" alt="parse" width="700" height="188" style="margin: 15px;" /></p>
+<p>The error message is not so meaningful. The compiler can interpret the expression in line 15 as a call of a constructor or as a declaration of a function. In case of doubt it interprets the expression as function declaration. The slightly modified program shows it.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+	<table>
+		<tbody>
+			<tr>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22</pre>
+				</td>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// parseResolved.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;typeinfo&gt;</span>
+
+<span style="color: #0000ff;">struct</span> MyInt{
+  MyInt(<span style="color: #2b91af;">int</span> i):i(i){}
+  MyInt():i(0){}
+  <span style="color: #2b91af;">int</span> i;
+};
+
+MyInt myFunction();
+
+<span style="color: #2b91af;">int</span> main(){
+
+  MyInt myInt(2011);
+  MyInt myInt2();
+  
+  std::cout &lt;&lt; <span style="color: #0000ff;">typeid</span>(myInt2).name() &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #0000ff;">typeid</span>(myFunction).name() &lt;&lt; std::endl;
+
+}
+</pre>
+				</td>
+			</tr>
+		</tbody>
+	</table>
+</div>
+<p>&nbsp;</p>
+<p>I declare in line 12 the function <span style="font-family: courier new,courier;">myFunction</span> that has no arguments and returns a type <span style="font-family: courier new,courier;">MyInt.</span> <span style="font-family: courier new,courier;">myFunction</span> has the same signature as the function declarations in line 17. Thanks to the <span style="font-family: courier new,courier;">typeid</span> operator, the output of the program shows exactly that.</p>
+<p><img src="images/blog/EmbeddedProgrammierung/GeschweifteKlammerInitialisierung/parseResolved.png" alt="parseResolved" /></p>
+<p>The solutions to the problem is quite easy. If I use curly braces in the lines 12 and 17, the compiler will not interpret both lines as function declaration. I already used this characteristic of the {}-initialization in the first example of this post (line 42 - 45).</p>
+<p>But now to the main topic of this post, which is so precious for software in safety-critical systems: preventing narrowing.</p>
+<h2>Preventing narrowing</h2>
+<p>Narrowing or more precise narrowing conversion is a implicit conversion of arithmetic values including a loss of accuracy. That sound extremely dangerous.</p>
+<p>The following example shows the issue with the classical initialization for fundamental types. It doesn't matter whether I use direct initialization or assignment.</p>
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+	<table>
+		<tbody>
+			<tr>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17</pre>
+				</td>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// narrowing.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+
+<span style="color: #2b91af;">int</span> main(){
+
+  <span style="color: #2b91af;">char</span> c1(999);     
+  <span style="color: #2b91af;">char</span> c2= 999;
+  std::cout &lt;&lt; <span style="color: #a31515;">"c1: "</span> &lt;&lt; c1 &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"c2: "</span> &lt;&lt; c2 &lt;&lt; std::endl;
+  
+  <span style="color: #2b91af;">int</span> i1(3.14); 
+  <span style="color: #2b91af;">int</span> i2= 3.14;
+  std::cout &lt;&lt; <span style="color: #a31515;">"i1: "</span> &lt;&lt; i1 &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"i2: "</span> &lt;&lt; i2 &lt;&lt; std::endl;
+
+}
+</pre>
+				</td>
+			</tr>
+		</tbody>
+	</table>
+</div>
+<p>&nbsp;</p>
+<p>The output of the program shows two issues. First, the <span style="font-family: courier new,courier;">int</span> literal 999 doesn't fit into the type <span style="font-family: courier new,courier;">char;</span> second, the <span style="font-family: courier new,courier;">double</span> literal doesn't fit into the <span style="font-family: courier new,courier;">int</span> type.</p>
+<p><img src="images/blog/EmbeddedProgrammierung/GeschweifteKlammerInitialisierung/narrowingUndefined.png" alt="narrowingUndefined" width="350" height="174" style="margin: 15px;" /></p>
+<p>That is not possible with {}-initialization.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+	<table>
+		<tbody>
+			<tr>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17</pre>
+				</td>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// narrowingSolved.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+
+<span style="color: #2b91af;">int</span> main(){
+
+  <span style="color: #2b91af;">char</span> c1{999};     
+  <span style="color: #2b91af;">char</span> c2= {999};
+  std::cout &lt;&lt; <span style="color: #a31515;">"c1: "</span> &lt;&lt; c1 &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"c2: "</span> &lt;&lt; c2 &lt;&lt; std::endl;
+  
+  <span style="color: #2b91af;">int</span> i1{3.14}; 
+  <span style="color: #2b91af;">int</span> i2= {3.14};
+  std::cout &lt;&lt; <span style="color: #a31515;">"i1: "</span> &lt;&lt; i1 &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"i2: "</span> &lt;&lt; i2 &lt;&lt; std::endl;
+
+}
+</pre>
+				</td>
+			</tr>
+		</tbody>
+	</table>
+</div>
+<p>&nbsp;</p>
+<p>The program is ill-formed. Because of the narrowing with {}-Initialization the compiler has at least to diagnose a warning. Although the program is ill-formed, the compiler has not to reject it.</p>
+<p>But now the maximum confusion with GCC begins. It make a difference whether I use the GCC 4.7 or the GCC 4.8. The GCC 4.7 rejected the program; the GCC 4.8 only provides a warning. With GCC 5.1 we get an error. You don't believe me? Try it out with the online compiler <a href="https://gcc.godbolt.org/">https://gcc.godbolt.org/</a>. The clang++ compiler is much more predictable. Therefore my tip. <strong>Compile your program in such a way that narrowing is an error.</strong> So did I. I used the flag <span style="font-family: courier new,courier;">-Werror=narrowing</span> and GCC 4.8 complains about the program.</p>
+<p>&nbsp;<img src="images/blog/EmbeddedProgrammierung/GeschweifteKlammerInitialisierung/narrowing.png" alt="narrowing" width="700" height="406" /></p>
+<p>A small remark at the end. The expression char <span style="font-family: courier new,courier;">c3{8}</span> is indeed no narrowing because 8 fits in the type char. The same holds for <span style="font-family: courier new,courier;">char c3= {8}.</span></p>
+<h2>What's next?<span style="font-family: courier new,courier;"></span></h2>
+<p>C++11 got with <span style="font-family: courier new,courier;">static_assert</span> the the type-traits library two powerful features for checking the source code at compile time. I the next post I will have a deeper look into <span style="font-family: courier new,courier;">static_assert</span> and its combination with the functions of the type-traits library.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>Do you want to get the source code? <a href="index.php/source-code-repository">Source code repository</a></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
