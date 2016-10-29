@@ -1,0 +1,357 @@
+<p>User-defined literals are a unique feature in all mainstream programming languages. They empower you to combine values with units.</p>
+<hr id="system-readmore" />
+<h2>The syntax</h2>
+<p>Literals are explicit values in a program. This can be a boolean like <span style="font-family: courier new,courier;">true,</span> the number <span style="font-family: courier new,courier;">3</span> or <span style="font-family: courier new,courier;">4.15</span>; but this can also be the character '<span style="font-family: courier new,courier;">a'</span> or the C string <span style="font-family: courier new,courier;">"hallo".</span> Even den lambda function [<span style="font-family: courier new,courier;">](int a, int b){ return a+b; }</span> is a function literal. With C++11 it's possible to generate user-defined literals by adding a suffix to a built-in literal for integers, floating points, characters, and C strings.</p>
+<p>User-defined literals have to obey the following syntax:<span style="font-family: courier new,courier;"> built-in literal + _ + suffix.</span></p>
+<p>Usually, you use the suffix for a unit:</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+	<pre style="margin: 0; line-height: 125%;">101000101_b
+63_s
+10345.5_dm
+123.45_km
+100_m
+131094_cm
+33_cent
+<span style="color: #a31515;">"Hallo"</span>_i18n
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>But what is the key benefit of user-defined literals? The C++ compiler maps the user-defined literals to the corresponding literal operator. This literal operator has - of course - to be implemented by the programmer.</p>
+<h3>The magic</h3>
+<p>Let's have a look at the user-defined literal <span style="font-family: courier new,courier; color: #000080;"><span style="color: #339966;">0101001000</span></span><span style="color: #ff0000;"><span style="font-family: courier new,courier;">_b</span></span> that represents a binary value. The compiler maps the user-defined literal&nbsp;<span style="font-family: courier new,courier; color: #000080;"><span style="color: #339966;">0101001000</span></span><span style="color: #ff0000;"><span style="font-family: courier new,courier;">_b</span> <span style="color: #000000;">to the literal operator <span style="font-family: courier new,courier;">operator"" <span style="color: #ff0000;">_b</span>(long long int <span style="color: #339966;">bin</span>)</span>. A few special rules are still missing. </span>
+	</span>
+</p>
+<ul>
+	<li><span style="color: #ff0000;"><span style="color: #000000;">There has to be a space between the quotation marks&nbsp; ("") and the underscore with suffix (<span style="color: #ff0000;">_b</span>). </span>
+		</span>
+	</li>
+	<li><span style="color: #ff0000;"><span style="color: #000000;">You have the binary value (<span style="font-family: courier new,courier; color: #000080;"><span style="color: #339966;">0101001000</span></span>) in the variable <span style="color: #ff0000;"><span style="color: #000000;"><span style="font-family: courier new,courier;"><span style="color: #339966;">bin.</span></span>
+		</span>
+		</span>
+		</span>
+		</span>
+	</li>
+	<li>If the compiler doesn't find the corresponding literal operator, the compilation will fail.</li>
+</ul>
+<p>We get with C++14 an alternative syntax for user-defined types. They differ from the C++11 syntax, because it requires no space. Therefore, it is possible to use&nbsp;<a href="http://en.cppreference.com/w/cpp/language/identifiers">reserved keywords</a> like <span style="font-family: courier new,courier;">_C</span> as suffix and use a user-defined literal of the form <span style="font-family: courier new,courier;">11_C</span>. The compiler will map <span style="font-family: courier new,courier;">11_C </span>to the literal <span style="font-family: courier new,courier;">operator""<span style="color: #ff0000;">_C</span>(unsigned long long<span style="color: #339966;"> int)</span></span>.&nbsp; The simple rule is now that you can use suffixes starting with an upper letter.</p>
+<p>User-defined literals is the killer feature in modern C++, if you want to write safety critical software. Why? Thanks to the automatic mapping of the user-defined literal to the literal operator you can implement type safe arithmetic. The compiler takes care that you don't add apples and pears. Example?</p>
+<p>How many meters do I drive in average per week? The question has occupied me for a long time.</p>
+<h2>Type safe calculation with distances</h2>
+<p>Before I deal with the details, here is the main program.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+	<table>
+		<tbody>
+			<tr>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46</pre>
+				</td>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// average.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;distance.h&gt;</span>
+<span style="color: #0000ff;">#include &lt;unit.h&gt;</span>
+
+<span style="color: #0000ff;">using</span> <span style="color: #0000ff;">namespace</span> Distance::Unit;
+
+<span style="color: #2b91af;">int</span> main(){
+
+  std:: cout &lt;&lt; std::endl;
+
+  std::cout &lt;&lt; <span style="color: #a31515;">"1.0_km: "</span> &lt;&lt; 1.0_km &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"1.0_m: "</span> &lt;&lt; 1.0_m &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"1.0_dm: "</span> &lt;&lt; 1.0_dm &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"1.0_cm: "</span> &lt;&lt; 1.0_cm &lt;&lt; std::endl;
+  
+  std::cout &lt;&lt; std::endl;
+
+  std::cout &lt;&lt; <span style="color: #a31515;">"0.001 * 1.0_km: "</span> &lt;&lt; 0.001 * 1.0_km &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"10 * 1_dm: "</span> &lt;&lt; 10 * 1.0_dm &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"100 * 1.0cm: "</span> &lt;&lt; 100 * 1.0_cm &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"1_km / 1000: "</span> &lt;&lt; 1.0_km / 1000 &lt;&lt; std::endl;
+
+  std::cout &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"1.0_km + 2.0_dm +  3.0_dm + 4.0_cm: "</span> &lt;&lt; 1.0_km + 2.0_dm +  3.0_dm + 4.0_cm &lt;&lt; std::endl;
+  std::cout &lt;&lt; std::endl;
+  
+  <span style="color: #0000ff;">auto</span> work= 63.0_km;
+  <span style="color: #0000ff;">auto</span> workPerDay= 2 * work;
+  <span style="color: #0000ff;">auto</span> abbrevationToWork= 5400.0_m;
+  <span style="color: #0000ff;">auto</span> workout= 2 * 1600.0_m;
+  <span style="color: #0000ff;">auto</span> shopping= 2 * 1200.0_m;
+  
+  <span style="color: #0000ff;">auto</span> distPerWeek1= 4*workPerDay-3*abbrevationToWork+ workout+ shopping;
+  <span style="color: #0000ff;">auto</span> distPerWeek2= 4*workPerDay-3*abbrevationToWork+ 2*workout;
+  <span style="color: #0000ff;">auto</span> distPerWeek3= 4*workout + 2*shopping;
+  <span style="color: #0000ff;">auto</span> distPerWeek4= 5*workout + shopping;
+
+  std::cout &lt;&lt; <span style="color: #a31515;">"distPerWeek1: "</span> &lt;&lt; distPerWeek1 &lt;&lt; std::endl;
+  
+  <span style="color: #0000ff;">auto</span> averageDistance= getAverageDistance({distPerWeek1,distPerWeek2,distPerWeek3,distPerWeek4});
+  std::cout&lt;&lt; <span style="color: #a31515;">"averageDistance: "</span> &lt;&lt; averageDistance &lt;&lt; std::endl;
+  
+  std::cout &lt;&lt; std::endl;
+
+}
+</pre>
+				</td>
+			</tr>
+		</tbody>
+	</table>
+</div>
+<p>&nbsp;</p>
+<p>The literal operators are implemented in the namespace <span style="font-family: courier new,courier;">Distance::uni</span>t. You should use namespaces for user-defined literals because name collisions are for tow reasons very likely. First, the suffixes are usually very short; second, the suffixes&nbsp;usually stand for units which already established abbreviations. I used in the program the suffixes <span style="font-family: courier new,courier;">km, m, dm </span>und <span style="font-family: courier new,courier;">cm.</span></p>
+<p>Here is the output of the program. My unit for distances is meter.</p>
+<p><img src="images/blog/EmbeddedProgrammierung/BenutzerdefinierteLiterale/average.png" alt="average" /></p>
+<p>I display in the lines 12 - 15 the various distances; I calculate in the lines 19 - 22 the meter in various resolutions. The last test looks quite promising.<br /><span style="font-family: courier new,courier;">1.0_km + 2.0_dm +&nbsp; 3.0_dm + 4.0_cm</span>&nbsp; is <span style="font-family: courier new,courier;">1000.54 m</span> (line 54). The compiler takes care of the calculations with all units.</p>
+<p>The key question remains. How many meter will I drive in average a week? For convenience I define a few constants: <span style="font-family: courier new,courier;">work, workPerDay, abbrevationToWork, a</span>nd <span style="font-family: courier new,courier;">shopping.</span>&nbsp;These are my building blocks for the 4 weeks (line 34 - 37). I went 493 km in the first week by car. The function getAverageDisttance (line 41) helps me to get the average. I have to invoke it with an initializer list. I drive 255900m in average per week. That needs to change! And that has changed. I'm now an independent trainer.</p>
+<h3>Under the hood</h3>
+<p>I ignored one fact. Where are the <span style="font-family: courier new,courier;">MyDistance</span> objects defined? They are hidden in the program behind the automatic type deduction. Therefore, the explicit type for the variable work (line 28) is <span style="font-family: courier new,courier;">Distance::Distance</span>. The line 28 is equivalent to <span style="font-family: courier new,courier;">Distance::MyDistance work= 63.0_km;</span></p>
+<p>&nbsp;</p>
+<p><img src="images/blog/EmbeddedProgrammierung/BenutzerdefinierteLiterale/arithmetik.png" alt="arithmetik" width="800" height="486" /></p>
+<p>&nbsp;</p>
+<p>If I use&nbsp;<span style="font-family: courier new,courier;">1.5_km + 105.1_m</span> in the source code, the following steps will automatically happen. The compiler maps at first the suffixes km and m to the corresponding literal operators; at second, the compiler maps the + operator to the overloaded + operator of the MyDistance objects. Both steps can only work, if the programmer implements the right operators as part of his contract. This means in this concrete case that he has to implement the literal operator and + operator. The black arrows in the graphic stand for the automatically performed mapping of the compiler. The red arrows stand for the functionality that the programmer has to implement.</p>
+<p>What's still missing to make the graphic complete. Right! The meat behind the red arrows.</p>
+<h3>Tasks of the programmer</h3>
+<p>At first to the known overloading of operators. I overloaded for the class <span style="font-family: courier new,courier;">MyDistance</span> basic arithmetic (line 15 - 28) and the output operator (line 30 - 33). The operators are global functions and can use - thanks to their friendship - the internals of the class. I store in the private variable <span style="font-family: courier new,courier;">m</span> the distance. The function <span style="font-family: courier new,courier;">getAverageDistance</span> (line 41 - 45) is applying the overloaded addition and division operator.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+	<table>
+		<tbody>
+			<tr>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48</pre>
+				</td>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// distance.h</span>
+
+<span style="color: #0000ff;">#ifndef DISTANCE_H</span>
+<span style="color: #0000ff;">#define DISTANCE_H</span>
+
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;ostream&gt;</span>
+
+
+<span style="color: #0000ff;">namespace</span> Distance{
+  <span style="color: #0000ff;">class</span> <span style="color: #2b91af;">MyDistance</span>{
+    public:
+      MyDistance(<span style="color: #2b91af;">double</span> i):m(i){}
+
+      <span style="color: #0000ff;">friend</span> MyDistance <span style="color: #0000ff;">operator</span>+(<span style="color: #0000ff;">const</span> MyDistance&amp; a, <span style="color: #0000ff;">const</span> MyDistance&amp; b){
+        <span style="color: #0000ff;">return</span> MyDistance(a.m + b.m);
+      }
+      <span style="color: #0000ff;">friend</span> MyDistance <span style="color: #0000ff;">operator</span>-(<span style="color: #0000ff;">const</span> MyDistance&amp; a,<span style="color: #0000ff;">const</span> MyDistance&amp; b){
+        <span style="color: #0000ff;">return</span> MyDistance(a.m - b.m);
+      }
+	 <br />      <span style="color: #0000ff;">friend</span> MyDistance <span style="color: #0000ff;">operator</span>*(<span style="color: #2b91af;">double</span> m, <span style="color: #0000ff;">const</span> MyDistance&amp; a){
+        <span style="color: #0000ff;">return</span> MyDistance(m*a.m);
+      }
+	  
+      <span style="color: #0000ff;">friend</span> MyDistance <span style="color: #0000ff;">operator</span>/(<span style="color: #0000ff;">const</span> MyDistance&amp; a, <span style="color: #2b91af;">int</span> n){
+        <span style="color: #0000ff;">return</span> MyDistance(a.m/n);
+      }
+	  
+      <span style="color: #0000ff;">friend</span> std::ostream&amp; <span style="color: #0000ff;">operator</span>&lt;&lt; (std::ostream &amp;out, <span style="color: #0000ff;">const</span> MyDistance&amp; myDist){
+        out &lt;&lt; myDist.m &lt;&lt; <span style="color: #a31515;">" m"</span>;
+        <span style="color: #0000ff;">return</span> out;
+      }
+	private:
+	  <span style="color: #2b91af;">double</span> m;
+	  
+  };
+  
+}
+  
+Distance::MyDistance getAverageDistance(std::initializer_list&lt;Distance::MyDistance&gt; inList){
+  <span style="color: #0000ff;">auto</span> sum= Distance::MyDistance{0.0};
+  <span style="color: #0000ff;">for</span> (<span style="color: #0000ff;">auto</span> i: inList) sum = sum + i ;
+  <span style="color: #0000ff;">return</span> sum/inList.size(); 
+}
+
+
+<span style="color: #0000ff;">#endif</span>
+</pre>
+				</td>
+			</tr>
+		</tbody>
+	</table>
+</div>
+<p>&nbsp;</p>
+<p>Shorter but more thrilling are the literal operators.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+	<table>
+		<tbody>
+			<tr>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26</pre>
+				</td>
+				<td>
+					<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// unit.h</span>
+
+<span style="color: #0000ff;">#ifndef UNIT_H</span>
+<span style="color: #0000ff;">#define UNIT_H</span>
+
+<span style="color: #0000ff;">#include &lt;distance.h&gt;</span>
+
+<span style="color: #0000ff;">namespace</span> Distance{
+
+  <span style="color: #0000ff;">namespace</span> Unit{
+    MyDistance <span style="color: #0000ff;">operator</span> <span style="color: #a31515;">""</span> _km(<span style="color: #2b91af;">long</span> <span style="color: #2b91af;">double</span> d){
+      <span style="color: #0000ff;">return</span> MyDistance(1000*d);
+    }
+    MyDistance <span style="color: #0000ff;">operator</span> <span style="color: #a31515;">""</span> _m(<span style="color: #2b91af;">long</span> <span style="color: #2b91af;">double</span> m){
+      <span style="color: #0000ff;">return</span> MyDistance(m);
+    }
+    MyDistance <span style="color: #0000ff;">operator</span> <span style="color: #a31515;">""</span> _dm(<span style="color: #2b91af;">long</span> <span style="color: #2b91af;">double</span> d){
+      <span style="color: #0000ff;">return</span> MyDistance(d/10);
+    }
+    MyDistance <span style="color: #0000ff;">operator</span> <span style="color: #a31515;">""</span> _cm(<span style="color: #2b91af;">long</span> <span style="color: #2b91af;">double</span> c){
+      <span style="color: #0000ff;">return</span> MyDistance(c/100);
+    }
+  }
+}
+
+<span style="color: #0000ff;">#endif</span>
+</pre>
+				</td>
+			</tr>
+		</tbody>
+	</table>
+</div>
+<p>&nbsp;</p>
+<p>The literal operators take as argument a long double and return a MyDistance object.&nbsp;MyDistance is automatically normalized to meters. And now? That's was the whole functionality that programmer has to provide.</p>
+<p>I totally ignored one big optimization potential in my program. Almost all operations can be performed at compile time; almost all objects can be instantiated at compile time. To make that happen&nbsp;I have to declare the operations and objects as <span style="font-family: courier new,courier;">constexpr</span> respectively. I will present this feature in the post constant expression.</p>
+<h2>What's next?</h2>
+<p>You can defined user-defined literals not only for floating point number. You can do it for integers, characters, and C strings. In addition, C++ has for integers and floating point numbers two ways to do it. One is called cooked the other raw. I have a lot more to write about user-defined literals. <span id="transmark"></span>Wait for the next post.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>Do you want to get the source code?<span style="font-family: courier new,courier;"> <a href="index.php/source-code-repository">Source code repository</a></span></p>
+<p>&nbsp;</p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="80" height="101" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to
+	<a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a>
+	<a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong>
+	<a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Get your e-book.</span></strong></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
