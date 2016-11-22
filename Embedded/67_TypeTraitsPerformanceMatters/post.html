@@ -1,0 +1,198 @@
+<p>If you look carefully, you see, type-traits have a big optimization potential. The type-traits support it in the first step to analyse the code at the compile time and in the second step, to optimize the code based on that analysis. How is that possible? Dependent on the type of a variable a faster variant of an algorithm will be chosen.</p>
+<hr id="system-readmore" />
+<h2>Work on the entire memory area</h2>
+<p>The idea is quite straightforward and is used in current implementations of the Standard Template Library (STL). If the elements of a container are simple enough, algorithm of the STL like <span style="font-family: courier new,courier;">std::copy, std::fill,</span> or&nbsp; <span style="font-family: courier new,courier;">std::equal </span>will&nbsp;<span style="font-family: courier new,courier;"></span>directly be applied on the memory area.&nbsp; Instead of using <span style="font-family: courier new,courier;">std::copy</span> to copy the elements one by one, all is done in one large step.&nbsp; Internally, C functions like<span style="font-family: courier new,courier;"> <a href="http://en.cppreference.com/w/cpp/string/byte/memcmp">memcmp</a>, <a href="http://en.cppreference.com/w/cpp/string/byte/memset">memset</a>, </span><a href="http://en.cppreference.com/w/cpp/string/byte/memcpy"><span style="font-family: courier new,courier;">memcpy,</span> </a>or <a href="http://en.cppreference.com/w/cpp/string/byte/memmove"><span style="font-family: courier new,courier;">memmove</span></a> are used. The small difference between <span style="font-family: courier new,courier;">memcpy</span> and <span style="font-family: courier new,courier;">memmove</span> is that <span style="font-family: courier new,courier;">memmove</span> can deal with overlapping memory areas. <span style="font-family: courier new,courier;"><br /></span></p>
+<p>The implementations of the algorithm <span style="font-family: courier new,courier;">std::cop</span>y, <span style="font-family: courier new,courier;">std::fill,</span> or<span style="font-family: courier new,courier;"> std::equal</span> use a simple strategy.&nbsp; <span style="font-family: courier new,courier;">std::copy</span> is like a wrapper. This wrapper checks if the element is simple enough. If so, the wrapper will delegate the&nbsp;work to the optimized copy function. If not, the general copy algorithm will be used. This one copies each element after each other. To make the right decision, if the elements are simple enough, the functions of the type-traits library will be used.&nbsp;</p>
+<p>The graphic shows this strategy once more:</p>
+<p>&nbsp;<img src="images/blog/EmbeddedProgrammierung/TypeTraitsPerformanzZaehlt/ContainerVersusElement.png" alt="ContainerVersusElement" width="700" height="526" style="margin: 15px;" /></p>
+<p>That was the theory, but here is the practice. Which strategy is used by <span style="font-family: courier new,courier;">std::fill</span>?</p>
+<h2>std::fill</h2>
+<p><a href="http://en.cppreference.com/w/cpp/algorithm/fill"> std::fill&nbsp;</a>assigns each element in the range a value. The listing shows a simple implementation.</p>
+<div style="background: #ffffff none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+	<table>
+		<tbody>
+			<tr>
+				<td>
+					<pre style="margin: 0px; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51</pre>
+				</td>
+				<td>
+					<pre style="margin: 0px; line-height: 125%;"><span style="color: #008000;">// fill.cpp</span>
+ 
+<span style="color: #0000ff;">#include &lt;cstring&gt;</span>
+<span style="color: #0000ff;">#include &lt;chrono&gt;</span>
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;type_traits&gt;</span>
+
+<span style="color: #0000ff;">namespace</span> my{
+
+  <span style="color: #0000ff;">template</span> &lt;<span style="color: #0000ff;">typename</span> I, <span style="color: #0000ff;">typename</span> T, <span style="color: #2b91af;">bool</span> b&gt;
+  <span style="color: #2b91af;">void</span> fill_impl(I first, I last, <span style="color: #0000ff;">const</span> T&amp; val, <span style="color: #0000ff;">const</span> std::integral_constant&lt;<span style="color: #2b91af;">bool</span>, b&gt;&amp;){
+    <span style="color: #0000ff;">while</span>(first != last){
+      *first = val;
+      ++first;
+    }
+  }
+
+  <span style="color: #0000ff;">template</span> &lt;<span style="color: #0000ff;">typename</span> T&gt;
+  <span style="color: #2b91af;">void</span> fill_impl(T* first, T* last, <span style="color: #0000ff;">const</span> T&amp; val, <span style="color: #0000ff;">const</span> std::true_type&amp;){
+    std::memset(first, val, last-first);
+  }
+
+  <span style="color: #0000ff;">template</span> &lt;<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">I</span>, <span style="color: #0000ff;">class</span> <span style="color: #2b91af;">T</span>&gt;
+  <span style="color: #0000ff;">inline</span> <span style="color: #2b91af;">void</span> fill(I first, I last, <span style="color: #0000ff;">const</span> T&amp; val){
+    <span style="color: #008000;">// typedef std::integral_constant&lt;bool,std::has_trivial_copy_assign&lt;T&gt;::value &amp;&amp; (sizeof(T) == 1)&gt; boolType;</span>
+    <span style="color: #0000ff;">typedef</span> std::integral_constant&lt;<span style="color: #2b91af;">bool</span>,std::is_trivially_copy_assignable&lt;T&gt;::value &amp;&amp; (<span style="color: #0000ff;">sizeof</span>(T) == 1)&gt; boolType;
+    fill_impl(first, last, val, boolType());
+  }
+}
+
+<span style="color: #0000ff;">const</span> <span style="color: #2b91af;">int</span> arraySize = 100000000;
+<span style="color: #2b91af;">char</span> charArray1[arraySize]= {0,};
+<span style="color: #2b91af;">char</span> charArray2[arraySize]= {0,};
+
+<span style="color: #2b91af;">int</span> main(){
+
+  std::cout &lt;&lt; std::endl;
+
+  <span style="color: #0000ff;">auto</span> begin= std::chrono::system_clock::now();
+  my::fill(charArray1, charArray1 + arraySize,1);
+  <span style="color: #0000ff;">auto</span> last=  std::chrono::system_clock::now() - begin;
+  std::cout &lt;&lt;  <span style="color: #a31515;">"charArray1: "</span> &lt;&lt; std::chrono::duration&lt;<span style="color: #2b91af;">double</span>&gt;(last).count() &lt;&lt; <span style="color: #a31515;">" seconds"</span> &lt;&lt; std::endl;
+
+  begin= std::chrono::system_clock::now();
+  my::fill(charArray2, charArray2 + arraySize, <span style="color: #0000ff;">static_cast</span>&lt;<span style="color: #2b91af;">char</span>&gt;(1));
+  last=  std::chrono::system_clock::now() - begin;
+  std::cout &lt;&lt;  <span style="color: #a31515;">"charArray2: "</span> &lt;&lt; std::chrono::duration&lt;<span style="color: #2b91af;">double</span>&gt;(last).count() &lt;&lt; <span style="color: #a31515;">" seconds"</span> &lt;&lt; std::endl;
+
+  std::cout &lt;&lt; std::endl;
+
+}
+</pre>
+				</td>
+			</tr>
+		</tbody>
+	</table>
+</div>
+<p>&nbsp;</p>
+<p><span style="font-family: courier new,courier;">my::fill</span> make in line 27 the decision which implementation of <span style="font-family: courier new,courier;">my::fill_impl</span> is applied. To use the optimized variant, the elements should have a compiler generated copy assignment operator <span style="font-family: courier new,courier;">std::is_trivially_copy_assignable&lt;T&gt;</span> and should be 1 byte large: <span style="font-family: courier new,courier;">sizeof(T) == 1. </span>The function<span style="font-family: courier new,courier;"> std::is_trivially_copy_assignable </span>is part of the type-traits. I explain in the post <a href="index.php/check-types">Check types</a> the magic behind the type-traits functions.</p>
+<p>My GCC 4.8 calls instead of the function <span style="font-family: courier new,courier;">std::is_trivially_copy_assignable</span>&nbsp;<span style="font-family: courier new,courier;">std::has_trivial_copy_assign</span>. If you request with the keyword <span style="font-family: courier new,courier;">default</span> from the compiler the copy assignment operator, the operator will be trivial. <span style="font-family: courier new,courier;"></span></p>
+<div style="background: #ffffff none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+	<pre style="margin: 0px; line-height: 125%;"><span style="color: #0000ff;">struct</span> TrivCopyAssign{
+  TrivCopyAssign&amp; <span style="color: #0000ff;">operator</span>=(<span style="color: #0000ff;">const</span> TrivCopyAssign&amp; other)= <span style="color: #0000ff;">default</span>;
+};<br />
+</pre>
+</div>
+<p>Back to the code example. If the expression <span style="font-family: courier new,courier;">boolType()</span> in line 27 is <span style="font-family: courier new,courier;">true,</span> the optimized version of <span style="font-family: courier new,courier;">my::fill_impl</span> in the lines 18 - 21 will be used. This variant fills in opposite to the generic variant <span style="font-family: courier new,courier;">my::fill_impl</span> (line 10 -16) the entire memory area - consisting of 100 million entries - with the value 1.&nbsp; <span style="font-family: courier new,courier;">sizeof(char)</span> is 1.</p>
+<p>What's about the performance of the program? I compiled the program without optimization. The execution of the optimized variant is about 3 times faster on windows; about 20 times faster on linux.</p>
+<h3>Microsoft Visual 15</h3>
+<p><img src="images/blog/EmbeddedProgrammierung/TypeTraitsPerformanzZaehlt/fillWindows.PNG" alt="fillWindows" width="500" height="141" /></p>
+<h3>GCC 4.8</h3>
+<p><img src="images/blog/EmbeddedProgrammierung/TypeTraitsPerformanzZaehlt/filLLinux.png" alt="filLLinux" /></p>
+<p>The decision, which variant of an algorithm should be used is sometimes not so easy do get.<br /><br /></p>
+<h2>std::equal</h2>
+<p>The implementer of<span style="font-family: courier new,courier;"> std::equal</span> had a special humour because he called his decision criteria <span style="font-family: courier new,courier;">__simple.</span> The code is copied from the GCC 4.8 STL implementation.</p>
+<div style="background: #ffffff none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+	<table>
+		<tbody>
+			<tr>
+				<td>
+					<pre style="margin: 0px; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12</pre>
+				</td>
+				<td>
+					<pre style="margin: 0px; line-height: 125%;"><span style="color: #0000ff;">template</span>&lt;<span style="color: #0000ff;">typename</span> _II1, <span style="color: #0000ff;">typename</span> _II2&gt;
+<span style="color: #0000ff;">inline</span> <span style="color: #2b91af;">bool</span> __equal_aux(_II1 __first1, _II1 __last1, _II2 __first2){
+  <span style="color: #0000ff;">typedef</span> <span style="color: #0000ff;">typename</span> iterator_traits&lt;_II1&gt;::value_type _ValueType1;
+  <span style="color: #0000ff;">typedef</span> <span style="color: #0000ff;">typename</span> iterator_traits&lt;_II2&gt;::value_type _ValueType2;
+  <span style="color: #0000ff;">const</span> <span style="color: #2b91af;">bool</span> __simple = ((__is_integer&lt;_ValueType1&gt;::__value
+                         || __is_pointer&lt;_ValueType1&gt;::__value )
+                        &amp;&amp; __is_pointer&lt;_II1&gt;::__value
+                        &amp;&amp; __is_pointer&lt;_II2&gt;::__value
+                        &amp;&amp;__are_same&lt;_ValueType1, _ValueType2&gt;::__value
+                        );
+  <span style="color: #0000ff;">return</span> std::__equal&lt;__simple&gt;::equal(__first1, __last1, __first2);
+}
+</pre>
+				</td>
+			</tr>
+		</tbody>
+	</table>
+</div>
+<p>&nbsp;</p>
+<p>I have a different perception of<span style="font-family: courier new,courier;"> __simple</span>. To used the optimized variant of<span style="font-family: courier new,courier;"> std::equal</span>, the container elements have to fulfil some assurances. The elements of the container have to be of the same type (line 9) and have to be an integral or a pointer (line 5 and 6). In addition, the iterators have to be pointers (line 7 and 8).<span style="font-family: courier new,courier;"><br /></span></p>
+<h2>What's next?</h2>
+<p>They didn't make it in the C++98 standard. But we have them in C++11: hash tables. The official name is unordered associative container. Unofficially, they are often called dictionaries. They promise one import feature: performance. Because their access time is constant in the optimal case.</p>
+<p>Why we need the unordered associative container? What make them differe<span id="transmark"></span>nt from the C++98 ordered associate containers (<span style="font-family: courier new,courier;">std::map, std::set, std::multimap, </span>and<span style="font-family: courier new,courier;"> std::multiset</span>)? That's the story of the next post.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong><br /></strong><span class="h3"></span></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>Do you want to get the source code?<span style="font-family: courier new,courier;"> <a href="index.php/source-code-repository">Source code repository</a></span></p>
+<p>&nbsp;</p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="80" height="101" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to
+	<a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a>
+	<a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong>
+	<a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Get your e-book.</span></strong></p>
+<p><span style="font-family: courier new,courier;"></span></p>
