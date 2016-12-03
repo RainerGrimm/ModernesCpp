@@ -1,0 +1,184 @@
+<p>The hash function maps a potential infinite number of keys on a finite number of buckets. What is the strategy of the C++ runtime and how can you tailor it to your needs, that is what this article is all about.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p>In order not to lose the big picture I want explicitly stress the point. This article is about<span style="font-family: courier new,courier;"> std::unordered_set</span> but observations hold also for the other three unordered associative containers in C++11. If you want to have a closer look, you should read my previous post <a href="index.php/hash-tables">Hash tables.</a></p>
+<h2>Rehashing</h2>
+<p>The hash function decides to which bucket the key goes. Because, the hash function reduces a potential infinite number of keys on a finite number of buckets it can happen that various keys goes to the same bucket. This event is called collision. The keys in each bucket are typically stored as singly linked list. With this knowledge in mind you can quite simply reason how fast the access time on a key is in an unordered associative container. <strong>The application of the hash function is a constant operation, the searching of the key in the singly linked list is a linear operation.</strong> Therefore, the goal of the hash function is it to produce few collisions.</p>
+<p>The number of buckets is called the capacity, the average number of elements of each bucket the load factor. The C++ runtime creates by default new buckets if the load factor goes beyond 1. This process is called rehashing and you can explicitly trigger it by setting the capacity of the unordered associative container to a higher value. Once more, the few new terms on the spot.</p>
+<ul>
+<li><strong>Capacity:</strong> Number of buckets</li>
+<li><strong><span style="color: #000000;">Load factor:</span></strong> Average number of elements (keys) per bucket</li>
+<li><strong>Rehashing</strong>: Creation of new buckets</li>
+</ul>
+<p>You can read and adjust these characteristics.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+55
+56
+57
+58
+59
+60
+61
+62
+63
+64
+65</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;">// rehash.cpp
+
+<span style="color: #008000;">#include &lt;iostream&gt;</span>
+<span style="color: #008000;">#include &lt;random&gt;</span>
+<span style="color: #008000;">#include &lt;unordered_set&gt;</span>
+
+void getInfo(const std::unordered_set&lt;int&gt;&amp; hash){
+  std::cout &lt;&lt; <span style="color: #a31515;">"hash.bucket_count(): "</span> &lt;&lt; hash.bucket_count() &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"hash.load_factor(): "</span> &lt;&lt; hash.load_factor() &lt;&lt; std::endl;
+}
+
+void fillHash(std::unordered_set&lt;int&gt;&amp; h,int n){
+  std::random_device seed;
+  // default generator
+  std::mt19937 engine(seed());
+  // get random numbers 0 - 1000
+  std::uniform_int_distribution&lt;&gt; uniformDist(0,1000);
+
+  <span style="color: #0000ff;">for</span> ( int i=1; i&lt;= n; ++i){
+    h.insert(uniformDist(engine));
+  }
+}<span id="transmark"></span>
+
+int main(){
+
+  std::cout &lt;&lt; std::endl;
+
+  std::unordered_set&lt;int&gt; hash;
+  std::cout &lt;&lt; <span style="color: #a31515;">"hash.max_load_factor(): "</span> &lt;&lt; hash.max_load_factor() &lt;&lt; std::endl;
+
+  std::cout &lt;&lt; std::endl;
+
+  getInfo(hash);
+
+  std::cout &lt;&lt; std::endl;
+
+  // only to be sure
+  hash.insert(500);
+  // get the bucket of 500
+  std::cout &lt;&lt; <span style="color: #a31515;">"hash.bucket(500): "</span> &lt;&lt; hash.bucket(500) &lt;&lt; std::endl;
+
+  std::cout &lt;&lt; std::endl;
+
+  // add 100 elements
+  fillHash(hash,100);
+  getInfo(hash);
+
+  std::cout &lt;&lt; std::endl;
+
+  // at least 500 buckets
+  std::cout &lt;&lt; <span style="color: #a31515;">"hash.rehash(500): "</span> &lt;&lt; std::endl;
+  hash.rehash(500);
+
+  std::cout &lt;&lt; std::endl;
+
+  getInfo(hash);
+
+  std::cout &lt;&lt; std::endl;
+
+  // get the bucket of 500
+  std::cout &lt;&lt; <span style="color: #a31515;">"hash.bucket(500): "</span> &lt;&lt; hash.bucket(500) &lt;&lt; std::endl;
+
+  std::cout &lt;&lt; std::endl;
+
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>At first to the helper functions <span style="font-family: courier new,courier;">getInfo</span> (line 7 - 10) and <span style="font-family: courier new,courier;">fillHash</span> (line 12 - 22). The function <span style="font-family: courier new,courier;">getInfo</span> returns for the <span style="font-family: courier new,courier;">std::unordered_set</span> the number of buckets and the load factor. The function <span style="font-family: courier new,courier;">fillHash</span> fills the unordered associative container with n arbitrary created integers.</p>
+<p>It is interesting to compare the execution of the program on Linux and Windows. I used on Linux the GCC; I used on Windows the cl.exe compiler. I translated the program without optimization.</p>
+<p>&nbsp;</p>
+<p><img src="images/blog/EmbeddedProgrammierung/BucketsKapazitaetLadefaktor/rehashLinux.png" alt="rehashLinux" /></p>
+<p>At first, I'm interested in the maximum load factor (line 29) of the empty container. If the <span style="font-family: courier new,courier;">std::unordered_set</span> exceeds the maximum load factor, a rehashing will take place. The maximum load factor is on 1. The GCC initially starts with 11 buckets, Windows starts with 8 buckets. Of course, the load factor is 0. If I put the key 500 (line 38) into the hash table, it will go to the bucket 5 on Linux and to the bucket 6 on Windows. In line 45 I added 100 keys to the hash table. Afterwards Linux has 97 and Windows has 512 buckets. Linux has less than 100 buckets because I get a few identical keys. Linux now has a load factor near to 1, but Windows about 0.2. Therefore, I can put a lot more elements into the Windows hash table without the need of rehashing. I trigger the rehashing on Linux by requesting at least 500 buckets (line 51). Here you see the difference. On Linux I get new buckets and the keys must be newly distributed. But this is not happening on Windows because 512 is bigger than 500. At the end the key 500 (line 61) is in a different bucket.</p>
+<p>&nbsp;</p>
+<p><img src="images/blog/EmbeddedProgrammierung/BucketsKapazitaetLadefaktor/rehashWindows.PNG" alt="rehashWindows" /></p>
+<p>It's difficult to draw conclusions from the observed behaviour on Linux and Windows. It seems in the unoptimized case, that Linux optimizes for memory consumption and Windows for performance. But I want to give one advice for the usage of unordered associative containers.</p>
+<h3>My rule of thumb</h3>
+<p>If you know, how large your&nbsp;unordered associative container will become, start with a <em>reasonable</em> number of bucket. Therefore, you can spare a lot of expensive rehashings. Because each rehashing includes memory allocation and the new distribution of all keys. The question is, what is <em>reasonable.</em> My rule of thumb is to start with a bucket size similar to the number of your keys. Therefore, your load factor is close to 1.</p>
+<p>I'm looking forward to discussion about my rule of thumb. If possible, I will add them to this post.</p>
+<h2>What's next?</h2>
+<p>POD's stands for <strong>P</strong>lain <strong>O</strong>ld <strong>D</strong>ata. These are data types that have a C standard layout. Therefore, you can directly manipulate them with the C functions <span style="font-family: courier new,courier;">memcpy,</span> <span style="font-family: courier new,courier;">memmove, memcmp,</span> or <span style="font-family: courier new,courier;">memset</span>. With C++11 even instances of classes can be PODs. I will write in the next post, which requirements must hold for the class.<a href="index.php/blog/plain-old-data"><br /></a></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>Do you want to get the source code?<span style="font-family: courier new,courier;"> <a href="index.php/source-code-repository">Source code repository</a></span></p>
+<p>&nbsp;</p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="80" height="101" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Get your e-book.</span></strong></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
