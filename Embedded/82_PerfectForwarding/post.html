@@ -1,0 +1,417 @@
+<p>Today, we solve " ... a herefore unsolved problem in C++" (Bjarne Stroustrup). To make the long story short, I will write about perfect forwarding.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p>But, what is<strong> perfect forwarding?<br /></strong></p>
+<p style="padding-left: 30px;">If a function templates forward its arguments without changing their lvalue or rvalue characteristics, we call it perfect forwarding.</p>
+<p>Great. But what are lvalues and rvalues? Now, I have to make a little detour.</p>
+<h2>Lvalues and rvalues</h2>
+<p>I will not talk about the details about lvalues and rvalues and introduce therefore <em>glvalues,</em> <em>xvalues</em> ,and <em>prvalues. </em>That's not necessary. In case, you are curious, read the post from Anthony Williams: <a href="https://www.justsoftwaresolutions.co.uk/cplusplus/core-c++-lvalues-and-rvalues.html">Core C++ - lvalues and rvalues. </a>I will provide in my post a sustainable intuition.</p>
+<p><strong>Rvalues</strong> are</p>
+<ul>
+<li>temporary objects.</li>
+<li>objects without names.</li>
+<li>objects which have no address.</li>
+</ul>
+<p>If one of the characteristics holds for an object, it will be an rvalue. In reverse that means that lvalues have a name and an address. A few examples for rvalues:</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #2b91af;">int</span> five= 5;
+std::string a= std::string(<span style="color: #a31515;">"Rvalue"</span>);
+std::string b= std::string(<span style="color: #a31515;">"R"</span>) +  std::string(<span style="color: #a31515;">"value"</span>);
+std::string c= a + b;
+std::string d= std::move(b);<br />
+</pre>
+</div>
+<p>Rvalues are on the right side of an assignment. The value 5 and the constructor call are <span style="font-family: courier new,courier;">std::string("Rvalue")</span> rvalues because you can either determine the address of the value 5 nor has the created string object a name. The same holds for the addition of the rvalues in the expression <span style="font-family: courier new,courier;">std::string("R") + std::string("value").</span></p>
+<p>The addition of the two strings<span style="font-family: courier new,courier;"> a + b</span> is interesting. Both strings are lvalues, but the addition creates a temporary object. A special use case is <span style="font-family: courier new,courier;">std::move(b).</span> The new C++11 function convert the lvalue b into a rvalue reference. <span style="font-family: courier new,courier;"></span></p>
+<p>Rvalues are on the right side of an assignment; lvalues can be a the left side of an assignment. But that is not always true:</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">const</span> <span style="color: #2b91af;">int</span> five= 5;
+five= 6;
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Although, the variable five is a lvalue. But five is constant and you can not use on the left side of an assignment. <span style="font-family: courier new,courier;"></span></p>
+<p>But now to the challenge of this post: Perfect forwarding. To get an intuition for the unsolved problem, I will create a few <em>perfect</em> fabric methods.</p>
+<h2>A perfect fabric method</h2>
+<p>At first, a short disclaimer. The expression a perfect fabric method is no formal term.</p>
+<p>A <strong>perfect fabric method</strong> is for me a totally generic fabric method. In particular that means that the function should have the following characteristics:</p>
+<ul>
+<li>Can take an arbitrary number of arguments</li>
+<li>Can accept lvalues and rvalues as argument</li>
+<li>Forwards it arguments identical to the underlying constructor</li>
+</ul>
+<p>I want to say it less formal. A perfect fabric method should be able to create each arbitrary object.</p>
+<p>Lets start with the first iteration.</p>
+<h3>First iteration</h3>
+<p>For efficiency reasons the function template should take its arguments by reference. To say it exactly. As a non-constant lvalue reference. Here is the function template <span style="font-family: courier new,courier;">create</span> in my first iteration.&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// perfectForwarding1.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+
+<span style="color: #0000ff;">template</span> &lt;<span style="color: #0000ff;">typename</span> T,<span style="color: #0000ff;">typename</span> Arg&gt;
+T create(Arg&amp; a){
+  <span style="color: #0000ff;">return</span> T(a);
+}
+
+
+<span style="color: #2b91af;">int</span> main(){
+    
+  std::cout &lt;&lt; std::endl;
+
+  <span style="color: #008000;">// Lvalues</span>
+  <span style="color: #2b91af;">int</span> five=5;
+  <span style="color: #2b91af;">int</span> myFive= create&lt;<span style="color: #2b91af;">int</span>&gt;(five);
+  std::cout &lt;&lt; <span style="color: #a31515;">"myFive: "</span>  &lt;&lt; myFive &lt;&lt; std::endl;
+
+  <span style="color: #008000;">// Rvalues</span>
+  <span style="color: #2b91af;">int</span> myFive2= create&lt;<span style="color: #2b91af;">int</span>&gt;(5);
+  std::cout &lt;&lt; <span style="color: #a31515;">"myFive2: "</span> &lt;&lt; myFive2 &lt;&lt; std::endl;
+
+  std::cout &lt;&lt; std::endl;
+
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>If I compile the program, I will get a compiler error. The reason is that the rvalue (line 21) can not be bound to a non-constant lvalue reference.</p>
+<p><img src="images/blog/EmbeddedProgrammierung/Perfect_Forwarding/perfectForwarding1.png" alt="perfectForwarding1" width="700" height="158" style="margin: 15px;" /></p>
+<p>Now, I have to ways to solve the issue.</p>
+<ol>
+<li>Change the <strong>non-constant lvalue reference</strong> (line 6) in a <strong>constant lvalue reference.</strong> You can bind a rvalue to a constant lvalue reference. But that is not perfect, because the function argument is constant and I can therefore not change it. <span style="font-family: courier new,courier;"></span></li>
+<li>Overload the function template for a <strong>constant lvalue reference</strong> and a <strong>non-const lvalue reference.</strong> That is easy. That is the right way to go.</li>
+</ol>
+<h3>Second iteration</h3>
+<p>Here is the fabric method <span style="font-family: courier new,courier;">create</span> overloaded for a constant lvalue reference and a non-constant lvalue reference.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// perfectForwarding2.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+
+<span style="color: #0000ff;">template</span> &lt;<span style="color: #0000ff;">typename</span> T,<span style="color: #0000ff;">typename</span> Arg&gt;
+T create(Arg&amp; a){
+  <span style="color: #0000ff;">return</span> T(a);
+}
+
+<span style="color: #0000ff;">template</span> &lt;<span style="color: #0000ff;">typename</span> T,<span style="color: #0000ff;">typename</span> Arg&gt;
+T create(<span style="color: #0000ff;">const</span> Arg&amp; a){
+  <span style="color: #0000ff;">return</span> T(a);
+}
+
+<span style="color: #2b91af;">int</span> main(){
+    
+  std::cout &lt;&lt; std::endl;
+
+  <span style="color: #008000;">// Lvalues</span>
+  <span style="color: #2b91af;">int</span> five=5;
+  <span style="color: #2b91af;">int</span> myFive= create&lt;<span style="color: #2b91af;">int</span>&gt;(five);
+  std::cout &lt;&lt; <span style="color: #a31515;">"myFive: "</span>  &lt;&lt; myFive &lt;&lt; std::endl;
+
+  <span style="color: #008000;">// Rvalues</span>
+  <span style="color: #2b91af;">int</span> myFive2= create&lt;<span style="color: #2b91af;">int</span>&gt;(5);
+  std::cout &lt;&lt; <span style="color: #a31515;">"myFive2: "</span> &lt;&lt; myFive2 &lt;&lt; std::endl;
+
+  std::cout &lt;&lt; std::endl;
+
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>The program produces the expected result.</p>
+<p><img src="images/blog/EmbeddedProgrammierung/Perfect_Forwarding/perfectForwarding2.png" alt="perfectForwarding2" style="margin: 15px;" /></p>
+<p>That was easy. Too easy. The solution has two conceptional issues.</p>
+<ol>
+<li>To support n different arguments, I have to overload&nbsp; 2^n +1 variations of the function template <span style="font-family: courier new,courier;">create.</span> <span style="font-family: courier new,courier;"></span> 2^n +1 because the function <span style="font-family: courier new,courier;">create</span> without an argument is part of the perfect fabric method.</li>
+<li>The function argument mutates in the function body of create to a lvalue, because it has a name. Does this matter? Of course, yes. a is not movable any more. Therefore, I have to perform an expensive copy instead of a cheap move. But what is even worse. If the constructor of T (line 12) needs a rvalue, it will not work any more.</li>
+</ol>
+<p>&nbsp;</p>
+<p>Now, I have the solution in the shape of the C++ function <span style="font-family: courier new,courier;">std::forward.</span></p>
+<h3>Third iteration</h3>
+<p>With <span style="font-family: courier new,courier;">std::forward,</span> the solution looks promising.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// perfectForwarding3.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+
+<span style="color: #0000ff;">template</span> &lt;<span style="color: #0000ff;">typename</span> T,<span style="color: #0000ff;">typename</span> Arg&gt;
+T create(Arg&amp;&amp; a){
+  <span style="color: #0000ff;">return</span> T(std::forward&lt;Arg&gt;(a));
+}
+
+<span style="color: #2b91af;">int</span> main(){
+    
+  std::cout &lt;&lt; std::endl;
+
+  <span style="color: #008000;">// Lvalues</span>
+  <span style="color: #2b91af;">int</span> five=5;
+  <span style="color: #2b91af;">int</span> myFive= create&lt;<span style="color: #2b91af;">int</span>&gt;(five);
+  std::cout &lt;&lt; <span style="color: #a31515;">"myFive: "</span>  &lt;&lt; myFive &lt;&lt; std::endl;
+
+  <span style="color: #008000;">// Rvalues</span>
+  <span style="color: #2b91af;">int</span> myFive2= create&lt;<span style="color: #2b91af;">int</span>&gt;(5);
+  std::cout &lt;&lt; <span style="color: #a31515;">"myFive2: "</span> &lt;&lt; myFive2 &lt;&lt; std::endl;
+
+  std::cout &lt;&lt; std::endl;
+
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Before I present the recipe from <a href="http://en.cppreference.com/w/cpp/utility/forward">cppreference.com </a>to get perfect forwarding, I will introduce the name universal reference.</p>
+<p>The name<strong> universal reference</strong> is coined by Scott Meyers.</p>
+<p style="padding-left: 30px;">The universal reference (<span style="font-family: courier new,courier;">Arg&amp;&amp; a</span>)&nbsp;in line 7 is a powerful reference that can bind lvalues or rvalues. You have it to your disposal if you declare a variable <span style="font-family: courier new,courier;">Arg&amp;&amp; a</span> for a derived type A. <code></code><code></code><em></em></p>
+<p>To achieve perfect forwarding you have to combine a universal reference with <span style="font-family: courier new,courier;">std::forward. std::forward&lt;Arg&gt;(a)</span> returns the underlying type of a, because a is a universal reference. Therefore, a rvalue remains a rvalue.</p>
+<p>Now to the pattern</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0000ff;">template</span>&lt;<span style="color: #0000ff;">class</span> <span style="color: #ff0000;"><strong>T</strong></span>&gt;
+<span style="color: #2b91af;">void</span> wrapper(<strong><span style="color: #ff0000;">T&amp;&amp;</span></strong> a){
+    func(<strong><span style="color: #ff0000;">std::forward&lt;T&gt;(a)</span></strong>); 
+}<br />&nbsp;</pre>
+</div>
+<p>I used the colour red to emphasis the key parts of the pattern. I used exactly this pattern in the function template <span style="font-family: courier new,courier;">create.</span> Only the name of the type changed from T to <span style="font-family: courier new,courier;">Arg.</span></p>
+<p>Is the function template <span style="font-family: courier new,courier;">create</span> perfect? Sorry to say, but now. <span style="font-family: courier new,courier;">create</span> needs exactly one argument which is perfectly forwarded to the constructor of the object (line 7). The last step in now to make a variadic template out of the function template.</p>
+<h3>Forth iteration - the perfect fabric method</h3>
+<p><a href="http://en.cppreference.com/w/cpp/language/parameter_pack">Variadic Templates</a> are templates that can get an arbitrary number of arguments. That is exactly the missing feature of the perfect fabric method.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// perfectForwarding4.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;string&gt;</span>
+<span style="color: #0000ff;">#include &lt;utility&gt;</span>
+
+<span style="color: #0000ff;">template</span> &lt;<span style="color: #0000ff;">typename</span> T, <span style="color: #0000ff;">typename</span> ... Args&gt;
+T create(Args&amp;&amp; ... args){
+  <span style="color: #0000ff;">return</span> T(std::forward&lt;Args&gt;(args)...);
+}
+
+<span style="color: #0000ff;">struct</span> MyStruct{
+  MyStruct(<span style="color: #2b91af;">int</span> i,<span style="color: #2b91af;">double</span> d,std::string s){}
+};
+
+<span style="color: #2b91af;">int</span> main(){
+    
+    std::cout &lt;&lt; std::endl;
+
+  <span style="color: #008000;">// Lvalues</span>
+  <span style="color: #2b91af;">int</span> five=5;
+  <span style="color: #2b91af;">int</span> myFive= create&lt;<span style="color: #2b91af;">int</span>&gt;(five);
+  std::cout &lt;&lt; <span style="color: #a31515;">"myFive: "</span>  &lt;&lt; myFive &lt;&lt; std::endl;
+
+  std::string str{<span style="color: #a31515;">"Lvalue"</span>};
+  std::string str2= create&lt;std::string&gt;(str);
+  std::cout &lt;&lt; <span style="color: #a31515;">"str2: "</span> &lt;&lt; str2 &lt;&lt; std::endl;
+
+  <span style="color: #008000;">// Rvalues</span>
+  <span style="color: #2b91af;">int</span> myFive2= create&lt;<span style="color: #2b91af;">int</span>&gt;(5);
+  std::cout &lt;&lt; <span style="color: #a31515;">"myFive2: "</span> &lt;&lt; myFive2 &lt;&lt; std::endl;
+
+  std::string str3= create&lt;std::string&gt;(std::string(<span style="color: #a31515;">"Rvalue"</span>));
+  std::cout &lt;&lt; <span style="color: #a31515;">"str3: "</span> &lt;&lt; str3 &lt;&lt; std::endl;
+
+  std::string str4= create&lt;std::string&gt;(std::move(str3));
+  std::cout &lt;&lt; <span style="color: #a31515;">"str4: "</span> &lt;&lt; str4 &lt;&lt; std::endl;
+  
+  <span style="color: #008000;">// Arbitrary number of arguments</span>
+  <span style="color: #2b91af;">double</span> doub= create&lt;<span style="color: #2b91af;">double</span>&gt;();
+  std::cout &lt;&lt; <span style="color: #a31515;">"doub: "</span> &lt;&lt; doub &lt;&lt; std::endl;
+  
+  MyStruct myStr= create&lt;MyStruct&gt;(2011,3.14,str4);
+
+
+  std::cout &lt;&lt; std::endl;
+
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>The three dots in line 7 -9 are the so called parameter pack. If the three dots (also called ellipse) are left of <span style="font-family: courier new,courier;">Args,</span> the parameter pack will be packed; if right, the parameter pack will be unpacked. In particular, the three dots in line 9 <span style="font-family: courier new,courier;">std std::forward&lt;Args&gt;(args)...&nbsp;</span>causes that each constructor call performs perfect forwarding. The result is impressive. Now, I can invoke the perfect fabric method without (line 40) or with three arguments (line 43).</p>
+<p>&nbsp;<img src="images/blog/EmbeddedProgrammierung/Perfect_Forwarding/perfectForwarding4.png" alt="perfectForwarding4" style="margin: 15px;" /></p>
+<h2>What's next?</h2>
+<p>&nbsp;RAII, short for Resource Acquisition Is Initialization is a very import idiom in C++. Why? Read in the next post.&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>Do you want to get the source code?<span style="font-family: courier new,courier;"> <a href="index.php/source-code-repository">Source code repository</a></span></p>
+<p>&nbsp;</p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="80" height="101" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Get your e-book.</span></strong></p>
+<p>&nbsp;</p>
