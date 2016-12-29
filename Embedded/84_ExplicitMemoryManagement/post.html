@@ -1,0 +1,114 @@
+<p>Explicit memory management has in C++ a high complexity but also provides a great functionality. Sad to say, but this special domain in not so known in C++. For example, you can directly create objects in static memory, in a reversed area, or even in a memory pool. That is functionality, that is often key in safety critical applications in the embedded world. Before the harvest is the work. Therefore, I will give in this post an overview, before I dive deeper into the details.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p>In C++ we use <span style="font-family: courier new,courier;">new</span> and <span style="font-family: courier new,courier;">new[]</span> for memory allocation and <span style="font-family: courier new,courier;">delete</span> and <span style="font-family: courier new,courier;">delete[]</span> for memory deallocation. But that is by far not the whole story.</p>
+<h2>Memory allocation</h2>
+<h3>new</h3>
+<p>Thanks to the <span style="font-family: courier new,courier;">operator new</span> you can dynamically allocate memory for the instance of a type.<span style="font-family: courier new,courier;"></span></p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #2b91af;">int</span>* i= <span style="color: #0000ff;">new</span> <span style="color: #2b91af;">int</span>;
+<span style="color: #2b91af;">double</span>* x= <span style="color: #0000ff;">new</span> <span style="color: #2b91af;">double</span>(10.0);
+Circle* c= <span style="color: #0000ff;">new</span> Circle;
+Point* p= <span style="color: #0000ff;">new</span> Point(1.0, 2.0);
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The in round brackets used arguments are the arguments for the constructor. The result of the <span style="font-family: courier new,courier;">new</span> call is a pointer to the according type. The initialization of the instance is happing after the allocation of the memory. <span>Placement new</span> uses the fact, that <span style="font-family: courier new,courier;">new</span> consists of two steps. If the object is object of a class hierarchy, the constructors of all base classes will automatically be performed</p>
+<h3>new[]</h3>
+<p><span style="font-family: courier new,courier;">new[]</span> creates in opposite to <span style="font-family: courier new,courier;">new a</span> C array of objects. The newly created objects need a default constructor.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #2b91af;">double</span>* da= <span style="color: #0000ff;">new</span> <span style="color: #2b91af;">double</span>[5];
+Circle* ca= <span style="color: #0000ff;">new</span> Circle[8];
+</pre>
+</div>
+<h3>Placement-new</h3>
+<p>Placement new is often used to instantiate an object in a pre reserved memory area. In addition, you can overload placement new globally and for own data types. This is the big benefit that C++ offer.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;">1
+2
+3
+4
+5</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #2b91af;">char</span>* memory= <span style="color: #0000ff;">new</span> <span style="color: #2b91af;">char</span>[<span style="color: #0000ff;">sizeof</span>(Account)];
+Account* a= <span style="color: #0000ff;">new</span>(memory) Account;
+
+<span style="color: #2b91af;">char</span>* memory2= <span style="color: #0000ff;">new</span> <span style="color: #2b91af;">char</span>[5*<span style="color: #0000ff;">sizeof</span>(Account)];
+Account* b= <span style="color: #0000ff;">new</span>(memory2) Account[5];
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Placement new needs an additional argument (line 2 and 5). The line 1 and 4 is the reason that the <span></span><span style="font-family: courier new,courier;"><span>operator</span> new(sizeof(Account),memory) </span>can be used. Or to say it the other way around. The object a will be instantiated in the memory area<span style="font-family: courier new,courier;"></span> <span style="font-family: courier new,courier;">memory</span>. Accordingly, the same holds for the C array<span style="font-family: courier new,courier;"> b</span>.<span style="font-family: courier new,courier;"></span></p>
+<h3>Failed allocation</h3>
+<p>If the memory allocations fails <span style="font-family: courier new,courier;">new</span> and<span style="font-family: courier new,courier;"> new[]</span> will raise a <span style="font-family: courier new,courier;">std::bad_alloc</span> exception. But, that is often not the behaviour you want. Therefore, you can invoke placement new with a constant <span style="font-family: courier new,courier;">std::nothrow:</span> <span style="font-family: courier new,courier;">char* c new(std::nothrow) char[10].</span> This call causes that you will get a <span style="font-family: courier new,courier;">nullptr</span> in the error case.</p>
+<h4>New handler</h4>
+<p>In the case of a failed allocation you can use with <span style="font-family: courier new,courier;">std::set_new_handler</span> your own handler. <span style="font-family: courier new,courier;">std::set_new_handler</span> returns the older handler and needs a callable unit. This callable unit should take no argument and return nothing. You can get the currently used handler be invoking the function <span style="font-family: courier new,courier;">std::get_new_handler.</span></p>
+<p>Your own handler allows you to implement special strategies for failed allocations:</p>
+<ul>
+<li>request more memory</li>
+<li>terminate the program with <span style="font-family: courier new,courier;">std::terminate</span></li>
+<li>throw an exception of type <span style="font-family: courier new,courier;">std::bad_alloc</span></li>
+</ul>
+<h2>Memory deallocation</h2>
+<h3>delete</h3>
+<p>A with <span style="font-family: courier new,courier;">new</span> previously allocated memory will be deallocated with <span style="font-family: courier new,courier;">delete.</span></p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">Circle* c= <span style="color: #0000ff;">new</span> Circle;
+...
+<span style="color: #0000ff;">delete</span> c;
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The destructors of the object and the destructors of a base classes will automatically be called. If the destructor of the base class is virtual, you can destroy the object with a pointer or reference to the base class.</p>
+<p>After the memory of the object is deallocated, the access to the object is undefined. You can point the pointer of the object to a different object.</p>
+<h3>delete[]</h3>
+<p>You have to use operator <span style="font-family: courier new,courier;">delete[]</span> for the deallocation of a C array that was allocated with <span style="font-family: courier new,courier;">new[].</span></p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">Circle* ca= <span style="color: #0000ff;">new</span> Circle[8];
+...
+<span style="color: #0000ff;">delete</span>[] ca;
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>By invoking <span style="font-family: courier new,courier;">delete[]</span> all destructors of the objects will automatically be invoked.</p>
+<p>The deallocation of a C array with <span style="font-family: courier new,courier;">delete</span> is undefined behaviour.</p>
+<h3>Placement delete</h3>
+<p>According to placement new, you can implement placement delete. But it's special that the C++ runtime will not automatically call placement delete. Therefore, it's the programmer's duty.</p>
+<p>A typically used strategy is it to invoke in the first step the destructor and in the second step placement delete.&nbsp; The destructor deinitializes the object and placement new deallocates the memory.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #2b91af;">char</span>* memory= <span style="color: #0000ff;">new</span> <span style="color: #2b91af;">char</span>[<span style="color: #0000ff;">sizeof</span>(Account)];
+Account* a= <span style="color: #0000ff;">new</span>(memory) Account;  <span style="color: #008000;">// placement new</span>
+...
+a-&gt;~Account();                    <span style="color: #008000;">// destructor</span>
+<span style="color: #0000ff;">operator</span> delete(a,memory);        <span style="color: #008000;">// placement delete<br /></span>
+</pre>
+</div>
+<p>Of course, the according statements and strategies holds for the usage of placement delete for C arrays.</p>
+<h2>What's next?</h2>
+<p>The plan is crystal clear. In the next post I will dig deeper in the overloading of operator new and delete.<span style="font-family: courier new,courier;"></span></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>Do you want to get the source code?<span style="font-family: courier new,courier;"> <a href="index.php/source-code-repository">Source code repository</a></span></p>
+<p>&nbsp;</p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="80" height="101" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Get your e-book.</span></strong></p>
+<p>&nbsp;</p>
