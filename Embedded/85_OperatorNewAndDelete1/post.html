@@ -1,0 +1,439 @@
+<p>It happens quite to often that a C++ application allocates memory but don't deallocate it. This is the job for operator new and delete. Thanks to them both you can explicitly manage the memory management of an application.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p>From time to time I had to verify for a customer that its application correctly releases its memory. In particular, programs running for a long period of time and often allocate and deallocate memory are a challenge from the memory management perspective. Of course, the automatic release of the memory during the shutdown of the program is not an option.</p>
+<h2>The baseline</h2>
+<p>I use as baseline of my analysis a simple program that quite often allocates and deallocates memory. In production, the code is bigger. That has no effect on my strategy.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// overloadOperatorNewAndDelete.cpp</span>
+
+<span style="color: #008000;">// #include "myNew.hpp"</span>
+<span style="color: #008000;">// #include "myNew2.hpp"</span>
+<span style="color: #008000;">// #include "myNew3.hpp"</span>
+
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;string&gt;</span>
+
+<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">MyClass</span>{
+  <span style="color: #2b91af;">float</span>* p= <span style="color: #0000ff;">new</span> <span style="color: #2b91af;">float</span>[100];
+};
+
+<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">MyClass2</span>{
+  <span style="color: #2b91af;">int</span> five= 5;
+  std::string s= <span style="color: #a31515;">"hello"</span>;
+};
+
+
+<span style="color: #2b91af;">int</span> main(){
+    
+    <span style="color: #2b91af;">int</span>* myInt= <span style="color: #0000ff;">new</span> <span style="color: #2b91af;">int</span>(1998);
+    <span style="color: #2b91af;">double</span>* myDouble= <span style="color: #0000ff;">new</span> <span style="color: #2b91af;">double</span>(3.14);
+    <span style="color: #2b91af;">double</span>* myDoubleArray= <span style="color: #0000ff;">new</span> <span style="color: #2b91af;">double</span>[2]{1.1,1.2};
+    
+    MyClass* myClass= <span style="color: #0000ff;">new</span> MyClass;
+    MyClass2* myClass2= <span style="color: #0000ff;">new</span> MyClass2;
+    
+    <span style="color: #0000ff;">delete</span> myDouble;
+    <span style="color: #0000ff;">delete</span> [] myDoubleArray;
+    <span style="color: #0000ff;">delete</span> myClass;
+    <span style="color: #0000ff;">delete</span> myClass2;
+    
+<span style="color: #008000;">//  getInfo();</span>
+    
+}<span id="transmark"></span>
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>The key question is. Is there a corresponding <span style="font-family: courier new,courier;">delete</span> to each <span style="font-family: courier new,courier;">new</span> call?</p>
+<h2>To careless</h2>
+<p>The question is quite simple to answer by overloading the global operator new and delete. I count for each operator, how often it was called .</p>
+<h3>Operator new</h3>
+<p>C++ offers the operator new in four variations.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #2b91af;">void</span>* <span style="color: #0000ff;">operator</span> new  (std::<span style="color: #2b91af;">size_t</span> count );
+<span style="color: #2b91af;">void</span>* <span style="color: #0000ff;">operator</span> <span style="color: #0000ff;">new</span>[](std::<span style="color: #2b91af;">size_t</span> count );
+<span style="color: #2b91af;">void</span>* <span style="color: #0000ff;">operator</span> new  (std::<span style="color: #2b91af;">size_t</span> count, <span style="color: #0000ff;">const</span> std::<span style="color: #2b91af;">nothrow_t</span>&amp; tag);
+<span style="color: #2b91af;">void</span>* <span style="color: #0000ff;">operator</span> <span style="color: #0000ff;">new</span>[](std::<span style="color: #2b91af;">size_t</span> count, <span style="color: #0000ff;">const</span> std::<span style="color: #2b91af;">nothrow_t</span>&amp; tag);
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The first two variations will throw a <span style="font-family: courier new,courier;">std::bad_alloc</span> exception, if they can not provide the memory. The last two variations return a null pointer. It's quite convenient that is sufficient to overload only the version 1 because the versions 2 - 4 use the version 1: <span style="font-family: courier new,courier;">void* operator new(std::size_t count)</span>. This statement holds also for the variants 2 and 4, which are designed for C arrays. You can read the details to the global operator new here: <a href="http://en.cppreference.com/w/cpp/memory/new/operator_new">cppreference.com.</a></p>
+<p>The statements hold also for <span style="font-family: courier new,courier;"><span style="font-family: courier new,courier;">operator delete</span>.</span><span style="font-family: courier new,courier;"><br /></span></p>
+<h3>Operator delete</h3>
+<p>&nbsp;C++ offers six variations for operator delete.<span style="font-family: courier new,courier;"></span></p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #2b91af;">void</span> <span style="color: #0000ff;">operator</span> delete  (<span style="color: #2b91af;">void</span>* ptr); 	
+<span style="color: #2b91af;">void</span> <span style="color: #0000ff;">operator</span> <span style="color: #0000ff;">delete</span>[](<span style="color: #2b91af;">void</span>* ptr);
+<span style="color: #2b91af;">void</span> <span style="color: #0000ff;">operator</span> delete  (<span style="color: #2b91af;">void</span>* ptr, <span style="color: #0000ff;">const</span> std::<span style="color: #2b91af;">nothrow_t</span>&amp; tag);
+<span style="color: #2b91af;">void</span> <span style="color: #0000ff;">operator</span> <span style="color: #0000ff;">delete</span>[](<span style="color: #2b91af;">void</span>* ptr, <span style="color: #0000ff;">const</span> std::<span style="color: #2b91af;">nothrow_t</span>&amp; tag);
+<span style="color: #2b91af;">void</span> <span style="color: #0000ff;">operator</span> delete  (<span style="color: #2b91af;">void</span>* ptr, std::<span style="color: #2b91af;">size_t</span> sz);
+<span style="color: #2b91af;">void</span> <span style="color: #0000ff;">operator</span> <span style="color: #0000ff;">delete</span>[](<span style="color: #2b91af;">void</span>* ptr, std::<span style="color: #2b91af;">size_t</span> sz);
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>According to <span style="font-family: courier new,courier;">operator new</span> it is sufficient to overload for <span style="font-family: courier new,courier;">operator delete</span> the first variant because the remaining 5 use <span style="font-family: courier new,courier;">void operator delete(void* ptr) </span>as fallback. Only a word about the two last versions of <span style="font-family: courier new,courier;">operator delete.</span> You have in this version the length of the memory block in the variable <span style="font-family: courier new,courier;">sz</span> <span style="font-family: courier new,courier;"></span><span style="font-family: courier new,courier;"></span>to your disposal. Read the details here <a href="http://en.cppreference.com/w/cpp/memory/new/operator_delete">cppreference.com</a>.</p>
+<p>This time I use in the program <span style="font-family: courier new,courier;">overloadOperatorNewAndDelete.cpp</span> the header <span style="font-family: courier new,courier;">myNew.hpp</span> (line 3). The same holds for the lines 34. Here I invoke the function <span style="font-family: courier new,courier;">getInfo</span> to get information about my memory management.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// myNew.hpp</span>
+
+<span style="color: #0000ff;">#ifndef MY_NEW</span>
+<span style="color: #0000ff;">#define MY_NEW</span>
+
+<span style="color: #0000ff;">#include &lt;cstdlib&gt;</span>
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;new&gt;</span>
+
+<span style="color: #0000ff;">static</span> std::<span style="color: #2b91af;">size_t</span> alloc{0};
+<span style="color: #0000ff;">static</span> std::<span style="color: #2b91af;">size_t</span> dealloc{0};
+
+<span style="color: #2b91af;">void</span>* <span style="color: #0000ff;">operator</span> new(std::<span style="color: #2b91af;">size_t</span> sz){
+    alloc+= 1;
+    <span style="color: #0000ff;">return</span> std::malloc(sz);
+}
+
+<span style="color: #2b91af;">void</span> <span style="color: #0000ff;">operator</span> <span style="color: #0000ff;">delete</span>(<span style="color: #2b91af;">void</span>* ptr) noexcept{
+    dealloc+= 1;
+    std::free(ptr);
+}
+
+<span style="color: #2b91af;">void</span> getInfo(){
+    
+    std::cout &lt;&lt; std::endl;
+ 
+    std::cout &lt;&lt; <span style="color: #a31515;">"Number of allocations: "</span> &lt;&lt; alloc &lt;&lt; std::endl;
+    std::cout &lt;&lt; <span style="color: #a31515;">"Number of deallocations: "</span> &lt;&lt; dealloc &lt;&lt; std::endl;
+    
+    std::cout &lt;&lt; std::endl;
+}
+
+<span style="color: #0000ff;">#endif </span><span style="color: #008000;">// MY_NEW</span>
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>I create in the file two static variables <span style="font-family: courier new,courier;">alloc</span> and <span style="font-family: courier new,courier;">dealloc</span> (line 10 and 11). They keep track how often I used the overloaded <span style="font-family: courier new,courier;">operator new</span> (line 13) and <span style="font-family: courier new,courier;">operator delete</span> (line 18). I delegate in the functions the memory allocation to<span style="font-family: courier new,courier;"> std::malloc</span> and the memory deallocation to<span style="font-family: courier new,courier;"> std::free</span>. The function <span style="font-family: courier new,courier;">getInfo</span> (lines 23 - 31) provides me the numbers and displays them.</p>
+<p>The question is. Have I cleaned everything clean?</p>
+<p>&nbsp;<img src="images/blog/EmbeddedProgrammierung/OverloadingOperatorNewAndDelete1/myNew.png" alt="myNew" style="margin: 15px;" /></p>
+<p>Of course, not. That was the intention of this and the following post. Now I know, that I have leaks. Maybe it helps to determine the addresses of the objects, which I have forgotten to clean up.</p>
+<h2>Addresses of the memory leaks.</h2>
+<p>So, I have to put more cleverness into the header <span style="font-family: courier new,courier;">myNew2.hpp.</span></p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// myNew2.hpp</span>
+
+<span style="color: #0000ff;">#ifndef MY_NEW2</span>
+<span style="color: #0000ff;">#define MY_NEW2</span>
+
+<span style="color: #0000ff;">#include &lt;algorithm&gt;</span>
+<span style="color: #0000ff;">#include &lt;cstdlib&gt;</span>
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;new&gt;</span>
+<span style="color: #0000ff;">#include &lt;string&gt;</span>
+<span style="color: #0000ff;">#include &lt;array&gt;</span>
+
+<span style="color: #2b91af;">int</span> <span style="color: #0000ff;">const</span> MY_SIZE= 10;
+
+std::array&lt;<span style="color: #2b91af;">void</span>* ,MY_SIZE&gt; myAlloc{nullptr,};
+    
+<span style="color: #2b91af;">void</span>* <span style="color: #0000ff;">operator</span> new(std::<span style="color: #2b91af;">size_t</span> sz){
+    <span style="color: #0000ff;">static</span> <span style="color: #2b91af;">int</span> counter{};
+    <span style="color: #2b91af;">void</span>* ptr= std::malloc(sz);
+    myAlloc.at(counter++)= ptr;
+    <span style="color: #0000ff;">return</span> ptr;
+}
+
+<span style="color: #2b91af;">void</span> <span style="color: #0000ff;">operator</span> delete(<span style="color: #2b91af;">void</span>* ptr) noexcept{
+    <span style="color: #0000ff;">auto</span> ind= std::distance(myAlloc.begin(),std::find(myAlloc.begin(),myAlloc.end(),ptr));
+    myAlloc[ind]= nullptr;
+    std::free(ptr);
+}
+
+<span style="color: #2b91af;">void</span> getInfo(){
+    
+    std::cout &lt;&lt; std::endl;
+     
+    std::cout &lt;&lt; <span style="color: #a31515;">"Not deallocated: "</span> &lt;&lt; std::endl;
+    <span style="color: #0000ff;">for</span> (<span style="color: #0000ff;">auto</span> i: myAlloc){
+        <span style="color: #0000ff;">if</span> (i != nullptr ) std::cout &lt;&lt; <span style="color: #a31515;">" "</span> &lt;&lt; i &lt;&lt; std::endl;
+    }
+    
+    std::cout &lt;&lt; std::endl;
+    
+}
+
+<span style="color: #0000ff;">#endif </span><span style="color: #008000;">// MY_NEW2</span>
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>The key idea is it to use the static array <span style="font-family: courier new,courier;">myAlloc</span> (line 15) to keep track of the addresses of all <span style="font-family: courier new,courier;">std::malloc</span> (line 19) and <span style="font-family: courier new,courier;">std::free</span> (line 19) invocations. Of course, I can not use in the function <span style="font-family: courier new,courier;">operator new</span> a container that needs dynamic memory. This container would invoke operator new. A recursion that would cause my program to crash. Therefore, I use a <span style="font-family: courier new,courier;">std::array</span> in line 15, because<span style="font-family: courier new,courier;"> std::array</span> gets its memory at compile time. Now it can happen, that my <span style="font-family: courier new,courier;">std::array</span> becomes to small. Therefore, I invoke <span style="font-family: courier new,courier;">myAlloc.at(counter++) </span>for checking the array boundaries<span style="font-family: courier new,courier;">.</span></p>
+<p>Which memory address have I forgotten to release? The output gives the answer.</p>
+<p><img src="images/blog/EmbeddedProgrammierung/OverloadingOperatorNewAndDelete1/myNew2.png" alt="myNew2" style="margin: 15px;" /></p>
+<p>A simple search for the object having the address is no good idea. Because it is quite probable that a new call of <span style="font-family: courier new,courier;">std::malloc</span> reuse an already used address. That is ok, if the objects has been deleted in the meantime.</p>
+<p>But why are the addresses part of the solution? I have only to compare the memory address of the created objects with the memory address of the not deleted objects.</p>
+<h2>Comparison of the memory addresses</h2>
+<p>In addition to the memory address I have the size of the reserved memory at my disposal. I use this information in <span style="font-family: courier new,courier;">operator new.</span></p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// myNew3.hpp</span>
+
+<span style="color: #0000ff;">#ifndef MY_NEW3</span>
+<span style="color: #0000ff;">#define MY_NEW3</span>
+
+<span style="color: #0000ff;">#include &lt;algorithm&gt;</span>
+<span style="color: #0000ff;">#include &lt;cstdlib&gt;</span>
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;new&gt;</span>
+<span style="color: #0000ff;">#include &lt;string&gt;</span>
+<span style="color: #0000ff;">#include &lt;array&gt;</span>
+
+<span style="color: #2b91af;">int</span> <span style="color: #0000ff;">const</span> MY_SIZE= 10;
+
+std::array&lt;<span style="color: #2b91af;">void</span>* ,MY_SIZE&gt; myAlloc{nullptr,};
+    
+<span style="color: #2b91af;">void</span>* <span style="color: #0000ff;">operator</span> new(std::<span style="color: #2b91af;">size_t</span> sz){
+    <span style="color: #0000ff;">static</span> <span style="color: #2b91af;">int</span> counter{};
+    <span style="color: #2b91af;">void</span>* ptr= std::malloc(sz);
+    myAlloc.at(counter++)= ptr;
+    std::cout &lt;&lt; <span style="color: #a31515;">"Addr.: "</span> &lt;&lt; ptr &lt;&lt; <span style="color: #a31515;">" size: "</span> &lt;&lt; sz &lt;&lt; std::endl;
+    <span style="color: #0000ff;">return</span> ptr;
+}
+
+<span style="color: #2b91af;">void</span> <span style="color: #0000ff;">operator</span> delete(<span style="color: #2b91af;">void</span>* ptr) noexcept{
+    <span style="color: #0000ff;">auto</span> ind= std::distance(myAlloc.begin(),std::find(myAlloc.begin(),myAlloc.end(),ptr));
+    myAlloc[ind]= nullptr;
+    std::free(ptr);
+}
+
+<span style="color: #2b91af;">void</span> getInfo(){
+    
+    std::cout &lt;&lt; std::endl;
+     
+    std::cout &lt;&lt; <span style="color: #a31515;">"Not deallocated: "</span> &lt;&lt; std::endl;
+    <span style="color: #0000ff;">for</span> (<span style="color: #0000ff;">auto</span> i: myAlloc){
+        <span style="color: #0000ff;">if</span> (i != nullptr ) std::cout &lt;&lt; <span style="color: #a31515;">" "</span> &lt;&lt; i &lt;&lt; std::endl;
+    }
+    
+    std::cout &lt;&lt; std::endl;
+    
+}
+
+<span style="color: #0000ff;">#endif </span><span style="color: #008000;">// MY_NEW3</span>
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Now, the allocation and deallocation of the application is clearly more transparent.</p>
+<p><img src="images/blog/EmbeddedProgrammierung/OverloadingOperatorNewAndDelete1/myNew3.png" alt="myNew3" style="margin: 15px;" /></p>
+<p>A simple comparison shows. I forget to release an object with 4 bytes and an object with 400 bytes. In addition, the sequence of allocation in the source code corresponds to the sequence of outputs in the program. Now, it should be quite easy to identify the missing memory releases.</p>
+<h2>What's next?</h2>
+<p>The program is not beautiful in two ways. First, I statically allocate the memory for std::array; second, I want to know, which object was not released. In the next post I will solve both issues.&nbsp; &nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>Do you want to get the source code?<span style="font-family: courier new,courier;"> <a href="index.php/source-code-repository">Source code repository</a></span></p>
+<p>&nbsp;</p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="80" height="101" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Get your e-book.</span></strong></p>
+<p>&nbsp;</p>
