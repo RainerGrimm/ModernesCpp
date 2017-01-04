@@ -1,0 +1,460 @@
+<p>I overloaded in the <a href="index.php/overloading-operator-new-and-delete">last post </a><span style="font-family: 'Courier New', Courier, monospace;">operator new </span>and <span style="font-family: 'Courier New', Courier, monospace;">delete</span>. Therefore, it was possible to find memory leaks and get a first hint of the bad guys. My solution had two not so nice properties. With this post, I will overcome them.</p>
+<hr id="system-readmore" />
+<p>What were the not so nice properties of my last post? At first, I get only a hint which memory was lost; at second, I had to prepare the whole bookkeeping of the memory management at compile time. Who want to know the details of these shortcomings should read the last post. But now the ugliness will go.</p>
+<h2>Who is the&nbsp; bad guy?</h2>
+<p>Special tasks ask for special forces. So I have to use a small macro for debugging purposes.<span id="transmark"></span></p>
+<p>I want to stress this point. <b>I'm not a friend of macros.</b></p>
+<p>Let's have a look at the macro. <span style="font-family: courier        new,courier;">#define new new(__FILE__, __LINE__)</span></p>
+<p>The macro causes that each <span style="font-family: 'Courier New', Courier, monospace;">new</span> call will be mapped to the overloaded <span style="font-family: 'Courier New', Courier, monospace;">new </span>call. This overloaded <span style="font-family: 'Courier New', Courier, monospace;">new </span>call gets in addition the name of the file and the line number, respectively. That's exactly the information I need.</p>
+<p>But what will happen, if I use the macro in line 6?</p>
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// overloadOperatorNewAndDelete2.cpp</span>
+
+<span style="color: #0000ff;">#include "myNew4.hpp"</span>
+<span style="color: #008000;">// #include "myNew5.hpp"</span>
+
+<span style="color: #0000ff;">#define new new(__FILE__, __LINE__)</span>
+
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;new&gt;</span>
+<span style="color: #0000ff;">#include &lt;string&gt;</span>
+
+<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">MyClass</span>{
+  <span style="color: #2b91af;">float</span>* p= <span style="color: #0000ff;">new</span> <span style="color: #2b91af;">float</span>[100];
+};
+
+<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">MyClass2</span>{
+  <span style="color: #2b91af;">int</span> five= 5;
+  std::string s= <span style="color: #a31515;">"hello"</span>;
+};
+
+<span style="color: #2b91af;">int</span> main(){
+    
+    <span style="color: #2b91af;">int</span>* myInt= <span style="color: #0000ff;">new</span> <span style="color: #2b91af;">int</span>(1998);
+    <span style="color: #2b91af;">double</span>* myDouble= <span style="color: #0000ff;">new</span> <span style="color: #2b91af;">double</span>(3.14);
+    <span style="color: #2b91af;">double</span>* myDoubleArray= <span style="color: #0000ff;">new</span> <span style="color: #2b91af;">double</span>[2]{1.1,1.2};
+    
+    MyClass* myClass= <span style="color: #0000ff;">new</span> MyClass;
+    MyClass2* myClass2= <span style="color: #0000ff;">new</span> MyClass2;
+    
+    <span style="color: #0000ff;">delete</span> myDouble;
+    <span style="color: #0000ff;">delete</span> [] myDoubleArray;
+    <span style="color: #0000ff;">delete</span> myClass;
+    <span style="color: #0000ff;">delete</span> myClass2;
+    
+    dummyFunction();
+    
+    getInfo();
+    
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>The preprocessor substitutes all <span style="font-family: 'Courier New', Courier, monospace;">new </span>calls. That shows exactly the modified <span style="font-family: 'Courier New', Courier, monospace;">main </span>function.</p>
+<p>&nbsp;</p>
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">class</span> <span style="color: #2b91af;">MyClass</span>{
+  <span style="color: #2b91af;">float</span>* p= <span style="color: #0000ff;">new</span>(<span style="color: #a31515;">"overloadNewAndDelete.cpp"</span>, 14) <span style="color: #2b91af;">float</span>[100];
+};
+
+<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">MyClass2</span>{
+  <span style="color: #2b91af;">int</span> five= 5;
+  std::string s= <span style="color: #a31515;">"hello"</span>;
+};
+
+<span style="color: #2b91af;">int</span> main(){
+
+    <span style="color: #2b91af;">int</span>* myInt= <span style="color: #0000ff;">new</span>(<span style="color: #a31515;">"overloadNewAndDelete.cpp"</span>, 24) <span style="color: #2b91af;">int</span>(1998);
+    <span style="color: #2b91af;">double</span>* myDouble= <span style="color: #0000ff;">new</span>(<span style="color: #a31515;">"overloadNewAndDelete.cpp"</span>, 25) <span style="color: #2b91af;">double</span>(3.14);
+    <span style="color: #2b91af;">double</span>* myDoubleArray= <span style="color: #0000ff;">new</span>(<span style="color: #a31515;">"overloadNewAndDelete.cpp"</span>, 26) <span style="color: #2b91af;">double</span>[2]{1.1,1.2};
+
+    MyClass* myClass= <span style="color: #0000ff;">new</span>(<span style="color: #a31515;">"overloadNewAndDelete.cpp"</span>, 28) MyClass;
+    MyClass2* myClass2= <span style="color: #0000ff;">new</span>(<span style="color: #a31515;">"overloadNewAndDelete.cpp"</span>, 29) MyClass2;
+
+    <span style="color: #0000ff;">delete</span> myDouble;
+    <span style="color: #0000ff;">delete</span> [] myDoubleArray;
+    <span style="color: #0000ff;">delete</span> myClass;
+    <span style="color: #0000ff;">delete</span> myClass2;
+
+    dummyFunction();
+
+    getInfo();
+
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>The lines 2 and 12 shows that the preprocessor substitutes the constants <span style="font-family: courier new,courier;">__FILE__</span> and <span style="font-family: courier new,courier;">__LINE__</span> in the macro. But how does the magic work? The header <span style="font-family: 'Times New Roman', Times, serif;"><span style="font-family: 'Courier New', Courier, monospace;">myNew4</span>.</span><span style="font-family: 'Courier New', Courier, monospace;">hpp </span>solves the riddle. <span style="font-family: courier new,courier;"></span></p>
+<p>&nbsp;</p>
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+55
+56
+57
+58</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// myNew4.hpp</span>
+
+<span style="color: #0000ff;">#ifndef MY_NEW4</span>
+<span style="color: #0000ff;">#define MY_NEW4</span>
+
+<span style="color: #0000ff;">#include &lt;algorithm&gt;</span>
+<span style="color: #0000ff;">#include &lt;cstdlib&gt;</span>
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;new&gt;</span>
+<span style="color: #0000ff;">#include &lt;array&gt;</span>
+
+<span style="color: #2b91af;">int</span> <span style="color: #0000ff;">const</span> MY_SIZE= 10;
+
+<span style="color: #2b91af;">int</span> counter= 0;
+
+std::array&lt;<span style="color: #2b91af;">void</span>* ,MY_SIZE&gt; myAlloc{nullptr,};
+
+<span style="color: #2b91af;">void</span>* newImpl(std::<span style="color: #2b91af;">size_t</span> sz,<span style="color: #2b91af;">char</span> <span style="color: #0000ff;">const</span>* file, <span style="color: #2b91af;">int</span> line){
+    <span style="color: #2b91af;">void</span>* ptr= std::malloc(sz);
+    std::cout &lt;&lt; file &lt;&lt; <span style="color: #a31515;">": "</span> &lt;&lt; line &lt;&lt; <span style="color: #a31515;">" "</span> &lt;&lt;  ptr &lt;&lt; std::endl;
+    myAlloc.at(counter++)= ptr;
+    <span style="color: #0000ff;">return</span> ptr;
+}
+
+<span style="color: #2b91af;">void</span>* <span style="color: #0000ff;">operator</span> new(std::<span style="color: #2b91af;">size_t</span> sz,<span style="color: #2b91af;">char</span> <span style="color: #0000ff;">const</span>* file, <span style="color: #2b91af;">int</span> line){  
+    <span style="color: #0000ff;">return</span> newImpl(sz,file,line);
+}
+
+<span style="color: #2b91af;">void</span>* <span style="color: #0000ff;">operator</span> <span style="color: #0000ff;">new</span> [](std::<span style="color: #2b91af;">size_t</span> sz,<span style="color: #2b91af;">char</span> <span style="color: #0000ff;">const</span>* file, <span style="color: #2b91af;">int</span> line){  
+    <span style="color: #0000ff;">return</span> newImpl(sz,file,line);
+}
+
+<span style="color: #2b91af;">void</span> <span style="color: #0000ff;">operator</span> <span style="color: #0000ff;">delete</span>(<span style="color: #2b91af;">void</span>* ptr) noexcept{
+    <span style="color: #0000ff;">auto</span> ind= std::distance(myAlloc.begin(),std::find(myAlloc.begin(),myAlloc.end(),ptr));
+    myAlloc[ind]= nullptr;
+    std::free(ptr);
+}
+
+<span style="color: #0000ff;">#define new new(__FILE__, __LINE__)</span>
+
+<span style="color: #2b91af;">void</span> dummyFunction(){
+    <span style="color: #2b91af;">int</span>* dummy= <span style="color: #0000ff;">new</span> <span style="color: #2b91af;">int</span>;
+}
+
+<span style="color: #2b91af;">void</span> getInfo(){
+    
+    std::cout &lt;&lt; std::endl;
+     
+    std::cout &lt;&lt; <span style="color: #a31515;">"Allocation: "</span> &lt;&lt; std::endl;
+    <span style="color: #0000ff;">for</span> (<span style="color: #0000ff;">auto</span> i: myAlloc){
+        <span style="color: #0000ff;">if</span> (i != nullptr ) std::cout &lt;&lt; <span style="color: #a31515;">" "</span> &lt;&lt; i &lt;&lt; std::endl;
+    }
+    
+    std::cout &lt;&lt; std::endl;
+    
+}
+
+<span style="color: #0000ff;">#endif </span><span style="color: #008000;">// MY_NEW4</span>
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>I implement in the line 25 and 29 the special operators <span style="font-family: 'Courier New', Courier, monospace;">new </span>and <span style="font-family: 'Courier New', Courier, monospace;">new[] </span>that delegates their functionality to the helper function <span style="font-family: 'Courier New', Courier, monospace;">newImpl </span>(line 18 - 23). The function does two important jobs. At first, it displays to each <span style="font-family: 'Courier New', Courier, monospace;">new </span>call the name of the source file and the line number (line 20); at second, it keeps in the static array <span style="font-family: 'Courier New', Courier, monospace;">myAlloc </span>track of each used memory address (line 21). This fits to the behaviour of the overloaded operator <span style="font-family: 'Courier New', Courier, monospace;">delete </span>that sets all memory addresses to the null pointer <span style="font-family: 'Courier New', Courier, monospace;">nullptr</span> (line 35). The memory addresses stands for the deallocated memory areas. At the end the function <span style="font-family: 'Courier New', Courier, monospace;">getInfo </span>displays the memory addresses that were not deallocated. You can directly see them together with the file name and line number.</p>
+<p>Of course, I can directly apply the macro in the file <span style="font-family: courier new,courier;">myNew4.hpp</span>. That was a lot of theory. What's the output of the program?</p>
+<p><img src="images/blog/EmbeddedProgrammierung/OverloadingOperatorNewAndDelete2/overloadNewAndDelete.png" alt="overloadNewAndDelete" width="481" height="334" />&nbsp;</p>
+<p>The memory areas to the memory addresses 0x8c3010, 0x8c3090, and 0x8c3230 were not deallocated. The bad guys are the <span style="font-family: 'Courier New', Courier, monospace;">new </span>calls in the line 24 and line 14 <span style="font-family: courier new,courier;"></span>(<span style="font-family: courier new,courier;">overloadNewAndDelete.hpp</span>) and the <span style="font-family: 'Courier New', Courier, monospace;">new </span>call in the line 42 <span style="font-family: courier new,courier;"></span>(<span style="font-family: courier new,courier;">myNew4.hpp</span>).</p>
+<p>Impressed? I assume, yes. But the presented technique has two drawbacks. One minor and one major.</p>
+<ol>
+<li>I have to overload the simple operator <span style="font-family: courier new,courier;">new</span> and the operator<span style="font-family: courier new,courier;"> new []</span> for arrays. This, because the overloaded <span style="font-family: courier new,courier;">operator new</span> is not a fallback for the <a href="index.php/overloading-operator-new-and-delete">three remaining operators <span style="font-family: 'Courier New', Courier, monospace;">new. </span></a></li>
+<li>I can not use the special operator <span style="font-family: courier          new,courier;">new</span> that returns in the error case a null pointer. Because, it will be explicitly called by the operator <span style="font-family: 'Courier New', Courier, monospace;">new </span>with the argument <span style="font-family: courier new,courier;">std::nothrow</span>: <span style="font-family: courier new,courier;">int* myInt= new (std::nothrow) int(1998);</span></li>
+</ol>
+<p>Now, I have to solve the first issue. I want to use for the array <span style="font-family: 'Courier New', Courier, monospace;">myAlloc </span>a data structure that manages its memory at run time. Therefore, it is not necessary any more to eagerly allocate the memory at compile time .</p>
+<h2>All at run time</h2>
+<p>What was the reason that I can't allocate memory in the <span style="font-family: 'Courier New', Courier, monospace;">operator new</span>? The <span style="font-family: 'Courier New', Courier, monospace;">operator new </span>was globally overloaded. Therefore, a call of <span style="font-family: 'Courier New', Courier, monospace;">new </span>would end in a never ending recursion. That will exactly happen, if I use a container like <span style="font-family: 'Courier New', Courier, monospace;">std::vector </span>that dynamically allocates its memory.</p>
+<p>This restriction holds not any more because I didn't overload the global <span style="font-family: 'Courier New', Courier, monospace;">operator new </span>that is a fallback to the three remaining <span style="font-family: 'Courier New', Courier, monospace;">new </span>operators. Thanks to the macro, my own variant of <span style="font-family: 'Courier New', Courier, monospace;">operator new </span>is used. Therefore, I can use <span style="font-family: 'courier new';">std::</span><span style="font-family: 'Courier New', Courier, monospace;">vector </span>in my <span style="font-family: 'Courier New', Courier, monospace;">operator new. </span></p>
+<p>Exactly that can you see in my program.</p>
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+55
+56</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// myNew5.hpp</span>
+
+<span style="color: #0000ff;">#ifndef MY_NEW5</span>
+<span style="color: #0000ff;">#define MY_NEW5</span>
+
+<span style="color: #0000ff;">#include &lt;algorithm&gt;</span>
+<span style="color: #0000ff;">#include &lt;cstdlib&gt;</span>
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;new&gt;</span>
+<span style="color: #0000ff;">#include &lt;string&gt;</span>
+<span style="color: #0000ff;">#include &lt;vector&gt;</span>
+
+std::vector&lt;<span style="color: #2b91af;">void</span>*&gt; myAlloc;
+
+<span style="color: #2b91af;">void</span>* newImpl(std::<span style="color: #2b91af;">size_t</span> sz,<span style="color: #2b91af;">char</span> <span style="color: #0000ff;">const</span>* file, <span style="color: #2b91af;">int</span> line){
+    <span style="color: #0000ff;">static</span> <span style="color: #2b91af;">int</span> counter{};
+    <span style="color: #2b91af;">void</span>* ptr= std::malloc(sz);
+    std::cout &lt;&lt; file &lt;&lt; <span style="color: #a31515;">": "</span> &lt;&lt; line &lt;&lt; <span style="color: #a31515;">" "</span> &lt;&lt;  ptr &lt;&lt; std::endl;
+    myAlloc.push_back(ptr);
+    <span style="color: #0000ff;">return</span> ptr;
+}
+
+<span style="color: #2b91af;">void</span>* <span style="color: #0000ff;">operator</span> new(std::<span style="color: #2b91af;">size_t</span> sz,<span style="color: #2b91af;">char</span> <span style="color: #0000ff;">const</span>* file, <span style="color: #2b91af;">int</span> line){  
+    <span style="color: #0000ff;">return</span> newImpl(sz,file,line);
+}
+
+<span style="color: #2b91af;">void</span>* <span style="color: #0000ff;">operator</span> <span style="color: #0000ff;">new</span> [](std::<span style="color: #2b91af;">size_t</span> sz,<span style="color: #2b91af;">char</span> <span style="color: #0000ff;">const</span>* file, <span style="color: #2b91af;">int</span> line){  
+    <span style="color: #0000ff;">return</span> newImpl(sz,file,line);
+}
+
+<span style="color: #2b91af;">void</span> <span style="color: #0000ff;">operator</span> <span style="color: #0000ff;">delete</span>(<span style="color: #2b91af;">void</span>* ptr) noexcept{
+    <span style="color: #0000ff;">auto</span> ind= std::distance(myAlloc.begin(),std::find(myAlloc.begin(),myAlloc.end(),ptr));
+    myAlloc[ind]= nullptr;
+    std::free(ptr);
+}
+
+<span style="color: #0000ff;">#define new new(__FILE__, __LINE__)</span>
+
+<span style="color: #2b91af;">void</span> dummyFunction(){
+    <span style="color: #2b91af;">int</span>* dummy= <span style="color: #0000ff;">new</span> <span style="color: #2b91af;">int</span>;
+}
+
+<span style="color: #2b91af;">void</span> getInfo(){
+    
+    std::cout &lt;&lt; std::endl;
+     
+    std::cout &lt;&lt; <span style="color: #a31515;">"Allocation: "</span> &lt;&lt; std::endl;
+    <span style="color: #0000ff;">for</span> (<span style="color: #0000ff;">auto</span> i: myAlloc){
+        <span style="color: #0000ff;">if</span> (i != nullptr ) std::cout &lt;&lt; <span style="color: #a31515;">" "</span> &lt;&lt; i &lt;&lt; std::endl;
+    }
+    
+    std::cout &lt;&lt; std::endl;
+    
+}
+
+<span style="color: #0000ff;">#endif </span><span style="color: #008000;">// MY_NEW5</span>
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>I use in line 13, 19, and 33 <span style="font-family: 'courier new';">std</span><span style="font-family: 'Courier New', Courier, monospace;">::vector. </span></p>
+<h2>What's next?</h2>
+<p>I the <a href="index.php/memory-management-with-std-allocator">next post </a>I will have a closer look at&nbsp;<span style="font-family: 'courier new';">std</span>::<span style="font-family: 'courier new';">allocator</span>. In particular, I'm interested how memory requests can be mapped to special memory areas.</p>
+<p><span style="font-family: courier new,courier;"></span></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>Do you want to get the source code?<span style="font-family: courier        new,courier;"> <a href="index.php/source-code-repository">Source code repository</a></span></p>
+<p>&nbsp;</p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="80" height="101" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Get your e-book.</span></strong></p>
+<p>&nbsp;</p>
