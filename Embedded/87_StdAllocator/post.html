@@ -1,0 +1,278 @@
+<p>What is common between all containers of the Standard Template Library? They have a type parameter <span style="font-family: 'courier new', courier;">Allocator</span> that is by default&nbsp;<span style="font-family: 'courier new', courier;">std::allocator</span>. The job of the allocator is it to manage the lifetime of its elements. That means to allocate and deallocate memory for its elements and to initialize and destruct them.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p>I write in this post about the containers of the Standard Template Library but this includes <span style="font-family: 'courier new', courier;">std::string</span>. For simplicity reason I will use the term container for both.</p>
+<p>What is special about <span style="font-family: 'courier new', courier;">std</span>::<span style="font-family: courier new,courier;">allocator</span>?</p>
+<p>At one hand, it makes a difference, if <span style="font-family: 'courier new', courier;">std::allocator</span> allocates elements for a <span style="font-family: 'courier new', courier;">std::vector</span> or pairs of<span style="font-family: 'courier new', courier;"> std::map</span>.&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">template</span>&lt;
+    <span style="color: #0000ff;">class</span> <span style="color: #2b91af;">T</span>,
+    <span style="color: #0000ff;">class</span> <span style="color: #2b91af;">Allocator</span> = std::allocator&lt;T&gt;
+&gt; <span style="color: #0000ff;">class</span> <span style="color: #2b91af;">vector</span>;
+
+
+<span style="color: #0000ff;">template</span>&lt;
+    <span style="color: #0000ff;">class</span> <span style="color: #2b91af;">Key</span>,
+    <span style="color: #0000ff;">class</span> <span style="color: #2b91af;">T</span>,
+    <span style="color: #0000ff;">class</span> <span style="color: #2b91af;">Compare</span> = std::less&lt;Key&gt;,
+    <span style="color: #0000ff;">class</span> <span style="color: #2b91af;">Allocator</span> = std::allocator&lt;std::pair&lt;<span style="color: #0000ff;">const</span> Key, T&gt; &gt;
+&gt; <span style="color: #0000ff;">class</span> <span style="color: #2b91af;">map</span>;
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>At the other hand, an allocator needs a bunch of attributes, methods, and functions to do its job.</p>
+<h2>The interface</h2>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// Attributes</span>
+value_type                               T
+pointer                                  T*
+const_pointer                            <span style="color: #0000ff;">const</span> T*
+reference                                T&amp;
+const_reference                          <span style="color: #0000ff;">const</span> T&amp;
+size_type                                std::<span style="color: #2b91af;">size_t</span>
+difference_type                          std::<span style="color: #2b91af;">ptrdiff_t</span>
+propagate_on_container_move_assignment   std::true_ty
+rebind                                   <span style="color: #0000ff;">template</span>&lt; <span style="color: #0000ff;">class</span> <span style="color: #2b91af;">U</span> &gt; <span style="color: #0000ff;">struct</span> rebind { <span style="color: #0000ff;">typedef</span> allocator&lt;U&gt; other; };
+is_always_equal                          std::true_type
+
+<span style="color: #008000;">// Methods</span>
+constructor
+destructor
+address
+allocate
+deallocate
+max_size
+construct
+destroy
+
+<span style="color: #008000;">// Functions</span>
+<span style="color: #0000ff;">operator</span>==
+<span style="color: #0000ff;">operator</span>!=
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>In short, here are the most important members of&nbsp;<span style="font-family: courier new,courier;">std::allocator&lt;T&gt;</span>.</p>
+<p>The inner class template <span style="font-family: 'courier new', courier;">rebind</span> (line 10) is one of this important members. Thanks to the class template, you can rebind a<span style="font-family: 'courier new', courier;"> std::allocator</span> of type T to a type U. The heart of <span style="font-family: 'courier new', courier;">std::allocate</span> are the two methods <span style="font-family: 'courier new', courier;">alllocate</span> (line 17) and <span style="font-family: 'courier new', courier;">deallocate</span> (line 18). These both methods manage the memory in which the object is initialized with <span style="font-family: 'courier new', courier;">construct</span> (line 20) and destroyed with <span style="font-family: 'courier new', courier;">destroy</span>&nbsp;(line 21). The method <span style="font-family: 'courier new', courier;">max_size</span> (line 19) returns the maximum number of objects of type T for which <span style="font-family: 'courier new', courier;">std::allocate</span> can allocate memory.&nbsp;</p>
+<p>Of course, you can directly use<span style="font-family: 'courier new', courier;"> std::allocator</span>.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// allocate.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;memory&gt;</span>
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;string&gt;</span>
+ 
+<span style="color: #2b91af;">int</span> main(){
+  
+  std::cout &lt;&lt; std::endl;
+
+  std::allocator&lt;<span style="color: #2b91af;">int</span>&gt; intAlloc; 
+
+  std::cout &lt;&lt; <span style="color: #a31515;">"intAlloc.max_size(): "</span> &lt;&lt; intAlloc.max_size() &lt;&lt; std::endl;
+  <span style="color: #2b91af;">int</span>* intArray = intAlloc.allocate(100);
+
+  std::cout &lt;&lt; <span style="color: #a31515;">"intArray[4]: "</span> &lt;&lt; intArray[4] &lt;&lt; std::endl;
+ 
+  intArray[4] = 2011;
+
+  std::cout &lt;&lt; <span style="color: #a31515;">"intArray[4]: "</span> &lt;&lt; intArray[4] &lt;&lt; std::endl;
+ 
+  intAlloc.deallocate(intArray, 100);
+
+  std::cout &lt;&lt; std::endl;
+ 
+  std::allocator&lt;<span style="color: #2b91af;">double</span>&gt; doubleAlloc;
+  std::cout &lt;&lt; <span style="color: #a31515;">"doubleAlloc.max_size(): "</span> &lt;&lt; doubleAlloc.max_size() &lt;&lt; std::endl;
+  
+  std::cout &lt;&lt; std::endl;
+
+  std::allocator&lt;std::string&gt; stringAlloc;
+  std::cout &lt;&lt; <span style="color: #a31515;">"stringAlloc.max_size(): "</span> &lt;&lt; stringAlloc.max_size() &lt;&lt; std::endl;
+ 
+  std::string* myString = stringAlloc.allocate(3); 
+ 
+  stringAlloc.construct(myString, <span style="color: #a31515;">"Hello"</span>);
+  stringAlloc.construct(myString + 1, <span style="color: #a31515;">"World"</span>);
+  stringAlloc.construct(myString + 2, <span style="color: #a31515;">"!"</span>);
+ 
+  std::cout &lt;&lt; myString[0] &lt;&lt; <span style="color: #a31515;">" "</span> &lt;&lt; myString[1] &lt;&lt; <span style="color: #a31515;">" "</span> &lt;&lt; myString[2] &lt;&lt; std::endl;
+ 
+  stringAlloc.destroy(myString);
+  stringAlloc.destroy(myString + 1);
+  stringAlloc.destroy(myString + 2);
+  stringAlloc.deallocate(myString, 3);
+  
+  std::cout &lt;&lt; std::endl;
+  
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>I used in the program three allocators. One for an <span style="font-family: 'courier new', courier;">int</span> (line 11), one for a&nbsp;<span style="font-family: 'courier new', courier;">double</span> (line 26), and one for a <span style="font-family: 'courier new', courier;">std::string</span> (line 31). Each of these allocators knows the maximum number of elements it can allocate (line 14, 27, and 32).</p>
+<p>Now to the allocator for i<span style="font-family: courier new,courier;">nt: std::allocator&lt;int&gt; intAlloc</span> (line 11). With&nbsp;<span style="font-family: courier new,courier;">intAlloc</span>&nbsp;you can allocate an <span style="font-family: 'courier new', courier;">int</span> array of 100 elements (line 14). The access to the 5th element is not defined because firstly, it has to be initialized. That changes in line 20. Thanks to the call&nbsp;<span style="font-family: courier new,courier;">intAlloc.deallocate(intArray, 100)</span> (Zeile 22) &nbsp;I deallocate the memory.&nbsp;&nbsp;</p>
+<p>The handling of the std::string allocator is more complex. The&nbsp;<span style="font-family: 'courier new', courier;">stringAlloc.construct</span> calls in den lines 36 - 38 trigger three constructor calls for <span style="font-family: 'courier new', courier;">std::string.</span> The three <span style="font-family: 'courier new', courier;">stringAlloc.destroy</span> calls (line 42 - 44) do the opposite. At the end (line 34) the memory of <span style="font-family: 'courier new', courier;">myString</span> is released.</p>
+<p>And now the output of the program.</p>
+<p><img src="images/blog/EmbeddedProgrammierung/StdAllocator/allocator.png" alt="allocator" style="margin: 15px;" /></p>
+<h3>C++17</h3>
+<p>With C++17 the interface of <span style="font-family: 'courier new', courier;">std::allocator</span> becomes a lot easier to handle. A lot of its members are depraceted.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// Attributes</span>
+value_type                               T
+propagate_on_container_move_assignment   std::true_ty
+is_always_equal                          std::true_type
+
+<span style="color: #008000;">// Methods</span>
+constructor
+destructor
+allocate
+deallocate
+
+<span style="color: #008000;">// Functions</span>
+<span style="color: #0000ff;">operator</span>==
+<span style="color: #0000ff;">operator</span>!=
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>But the key answer is this post is still missing.</p>
+<h2>Why does a container needs an allocator?</h2>
+<p>I have three answers.</p>
+<ol>
+<li>The container should be <strong>independent of the underlying memory model</strong>. For example, the &nbsp;<a href="https://en.wikipedia.org/wiki/Intel_Memory_Model">Intel Memory Model</a>&nbsp;on x86 architectures use six different variants:<em><span style="font-family: courier new,courier;"></span><span style="font-family: courier new,courier;">tiny, small, medium, compact, large,&nbsp;</span></em>and <em>huge</em>. I want to explicitly stress the point. I speak from the Intel Memory Model and not from the memory model as the base of multithreading.</li>
+<li>The container can separate the <strong>memory allocation and deallocation from the initialization and destruction of their elements</strong>. Therefore, a call of&nbsp;<span style="font-family: courier new,courier;">vec.reserve(n)</span>&nbsp;of a &nbsp;<span style="font-family: courier new,courier;">std::vector vec</span>&nbsp;allocates only memory for at least n elements. The constructor for each element will not be executed. (<strong>Sven Johannsen</strong>)</li>
+<li>You can <strong>adjust the allocator of the container exactly to your needs.</strong> Therefore, the default allocators are optimized for not so frequent &nbsp;memory calls and big memory areas. Under the hood, the C function <span style="font-family: 'courier new', courier;">std::malloc</span> will typicially be used. Therefore, an allocator, who uses preallocated memory can gain a great performance boost. A adjusted allocator also makes a lot of sense, if you need a deterministic timing behaviour of your program. With the default allocator of a container you have no guarantee how long a memory allocation will take. Of course, you can use an adjusted allocator to give you enriched debugging information. &nbsp;</li>
+</ol>
+<h2>What's next?</h2>
+<p>Which strategies for requesting memory exists? That's the question I want to answer in the next post.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;<a href="https://github.com/RainerGrimm/ModernesCppSource"></a></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>Do you want to get the source code?<span style="font-family: courier new,courier;"> <a href="index.php/source-code-repository">Source code repository</a></span></p>
+<p>&nbsp;</p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="80" height="101" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Get your e-book.</span></strong></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
