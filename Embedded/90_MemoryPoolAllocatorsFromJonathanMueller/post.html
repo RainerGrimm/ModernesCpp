@@ -1,0 +1,116 @@
+<p>After I have written a few posts about <a href="index.php/tag/memory">memory management </a>in C++, I'm very glad to present Jonathan Müller, which will write a guest post about his implementation of the <a href="https://github.com/foonathan/memory">memory</a> library. He will explain us his concepts about his design. Jonathan is known as an expert of memory management in the C++ community. In the&nbsp; <a href="http://cppcast.com/2016/06/jonathan-muller/">59 episode</a> he presented his ideas to a world wide audiance.</p>
+<hr id="system-readmore" />
+<h2>The motivation</h2>
+<p>At first, there is the question. Why did Jonathan wrote a library in C++ for memory management? Of course, he answered the question himself on his github project <a href="https://github.com/foonathan/memory">memory:</a></p>
+<p>"<em>The C++ STL allocator model has various flaws. For example, they are fixed to a certain type, because they are almost necessarily required to be templates. So you can't easily share a single allocator for multiple types. In addition, you can only get a copy from the containers and not the original allocator object. At least with C++11 they are allowed to be stateful and so can be made object not instance based. But still, the model has many flaws. Over the course of the years many solutions have been proposed. for example <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2007/n2271.html">EASTL</a>. This library is another. But instead of trying to change the STL, it works with the current implementation</em>."</p>
+<p>But that is not the full answer. More promising is his provoking statement to the performance of his library, which he proofs in four&nbsp;<a href="https://foonathan.github.io/blog/2016/03/18/boosting-pools-1.html">very readable posts</a>:&nbsp;<strong>How I have beaten Boost.Pool.</strong> In particular, his explanations to the different optimization strategies for memory allocations provide deep insight and have a broader focus. <strong><br /> </strong></p>
+<p>But now, lets start with Jonathan Müller post, translated from German to English by Rainer Grimm.</p>
+<h2>Memory pool allocator</h2>
+<p>A memory pool allocator is a generally usable and fast allocator. It allocates only big memory blocks and divides them in equally sized pieces. All free pieces are stored in a so called <strong>free list</strong><span class="moz-txt-tag"></span><span class="moz-txt-tag"></span>.&nbsp; Allocation simply removes the first element of the<strong class="moz-txt-star"><span class="moz-txt-tag"> </span>free list<span class="moz-txt-tag"></span></strong> and returns it. Deallocation pushes it at the back. That is quite fast but you can only use it for pieces of a fixed size. If not you have fragmentation issues and therefore need a long time for finding the fitting piece.</p>
+<p>Now, I will show how you can use the pool implementation of my <a href="https://github.com/foonathan/memory">memory library</a> for your own allocation.</p>
+<p style="padding-left: 30px;">memory is a library that provides different allocators and their infrastructure to use them without any issues. The current version is 0.x and therefore in the development phase.</p>
+<h3>The<span style="font-family: courier new,courier;"> memory pool</span></h3>
+<p>If you've <a href="https://github.com/foonathan/memory">installed</a> my library, the memory pool will be quite easy to use.</p>
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0000ff;">#include &lt;foonathan/memory/memory_pool.hpp&gt;</span>
+<span style="color: #0000ff;">#include &lt;foonathan/memory/namespace_alias.hpp&gt; </span><span style="color: #008000;">// (1)</span>
+
+<span style="color: #2b91af;">int</span> main()
+{
+    memory::memory_pool&lt;&gt; pool(16, 4096); <span style="color: #008000;">// (2)</span>
+    <span style="color: #2b91af;">void</span>* node = pool.allocate_node(); <span style="color: #008000;">// (3)</span>
+    <span style="color: #008000;">// ...</span>
+    pool.deallocate_node(node); <span style="color: #008000;">// (4)</span>
+} 
+</pre>
+<p>After you have included the necessary headers (1) you can use a memory pool (2).&nbsp; The header<span style="font-family: courier new,courier;"> namespace_alias.hpp</span> gives you automatically the <a href="https://foonathan.github.io/blog/2016/01/26/namespace-alias.html">alias</a> for the long namespace names<span style="font-family: courier new,courier;"> foonathan::memory. </span>The constructor has two parameters. The first one is the size of each block in the <strong>free list,</strong> the so called <strong>node</strong> <strong>size.</strong> The second one is the size of the big memory block, which will be divided in<span style="font-family: courier new,courier;"> </span>4KiB parts.</p>
+<p>Now, you can request small memory blocks from the pool, so called <strong>nodes</strong> (3) and realase them (4). Each <strong>node</strong> is as big as specified in the constructor. In this example 16 Bytes. Of course, the release of the big memory block in the destructor of the pool will automatically relase all <strong>nodes</strong> - even if there was no call <span style="font-family: courier new,courier;">deallocate_node().</span></p>
+<p>But it is quite tedious to use the pool in such a way. Therefore, the concept of <span style="font-family: courier new,courier;">RawAllocator </span>come to our rescue. This is the key abstraction.</p>
+<h3>The <span style="font-family: courier new,courier;">RawAllocator</span></h3>
+<p>In a previous chapter the concept of the Allocator was presented. With it you can adjust the memory requirements of the STL containers. The allocator concepts is not&nbsp;<a href="https://foonathan.github.io/blog/2015/10/05/allocatorawarecontainer-propagation-pitfalls.html">so easy to get</a> and it combines the creation of the object with the allocation of the memory. That is usually not necessary. Most of the times you only want to adjust how the memory is managed. This is the use case for <a href="https://foonathan.github.io/doc/memory/md_doc_concepts.html#concept_rawallocator">RawAllocator.</a></p>
+<p><br /> A <span style="font-family: courier new,courier;">RawAllocator</span> has the following interface:</p>
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0000ff;">struct</span> raw_allocator
+{
+    <span style="color: #0000ff;">using</span> is_stateful = std::integral_constant&lt;<span style="color: #2b91af;">bool</span>, Value&gt;; <span style="color: #008000;">// optional, default is std::is_empty</span>
+
+    <span style="color: #2b91af;">void</span>* allocate_node(std::<span style="color: #2b91af;">size_t</span> size, std::<span style="color: #2b91af;">size_t</span> alignment); <span style="color: #008000;">// required, allocates memory</span>
+    <span style="color: #2b91af;">void</span> deallocate_node(<span style="color: #2b91af;">void</span> *node, std::<span style="color: #2b91af;">size_t</span> size, std::<span style="color: #2b91af;">size_t</span> alignment) noexcept; <span style="color: #008000;">// required: releases memory</span>
+
+    <span style="color: #2b91af;">void</span>* allocate_array(std::<span style="color: #2b91af;">size_t</span> count, std::<span style="color: #2b91af;">size_t</span> size, std::<span style="color: #2b91af;">size_t</span> alignment); <span style="color: #008000;">// optional: invokes by default allocate_node() </span>
+    <span style="color: #2b91af;">void</span> deallocate_array(<span style="color: #2b91af;">void</span> *ptr, std::<span style="color: #2b91af;">size_t</span> count, std::<span style="color: #2b91af;">size_t</span> size, std::<span style="color: #2b91af;">size_t</span> alignment) noexcept; <span style="color: #008000;">// optional: invokes by default deallocate_node()</span>
+
+    std::<span style="color: #2b91af;">size_t</span> max_node_size() <span style="color: #0000ff;">const</span>; <span style="color: #008000;">// optional: returns by default the maximum value</span>
+    std::<span style="color: #2b91af;">size_t</span> max_array_size() <span style="color: #0000ff;">const</span>; <span style="color: #008000;">// optional: returns by default max_node_size()</span>
+    std::<span style="color: #2b91af;">size_t</span> max_alignment() <span style="color: #0000ff;">const</span>; <span style="color: #008000;">// optional: returns by default maximum alginment, e.g.: alignof(std::max_align_t)</span>
+}
+</pre>
+<p style="padding-left: 30px;">The interface is quite similar to the new <a href="http://en.cppreference.com/w/cpp/memory/memory_resource)">std::pmr::memory_resource</a>, but it is not implemened with inheritance. Therefore, the <span style="font-family: courier new,courier;">RawAllocator</span> is by default part of the type and can only optionally be <strong class="moz-txt-star"><span class="moz-txt-tag"></span>type erased<span class="moz-txt-tag"> </span></strong>by using the <span style="font-family: courier new,courier;">any_allocator_reference </span>class.<span style="font-family: courier new,courier;"> </span></p>
+<p>Most parts of the interface is optional and only needs to be implemented for special use cases. Although the <span style="font-family: courier new,courier;">memory_pool</span> does not implement the interface, it is a <span style="font-family: courier new,courier;">RawAllocator.</span> This is possible because each access is via the <span style="font-family: courier new,courier;">memory::allocator_traits</span>, which are specialised by the <span style="font-family: courier new,courier;">memory_pool.</span></p>
+<p>To use the <span style="font-family: courier new,courier;">RawAllocator</span> in the STL containers there is the adapter <span style="font-family: courier new,courier;">std_allocator</span> which gets an <span style="font-family: courier new,courier;">RawAllocator</span> and adjust it to the interface of an <span style="font-family: courier new,courier;">Allocator.</span> <span style="font-family: courier new,courier;">Allocator</span> have to be copyable, but <span style="font-family: courier new,courier;">RawAllocator</span>sg not, therefore it stores the <span style="font-family: courier new,courier;">RawAllocator</span> by reference.</p>
+<p>Because memory pools have issues with the requirements of an array, they are ideal candidates for <span style="font-family: courier new,courier;">node based containers</span>. Here is an example:<span style="font-family: courier new,courier;"></span></p>
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0000ff;">#include &lt;set&gt;</span>
+
+<span style="color: #0000ff;">#include &lt;foonathan/memory/container.hpp&gt;</span>
+<span style="color: #0000ff;">#include &lt;foonathan/memory/memory_pool.hpp&gt;</span>
+<span style="color: #0000ff;">#include &lt;foonathan/memory/namespace_alias.hpp&gt;</span>
+
+<span style="color: #2b91af;">int</span> main()
+{
+    memory::memory_pool&lt;&gt; pool(memory::set_node_size&lt;<span style="color: #2b91af;">int</span>&gt;::value, 4096); <span style="color: #008000;">// (1)</span>
+    memory::set&lt;<span style="color: #2b91af;">int</span>, decltype(pool)&gt; set(pool); <span style="color: #008000;">// (2)</span>
+    set.insert(3);
+    <span style="color: #008000;">// ...</span>
+} 
+</pre>
+<p>You can create - as previously - your pool (1). The given<strong> node size</strong> is exactly the size that a <span style="font-family: courier new,courier;">std::set&lt;int&gt;</span> needs. Now I use this size for the set in (2). The type of the container is <span style="font-family: courier new,courier;">memory::set.</span> This is not a new implementation of a <span style="font-family: courier new,courier;">std::set</span> but only a template alias. In this case a <strong>template alias</strong> for <span style="font-family: Courier New;">std::set&lt;int, std::less&lt;int&gt;, memory::std_allocator&lt;int, decltype(pool)&gt;&gt;</span>. Therefore, it is a <span style="font-family: Courier New;">std::set&lt;int&gt; </span>which uses the pool through the <span style="font-family: Courier New;">std_allocator</span>. The called constructor is the regular constructor of <span style="font-family: Courier New;">std::set</span>. We use the fact that the <span style="font-family: Courier New;">memory::std_allocator</span> can implicitly be created by a <span style="font-family: Courier New;">RawAllocator</span>.</p>
+<p>Now, the usage of the set is as always. All allocation is done by our pool.</p>
+<h3>Internally adjustment of the pool allocation</h3>
+<p>As i previously mentioned a pool request a big memory block and divides in small pieces. By default, it uses <span style="font-family: Courier New;">memory::heap_allocator for that. </span>This is a <span style="font-family: Courier New;">RawAllocator </span>that delegates its task to OS specific functions such as <span style="font-family: Courier New;">HeapAlloc()</span> on Windows.</p>
+<p>But you can use template arguments to adjust the internal allocator.</p>
+<p>One combination of allocators is quite useful. For example, we want to have a <span style="font-family: courier new,courier;">std::vector</span> which is totally located on the stack instead of the heap. <span style="font-family: Courier New;"></span><br /> That is simple: We use a <span style="font-family: courier new,courier;">std::array</span> or a C array.<span style="font-family: Courier New;"></span></p>
+<p>But how does it look like if we want to have a<span style="font-family: courier new,courier;"> std::set</span> on the stack?</p>
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0000ff;">#include &lt;set&gt;</span>
+
+<span style="color: #0000ff;">#include &lt;foonathan/memory/container.hpp&gt;</span>
+<span style="color: #0000ff;">#include &lt;foonathan/memory/memory_pool.hpp&gt;</span>
+<span style="color: #0000ff;">#include &lt;foonathan/memory/namespace_alias.hpp&gt;</span>
+<span style="color: #0000ff;">#include &lt;foonathan/memory/static_allocator.hpp&gt;</span>
+
+<span style="color: #2b91af;">int</span> main()
+{
+    memory::static_allocator_storage&lt;4096u&gt; storage; <span style="color: #008000;">// (1)</span>
+
+    <span style="color: #0000ff;">using</span> static_pool = memory::memory_pool&lt;memory::node_pool, memory::static_allocator&gt;; <span style="color: #008000;">// (2)</span>
+    static_pool pool(memory::set_node_size&lt;<span style="color: #2b91af;">int</span>&gt;::value, 4096, storage); <span style="color: #008000;">// (3)</span>
+
+    memory::set&lt;<span style="color: #2b91af;">int</span>, decltype(pool)&gt; set(pool);
+    set.insert(3);
+    <span style="color: #008000;">// ...</span>
+} 
+
+</pre>
+<p>In this example we combine the <span style="font-family: Courier New;">memory_pool</span> with the <span style="font-family: Courier New;">static_allocator</span> for the internal memory allocation. Like <span style="font-family: Courier New;">heap_allocator</span> you can use <span style="font-family: Courier New;">static_allocator</span> as RawAllocator directly but it makes more sense with a <span style="font-family: Courier New;">memory_pool</span>. The allocators of <strong class="moz-txt-star">memory</strong> are quite easy to combine to implement various strategies.</p>
+<p>At first, we create the memory which will be used by the <span style="font-family: Courier New;">static_allocator</span> for its memory requests in (1). The alias in (2) defines our new pool type. <span style="font-family: Courier New;">memory::memory_pool</span> has two template parameters. The first one is the type of the pool, which you can adjust for different requirements. The default is <span style="font-family: Courier New;">memory::node_pool</span>. The second parameter is the type of the internal allocator. Here we use <span style="font-family: Courier New;">memory::static_allocator</span>.&nbsp; We construct the pool in (3). This time we also have to give the <span style="font-family: Courier New;">storage </span>which is needed by <span style="font-family: Courier New;"><span style="font-family: Courier New;">the memory::static_allocator.</span></span></p>
+<p>Now we can create our <span style="font-family: courier new,courier;">set</span> that is located on the stack.</p>
+<p style="padding-left: 30px;"><br /> &nbsp;The internal allocator is exactly speaking a <span style="font-family: Courier New;">BlockAllocator </span>and not a <span style="font-family: Courier New;">RawAllocator</span> because you can directly control how big the blocks will become, if the first block is out of memory. Template magic makes sure that you can give a <span style="font-family: Courier New;">RawAllocator</span>, which becomes a <span style="font-family: Courier New;">BlockAllocator automatically</span>.</p>
+<h3>Several pools</h3>
+<p>A memory_pool can only manage memory of a certain size.<span style="font-family: Courier New;"></span><br /> If you need several sizes, you have to set the <strong class="moz-txt-star">node size</strong> to its maximum and waste memory for smaller sizes or your have to use several pools and choose the best fitting.</p>
+<p>The second alternative will be done in the <span style="font-family: Courier New;">memory::memory_pool_collection</span> automatically.&nbsp; The class uses several pools and chooses the right one. It's a template with three parameters. The first one is the type of the pool, which is most of the time's <span style="font-family: Courier New;">memory::node_pool</span>. The second one is the distribution policy. These can be <span style="font-family: Courier New;">memory::identity_buckets</span> - a pool of fixed size - or <span style="font-family: Courier New;">memory::log2_buckets</span> - a pool for each power of two. The third one is - like in the regularly pool - the allocator, which is used for the internal memory.</p>
+<p>Please note that all pools share the already unused memory and each pool takes its share as needed.<br /> <br /> The usage is similar to the regular <span style="font-family: Courier New;">memory_pool</span>, therefore I skip the example.</p>
+<p>Please note, that the <strong class="moz-txt-star">node size</strong> in the constructor is <strong class="moz-txt-star">maximum</strong> size and that the <span style="font-family: Courier New;">allocate_node()</span> function needs a size.<br /> Thanks to the <span style="font-family: Courier New;">RawAllocator</span> is the usage for STL containers etc. identical.</p>
+<h3>Conclusion</h3>
+<p>There are a lot of libraries implementing pools. <strong class="moz-txt-star">memory</strong> is the only one having all allocators for your needs. I did not present the whole functionality in this post. There are a lot more allocators and adapters. For example a <span style="font-family: courier new,courier;">Deleter</span> class for<span style="font-family: courier new,courier;"> std::unique_ptr. </span>In addition, I didn't mention the&nbsp; <span style="font-family: Courier New;">allocator_storage</span> functionality that is implemented by <span style="font-family: Courier New;">allocator_reference</span>.</p>
+<p>The library is designed in such a way that you can simply put the allocator you need where you need it. But you can also fine tune each detail if that's required.</p>
+<p>If you want to know more about memory, watch my talk at <a href="http://%20foonathan.net/meetingcpp2016">Meeting C++.</a></p>
+<p>Of course, you can also follow me at <a href="https://twitter.com/foonathan">twitter</a> or visit my <a href="https://foonathan.github.io">blog.</a></p>
+<h2>What's next?</h2>
+<p>The is my last post about embedded programming with C++ and memory management in particular. The next post will be about functional programming in C++.</p>
+<p class="moz-signature"><a href="index.php/blog" class="moz-txt-link-freetext"></a> <br /> <br /> <a href="https://github.com/RainerGrimm/ModernesCppSource"></a></p>
+<p><span class="h3"></span></p>
+<div>&nbsp;</div>
+<div>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>Do you want to get the source code?<span style="font-family: courier new,courier;"> <a href="index.php/source-code-repository">Source code repository</a></span></p>
+<p>&nbsp;</p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="80" height="101" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Get your e-book.</span></strong></p>
+</div>
