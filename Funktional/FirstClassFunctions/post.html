@@ -1,0 +1,220 @@
+<p>One of the characteristics of functional programming is first class functions. First-class functions behave like data and are heavily used in the Standard Template Library.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<h2>First-class functions</h2>
+<p><img src="images/blog/Functional/FirstClassFunctions/CharakteristikenFunktionaleProgrammierungFirstClassFunctionsEng.png" alt="CharakteristikenFunktionaleProgrammierungFirstClassFunctionsEng" style="margin: 15px;" /></p>
+<p>First-class functions behave like data? What does that mean?</p>
+<p>First-class functions can be</p>
+<ul>
+<li><strong>an argument of a function.<br /></strong></li>
+</ul>
+<p style="padding-left: 30px;">&nbsp; &nbsp; std::accumulate(vec.begin(), vec.end(), []{ <span style="color: #2b91af;">int</span> a, <span style="color: #2b91af;">int</span> b}{ <span style="color: #0000ff;">return</span> a+b; })</p>
+<ul>
+<li><strong>returned from a function.<br /></strong></li>
+</ul>
+<pre style="margin: 0px; line-height: 125%;"><code><samp>       std::function&lt;<span style="color: #2b91af;">int</span>(<span style="color: #2b91af;">int</span>, <span style="color: #2b91af;">int</span>)&gt; makeAdd(){
+         <span style="color: #0000ff;">return</span> [](<span style="color: #2b91af;">int</span> a, <span style="color: #2b91af;">int</span> b){ <span style="color: #0000ff;">return</span> a + b; };
+       }
+       std::function&lt;<span style="color: #2b91af;">int</span>(<span style="color: #2b91af;">int</span>, <span style="color: #2b91af;">int</span>)&gt; myAdd= makeAdd();
+       myAdd(2000, 11);  <span style="color: #008000;">// 2011</span></samp></code></pre>
+<ul>
+<li><strong>stored in a variable.<br /></strong></li>
+</ul>
+<p>One short remark to the second point. The function <span style="font-family: courier new,courier;">makeAdd</span> returns the lambda function <span style="color: #008000;"><span style="color: #000000;"><span style="font-family: courier new,courier;">[](int a, int b){ return a + b; }</span>. This function needs two <span style="font-family: courier new,courier;">int</span> arguments and returns an <span style="font-family: courier new,courier;">int</span> value: <span style="font-family: courier new,courier;">std::function&lt;int(int,int)&gt;</span>. You can bind the return value of <span style="font-family: courier new,courier;">makeAdd</span> to the generic function wrapper <span style="font-family: courier new,courier;">myAdd</span> and execute it.<span style="font-family: courier new,courier;"></span><span style="font-family: courier new,courier;"></span></span> </span></p>
+<p>Which power lies in first-class functions is shown in my post <a href="index.php/functional-in-c-dispatch-table">Functional in C++11 and C++14: Dispatch Table and Generic Lambdas. </a> Have a look at the dispatch table in C++.</p>
+<p>Function pointers are the first-class functions of the poor man. Even C has function pointers. C++ goes a few steps further. In particular, you can connect the evolution of the function concept with the evolution of C++.</p>
+<h2>The evolution of the function concept</h2>
+<p>Simplified, the evolution consists of four steps.</p>
+<p><img src="images/blog/Functional/FirstClassFunctions/FunctionEvolutionEng.png" alt="FunctionEvolutionEng" width="399" height="492" style="margin: 15px;" /></p>
+<p>C knows functions. C++ added function objects. These are objects, which behave like functions because their call operator is overloaded. C++11 added lambda-functions; C++14 made them generic. Each step made functions in C++ even more powerful.</p>
+<ul>
+<li><strong>Functions =&gt; Function objects: </strong>Function object can have in contrary to functions a state. Therefore, they have a kind of memory and you can configure them.</li>
+<li><strong>Function objects =&gt; Lambda functions: </strong>Lambda functions are usually implemented just in the place of their usage. That improves the readability of the code, reduces your typing to its bare minimum, and gives the optimizer maximum insight into your code. Therefore, the optimizer has more opportunities to do its job.</li>
+<li><strong>Lambda functions =&gt; Generic lambda functions: </strong>Generic lambda functions are quite similar to function templates but are a lot easier to implement. They can be widely used because as <a href="https://en.wikipedia.org/wiki/Closure_(computer_programming)">closures</a> they capture their environment and you can parametrize their type.&nbsp;</li>
+</ul>
+<p>Admittedly, that was a lot of theory. Therefore, the example is following right now. Here are the four steps of the function concepts in C++.</p>
+<p>&nbsp;</p>
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+55
+56
+57
+58
+59
+60
+61
+62
+63
+64
+65
+66
+67
+68
+69
+70
+71
+72
+73
+74
+75</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// evolutionOfFunctions.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;numeric&gt;</span>
+<span style="color: #0000ff;">#include &lt;string&gt;</span>
+<span style="color: #0000ff;">#include &lt;vector&gt;</span>
+
+std::string addMe(std::string fir, std::string sec){
+  <span style="color: #0000ff;">return</span> fir + <span style="color: #a31515;">" "</span> + sec;
+};
+
+<span style="color: #0000ff;">struct</span> AddMe{
+  
+  AddMe()= <span style="color: #0000ff;">default</span>;
+  AddMe(std::string gl): glue(gl) {}
+  
+  std::string <span style="color: #0000ff;">operator</span>()(std::string fir, std::string sec) <span style="color: #0000ff;">const</span> {
+    <span style="color: #0000ff;">return</span> fir + glue + sec;
+  }
+  
+  std::string glue= <span style="color: #a31515;">" "</span>;
+  
+};
+
+<span style="color: #2b91af;">int</span> main(){
+  
+  std::vector&lt;std::string&gt; myStrings={<span style="color: #a31515;">"The"</span>, <span style="color: #a31515;">"evolution"</span>, <span style="color: #a31515;">"of"</span>, <span style="color: #a31515;">"the"</span>, <span style="color: #a31515;">"function"</span>, <span style="color: #a31515;">"concept"</span>, <span style="color: #a31515;">"in"</span>, <span style="color: #a31515;">"C++."</span>};
+  
+  std::string fromFunc= std::accumulate(myStrings.begin(), myStrings.end(), std::string{}, addMe);
+  
+  std::cout &lt;&lt; fromFunc &lt;&lt; std::endl;
+  
+  std::cout &lt;&lt; std::endl;
+  
+  std::string fromFuncObj= std::accumulate(myStrings.begin(), myStrings.end(), std::string{}, AddMe());
+  
+  std::cout &lt;&lt; fromFuncObj &lt;&lt; std::endl;
+  
+  std::string fromFuncObj2= std::accumulate(myStrings.begin(), myStrings.end(), std::string{}, AddMe(<span style="color: #a31515;">":"</span>));
+  
+  std::cout &lt;&lt; fromFuncObj2 &lt;&lt; std::endl;
+  
+  std::cout &lt;&lt; std::endl;
+  
+  std::string fromLambdaFunc= std::accumulate(myStrings.begin(), myStrings.end(), std::string{}, [](std::string fir, std::string sec){ <span style="color: #0000ff;">return</span> fir + <span style="color: #a31515;">" "</span> + sec; });
+  
+  std::cout &lt;&lt; fromLambdaFunc &lt;&lt; std::endl;
+  
+  std::string glue=<span style="color: #a31515;">":"</span>;
+  
+  <span style="color: #0000ff;">auto</span> lambdaFunc= [glue](std::string fir, std::string sec){ <span style="color: #0000ff;">return</span> fir + glue + sec; };
+  
+  std::string fromLambdaFunc2=  std::accumulate(myStrings.begin(), myStrings.end(), std::string{}, lambdaFunc);
+  
+  std::cout &lt;&lt; fromLambdaFunc2 &lt;&lt; std::endl;
+  
+  std::cout &lt;&lt; std::endl;
+  
+  std::string fromLambdaFuncGeneric= std::accumulate(myStrings.begin(), myStrings.end(), std::string{}, [glue](<span style="color: #0000ff;">auto</span> fir, <span style="color: #0000ff;">auto</span> sec){ <span style="color: #0000ff;">return</span> fir + glue + sec; });
+  
+  std::cout &lt;&lt; fromLambdaFuncGeneric &lt;&lt; std::endl;
+  
+  <span style="color: #0000ff;">auto</span> lambdaFuncGeneric= [](<span style="color: #0000ff;">auto</span> fir, <span style="color: #0000ff;">auto</span> sec){ <span style="color: #0000ff;">return</span> fir + sec; };
+  
+  <span style="color: #0000ff;">auto</span> fromLambdaFuncGeneric1= std::accumulate(myStrings.begin(), myStrings.end(), std::string{}, lambdaFuncGeneric);
+  
+  std::cout &lt;&lt; fromLambdaFuncGeneric1 &lt;&lt; std::endl;
+  
+  std::vector&lt;<span style="color: #2b91af;">int</span>&gt; myInts={1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+  
+  <span style="color: #0000ff;">auto</span> fromLambdaFuncGeneric2= std::accumulate(myInts.begin(), myInts.end(), <span style="color: #2b91af;">int</span>{}, lambdaFuncGeneric);
+  
+  std::cout &lt;&lt; fromLambdaFuncGeneric2 &lt;&lt; std::endl;
+  
+}</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>The program begins with the function <span style="font-family: courier new,courier;">addMe</span> (line 8 - 10), the function object <span style="font-family: courier new,courier;">AddMe</span> (line 12 - 23), the lambda function (line 45 and 51), and the generic lambda function in line 59, 63, and 64. The purpose of the program is to concatenate in different ways the strings of the vector <span style="font-family: courier new,courier;">myString</span> (line 27) with the help of the algorithm <span style="font-family: courier new,courier;">std::accumulate.</span> Therefore, it is quite comfortable that <span style="font-family: courier new,courier;">std::accumulate</span> is a higher order function (wait for my next post) and can accept first-class functions. I use a function pointer, a function object and a (generic) lambda function as the first-class function.</p>
+<p>I apply in line 29 the function pointer <span style="font-family: courier new,courier;">addMe.</span> The function object <span style="font-family: courier new,courier;">AddMe</span> and <span style="font-family: courier new,courier;">AddMe(:)</span> (line 35 and 39) are more comfortable to use because I can parametrize the glue between the strings. The lambda functions offer the same comfort (line 45 and 51). In particular, the lambda function <span style="font-family: courier new,courier;">lambdaFunc</span> uses a copy of the variable <span style="font-family: courier new,courier;">glue</span> (line 49). Therefore, the lambda function is a closure. The generic lambda function <span style="font-family: courier new,courier;">[glue](auto fir, auto sec){ return fir + glue + sec; })</span> (line 59) is the most interesting one. As closure, they also use the variable <span style="font-family: courier new,courier;">glue.</span> I apply the generic lambda function<span style="font-family: courier new,courier;"></span> <span style="font-family: courier new,courier;">lambdaFuncGeneric</span> to a <span style="font-family: courier new,courier;">std::vector&lt;std::string&gt; (line 27) </span>and a<span style="font-family: courier new,courier;"> </span><span style="font-family: courier new,courier;">std::vector&lt;int&gt;</span> (line 69). In case of <span style="font-family: courier new,courier;">std::vector&lt;int&gt;</span> the result is 55.</p>
+<p>At the end, the output of the program.</p>
+<p>&nbsp;<img src="images/blog/Functional/FirstClassFunctions/evolutionOfFunctions.png" alt="evolutionOfFunctions" width="588" height="312" style="margin: 15px;" /></p>
+<p><em>The evolution will not end with C++14. In C++20 we get with high probability coroutines, which are a generalisation of functions. Coroutines can be suspended and resumed. I will write a post about it. So, stay tuned.<br /></em></p>
+<h3>But, that can be done easier</h3>
+<p>For didactical reasons, I used <span style="font-family: courier new,courier;">std::accumulate</span> to add pairs of elements together. That can be done a lot easier - even for generic lambda functions - because of <span style="font-family: courier new,courier;">std::accumulate</span> has a simple version, which needs no callable. The simple version just adds their elements together starting with the first element. Therefore, I can write line 65 a lot simpler: <span style="font-family: courier new,courier;">auto fromLambdaFuncGeneric1= std::accumulate(myStrings.begin(), myStrings.end(), std::string{}). </span>The same holds for<span style="font-family: courier new,courier;"> <span style="font-family: courier new,courier;">fromLambdaFuncGeneric2</span></span>.<span style="font-family: courier new,courier;"> </span></p>
+<h2>What's next?</h2>
+<p>I already mentioned it in the post. The classical counterpart to first-class functions is higher-order functions because they get first-class functions. The next post will be about higher-order functions The next property of functional programming.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>Do you want to get the source code?<span style="font-family: courier new,courier;"> <a href="index.php/source-code-repository">Source code repository</a></span></p>
+<p>&nbsp;</p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="166" height="212" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Get your e-book. Support my blog.</span></strong></p>
+<p>&nbsp;</p>
