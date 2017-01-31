@@ -1,0 +1,133 @@
+<p>Pure functions are quite similar to mathematical functions. They are the reason that Haskell is called a pure functional programming language.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<h2>Pure functions</h2>
+<p><img src="images/blog/Functional/PureFunctions/CharakteristikPureFunctionsEng.png" alt="CharakteristikPureFunctionsEng" style="margin: 15px;" /></p>
+<p>I compare in the table pure and impure functions.</p>
+<p><img src="images/blog/Functional/PureFunctions/PureImpureFunctionsEng.png" alt="PureImpureFunctionsEng" width="600" height="158" style="margin: 15px;" /></p>
+<p>&nbsp;</p>
+<p>Pure functions have a crucial drawback. They can not communicate with the outside world. Because functions for input and output, functions for building a state, or functions for creating random numbers can not be pure. The only effect that a pure function can have is according to <a href="https://en.wikipedia.org/wiki/Simon_Peyton_Jones">Simon Peyton Jones </a>to warm up the room. Haskell solves this dead end by embedded impure, imperative subsystems in the pure functional language. These imperative subsystems are called monads. I will write more about monads in a few seconds.</p>
+<p>What is the story of purity in C++? This story is based - similar to <a href="index.php/immutable-data">Immutable Data </a>- on the discipline of the programmer. I will present in the following program a function, a meta-function, and a constexpr function. All three are pure functions.</p>
+<p>&nbsp;</p>
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// pureFunctions.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+
+<span style="color: #2b91af;">int</span> powFunc(<span style="color: #2b91af;">int</span> m, <span style="color: #2b91af;">int</span> n){ 
+  <span style="color: #0000ff;">if</span> (n == 0) <span style="color: #0000ff;">return</span> 1; 
+  <span style="color: #0000ff;">return</span> m * powFunc(m, n-1); 
+}
+
+<span style="color: #0000ff;">template</span>&lt;<span style="color: #2b91af;">int</span> m, <span style="color: #2b91af;">int</span> n&gt;
+<span style="color: #0000ff;">struct</span> PowMeta{
+  <span style="color: #0000ff;">static</span> <span style="color: #2b91af;">int</span> <span style="color: #0000ff;">const</span> value = m * PowMeta&lt;m,n-1&gt;::value;
+};
+
+<span style="color: #0000ff;">template</span>&lt;<span style="color: #2b91af;">int</span> m&gt;
+<span style="color: #0000ff;">struct</span> PowMeta&lt;m,0&gt;{
+  <span style="color: #0000ff;">static</span> <span style="color: #2b91af;">int</span> <span style="color: #0000ff;">const</span> value = 1;
+};
+
+constexpr <span style="color: #2b91af;">int</span> powConst(<span style="color: #2b91af;">int</span> m, <span style="color: #2b91af;">int</span> n){ 
+  <span style="color: #2b91af;">int</span> r = 1;
+  <span style="color: #0000ff;">for</span>(<span style="color: #2b91af;">int</span> k=1; k&lt;=n; ++k) r*= m;
+  <span style="color: #0000ff;">return</span> r;
+}
+
+<span style="color: #2b91af;">int</span> main(){
+  std::cout &lt;&lt; powFunc(2,10) &lt;&lt; std::endl;               <span style="color: #008000;">// 1024</span>
+  std::cout &lt;&lt; PowMeta&lt;2,10&gt;::value &lt;&lt; std::endl;        <span style="color: #008000;">// 1024</span>
+  std::cout &lt;&lt; powConst(2,10) &lt;&lt; std::endl;              <span style="color: #008000;">// 1024</span>
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Although the three functions give the same result, they are completely different. <span style="font-family: courier new,courier;">powFunc</span> (line 5 - 8) is a classical function. It will be executed at the run time of the program and can get non-constant arguments. In contrary, <span style="font-family: courier new,courier;">PowMeta</span> (line 10 - 18) is a meta-function which is executed at the compile time of the program. Therefore, <span style="font-family: courier new,courier;">PowMeta</span> needs constant expressions as arguments. The constexpr function <span style="font-family: courier new,courier;">powConst</span> (line 20 - 24) can run at compile time and at run time. To be executed at the compile time, <span style="font-family: courier new,courier;">powConst</span> needs - accordingly to the meta-function <span style="font-family: courier new,courier;">PowMeta -</span> constant expressions as arguments.</p>
+<p>And now to something completely different. I will introduce in the next section monads. I will refer to this first definition of monads in later posts and I will show you examples of monads in future C++:&nbsp;<span style="font-family: courier new,courier;">std::optional</span> in C++17, the ranges library from Eric Nieber in C++20, and the extended futures in C++20.&nbsp; But now, I'm talking about the future concept in C++. Or, to say it in the words of Bartosz Milewski: <a href="http://bartoszmilewski.com/2014/02/26/c17-i-see-a-monad-in-your-future/">I See a Monad in Your Future</a>.&nbsp; I strongly encourage you the read the post or watch his video.<a href="http://bartoszmilewski.com/2014/02/26/c17-i-see-a-monad-in-your-future/"> </a></p>
+<h3>Monads</h3>
+<p>Haskell as pure functional language has only pure functions. Key of this pure functions is that the will always give the same result when given the same arguments. Thanks to this property which the name referential transparency a Haskell function can not have side effects. Therefore, Haskell has a conceptional issue. The word is full of calculations that have side effects. These are calculations that can fail, that can return an unknown number of results, or that are dependent on the environment. To solve this conceptional issue, Haskell uses monads and embeds them in the pure functional langue.</p>
+<p>The classical monads encapsulate one side effect:</p>
+<ul>
+<li><strong>I/O&nbsp; monad:</strong> Calculations that deal with input and output.</li>
+<li><strong>Maybe monad</strong>: Calculations that maybe return a result.</li>
+<li><strong>Error monad</strong>: Calculations that can fail.</li>
+<li><strong>List monad:</strong> Calculations that can have an arbitrary number of results.</li>
+<li><strong>State monad:</strong> Calculations that build a state.</li>
+<li><strong>Reader monad</strong>: Calculations that read from the environment.</li>
+</ul>
+<p>The concept of the monad is from the category theory. The category theory is a part of the mathematic that deals with objects and mapping between the objects. Monads are abstract data types (type classes), which transform simple types in enriched types. Values of this enriched types are called monadic values. Once in a monad, a value can only be transformed by a function composition in another monadic value.</p>
+<p>This composition respects the special structure of a monad. Therefore, the error monad will interrupt its calculation, if an error occur or the state monad builds its state.</p>
+<p>To make this happen, a monad consists of three components:</p>
+<ol>
+<li><strong>Type constructor</strong>: The type constructor defines how the simple data type becomes a monadic data type.</li>
+<li><strong>Functions:</strong>
+<ul>
+<li><strong>Identity function:</strong> Introduces the simple value into the monad.</li>
+<li><strong>bind operator:</strong> Defines how a function is applied to a monadic value to get a new monadic value.</li>
+</ul>
+</li>
+<li><strong>Rules for the functions:<br /></strong>
+<ul>
+<li>The identity function has to be the left and the right identity element.</li>
+<li>The composition of functions has to be associative.</li>
+</ul>
+<p>&nbsp;</p>
+</li>
+</ol>
+<p>In order for the error monad to become an instance of the type class monad, the error monad has to support the identity function and the bind operator. Both functions define how the error monad deals with an error in the calculation. If you use error monad, the error handling is done in the background.</p>
+<p>A monad consists of two control flows. The explicit control for calculating the result and the implicit control flow for dealing with the specific side effect.</p>
+<p><em>A few months ago, after I published this post in German a reader said: Hey, the definition of a monad is quite simple. "A monad is just a monoid in the category of endofunctors."&nbsp; I hope you get it.</em></p>
+<h2>What's next?</h2>
+<p>Pure functional languages have no immutable data. Therefore, they use recursion instead of loops. So you know, what the next post will be about.<span id="transmark"></span></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>Do you want to get the source code?<span style="font-family: courier new,courier;"> <a href="index.php/source-code-repository">Source code repository</a></span></p>
+<p>&nbsp;</p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="166" height="212" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Get your e-book. Support my blog.</span></strong></p>
