@@ -1,0 +1,235 @@
+<p>The remaining three characteristics of functional programming are told quite quickly: Recursion, manipulation of lists and lazy evaluation.</p>
+<hr id="system-readmore" />
+<h2>Recursion</h2>
+<p>&nbsp;<img src="images/blog/Functional/RecursionListManipulationLazyEvaluation/CharakteristikRecursionEng.png" alt="CharakteristikRecursionEng" style="margin: 15px;" /></p>
+<p>Pure functional languages support no mutable data. Instead of a loop, they use recursion. The meta-function from <a href="index.php/pure-functions">Pure Functions</a> showed it already. At compile time I use recursion instead of loops. The factorial function in C++</p>
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">template</span> &lt;<span style="color: #2b91af;">int</span> N&gt;
+<span style="color: #0000ff;">struct</span> Fac{
+  <span style="color: #0000ff;">static</span> <span style="color: #2b91af;">int</span> <span style="color: #0000ff;">const</span> value= N * Fac&lt;N-1&gt;::value;
+};
+
+<span style="color: #0000ff;">template</span> &lt;&gt;
+<span style="color: #0000ff;">struct</span> Fac&lt;0&gt;{
+  <span style="color: #0000ff;">static</span> <span style="color: #2b91af;">int</span> <span style="color: #0000ff;">const</span> value = 1;
+};<br />
+</pre>
+</div>
+<p>can be written quite easily in Haskell:</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">fac 0<span style="color: #0000ff;">=</span> 1</div>
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">fac n<span style="color: #0000ff;">=</span> n * fac (n-1)<br /><br /></div>
+<div>But, there is a small difference between the recursive factorial function in Haskell and C++. To be precise, the C++ version is not recursive. Each invocation of the general class template with the template argument N instantiates a new class template with the template argument N-1. The graphic shows the process.</div>
+<div>&nbsp;</div>
+<div><img src="images/blog/Functional/RecursionListManipulationLazyEvaluation/TemplateInstantiation.png" alt="TemplateInstantiation" width="500" height="299" style="margin: 15px;" /></div>
+<div>&nbsp;</div>
+<div>If you use recursion in combination with lists and pattern matching, you can create powerful functions. But, that only holds partially for C++.</div>
+<h2>Manipulation of lists</h2>
+<h2>&nbsp;<img src="images/blog/Functional/RecursionListManipulationLazyEvaluation/CharakteristikListManipulationEng.png" alt="CharakteristikListManipulationEng" style="margin: 15px;" /></h2>
+<p><strong>LIS</strong>t <strong>P</strong>rocessing (LISP) is a characteristic of functional programming languages. The list is the foundation of the extremely powerful function composition in a functional language, because it is the general data structure.</p>
+<p>The processing of lists follows a simple pattern:</p>
+<ol>
+<li>Process the first element of the list.</li>
+<li>Recursively process the rest of the list, reduce in each iteration by the first element.</li>
+</ol>
+<p>Because list processing is so idiomatic in functional programming, there exist special names for the first element and the rest of the list: (x,xs), (head,tail) or (car,cdr).</p>
+<p>The pattern for processing the list is directly applicable in Haskell and C++.</p>
+<p>Firstly, the concise version of C++. The function <span style="font-family: courier new,courier;">mySum</span> sums up the numbers from 1 to 5.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">mySum <span style="color: #2b91af;">[]</span>     <span style="color: #0000ff;">=</span> 0
+mySum (x<span style="color: #2b91af;">:</span>xs) <span style="color: #0000ff;">=</span> x + mySum xs
+mySum [1,2,3,4,5]  <span style="color: #008000;">-- 15</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>And here is the C++ version.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">template</span>&lt;<span style="color: #2b91af;">int</span> ...&gt; 
+<span style="color: #0000ff;">struct</span> mySum;
+
+<span style="color: #0000ff;">template</span>&lt;&gt;
+<span style="color: #0000ff;">struct</span> mySum&lt;&gt;{
+  <span style="color: #0000ff;">static</span> <span style="color: #0000ff;">const</span> <span style="color: #2b91af;">int</span> value= 0;
+};
+
+<span style="color: #0000ff;">template</span>&lt;<span style="color: #2b91af;">int</span> head, <span style="color: #2b91af;">int</span> ... tail&gt;
+<span style="color: #0000ff;">struct</span> mySum&lt;head,tail...&gt;{
+  <span style="color: #0000ff;">static</span> <span style="color: #0000ff;">const</span> <span style="color: #2b91af;">int</span> value= head + mySum&lt;tail...&gt;::value;
+};
+
+<span style="color: #2b91af;">int</span> sum= mySum&lt;1,2,3,4,5&gt;::value;  <span style="color: #008000;">// 15</span>
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>The Haskell version is quite easy to get. Or? But the C++ version is quite heavy weight. The C++ syntax requires that the primary or also called general template must be declared. Line 4 to line 7 is the fully specialised template (meta-metafunction) that is used for the empty argument list. If at least on template argument is used, the partially specialised class template (line 9 - 12) kicks in. Let me say a few word to the three dots, the so-called ellipse. That is the reason that the class in line 14 can take an arbitrary number of arguments. The three dots in line 1 and 9 pack the template parameter pack; the three dots in line 10 and 11 unpack the function parameter pack.</p>
+<p>Haskell and C++ apply pattern matching to use the right function.</p>
+<h3>Pattern matching</h3>
+<p>There is a subtle difference between Haskell and C++. Haskell matching strategy is first match. That's the reason, you have to define the special case first. C++ matching strategy is best match. You can use pattern matching to define the multiplication of two numbers by successively applying addition.</p>
+<p>For the sake of elegance, C++ first.</p>
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10</pre>
+</td>
+<td>
+<pre style="margin: 0px; line-height: 125%;">mult n 0 <span style="color: #0000ff;">=</span> 0
+mult n 1 <span style="color: #0000ff;">=</span> n
+mult n m <span style="color: #0000ff;">=</span> (mult n (m - 1)) + n
+
+
+
+mult 3 2 <span style="color: #0000ff;">=</span> (mult 3 (<span style="color: #000000;">2 - </span>1)) + 3
+         <span style="color: #0000ff;">=</span> (mult 3 1 ) + 3
+         <span style="color: #0000ff;">=</span> 3 + 3
+         <span style="color: #0000ff;">=</span> 6
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>The lines 7 - 10 show the enrolled multiplication of the two numbers 3 and 2. Line 1 is applied if <span style="font-family: courier new,courier;">m == 0</span> holds. If <span style="font-family: courier new,courier;">m == 1</span> holds, line 2 is used. The general case is line 3.</p>
+<p>C++ applies a similar strategy. The difference is that the C++ version is more verbose and that I have to define the general case at first.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">template</span> &lt;<span style="color: #2b91af;">int</span> N, <span style="color: #2b91af;">int</span> M&gt;
+<span style="color: #0000ff;">struct</span> Mult{
+<span style="color: #0000ff;">static</span> <span style="color: #0000ff;">const</span> <span style="color: #2b91af;">int</span> value= Mult&lt;N, M-1&gt;::value + N;
+};
+<span style="color: #0000ff;">template</span> &lt;<span style="color: #2b91af;">int</span> N&gt;
+<span style="color: #0000ff;">struct</span> Mult&lt;N, 1&gt; {
+<span style="color: #0000ff;">static</span> <span style="color: #0000ff;">const</span> <span style="color: #2b91af;">int</span> value= N;
+};
+
+<span style="color: #0000ff;">template</span> &lt;<span style="color: #2b91af;">int</span> N&gt;
+<span style="color: #0000ff;">struct</span> Mult&lt;N, 0&gt; {
+<span style="color: #0000ff;">static</span> <span style="color: #0000ff;">const</span> <span style="color: #2b91af;">int</span> value= 0;
+};
+
+std::cout &lt;&lt; Mult&lt;3, 2&gt;::value &lt;&lt; std::endl;    <span style="color: #008000;">// 6</span>
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h2>Lazy evaluation</h2>
+<p><img src="images/blog/Functional/RecursionListManipulationLazyEvaluation/CharakteristikLazyEvaluationEng.png" alt="CharakteristikLazyEvaluationEng" style="margin: 15px;" /></p>
+<p>The story about lazy evaluation in C++ is quite short. That will change in C++20 with the ranges library from Eric Niebler. Lazy evaluation is the default in Haskell. Lazy evaluation means that an expression is only evaluated when needed. This strategy has two benefits.</p>
+<ol>
+<li>Lazy evaluation helps you to save time and memory.</li>
+<li>You can define algorithm on infinite data structures. Of course, you can only ask for a finite number of values at run time.</li>
+</ol>
+<p>The following code snippet shows three impressive examples in Haskell:</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;">1
+2
+3
+4
+5
+6
+7
+8</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;">length [2+1, 3*2, 1/0, 5-4]  <span style="color: #008000;">-- 4</span>
+
+successor i<span style="color: #0000ff;">=</span> i<span style="color: #2b91af;">:</span> (successor (i+1))
+take 5 ( successor 1 )     <span style="color: #008000;">-- [1,2,3,4,5]</span>
+
+odds<span style="color: #0000ff;">=</span> takeWhile (&lt; 1000) . filter odd . map (^2)
+[1..]<span style="color: #0000ff;">=</span> [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15 ... <span style="color: #2b91af;">Control</span>-<span style="color: #2b91af;">C</span>  
+odds [1..]                 <span style="color: #008000;">-- [1,9,25, ... , 841,961]  </span>
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>I can calculate in the first line the <span style="font-family: courier new,courier;">length</span> of a list including the argument 1/0.&nbsp; successor in line 3 defines an infinite sequence of integers. But I only request five of them (<span style="font-family: courier new,courier;">take 5</span>) in line 4. Therefore, all is fine. If I want to have all integers such as in line 7, I have to hit Control-C to stop the recursion.&nbsp; I can use the same expression&nbsp; <span style="font-family: courier new,courier;">[1..]</span> as an argument for the function <span style="font-family: courier new,courier;">odds.</span> Line 6 shows the power off function composition in Haskell. The dot (.) is the symbol for function composition. With a little exercise, you can read the function composition in line 6 from right to left: Apply to each argument the square function; let the odd elements pass and continue as long as the resulting numbers are smaller than 1000. You can the result of the application in the last list.</p>
+<p>C++ uses by default eager evaluation. The means that, in contrary to Haskell, expressions are evaluated from the inside to the outside. C++ has short circuit evaluation. So, C++ is a little bit lazy. If the result of a logical expression is given before the whole expression was evaluated, C++ stops to evaluated the expression. Therefore, the following code snippet is valid in C++, although 1/0 is not defined.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">if</span> ( true or (1/0) ) std<span style="color: #0000ff;">::</span>cout &lt;&lt; <span style="color: #a31515;">"short circuit evaluation"</span> &lt;&lt; std<span style="color: #0000ff;">::</span>endl;</pre>
+</div>
+<h2>What's next?</h2>
+<p>With the next post, I step into the future of C++. Fold expression in C++17 are based on variadic templates and can be used to apply the <a href="index.php/higher-order-functions">fold</a> algorithm at compile time.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>Do you want to get the source code?<span style="font-family: courier new,courier;"> <a href="index.php/source-code-repository">Source code repository</a></span></p>
+<p>&nbsp;</p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="166" height="212" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Get your e-book. Support my blog.</span></strong></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
