@@ -1,0 +1,296 @@
+<p>A small time jump and we are in the year 2020. C++ will get - as far as the future is predictable - the new ranges library. Thanks to Eric Nieblers library, the working with the Standard Template Library (STL) will become much more comfortable and powerful.</p>
+<p>&nbsp;</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p>Much more comfortable because the algorithm of the STL can directly work on the containers and need no begin and end iterator. More powerful because we get with the ranges library lazy evaluation, improved function composition and range comprehension in C++20.</p>
+<p>Firstly, let me talk about the point more comfortable.</p>
+<h2>More comfortable</h2>
+<p>Iterators are the glue between the generic algorithms and containers of the STL. Therefore, each container returns on request an iterator pointing to the first element and an iterator pointing just behind the last element of the container. The half-open range interval defines the range of the algorithm. Thanks to the ranges library, you need no longer in C++20 a half-open interval. You can directly apply the algorithm to the container:</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">std::vector&lt;<span style="color: #2b91af;">int</span>&gt; vec{2, 5, 3, 1, 4};
+std::sort(vec.begin(), vec.end());   
+std::sort(vec);                   <span style="color: #008000;">// C++20<br /></span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Now, I will write about the functional features in the ranges library.</p>
+<h2>Lazy evaluation</h2>
+<p>Haskell is by default lazy (see <a href="index.php/recursion-list-manipulation-and-lazy-evaluation">Recursion, List Manipulation, and Lazy Evaluation</a>). Due to lazy evaluation, you can define in Haskell algorithm on infinite data structures if you only ask for a finite number of elements at runtime. Therefore, you can separate the algorithm for calculating the infinite date structure from is usage.</p>
+<p>Lazy evaluation is one of the characteristics of functional programming. With C++20 we will get it. Thanks to lazy evaluation, I can directly translate the Haskell code in the example into C++:</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// lazyEvaluation.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;range/v3/all.hpp&gt;</span>
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;tuple&gt;</span>
+
+<span style="color: #0000ff;">using</span> <span style="color: #0000ff;">namespace</span> ranges;
+
+<span style="color: #2b91af;">int</span> main(){
+
+  std::cout &lt;&lt; std::endl;
+
+  <span style="color: #008000;">// take 5 [1..]  -- [1,2,3,4,5]</span>
+
+  <span style="color: #0000ff;">auto</span> num = view::take(view::ints(1), 5);
+  ranges::for_each(num, [](<span style="color: #2b91af;">int</span> i){ std::cout &lt;&lt; i &lt;&lt; <span style="color: #a31515;">" "</span>; });
+
+  std::cout &lt;&lt; <span style="color: #a31515;">"\n\n"</span>;
+
+  <span style="color: #0000ff;">auto</span> pairs= view::zip_with([](<span style="color: #2b91af;">int</span> i, <span style="color: #2b91af;">char</span> c){ <span style="color: #0000ff;">return</span> std::make_pair(i, c); } , view::ints(0), <span style="color: #a31515;">"ranges"</span>);
+
+  ranges::for_each(pairs, [](std::pair&lt;<span style="color: #2b91af;">int</span>,<span style="color: #2b91af;">char</span>&gt; p){ std::cout &lt;&lt; <span style="color: #a31515;">"("</span> &lt;&lt;  p.first &lt;&lt; <span style="color: #a31515;">":"</span> &lt;&lt; p.second &lt;&lt; <span style="color: #a31515;">")"</span>; });
+
+  std::cout &lt;&lt; <span style="color: #a31515;">"\n\n"</span>;
+
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p><span style="font-family: courier new,courier;">view::ints(1)</span> in line 15 creates an infinite sequence of numbers starting with 1. The key is that I'm only asking for 5 of them. The numbers will be displayed in the following for_each loop using a lambda function. Admittedly, that is not so elegant. Firstly, I can implement the algorithm more elegant with function composition: <span style="font-family: courier new,courier;">auto num= view::ints(1) | view::take(5)</span>. The details will follow in a few seconds. Secondly, the upcoming C++20 standard will support the output of ranges with the range-based for-loop: <span style="font-family: courier new,courier;">for (n: num) std::cout &lt;&lt; num &lt;&lt; " ".</span></p>
+<p>The from the functional world known function <span style="font-family: courier new,courier;">view::zip_with </span>takes lists and a lambda function and zips the list with the help of a lambda function to a new list. Therefore, the lambda function in line 22 zips the infinite sequence of numbers starting with 0 with the finite string <span style="font-family: courier new,courier;">"ranges".</span> The result is a finite tuple. So you can refer to elements of the pairs by using <span style="font-family: courier new,courier;">first</span> or <span style="font-family: courier new,courier;">second.</span></p>
+<p><img src="images/blog/Functional/TheNewRangesLibrary/lazy.png" alt="lazy" style="margin: 15px;" /></p>
+<h2>Function composition</h2>
+<p>Function composition in Haskell feels like putting Lego stones together. The newly created functions express their functionality very concise and are readable for the used programmer like prose. In Haskell the power of function composition is based on three pillars:</p>
+<p>Haskell's functions</p>
+<ol>
+<li>perform <strong>one task,</strong></li>
+<li>use the <strong>list as the key data structure </strong>and</li>
+<li>use the <strong>(.) for function composition.</strong></li>
+</ol>
+<p>The story is similar for the ranges library. The library has a <a href="https://ericniebler.github.io/range-v3/index.html#range-views">rich set of functions</a>. These functions are inspired by Haskell, work on the key data structure range and use the from the Unix shell or from the windows PowerShell known pipe symbol (|) for function composition.</p>
+<p>Once more, I show how you can implement Haskell code in C++20:</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// functionCompositionRanges.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;range/v3/all.hpp&gt;</span>
+<span style="color: #0000ff;">#include &lt;numeric&gt;</span>
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+
+<span style="color: #0000ff;">using</span> <span style="color: #0000ff;">namespace</span> ranges;
+
+<span style="color: #2b91af;">int</span> main(){
+
+  std::cout &lt;&lt; std::endl;
+
+  <span style="color: #008000;">// odds= takeWhile (&lt; 1000) . filter odd . map (^2)</span>
+  <span style="color: #008000;">// odds [1..]                 -- [1,9,25, ... , 841,961]</span>
+
+  <span style="color: #0000ff;">auto</span> odds= view::transform([](<span style="color: #2b91af;">int</span> i){ <span style="color: #0000ff;">return</span> i*i;} ) |
+             view::remove_if([](<span style="color: #2b91af;">int</span> i){ <span style="color: #0000ff;">return</span> i % 2 == 0; } ) |
+             view::take_while([](<span style="color: #2b91af;">int</span> i){ <span style="color: #0000ff;">return</span> i &lt; 1000;} );
+  <span style="color: #0000ff;">auto</span> oddNumbers= view::ints(1) | odds;
+
+  ranges::for_each(oddNumbers,[](<span style="color: #2b91af;">int</span> i){ std::cout &lt;&lt; i &lt;&lt; <span style="color: #a31515;">" "</span>; });
+
+  std::cout &lt;&lt; <span style="color: #a31515;">"\n\n"</span>;
+
+  <span style="color: #008000;">// total= sum $ take 100 $ map (\x -&gt; x*x) [100..1000] -- 2318350</span>
+
+  <span style="color: #0000ff;">auto</span> total= ranges::accumulate(view::ints(100, 1000) |
+                                 view::transform([](<span style="color: #2b91af;">int</span> x){ <span style="color: #0000ff;">return</span> x*x; }) |
+                                 view::take(100), 0);
+
+  std::cout &lt;&lt; <span style="color: #a31515;">"total: "</span> &lt;&lt; total &lt;&lt; std::endl;
+
+  std::cout &lt;&lt; std::endl;
+
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>The evaluation order of function composition is in Haskell (line 13) from right to left; in C++ (line 16 - 19) form left to right. The C++ expression in line 27 - 29 is not so easy to digest. It accumulates (<span style="font-family: courier new,courier;">ranges::accumulate</span>) the first 100 numbers (<span style="font-family: courier new,courier;">view::take(100)</span>) from the numbers from 100 - 1000 (<span style="font-family: courier new,courier;">view::ints(100,1000</span>)) by mapping each number to its square (<span style="font-family: courier new,courier;">view::transform([](int x){ return x*x; }</span>). The start value is 0.</p>
+<p>Here is the output of the program.</p>
+<p><img src="images/blog/Functional/TheNewRangesLibrary/composition.png" alt="composition" style="margin: 15px;" /></p>
+<h2>Range comprehension</h2>
+<p>List comprehension is <a href="https://en.wikipedia.org/wiki/Syntactic_sugar">syntactic sugar</a> of the sweetest kind for the functional algorithm <a href="index.php/higher-order-functions">map and filter </a>and allows you to create at runtime new lists. The functional programming language Miranda introduced list comprehension; Haskell made them known. It is not an accident that list comprehension looks like the mathematical notation for set comprehension because Haskell is based on mathematical concepts.</p>
+<p>The figure compares set comprehension in Mathematics with list comprehension in Haskell.</p>
+<p>&nbsp;<img src="images/blog/Functional/TheNewRangesLibrary/setListComprehension.png" alt="setListComprehension" width="700" height="96" style="margin: 15px;" /></p>
+<p>The ranges library supports range comprehension. It's not as sweet as list comprehension but the functionality is comparable.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// rangeComprehension.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;range/v3/all.hpp&gt;</span>
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+
+<span style="color: #0000ff;">using</span> <span style="color: #0000ff;">namespace</span> ranges;
+
+<span style="color: #2b91af;">int</span> main(){
+
+  std::cout &lt;&lt; std::endl;
+
+  <span style="color: #008000;">// odds= [ x*x | x &lt;-[1..] , odd x  ]</span>
+  <span style="color: #008000;">// takeWhile (&lt;1000) odds --  -- [1,9,25, ... , 841,961]</span>
+
+  <span style="color: #0000ff;">auto</span> odds= view::ints(1) | view::for_each([](<span style="color: #2b91af;">int</span> i){ <span style="color: #0000ff;">return</span> yield_if(i%2 == 1, i*i); });
+
+  ranges::for_each(odds | view::take_while([](<span style="color: #2b91af;">int</span> i){ <span style="color: #0000ff;">return</span> i &lt; 1000; }) , [](<span style="color: #2b91af;">int</span> i){
+    std::cout &lt;&lt; i &lt;&lt; <span style="color: #a31515;">" "</span>;
+  });
+
+  std::cout &lt;&lt; <span style="color: #a31515;">"\n\n"</span>;
+
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>The list comprehension in Haskell (line 12) is very concise. I request the integers starting with 1(<span style="font-family: courier new,courier;">x&lt;-[1..]</span>), keep the odd values (<span style="font-family: courier new,courier;">odd x</span>) and map them to their square (<span style="font-family: courier new,courier;">x*x</span>). The expression <span style="font-family: courier new,courier;">odd</span> correspond to the filter function and the expression<span style="font-family: courier new,courier;"></span> <span style="font-family: courier new,courier;">x*x</span> to the map function. The list will be evaluated in line 13 as long as their elements are smaller than 1000 (<span style="font-family: courier new,courier;">takeWhile(&lt;1000)</span>).</p>
+<p>I apply the same strategy in C++. The first argument of the <span style="font-family: courier new,courier;">yield_if</span> function is the filter expression and the second one the map expression.</p>
+<p>At the end, the output of the program.<br /><span style="font-family: courier new,courier;"></span></p>
+<p>&nbsp;<img src="images/blog/Functional/TheNewRangesLibrary/rangeComprhension.png" alt="rangeComprhension" style="margin: 15px;" /></p>
+<p>If I use more generators for integers or more filter expressions in a range comprehension, the expression will become very difficult to understand. I present in the next example the Pythagorean Triple in Haskell and C++. The Pythagorean triple consists of three positive integers <span class="texhtml">x</span>, <span class="texhtml">y</span>, and <span class="texhtml">z</span>, such that <span class="texhtml">x<sup>2</sup> + y<sup>2</sup> = z<sup>2</sup></span>.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">triples =[(x, y, z)|z &lt;-[1..], x &lt;-[1..z],y &lt;-[x..z] ,x^2 + y^2 == z^2]
+
+<span style="color: #0000ff;">auto</span> triples = 
+  view::for_each(view::ints(1),[](<span style="color: #2b91af;">int</span> z){<br /><span style="color: #0000ff;">    return</span> view::for_each(view::ints(1, z),[=](<span style="color: #2b91af;">int</span> x){
+      <span style="color: #0000ff;">return</span> view::for_each(view::ints(x, z),[=](<span style="color: #2b91af;">int</span> y){
+        <span style="color: #0000ff;">return</span> yield_if(x*x + y*y == z*z, std::make_tuple(x, y, z));
+      });
+    });
+  });
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>The <strong>view </strong>algorithms such as <span style="font-family: courier new,courier;">view::for_each</span> of the ranges library is common that they are a lightweight wrapper for the underlying range. They will only evaluate its arguments on request and can not change them. With <strong>action</strong> such as (<span style="font-family: courier new,courier;">action::remove_if</span>) the ranges library has a bunch of additional algorithms that can change their arguments and create new ranges. In contrary to the view algorithms the action algorithms are not lazy. They are eager.</p>
+<h2>What's next?</h2>
+<p>To make the algorithm of the ranges library type-safe, Eric Niebler used the <a href="index.php/tag/type-traits">type-traits library</a>. That is not longer necessary with C++20 because we get concepts lite. Now you know, what I will write about in my next post.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>Do you want to get the source code?<span style="font-family: courier new,courier;"> <a href="index.php/source-code-repository">Source code repository</a></span></p>
+<p>&nbsp;</p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="166" height="212" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Get your e-book. Support my blog.</span></strong></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
