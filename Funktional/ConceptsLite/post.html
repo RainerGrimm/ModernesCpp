@@ -1,0 +1,150 @@
+<p>We stay in the year 2020. We will get with high probability concepts lite. Of course, waterproof statements about the future are difficult but the statement is from Bjarne Stroustrup (<a href="http://meetingcpp.com/index.php/mcpp2016.html">Meeting C++ 2016</a> at Berlin).</p>
+<hr id="system-readmore" />
+<h2>The classical concepts</h2>
+<p>The key idea of generic programming with templates is, to define functions and classes that can be used with different types. But it will often happen that you instantiate a template with the wrong type. The result may be a cryptic error message that is many pages long. Sadly to say, but templates in C++ are known for this. Therefore, concepts were planned as one of the great features of C++11. They should allow you to specify constraints for templates that can be verified by the compiler. Thanks to their complexity, the were remove in July 2009 from the standard:&nbsp; "The C++0x concept design evolved into a monster of complexity." (Bjarne Stroustrup)</p>
+<h2>Concepts lite</h2>
+<p>With C++20 we will get concepts lite. Although concepts lite are in the first implementations simplified concepts, they have a lot to offer.</p>
+<p>They</p>
+<ol>
+<li>empowers programmer to directly express their requirements as part of the interface.</li>
+<li>supports the overloading of functions and the specialisation of class templates based on the requirements of the template parameters.</li>
+<li>produces drastically improved error messages by comparing the requirements of the template parameter with the applied template arguments.</li>
+<li>can be used as placeholders for generic programming.</li>
+<li>empowers you to define your own concepts.</li>
+</ol>
+<p><em>Also concepts lite are called lite, their functionality is by no means lite and I can not be present them in one post. Therefore, I will postpone the points 4 and 5 to later posts. Promised!<br /></em></p>
+<p>You will get the benefit without additional compile time or runtime time of the program. Concepts lite are similar to Haskells type classes. Concepts lite will describe semantic categories and not syntactic restrictions. For types of the standard library, we get <a href="http://en.cppreference.com/w/cpp/concept">library concepts</a> such as <span style="font-family: courier new,courier;">DefaultConstructible, MoveConstructible, CopyConstructible, MoveAssignable, CopyAssignable</span>,&nbsp; or <span style="font-family: courier        new,courier;">Destructible</span>. For the containers, we get concepts such as <span style="font-family: courier new,courier;">ReversibleContainer, AllocatorAwareContainer, SequenceContainer, ContinousContainer, AssociativeContainer</span>, or <span style="font-family: couriernew,courier;">UnorderedAssociativeContainer</span>. You can read the about concepts and their constraints here: <a href="http://en.cppreference.com/w/cpp/concept">cppreference.com</a>.</p>
+<p>Before I present concepts lite, let me have a view at Haskell's type classes.</p>
+<h3>Type classes in Haskell</h3>
+<p>Type classes are interfaces for similar types. If a type is a member of a type class, it has to have specific properties. Type classes play a similar role for generic programming as interfaces play for object-oriented programming. Here you can see a part of Haskell's type classes hierarchy.</p>
+<p><img src="images/blog/Functional/ConceptsLite/typeclass.png" alt="typeclass" style="margin: 15px;" /></p>
+<p>What is special for a type if it is member of the a type class<span style="font-family: courier new;"> Eq</span>? <span style="font-family: courier new;">Eq</span> stands for equality and requires from its members:</p>
+<p>&nbsp;</p>
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">class</span> <span style="color: #2b91af;">Eq</span> a <span style="color: #0000ff;">where</span>
+    (==) <span style="color: #0000ff;">::</span> a <span style="color: #0000ff;">-&gt;</span> a <span style="color: #0000ff;">-&gt;</span> <span style="color: #2b91af;">Bool</span>
+    (/=) <span style="color: #0000ff;">::</span> a <span style="color: #0000ff;">-&gt;</span> a <span style="color: #0000ff;">-&gt;</span> <span style="color: #2b91af;">Bool</span>
+    a == b <span style="color: #0000ff;">=</span> not (a /= b)
+    a /= b <span style="color: #0000ff;">=</span> not (a == b)
+</pre>
+</div>
+<p><span style="font-family: courier new,courier;">Eq</span> requires that its types have to support the functions&nbsp; equality (<span style="font-family: courier new,courier;">==</span>) and inequality (<span style="font-family: courier new,courier;">/=)</span>. The expression&nbsp;<span style="font-family: courier new,courier;"> a -&gt; a -&gt; Bool</span> stands for the signature of the function. The function takes two identical types <span style="font-family: courier new,courier;">a</span> and returns a Boolean: <span style="font-family: courier new,courier;">Bool</span>. But for a concrete type, it is sufficient to implement equality or inequality because equality will be mapped to inequality and vice versa. The default implementations of both functions are provided in the two last lines.</p>
+<p>By the following code snipped the built-in type <span style="font-family: courier new,courier;">Bool</span> becomes an instance of the type class <span style="font-family: courier        new,courier;">Eq</span>.</p>
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">instance</span> <span style="color: #2b91af;">Eq</span> <span style="color: #2b91af;">Bool</span> <span style="color: #0000ff;">where</span>
+    <span style="color: #2b91af;">True</span> == <span style="color: #2b91af;">True</span> <span style="color: #0000ff;">=</span> <span style="color: #2b91af;">True</span>
+    <span style="color: #2b91af;">False</span> == <span style="color: #2b91af;">False</span> <span style="color: #0000ff;">=</span> <span style="color: #2b91af;">True</span>
+    <span style="color: #0000ff;">_</span> == <span style="color: #0000ff;">_</span> <span style="color: #0000ff;">=</span> <span style="color: #2b91af;">False</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Haskell's type classes build a hierarchy. The type class&nbsp; <span style="font-family: courier new,courier;">Ord</span> is a subclass of the type class<span style="font-family: courier new,courier;"> Eq.</span> Therefore, instances of the type class <span style="font-family: courier new,courier;">Ord</span> have to be members of the type class <span style="font-family: courier        new,courier;">Eq</span> and have in addition support the comparison operators.</p>
+<p>Haskell is able to automatically create the necessary functions of some type classes. Therefore, I can compare the values <span style="font-family: courier new;">Morning </span>and <span style="font-family: courier new;">Afternoon </span>of the data type day for equality and output them. I have only to derive Day from the type class <span style="font-family: courier new;">Eq </span>and <span style="font-family: courier new;">Show</span>.</p>
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">data</span> <span style="color: #2b91af;">Day</span><span style="color: #0000ff;">=</span> <span style="color: #2b91af;">Morning</span> | <span style="color: #2b91af;">Afternoon</span>
+     <span style="color: #0000ff;">deriving</span> (<span style="color: #2b91af;">Eq</span>,<span style="color: #2b91af;">Show</span>)
+</pre>
+</div>
+<p>Now I can directly test my data type <span style="font-family: courier new;">Day </span>in the interactive Haskell Shell. The formal name for the interactive Shell is REPL. Many programming languages such as Python or Perl have a REPL. REPL stands for <strong>R</strong>ead <strong>E</strong>valuate <strong>P</strong>rint <strong>L</strong>oop<strong>.</strong></p>
+<p>&nbsp;<img src="images/blog/Functional/ConceptsLite/day.png" alt="day" width="600" height="322" style="margin: 15px;" /></p>
+<p>Type classes in Haskell have a lot more to offer. For example, you can define your own type classes.</p>
+<h3>Concepts lite for functions, classes, and members of a class</h3>
+<p>Concepts lite are part of the template declaration.</p>
+<h4>Functions</h4>
+<p>The function template <span style="font-family: courier new,courier;">sort</span> requires</p>
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">template</span>&lt;Sortable Cont&gt;
+<span style="color: #2b91af;">void</span> sort(Cont&amp; container){...}
+
+
+</pre>
+</div>
+<p>that the container has to be <span style="font-family: courier new,courier;">Sortable</span>. It is also possible to define the requirement to the template parameters more explicitly:</p>
+<p>&nbsp;</p>
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">template</span>&lt;<span style="color: #0000ff;">typename</span> Cont&gt;
+  requires Sortable&lt;Cont&gt;()
+<span style="color: #2b91af;">void</span> sort(Cont&amp; container){...}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p><span style="font-family: courier new,courier;">Sortable</span> has to be a constant expression that is a predicate. That means that the expression has to be evaluable at compile time and has to return a boolean.</p>
+<p>If you invoke the sort algorithm with a container <span style="font-family: courier new;">lst </span>that is not sortable, you will be a unique error message from the compiler</p>
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">std::list&lt;<span style="color: #2b91af;">int</span>&gt; lst = {1998,2014,2003,2011};
+sort(lst); <span style="color: #008000;">// ERROR: lst is no random-access container with &lt;</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>You can use concepts lite for all kind of templates.</p>
+<h4>Classes</h4>
+<p>Therefore, you can define a class template <span style="font-family: courier new,courier;">MyVector</span> that will only accept objects as template arguments:</p>
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">template</span>&lt;Object T&gt;
+<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">MyVector</span>{};
+
+MyVector&lt;<span style="color: #2b91af;">int</span>&gt; v1; <span style="color: #008000;">// OK</span>
+MyVector&lt;<span style="color: #2b91af;">int</span>&amp;&gt; v2 <span style="color: #008000;">// ERROR: int&amp; does not satisfy the constraint Object</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Now, the compiler complains that the a pointer <span style="font-family: courier new,courier;">(int&amp;</span>)&nbsp; is no object. <span style="font-family: courier new,courier;">MyClass</span> can be further adjusted.</p>
+<h4>Members of a class</h4>
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">template</span>&lt;Object T&gt;
+<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">MyVector</span>{
+  ...
+  requires Copyable&lt;T&gt;()
+  <span style="color: #2b91af;">void</span> push_back(<span style="color: #0000ff;">const</span> T&amp; e);
+  ...
+};
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Now the method&nbsp; <span style="font-family: courier new,courier;">push_back</span>&nbsp; from <span style="font-family: courier new,courier;">MyVector <span style="font-family: Helvetica,Arial,sans-serif;">requires that the template argument has to be copyable.</span></span></p>
+<h3>Extended functionality</h3>
+<p>A template can have more the one requirements for its template parameters.</p>
+<h4>More than one requirement</h4>
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">template</span> &lt;SequenceContainer S,EqualityComparable&lt;value_type&lt;S&gt;&gt; T&gt;
+Iterator_type&lt;S&gt; find(S&amp;&amp; seq, <span style="color: #0000ff;">const</span> T&amp; val){...}
+</pre>
+</div>
+<p>The function template find has two requirements. At one hand, the container has to store its elements in a linear arrangement (<span style="font-family: courier new,courier;">SequenceContainer</span>), at the other hand the elements of the container has to be equal comparable: <span style="font-family: courier new,courier;">EqualityComparable&lt;value_type&lt;S&gt;&gt;</span>).</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>Concepts lite supports the overloading of functions.</p>
+<h4>Overloading of functions</h4>
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">template</span>&lt;InputIterator I&gt;
+<span style="color: #2b91af;">void</span> advance(I&amp; iter, <span style="color: #2b91af;">int</span> n){...}
+
+<span style="color: #0000ff;">template</span>&lt;BidirectionalIterator I&gt;
+<span style="color: #2b91af;">void</span> advance(I&amp; iter, <span style="color: #2b91af;">int</span> n){...}
+
+<span style="color: #0000ff;">template</span>&lt;RandomAccessIterator I&gt;
+<span style="color: #2b91af;">void</span> advance(I&amp; iter, <span style="color: #2b91af;">int</span> n){...}
+
+std::list&lt;<span style="color: #2b91af;">int</span>&gt; lst{1,2,3,4,5,6,7,8,9};
+std::list&lt;<span style="color: #2b91af;">int</span>&gt;:: iterator i= lst.begin();
+std::advance(i,2);   <span style="color: #008000;">// BidirectionalIterator</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The function template <span style="font-family: courier new,courier;">advance</span> puts its's iterator <span style="font-family: courier new,courier;">iter</span> <span style="font-family: courier new,courier;">n</span> positions further. Depending, if the iterator is a forward, a bi-directional of a random access iterator different function templates will be applied. If I use a std::list, the <span style="font-family: courier new,courier;">BidirectionalIterator</span> will be chosen.</p>
+<p>Concepts lite also support the specialisation of class templates.</p>
+<h4>Specialisation of class templates</h4>
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">template</span>&lt;<span style="color: #0000ff;">typename</span> T&gt;
+<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">MyVector</span>{};
+
+<span style="color: #0000ff;">template</span>&lt;Object T&gt;
+<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">MyVector</span>{};
+
+MyVector&lt;<span style="color: #2b91af;">int</span>&gt; v1; <span style="color: #008000;">// Object T</span>
+MyVector&lt;<span style="color: #2b91af;">int</span>&amp;&gt; v2 <span style="color: #008000;">// typename T</span>
+</pre>
+</div>
+<p>Therefore, the compiler maps <span style="font-family: courier new,courier;">MyVector&lt;int&amp;&gt; v2</span> to the general template in the first line; the compiler maps <span style="font-family: courier new,courier;">MyVector&lt;int&gt; v1</span> in the contrary to the specialisation <span style="font-family: courier new,courier;">template&lt;Object T&gt; class MyVector{}.</span></p>
+<h2>What's next?</h2>
+<p>Haskell has the type class <span style="font-family: courier new;">Monad</span>.&nbsp; A known instance is the <span style="font-family: courier new;">Maybe Monad</span>. Why did I write about that stuff? That is simple. C++17 gets with the data type <span style="font-family: courier new;">std::optiona</span>l a <span style="font-family: courier new;">Monad</span> that represent a calculation the can or can not return a result. The details about <span style="font-family: courier new,courier;">std::optional</span> will follow in the next post.&nbsp;&nbsp; <span id="transmark"><br /></span></p>
