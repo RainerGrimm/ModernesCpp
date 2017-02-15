@@ -1,0 +1,470 @@
+<p>Expression templates are "structures representing a computation at compile time, which structures are evaluated only as needed to produce efficient code for the entire computation" (<a href="https://en.wikipedia.org/wiki/Expression_templates">https://en.wikipedia.org/wiki/Expression_templates</a>). As needed, now we are in the centre of lazy evaluation and in the centre of this post.</p>
+<hr id="system-readmore" />
+<p>What problem do expression templates solve? Thanks to expression templates, you can get rid of superfluous temporary objects in expressions. What do I mean with superfluous temporary objects? My implementation of the class <span style="font-family: courier new,courier;">MyVector.</span></p>
+<h2>A first naive approach</h2>
+<p><span style="font-family: courier new,courier;">MyVector</span> is a simple wrapper for a&nbsp; <span style="font-family: courier new,courier;">std::vector&lt;T&gt;.</span> The wrapper has two constructors (line 12 and 15), knows its length (line 18 - 20) and supports the reading (line 23 - 25) and writing (line 27 - 29) index access.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+55
+56
+57
+58
+59
+60
+61
+62
+63
+64
+65
+66
+67
+68
+69
+70
+71
+72
+73
+74
+75</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// vectorArithmeticOperatorOverloading.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;vector&gt;</span>
+
+<span style="color: #0000ff;">template</span>&lt;<span style="color: #0000ff;">typename</span> T&gt;
+<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">MyVector</span>{
+  std::vector&lt;T&gt; cont;   
+
+public:
+  <span style="color: #008000;">// MyVector with initial size</span>
+  MyVector(<span style="color: #0000ff;">const</span> std::<span style="color: #2b91af;">size_t</span> n) : cont(n){}  
+
+  <span style="color: #008000;">// MyVector with initial size and value</span>
+  MyVector(<span style="color: #0000ff;">const</span> std::<span style="color: #2b91af;">size_t</span> n, <span style="color: #0000ff;">const</span> <span style="color: #2b91af;">double</span> initialValue) : cont(n, initialValue){}
+  
+  <span style="color: #008000;">// size of underlying container</span>
+  std::<span style="color: #2b91af;">size_t</span> size() <span style="color: #0000ff;">const</span>{ 
+    <span style="color: #0000ff;">return</span> cont.size(); 
+  }
+
+  <span style="color: #008000;">// index operators</span>
+  T <span style="color: #0000ff;">operator</span>[](<span style="color: #0000ff;">const</span> std::<span style="color: #2b91af;">size_t</span> i) <span style="color: #0000ff;">const</span>{ 
+    <span style="color: #0000ff;">return</span> cont[i]; 
+  }
+
+  T&amp; <span style="color: #0000ff;">operator</span>[](<span style="color: #0000ff;">const</span> std::<span style="color: #2b91af;">size_t</span> i){ 
+    <span style="color: #0000ff;">return</span> cont[i]; 
+  }
+
+};
+
+<span style="color: #008000;">// function template for the + operator</span>
+<span style="color: #0000ff;">template</span>&lt;<span style="color: #0000ff;">typename</span> T&gt; 
+MyVector&lt;T&gt; <span style="color: #0000ff;">operator</span>+ (<span style="color: #0000ff;">const</span> MyVector&lt;T&gt;&amp; a, <span style="color: #0000ff;">const</span> MyVector&lt;T&gt;&amp; b){
+  MyVector&lt;T&gt; result(a.size());
+  <span style="color: #0000ff;">for</span> (std::<span style="color: #2b91af;">size_t</span> s= 0; s &lt;= a.size(); ++s){
+    result[s]= a[s]+b[s];
+  }
+  <span style="color: #0000ff;">return</span> result;
+}
+
+<span style="color: #008000;">// function template for the * operator</span>
+<span style="color: #0000ff;">template</span>&lt;<span style="color: #0000ff;">typename</span> T&gt;
+MyVector&lt;T&gt; <span style="color: #0000ff;">operator</span>* (<span style="color: #0000ff;">const</span> MyVector&lt;T&gt;&amp; a, <span style="color: #0000ff;">const</span> MyVector&lt;T&gt;&amp; b){
+   MyVector&lt;T&gt; result(a.size());
+  <span style="color: #0000ff;">for</span> (std::<span style="color: #2b91af;">size_t</span> s= 0; s &lt;= a.size(); ++s){
+    result[s]= a[s]*b[s]; 
+  }
+  <span style="color: #0000ff;">return</span> result;
+}
+
+<span style="color: #008000;">// function template for &lt;&lt; operator</span>
+<span style="color: #0000ff;">template</span>&lt;<span style="color: #0000ff;">typename</span> T&gt;
+std::ostream&amp; <span style="color: #0000ff;">operator</span>&lt;&lt;(std::ostream&amp; os, <span style="color: #0000ff;">const</span> MyVector&lt;T&gt;&amp; cont){  
+  std::cout &lt;&lt; std::endl;
+  <span style="color: #0000ff;">for</span> (<span style="color: #2b91af;">int</span> i=0; i&lt;cont.size(); ++i) {
+    os &lt;&lt; cont[i] &lt;&lt; <span style="color: #a31515;">' '</span>;
+  }
+  os &lt;&lt; std::endl;
+  <span style="color: #0000ff;">return</span> os;
+} 
+
+<span style="color: #2b91af;">int</span> main(){
+
+  MyVector&lt;<span style="color: #2b91af;">double</span>&gt; x(10,5.4);
+  MyVector&lt;<span style="color: #2b91af;">double</span>&gt; y(10,10.3);
+
+  MyVector&lt;<span style="color: #2b91af;">double</span>&gt; result(10);
+  
+  result= x+x + y*y;
+  
+  std::cout &lt;&lt; result &lt;&lt; std::endl;
+  
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Thanks to the overloaded + operator (line 34 - 41), the overloaded&nbsp; * operator (line 44 - 51) and the overloaded output operator (line 54 - 62) the objects <span style="font-family: courier new,courier;">x, y</span> and <span style="font-family: courier new,courier;">result</span> feel like numbers.</p>
+<p><img src="images/blog/Functional/ExpressionTemplates/vectorArithmeticOperatorOverloading.png" alt="vectorArithmeticOperatorOverloading" /></p>
+<p>Why is this implementation naive? The answer is in the expression&nbsp; <span style="font-family: courier new,courier;">result=</span> <span style="font-family: courier new,courier;">x+x + y*y.&nbsp;</span> In order to evaluate the expression, three temporary objects are needed to hold the result of each arithmetic sub expression.<span style="font-family: courier new,courier;"><br /></span></p>
+<p>&nbsp;<img src="images/blog/Functional/ExpressionTemplates/Temporaries.png" alt="Temporaries" width="400" height="263" style="margin: 15px;" /></p>
+<p>How can I get rid of the temporaries? The idea is simple. Instead of performing the vector operations greedy, I&nbsp; create the expression tree for <span style="font-family: courier new,courier;">result[i] </span>at compile time in a lazy manner.</p>
+<h2>Expression templates&nbsp;</h2>
+<p><img src="images/blog/Functional/ExpressionTemplates/ExpressionTree.png" alt="ExpressionTree" width="400" height="206" style="margin: 15px;" /></p>
+<p>There are no temporaries need for the expression&nbsp; <span style="font-family: courier new,courier;">result[i]=</span> <span style="font-family: courier new,courier;">x[i]+x[i] + y[i]*y[i]<span style="font-family: arial,helvetica,sans-serif;">.&nbsp; </span></span>The assignment triggers the evaluation. Sad to say, but the code is even in this simple usage not so easy to digest. <span style="font-family: courier new,courier;"><span style="font-family: arial,helvetica,sans-serif;"><br /></span></span></p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;">  1
+  2
+  3
+  4
+  5
+  6
+  7
+  8
+  9
+ 10
+ 11
+ 12
+ 13
+ 14
+ 15
+ 16
+ 17
+ 18
+ 19
+ 20
+ 21
+ 22
+ 23
+ 24
+ 25
+ 26
+ 27
+ 28
+ 29
+ 30
+ 31
+ 32
+ 33
+ 34
+ 35
+ 36
+ 37
+ 38
+ 39
+ 40
+ 41
+ 42
+ 43
+ 44
+ 45
+ 46
+ 47
+ 48
+ 49
+ 50
+ 51
+ 52
+ 53
+ 54
+ 55
+ 56
+ 57
+ 58
+ 59
+ 60
+ 61
+ 62
+ 63
+ 64
+ 65
+ 66
+ 67
+ 68
+ 69
+ 70
+ 71
+ 72
+ 73
+ 74
+ 75
+ 76
+ 77
+ 78
+ 79
+ 80
+ 81
+ 82
+ 83
+ 84
+ 85
+ 86
+ 87
+ 88
+ 89
+ 90
+ 91
+ 92
+ 93
+ 94
+ 95
+ 96
+ 97
+ 98
+ 99
+100
+101
+102
+103
+104
+105
+106
+107
+108
+109
+110
+111
+112
+113
+114
+115
+116
+117
+118
+119
+120
+121
+122
+123
+124
+125</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// vectorArithmeticExpressionTemplates.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;cassert&gt;</span>
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;vector&gt;</span>
+
+<span style="color: #0000ff;">template</span>&lt;<span style="color: #0000ff;">typename</span> T, <span style="color: #0000ff;">typename</span> Cont= std::vector&lt;T&gt; &gt;
+<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">MyVector</span>{
+  Cont cont;   
+
+public:
+  <span style="color: #008000;">// MyVector with initial size</span>
+  MyVector(<span style="color: #0000ff;">const</span> std::<span style="color: #2b91af;">size_t</span> n) : cont(n){}
+
+  <span style="color: #008000;">// MyVector with initial size and value</span>
+  MyVector(<span style="color: #0000ff;">const</span> std::<span style="color: #2b91af;">size_t</span> n, <span style="color: #0000ff;">const</span> <span style="color: #2b91af;">double</span> initialValue) : cont(n, initialValue){}
+
+  <span style="color: #008000;">// Constructor for underlying container</span>
+  MyVector(<span style="color: #0000ff;">const</span> Cont&amp; other) : cont(other){}
+
+  <span style="color: #008000;">// assignment operator for MyVector of different type</span>
+  <span style="color: #0000ff;">template</span>&lt;<span style="color: #0000ff;">typename</span> T2, <span style="color: #0000ff;">typename</span> R2&gt;
+  MyVector&amp; <span style="color: #0000ff;">operator</span>=(<span style="color: #0000ff;">const</span> MyVector&lt;T2, R2&gt;&amp; other){
+    assert(size() == other.size());
+    <span style="color: #0000ff;">for</span> (std::<span style="color: #2b91af;">size_t</span> i = 0; i &lt; cont.size(); ++i) cont[i] = other[i];
+    <span style="color: #0000ff;">return</span> *<span style="color: #0000ff;">this</span>;
+  }
+
+  <span style="color: #008000;">// size of underlying container</span>
+  std::<span style="color: #2b91af;">size_t</span> size() <span style="color: #0000ff;">const</span>{ 
+    <span style="color: #0000ff;">return</span> cont.size(); 
+  }
+
+  <span style="color: #008000;">// index operators</span>
+  T <span style="color: #0000ff;">operator</span>[](<span style="color: #0000ff;">const</span> std::<span style="color: #2b91af;">size_t</span> i) <span style="color: #0000ff;">const</span>{ 
+    <span style="color: #0000ff;">return</span> cont[i]; 
+  }
+
+  T&amp; <span style="color: #0000ff;">operator</span>[](<span style="color: #0000ff;">const</span> std::<span style="color: #2b91af;">size_t</span> i){ 
+    <span style="color: #0000ff;">return</span> cont[i]; 
+  }
+
+  <span style="color: #008000;">// returns the underlying data</span>
+  <span style="color: #0000ff;">const</span> Cont&amp; data() <span style="color: #0000ff;">const</span>{ 
+    <span style="color: #0000ff;">return</span> cont; 
+  }
+
+  Cont&amp; data(){ 
+    <span style="color: #0000ff;">return</span> cont; 
+  }
+};
+
+<span style="color: #008000;">// MyVector + MyVector</span>
+<span style="color: #0000ff;">template</span>&lt;<span style="color: #0000ff;">typename</span> T, <span style="color: #0000ff;">typename</span> Op1 , <span style="color: #0000ff;">typename</span> Op2&gt;
+<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">MyVectorAdd</span>{
+  <span style="color: #0000ff;">const</span> Op1&amp; op1;
+  <span style="color: #0000ff;">const</span> Op2&amp; op2;
+
+public:
+  MyVectorAdd(<span style="color: #0000ff;">const</span> Op1&amp; a, <span style="color: #0000ff;">const</span> Op2&amp; b): op1(a), op2(b){}
+
+  T <span style="color: #0000ff;">operator</span>[](<span style="color: #0000ff;">const</span> std::<span style="color: #2b91af;">size_t</span> i) <span style="color: #0000ff;">const</span>{ 
+    <span style="color: #0000ff;">return</span> op1[i] + op2[i]; 
+  }
+
+  std::<span style="color: #2b91af;">size_t</span> size() <span style="color: #0000ff;">const</span>{ 
+    <span style="color: #0000ff;">return</span> op1.size(); 
+  }
+};
+
+<span style="color: #008000;">// elementwise MyVector * MyVector</span>
+<span style="color: #0000ff;">template</span>&lt; <span style="color: #0000ff;">typename</span> T, <span style="color: #0000ff;">typename</span> Op1 , <span style="color: #0000ff;">typename</span> Op2 &gt;
+<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">MyVectorMul</span> {
+  <span style="color: #0000ff;">const</span> Op1&amp; op1;
+  <span style="color: #0000ff;">const</span> Op2&amp; op2;
+
+public:
+  MyVectorMul(<span style="color: #0000ff;">const</span> Op1&amp; a, <span style="color: #0000ff;">const</span> Op2&amp; b ): op1(a), op2(b){}
+
+  T <span style="color: #0000ff;">operator</span>[](<span style="color: #0000ff;">const</span> std::<span style="color: #2b91af;">size_t</span> i) <span style="color: #0000ff;">const</span>{ 
+    <span style="color: #0000ff;">return</span> op1[i] * op2[i]; 
+  }
+
+  std::<span style="color: #2b91af;">size_t</span> size() <span style="color: #0000ff;">const</span>{ 
+    <span style="color: #0000ff;">return</span> op1.size(); 
+  }
+};
+
+<span style="color: #008000;">// function template for the + operator</span>
+<span style="color: #0000ff;">template</span>&lt;<span style="color: #0000ff;">typename</span> T, <span style="color: #0000ff;">typename</span> R1, <span style="color: #0000ff;">typename</span> R2&gt;
+MyVector&lt;T, MyVectorAdd&lt;T, R1, R2&gt; &gt;
+<span style="color: #0000ff;">operator</span>+ (<span style="color: #0000ff;">const</span> MyVector&lt;T, R1&gt;&amp; a, <span style="color: #0000ff;">const</span> MyVector&lt;T, R2&gt;&amp; b){
+  <span style="color: #0000ff;">return</span> MyVector&lt;T, MyVectorAdd&lt;T, R1, R2&gt; &gt;(MyVectorAdd&lt;T, R1, R2 &gt;(a.data(), b.data()));
+}
+
+<span style="color: #008000;">// function template for the * operator</span>
+<span style="color: #0000ff;">template</span>&lt;<span style="color: #0000ff;">typename</span> T, <span style="color: #0000ff;">typename</span> R1, <span style="color: #0000ff;">typename</span> R2&gt;
+MyVector&lt;T, MyVectorMul&lt; T, R1, R2&gt; &gt;
+<span style="color: #0000ff;">operator</span>* (<span style="color: #0000ff;">const</span> MyVector&lt;T, R1&gt;&amp; a, <span style="color: #0000ff;">const</span> MyVector&lt;T, R2&gt;&amp; b){
+   <span style="color: #0000ff;">return</span> MyVector&lt;T, MyVectorMul&lt;T, R1, R2&gt; &gt;(MyVectorMul&lt;T, R1, R2 &gt;(a.data(), b.data()));
+}
+
+<span style="color: #008000;">// function template for &lt; operator</span>
+<span style="color: #0000ff;">template</span>&lt;<span style="color: #0000ff;">typename</span> T&gt;
+std::ostream&amp; <span style="color: #0000ff;">operator</span>&lt;&lt;(std::ostream&amp; os, <span style="color: #0000ff;">const</span> MyVector&lt;T&gt;&amp; cont){  
+  std::cout &lt;&lt; std::endl;
+  <span style="color: #0000ff;">for</span> (<span style="color: #2b91af;">int</span> i=0; i&lt;cont.size(); ++i) {
+    os &lt;&lt; cont[i] &lt;&lt; <span style="color: #a31515;">' '</span>;
+  }
+  os &lt;&lt; std::endl;
+  <span style="color: #0000ff;">return</span> os;
+} 
+
+<span style="color: #2b91af;">int</span> main(){
+
+  MyVector&lt;<span style="color: #2b91af;">double</span>&gt; x(10,5.4);
+  MyVector&lt;<span style="color: #2b91af;">double</span>&gt; y(10,10.3);
+
+  MyVector&lt;<span style="color: #2b91af;">double</span>&gt; result(10);
+  
+  result= x+x + y*y;
+  
+  std::cout &lt;&lt; result &lt;&lt; std::endl;
+  
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>The key difference between the first naive implementation and this implementation with expression templates is that the overloaded + and + operators return in case of the expression tree proxy objects. These proxies represent the expression tree (line 94 and 100). The expression tree is only created but not evaluated. Lazy, of course. The assignment operator (line 22 - 27) triggers the evaluation of the expression tree that needs no temporaries.</p>
+<p>The result is the same.</p>
+<p><img src="images/blog/Functional/ExpressionTemplates/vectorArithmeticExpressionTemplates.png" alt="vectorArithmeticExpressionTemplates" /></p>
+<p>&nbsp;</p>
+<p>If you was not able to follow my explanation, no problem. The assembler code of the program <span style="font-family: courier new,courier;">vectorArithmeticExpressionTemplates.cpp </span>shows the magic.</p>
+<h3>Under the hood</h3>
+<p>Thanks to the compiler explorer on&nbsp; <a href="https://godbolt.org/">godbolt.org, </a>it's quite easy to have the assembler instructions.</p>
+<p>&nbsp;<img src="images/blog/Functional/ExpressionTemplates/godbolt.png" alt="godbolt" width="700" height="176" style="margin: 15px;" /></p>
+<p>The expression tree in line 60 is not so beautiful. But with a sharp eye, you can see the structure. For simplicity reasons, I ignored the <span style="font-family: courier new,courier;">std::allocator</span> in my graphic.</p>
+<p><img src="images/blog/Functional/ExpressionTemplates/Exression.png" alt="Exression" width="600" height="286" style="margin: 15px;" /></p>
+<h2>What's next?</h2>
+<p>With the next post, I will start the rework of my blog. That means, I will rework old posts and write new posts to complete my stories. I&nbsp; will start in the next post with the multithreading features of C++17 and C++20. Here is an overview of all my posts.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>Do you want to get the source code?<span style="font-family: courier new,courier;"> <a href="index.php/source-code-repository">Source code repository</a></span></p>
+<p>&nbsp;</p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="166" height="212" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Get your e-book. Support my blog.</span></strong></p>
+<p>&nbsp;</p>
