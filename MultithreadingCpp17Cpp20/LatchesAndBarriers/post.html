@@ -1,0 +1,224 @@
+<p>Latch</p>
+<p>Latches and barriers are simple thread synchronization mechanism which enables it that some threads wait until a counter becomes 0. We will presumably get in C++20 latches and barriers in three variations: <span style="font-family: courier new,courier;">std::latch,</span> <span style="font-family: courier new,courier;">std::barrier</span>, and <span style="font-family: courier new,courier;">std::flex_barrier.</span></p>
+<hr id="system-readmore" />
+<p>&nbsp;At first, there are two questions:</p>
+<ol>
+<li>What are the differences between these three mechanisms to synchronize threads? You can use a <span style="font-family: Courier New,Courier,monospace;">std::latch </span>only once but you can use a <span style="font-family: Courier New,Courier,monospace;">std::barrier</span> and a <span style="font-family: courier new;">std::flex_barrier</span> more than once. Additionally,&nbsp; a <span style="font-family: courier new;">std::flex_barrier</span> enables you to execute a function when the counter becomes 0.</li>
+<li>What use cases do latches and barriers support that can not be done in C++11 and C++14 with futures, threads, or condition variables in combinations with locks? Latches and barriers provide now new use cases but the are a lot easier to use. They are also more performant because they often use internally a lock-free mechanism.</li>
+</ol>
+<p>Now, I will have a closer look at the three coordination mechanism.<em>&nbsp;</em><br /> <em> </em></p>
+<h2>std::latch</h2>
+<p><span style="font-family: courier new,courier;">std::latch</span> is a counter that counts down. Its value is set in the constructor. A thread can decrement the counter by using the method<span style="font-family: courier new,courier;"></span> <span style="font-family: courier new,courier;"><strong>thread.count_down_and_wait</strong></span> and wait until the counter becomes 0. In addition, the method <span style="font-family: courier new,courier;"><strong>thread.count_down</strong></span> only decrease the counter by 1 without waiting. <span style="font-family: courier new;">std::latch</span> has further the method<span style="font-family: courier new,courier;"> </span><span style="font-family: courier new,courier;"><strong>thread.is_ready</strong></span> in order to test if the counter is 0 and the method <span style="font-family: courier new,courier;">thread.wait</span> to wait until the counter becomes 0. <span style="font-family: courier        new,courier;"></span>You have no possibility to increment or reset the counter of a<span style="font-family: courier new;"> std::latch</span> hence you can not reuse it.&nbsp;</p>
+<p>For further details to <span style="font-family: Courier New,Courier,monospace;">std::latch</span> read the documentation on<span style="font-family: courier new,courier;"></span> <a href="http://en.cppreference.com/w/cpp/experimental/latch">cppreference.com</a>.</p>
+<p><span style="font-family: courier new,courier;"></span>Here is a short code snippet from the proposal <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2014/n4204.html#h.9fyt9rmi4g2z">n4204</a>.</p>
+<p>&nbsp;</p>
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #2b91af;">void</span> DoWork(threadpool* pool) {
+    latch completion_latch(NTASKS);
+    <span style="color: #0000ff;">for</span> (<span style="color: #2b91af;">int</span> i = 0; i &lt; NTASKS; ++i) {
+      pool-&gt;add_task([&amp;] {
+        <span style="color: #008000;">// perform work</span>
+        ...
+        completion_latch.count_down();
+      }));
+    }
+    <span style="color: #008000;">// Block until work is done</span>
+    completion_latch.wait();
+  }
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>I set the <span style="font-family: courier new,courier;">std::latch completion_latch</span> in its constructor to <span style="font-family: courier new,courier;">NTASKS</span> (line 2). The thread pool executes <span style="font-family: courier        new,courier;">NTASKS</span> (line 4 - 8).&nbsp; At the end of each task (line 7), the counter will be decreased. Line 11 is the barrier for all threads because they have to wait until the counter becomes 0.</p>
+<h2>std::barrier</h2>
+<p>A <span style="font-family: courier new,courier;">std::barrier</span> is quite similar to a <span style="font-family: courier new,courier;">std::latch</span>. The subtle difference is that you can use a&nbsp; <span style="font-family: courier new,courier;">std::barrier</span> more than once because the counter will be reset to is previous value. Immediately after the counter becomes 0 the so-called completion phase starts. This completion phase is in the case of a <span style="font-family: courier new,courier;">std::barrier</span> empty. That changes wit a&nbsp; <span style="font-family: courier new,courier;">std::flex_barrier.</span> <span style="font-family: courier new,courier;">std::barrier</span> has two interesting methods: <span style="font-family: courier new,courier;">std::arrive_and_wait </span>and <span style="font-family: courier new,courier;">std::arrive_and_drop. </span>While <strong><span style="font-family: courier          new,courier;">std::arrive_and_wait</span></strong>&nbsp; is waiting at the synchronization point, <span style="font-family: courier new,courier;"><strong>std::arrive_and_drop</strong></span> removes itself from the synchronization mechanism.</p>
+<p>Before I take a closer look at the <span style="font-family: courier        new,courier;">std::flex_barrier <span style="font-family: Helvetica,Arial,sans-serif;">and the completion phase, I will give a short example to the </span>std::barrier.</span><span style="font-family: courier new,courier;"></span><span style="font-family: courier new,courier;"></span><span style="font-family: courier new,courier;"></span></p>
+<p>&nbsp;</p>
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #2b91af;">void</span> DoWork() {
+    Tasks&amp; tasks;
+    <span style="color: #2b91af;">int</span> n_threads;
+    vector&lt;<span style="color: #0000ff;">thread</span>*&gt; workers;
+
+    barrier task_barrier(n_threads);
+
+    <span style="color: #0000ff;">for</span> (<span style="color: #2b91af;">int</span> i = 0; i &lt; n_threads; ++i) {
+      workers.push_back(<span style="color: #0000ff;">new</span> <span style="color: #0000ff;">thread</span>([&amp;] {
+        <span style="color: #2b91af;">bool</span> active = true;
+        <span style="color: #0000ff;">while</span>(active) {
+          Task task = tasks.get();
+          <span style="color: #008000;">// perform task</span>
+          ...
+          task_barrier.arrive_and_wait();
+         }
+       });
+    }
+    <span style="color: #008000;">// Read each stage of the task until all stages are complete.</span>
+    <span style="color: #0000ff;">while</span> (!finished()) {
+      GetNextStage(tasks);
+    }
+  }
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>The <span style="font-family: courier new,courier;">std::barrier barrier</span> in line 6 is used to coordinate a number of threads that performs its tasks a few times. The number of threads is <span style="font-family: courier new,courier;">n_threads </span>(line 3). Each thread takes its task at line 12 via <span style="font-family: courier new,courier;"><span style="font-family: courier new,courier;">task.get(), </span></span>performs it and waits - as far as it is done with its task(line 15) - until all threads have done their tasks. After that, it takes a new task in line 12 as far as <span style="font-family: courier new;">active </span>returns <span style="font-family: courier new;">true </span>in line 12.<span style="font-family: courier new,courier;"> </span></p>
+<h2>std::flex_barrier</h2>
+<p><em>From my perspective, the names in the example to the <span style="font-family: courier new,courier;">std::flex_barrier</span> are a little bit confusing. For example, the <span style="font-family: courier new,courier;">std::flex_barrier</span> is called <span style="font-family: courier new,courier;">notifying_barrier</span>. Therefore I used the name <span style="font-family: courier          new,courier;">std::flex_barrier</span>.</em></p>
+<p>The <span style="font-family: courier new,courier;">std::flex_barrier</span> has in contrast to the <span style="font-family: courier new,courier;">std::barrier</span> an additionally constructor. This constructor can be parametrised by a callable unit that will be invoked in the completion phase. The callable unit has to return a number. This number sets the value of the counter in the completion phase. A number of -1 means that the counter keeps the same in the next iteration. Smaller numbers than -1 are not allowed.&nbsp;</p>
+<p>What is happening in the completion phase?</p>
+<ol>
+<li>All threads are blocked.</li>
+<li>A thread is unblocked and executes the callable unit.</li>
+<li>If the completion phase is done, all threads will be unblocked.</li>
+</ol>
+<p>The code snippet shows the usage of a <span style="font-family: courier        new,courier;">std::flex_barrier.</span></p>
+<p>&nbsp;</p>
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"> <span style="color: #2b91af;">void</span> DoWork() {
+    Tasks&amp; tasks;
+    <span style="color: #2b91af;">int</span> initial_threads;
+    atomic&lt;<span style="color: #2b91af;">int</span>&gt; current_threads(initial_threads)
+    vector&lt;<span style="color: #0000ff;">thread</span>*&gt; workers;
+
+    <span style="color: #008000;">// Create a flex_barrier, and set a lambda that will be</span>
+    <span style="color: #008000;">// invoked every time the barrier counts down. If one or more</span>
+    <span style="color: #008000;">// active threads have completed, reduce the number of threads.</span>
+    std::function rf = [&amp;] { <span style="color: #0000ff;">return</span> current_threads;};
+    flex_barrier task_barrier(n_threads, rf);
+
+    <span style="color: #0000ff;">for</span> (<span style="color: #2b91af;">int</span> i = 0; i &lt; n_threads; ++i) {
+      workers.push_back(<span style="color: #0000ff;">new</span> <span style="color: #0000ff;">thread</span>([&amp;] {
+        <span style="color: #2b91af;">bool</span> active = true;
+        <span style="color: #0000ff;">while</span>(active) {
+          Task task = tasks.get();
+          <span style="color: #008000;">// perform task</span>
+          ...
+          <span style="color: #0000ff;">if</span> (finished(task)) {
+            current_threads--;
+            active = false;
+          }
+          task_barrier.arrive_and_wait();
+         }
+       });
+    }
+
+    <span style="color: #008000;">// Read each stage of the task until all stages are complete.</span>
+    <span style="color: #0000ff;">while</span> (!finished()) {
+      GetNextStage(tasks);
+    }
+  }
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>The examples follow a similar strategy as the example to <span style="font-family: courier new,courier;">std::barrier. </span>The difference is that this time the counter of the <span style="font-family: courier new,courier;">std::flex_barrier</span> is adjusted during run time. Therefore the <span style="font-family: courier new,courier;">std::flex_barrier task_barrier</span> in line 11 gets a lambda-function. This lambda-function captures its variable <span style="font-family: courier        new,courier;">current_thread</span> by reference. The variable will be decremented in line 21 and <span style="font-family: courier new;">active </span>will be set to <span style="font-family: courier new;">false </span>if the thread has done its task. Therefore the counter is decreased in the completion phase.<span style="font-family: courier new,courier;"><br /> </span></p>
+<p>&nbsp;A <span style="font-family: courier new,courier;">std::flex_barrier</span> has one speciality&nbsp; in contrary to a <span style="font-family: courier new,courier;">std::barrier</span> and a <span style="font-family: courier new,courier;">std::latch.</span> That's the only one for which you can increase the counter.</p>
+<p>&nbsp;</p>
+<p><em>Read the details <a href="http://en.cppreference.com/w/cpp/experimental/latch"><span style="font-family: courier new,courier;">std::latch</span></a><span style="font-family: courier new,courier;">, </span><span style="font-family: courier new,courier;"><a href="http://en.cppreference.com/w/cpp/experimental/barrier">std::barrier</a></span> , and <span style="font-family: courier new,courier;"><a href="http://en.cppreference.com/w/cpp/experimental/flex_barrier">std::flex_barrier</a> </span>at cppreference.com.<br /> </em></p>
+<h2>What's next?</h2>
+<p>Coroutines are generalized functions that can be suspended and resumed while keeping their state. They are often used to implement cooperative tasks in operating systems, event loops in event systems, infinite lists, or pipelines. You can read the details about coroutines in the next post.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>Do you want to get the source code?<span style="font-family: courier        new,courier;"> <a href="index.php/source-code-repository">Source code repository</a></span></p>
+<p>&nbsp;</p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="166" height="212" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"<span id="transmark"></span>What every professional C++ programmer should know about the C++ standard library".</strong> {end-tooltip} &nbsp; <strong><span class="h3">Get your e-book. Support my blog.</span></strong></p>
+<p><strong><span class="h3"></span></strong></p>
