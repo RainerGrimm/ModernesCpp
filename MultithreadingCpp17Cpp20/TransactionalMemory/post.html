@@ -1,0 +1,215 @@
+<p>Transactional memory is based on the idea of a transaction from the database theory. Transactional memory shall make the handling with threads a lot easier. That for two reasons. <a href="index.php/threads-sharing-data">Data races </a>and <a href="index.php/the-risk-of-mutexes">deadlocks </a>disappear. Transactions are composable.</p>
+<hr id="system-readmore" />
+<p>A transaction is an action that has the properties <strong>A</strong>tomicity, <strong>C</strong>onsistency,<strong> I</strong>solation, and<strong> D</strong>urability (ACID). Except for the durability, all properties hold for transactional memory in C++. Therefore, only three short questions are left.</p>
+<h2>ACI(D)</h2>
+<p>What means atomicity, consistency, and isolation for an atomic block consisting of some statements?</p>
+<div style="background: #ffffff none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<pre style="margin: 0px; line-height: 125%;">atomic{
+  statement1;
+  statement2;
+  statement3;
+}
+</pre>
+</div>
+<ul>
+<li><strong>Atomicity: </strong>Either all or no statement of the block is performed. <strong><br /> </strong></li>
+<li><strong>Consistency: </strong>The system is always in a consistent state. All transaction build a total order.</li>
+<li><strong>Isolation: </strong>Each transaction runs in total isolation from the other transactions.<strong><br /> </strong></li>
+</ul>
+<p>How are these properties guaranteed? A transaction remembers its initial state. Then the transaction will be performed without synchronisation. If a conflict happens during its execution, the transaction will be interrupted and put to its initial state. This rollback causes that the transaction will be executed once more. If the initial state of the transaction even holds at the end of the transaction, the transaction will be committed.</p>
+<p>A transaction is a kind of speculative action that is only commited if the initial state holds. It is in contrary to a mutex an optimistic approach. A transaction is performed without synchronisation. It will only be published if no conflict to its initial state happens. A mutex is a pessimistic approach. At first, the mutex ensures that no other thread can enter the critical region. The thread only will enter the critical region if it is the exclusive owner of the mutex and hence all other threads are blocked.</p>
+<p>C++ supports transactional memory in two flavours: synchronized blocks and atomic blocks.</p>
+<h2>Transactional Memory</h2>
+<p>Up to now, I only wrote about transactions. No, I will write about synchronized blocks and atomic blocks. Both can be encapsulated in the other. To be specific, synchronized blocks are no atomic blocks because they can execute <span style="font-family: courier new,courier;">transaction-unsafe</span>. This may be code like the output to the console which can not be made undone. That is the reason, synchronized blocks are often called relaxed.</p>
+<h3>Synchronized Blocks</h3>
+<p>Synchronized block behave such as they are protected by a global lock. That means all synchronized blocks obey a total order. Therefore, all changes to a synchronized block are available in the next synchronized block. There is a <span style="font-family: Courier New,Courier,monospace;">synchronize-with</span> relation between the synchronized blocks. Because synchronized blocks behave like protected by a global lock, they can not cause a deadlock. While a classical lock protects a memory area, a global lock of a synchronized block protects the total program. That is the reason, why the following program is well-defined:</p>
+<div style="background: #ffffff none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0px; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26</pre>
+</td>
+<td>
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #888888;">// synchronized.cpp</span>
+
+<span style="color: #557799;">#include &lt;iostream&gt;</span>
+<span style="color: #557799;">#include &lt;vector&gt;</span>
+<span style="color: #557799;">#include &lt;thread&gt;</span>
+
+<span style="color: #333399; font-weight: bold;">int</span> i<span style="color: #333333;">=</span> <span style="color: #0000dd; font-weight: bold;">0</span>;
+
+<span style="color: #333399; font-weight: bold;">void</span> <span style="color: #0066bb; font-weight: bold;">increment</span>(){
+  synchronized{ 
+    std<span style="color: #333333;">::</span>cout <span style="color: #333333;">&lt;&lt;</span> <span style="color: #333333;">++</span>i <span style="color: #333333;">&lt;&lt;</span> <span style="background-color: #fff0f0;">" ,"</span>;
+  }
+}
+
+<span style="color: #333399; font-weight: bold;">int</span> <span style="color: #0066bb; font-weight: bold;">main</span>(){
+  
+  std<span style="color: #333333;">::</span>cout <span style="color: #333333;">&lt;&lt;</span> std<span style="color: #333333;">::</span>endl;
+    
+  std<span style="color: #333333;">::</span>vector<span style="color: #333333;">&lt;</span>std<span style="color: #333333;">::</span><span style="color: #008800; font-weight: bold;">thread</span><span style="color: #333333;">&gt;</span> vecSyn(<span style="color: #0000dd; font-weight: bold;">10</span>);
+  <span style="color: #008800; font-weight: bold;">for</span>(<span style="color: #008800; font-weight: bold;">auto</span><span style="color: #333333;">&amp;</span> thr<span style="color: #333333;">:</span> vecSyn)
+    thr <span style="color: #333333;">=</span> std<span style="color: #333333;">::</span><span style="color: #008800; font-weight: bold;">thread</span>([]{ <span style="color: #008800; font-weight: bold;">for</span>(<span style="color: #333399; font-weight: bold;">int</span> n <span style="color: #333333;">=</span> <span style="color: #0000dd; font-weight: bold;">0</span>; n <span style="color: #333333;">&lt;</span> <span style="color: #0000dd; font-weight: bold;">10</span>; <span style="color: #333333;">++</span>n) increment(); });
+  <span style="color: #008800; font-weight: bold;">for</span>(<span style="color: #008800; font-weight: bold;">auto</span><span style="color: #333333;">&amp;</span> thr<span style="color: #333333;">:</span> vecSyn) thr.join();
+  
+  std<span style="color: #333333;">::</span>cout <span style="color: #333333;">&lt;&lt;</span> <span style="background-color: #fff0f0;">"</span><span style="color: #666666; font-weight: bold; background-color: #fff0f0;">\n\n</span><span style="background-color: #fff0f0;">"</span>;
+  
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Although the variable <span style="font-family: Courier New,Courier,monospace;">i </span>in line 7 is a global variable and the operations in the synchronized block are <span style="font-family: courier new,courier;">transaction-unsafe,</span> the program is well-defined. The access to <span style="font-family: courier;">i</span> and <span style="font-family: courier new,courier;">std::cout</span> happen in total order. That is due to the synchronized block.</p>
+<p><span style="font-family: Helvetica,Arial,sans-serif;">The output of the program is not so thrilling. The values for i are written in an increasing sequence, separated by a comma. Only for completeness.</span></p>
+<p><img src="images/blog/MultithreadingCpp17Cpp20/TransactionalMemory/synchronized.png" alt="synchronized" width="700" height="152" style="margin: 15px;" /></p>
+<p>What about data races? You will have them with synchronized blocks. Only a small modification is necessary.</p>
+<div style="background: #ffffff none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0px; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36</pre>
+</td>
+<td>
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #008000;">// nonsynchronized.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;chrono&gt;</span>
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;vector&gt;</span>
+<span style="color: #0000ff;">#include &lt;thread&gt;</span>
+
+<span style="color: #0000ff;">using</span> <span style="color: #0000ff;">namespace</span> std::chrono_literals;
+
+<span style="color: #2b91af;">int</span> i= 0;
+
+<span style="color: #2b91af;">void</span> increment(){
+  synchronized{ 
+    std::cout &lt;&lt; ++i &lt;&lt; <span style="color: #a31515;">" ,"</span>;
+    std::this_thread::sleep_for(1ns);
+  }
+}
+
+<span style="color: #2b91af;">int</span> main(){
+  
+  std::cout &lt;&lt; std::endl;
+    
+  std::vector&lt;std::<span style="color: #0000ff;">thread</span>&gt; vecSyn(10);
+  std::vector&lt;std::<span style="color: #0000ff;">thread</span>&gt; vecUnsyn(10);
+    
+  <span style="color: #0000ff;">for</span>(<span style="color: #0000ff;">auto</span>&amp; thr: vecSyn)
+    thr = std::<span style="color: #0000ff;">thread</span>([]{ <span style="color: #0000ff;">for</span>(<span style="color: #2b91af;">int</span> n = 0; n &lt; 10; ++n) increment(); });
+  <span style="color: #0000ff;">for</span>(<span style="color: #0000ff;">auto</span>&amp; thr: vecUnsyn)
+    thr = std::<span style="color: #0000ff;">thread</span>([]{ <span style="color: #0000ff;">for</span>(<span style="color: #2b91af;">int</span> n = 0; n &lt; 10; ++n) std::cout &lt;&lt; ++i &lt;&lt; <span style="color: #a31515;">" ,"</span>; });
+    
+  <span style="color: #0000ff;">for</span>(<span style="color: #0000ff;">auto</span>&amp; thr: vecSyn) thr.join();
+  <span style="color: #0000ff;">for</span>(<span style="color: #0000ff;">auto</span>&amp; thr: vecUnsyn) thr.join();
+  
+  std::cout &lt;&lt; <span style="color: #a31515;">"\n\n"</span>;
+  
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>To observe the data race, I let the synchronized block sleep for a nanosecond (line 15). At the same time, I access <span style="font-family: courier;">std::cout</span> without a synchronized block (line 29). Therefore I launch 10 threads that increment the global variable <span style="font-family: courier;">i</span>. The output shows the issue.</p>
+<p><img src="images/blog/MultithreadingCpp17Cpp20/TransactionalMemory/nonsynchronizedEdit.png" alt="nonsynchronizedEdit" width="700" height="204" /></p>
+<p>I put red circles around the issues in the output. These are the spots, at which <span style="font-family: courier;">std::cout</span> is used by at least two threads at the same time. Because of the C++11 standard guarantees that the characters will be written in an atomic way that is only an optical issue. But what is worse, is that the variable<span style="font-family: courier;"> i </span>is be written by at least two threads. That is a data race. Therefore the program has undefined behaviour.</p>
+<p>The total order of synchronized blocks also holds for atomic blocks.</p>
+<h3>Atomic Blocks</h3>
+<p>You can execute <span style="font-family: courier new,courier;">transaction-unsafe</span> code in a synchronized block but not in an atomic block. Atomic blocks are available in the forms: <span style="font-family: courier new,courier;">atomic_noexcept, atomic_commit</span>, and <span style="font-family: courier new,courier;">atomic_cancel</span>. The three suffixes&nbsp; <span style="font-family: courier new,courier;">_noexcept, _commit</span>, and <span style="font-family: courier new,courier;">_cancel</span> defines how an atomic block should manage an exception.</p>
+<ul>
+<li><span style="font-family: courier new,courier;"><strong>atomic_noexcept: </strong></span>If an exception throws,&nbsp; <span style="font-family: courier new,courier;"><a href="http://en.cppreference.com/w/cpp/utility/program/abort">std::abort</a> </span>will be called and the program aborts<strong>.</strong><span style="font-family: courier new,courier;"><strong><br /> </strong></span></li>
+<li><strong><span style="font-family: courier new,courier;">atomic_cancel: </span></strong>In the default case, <span style="font-family: courier new,courier;">std::abort</span> is called. That will not hold if a <span style="font-family: courier new,courier;">transaction-safe</span> exception throws that is responsible for the ending of the transaction. In this case, the transaction will be canceled, put to its initial state and the exception will be thrown.<strong><span style="font-family: courier new,courier;"><br /> </span></strong></li>
+<li><strong><span style="font-family: courier new,courier;">atomic_commit: </span></strong>If an exception is thrown, the transaction will be committed normally.<span style="font-family: courier new,courier;"> </span></li>
+</ul>
+<p><strong><span style="font-family: courier new,courier;">transaction-safe</span> exceptions:</strong> <span class="t-lc"><a href="http://en.cppreference.com/w/cpp/memory/new/bad_alloc" title="cpp/memory/new/bad alloc">std::bad_alloc</a></span>, <span class="t-lc"><a href="http://en.cppreference.com/w/cpp/memory/new/bad_array_length" title="cpp/memory/new/bad array length">std::bad_array_length</a></span>, <span class="t-lc"><a href="http://en.cppreference.com/w/cpp/memory/new/bad_array_new_length" title="cpp/memory/new/bad array new length">std::bad_array_new_length</a></span>, <span class="t-lc"><a href="http://en.cppreference.com/w/cpp/types/bad_cast" title="cpp/types/bad cast">std::bad_cast</a></span>, <span class="t-lc"><a href="http://en.cppreference.com/w/cpp/types/bad_typeid" title="cpp/types/bad typeid">std::bad_typeid</a></span>, <span class="t-lc"><a href="http://en.cppreference.com/w/cpp/error/bad_exception" title="cpp/error/bad exception">std::bad_exception</a></span>, <span class="t-lc"><a href="http://en.cppreference.com/w/cpp/error/exception" title="cpp/error/exception">std::exception </a>und alle Ausnahme, die davon diesen abgeleitet sind, sind <span style="font-family: courier new,courier;">transaction-safe.</span></span></p>
+<h3>transaction_safe versus transaction_unsafe Code</h3>
+<p>You can declare a function as <span style="font-family: courier new,courier;">transaction_safe</span> or attach the <span style="font-family: courier new,courier;">transaction_unsafe</span> to it.</p>
+<div style="background: #ffffff none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #2b91af;">int</span> transactionSafeFunction() transaction_safe;
+
+[[transaction_unsafe]] <span style="color: #2b91af;">int</span> transactionUnsafeFunction();
+</pre>
+</div>
+<p><span style="font-family: courier new,courier;">transaction_safe</span> is part of the type of a function. But what does a <span style="font-family: courier new,courier;">transaction_safe</span> mean? A <span style="font-family: courier new,courier;">transaction_safe</span> function is according to the proposal <a href="https://isocpp.org/files/papers/n4265.html">N4265</a> a function that has a <span style="font-family: courier new,courier;">transaction_safe</span> definition. This holds true if the following properties do not apply to its definition.</p>
+<ul>
+<li>It has a <span style="font-family: courier new,courier;">volatile</span> parameter or a <span style="font-family: courier new,courier;">volatile</span> variable.</li>
+<li>It has <span style="font-family: courier new,courier;">transaction-unsafe</span> statements.</li>
+<li>If the function uses a constructor or destructor of a class in its body that has a <span style="font-family: courier new,courier;">volatile</span> non-static member.</li>
+</ul>
+<p>Of course, this definition of <span style="font-family: courier new,courier;">transaction_safe</span> is not sufficient because it uses the term <span style="font-family: courier new,courier;">transaction_unsafe</span>. You can read the proposal <a href="https://isocpp.org/files/papers/n4265.html">N4265</a> what does <span style="font-family: Courier New,Courier,monospace;">transaction_unsafe <span style="font-family: Helvetica,Arial,sans-serif;">means.</span><br /> </span></p>
+<h2>What's next?</h2>
+<p>The next post is about the fork-join paradigm. To be specific, it's about task blocks.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>Do you want to get the source code?<span style="font-family: courier new,courier;"> <a href="index.php/source-code-repository">Source code repository</a></span></p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="166" height="212" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Get your e-book. Support my blog.</span></strong></p>
