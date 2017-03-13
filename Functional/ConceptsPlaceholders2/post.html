@@ -1,0 +1,476 @@
+<p>The unification of templates, concepts, and placeholders goes on. This time, I will have a closer look at constrained (concepts) and unconstrained <span style="font-family: courier new,courier;">(auto)</span> placeholders in the context of templates.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p>At first, a short reminder for you (and me). I stated in my last post <a href="index.php/concepts-placeholders">Concepts -Placeholders</a>:&nbsp;You can use constrained placeholders (concepts) in each situation where you can use unconstrained placeholders <span style="font-family: courier new,courier;">(auto).</span> I used in the last post the concept <span style="font-family: courier new,courier;">Integral</span> in the algorithm <span style="font-family: courier new,courier;">gcd</span> to make it more type-safe. Let's continue.<span style="font-family: courier new,courier;"><br /></span></p>
+<h2>Syntactic sugar and more</h2>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// conceptsIntegralVariations.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;type_traits&gt;</span>
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+
+<span style="color: #0000ff;">template</span>&lt;<span style="color: #0000ff;">typename</span> T&gt;
+concept <span style="color: #2b91af;">bool</span> Integral(){
+  <span style="color: #0000ff;">return</span> std::is_integral&lt;T&gt;::value;
+}
+
+<span style="color: #0000ff;">template</span>&lt;<span style="color: #0000ff;">typename</span> T&gt;
+requires Integral&lt;T&gt;()
+T gcd(T a, T b){
+  <span style="color: #0000ff;">if</span>( b == 0 ){ <span style="color: #0000ff;">return</span> a; }
+  <span style="color: #0000ff;">else</span>{
+    <span style="color: #0000ff;">return</span> gcd(b, a % b);
+  }
+}
+
+<span style="color: #0000ff;">template</span>&lt;Integral T&gt;
+T gcd1(T a, T b){
+  <span style="color: #0000ff;">if</span>( b == 0 ){ <span style="color: #0000ff;">return</span> a; }
+  <span style="color: #0000ff;">else</span>{
+    <span style="color: #0000ff;">return</span> gcd(b, a % b);
+  }
+}
+
+Integral gcd2(Integral a, Integral b){
+  <span style="color: #0000ff;">if</span>( b == 0 ){ <span style="color: #0000ff;">return</span> a; }
+  <span style="color: #0000ff;">else</span>{
+    <span style="color: #0000ff;">return</span> gcd(b, a % b);
+  }
+}
+
+<span style="color: #0000ff;">auto</span> gcd3(<span style="color: #0000ff;">auto</span> a, <span style="color: #0000ff;">auto</span> b){
+  <span style="color: #0000ff;">if</span>( b == 0 ){ <span style="color: #0000ff;">return</span> a; }
+  <span style="color: #0000ff;">else</span>{
+    <span style="color: #0000ff;">return</span> gcd(b, a % b);
+  }
+}
+
+<span style="color: #2b91af;">int</span> main(){
+
+  std::cout &lt;&lt; std::endl;
+
+  std::cout &lt;&lt; <span style="color: #a31515;">"gcd(100, 10)= "</span>  &lt;&lt;  gcd(100, 10)  &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"gcd1(100, 10)= "</span> &lt;&lt;  gcd1(100, 10)  &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"gcd2(100, 10)= "</span> &lt;&lt;  gcd2(100, 10)  &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"gcd3(100, 10)= "</span> &lt;&lt;  gcd3(100, 10)  &lt;&lt; std::endl;
+
+  std::cout &lt;&lt; std::endl;
+
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Don't get me wrong. I'm a big fan of<a href="https://en.wikipedia.org/wiki/Syntactic_sugar"> syntactic sugar</a>. Syntactic sugar makes a feature easier to use and you can therefore write more expressive and less error-prone code. Isn't C++ only syntactic sugar for C or assembler?</p>
+<p>In define in line 7 -9 the concept <span style="font-family: courier new,courier;">Integral</span> that I use in the algorithm <span style="font-family: courier new,courier;">gcd</span> (line 11 - 18). Now,&nbsp; I make the syntax sweeter. Instead of specifiying the concept in the requires clause (line 12), I can use it instead of the keyword <span style="font-family: courier new,courier;">typename</span> or <span style="font-family: courier new,courier;">class</span> for the type parameter (line 20). It gets even sweeter. The concept <span style="font-family: courier new,courier;">Integral</span> is used in line 28 as a kind of function parameter. Of course, <span style="font-family: courier new,courier;">gcd2</span> becomes by the concept a function-template. Now the unifications kicks in. If I replace a constrained placeholders (Integral) in line 28 with the unconstrained placeholders <span style="font-family: courier new,courier;">(auto)</span> in line 35, I will get an <em>unconstrained function template.</em> Sorry about my new coined term unconstrained function template. I mean, <span style="font-family: courier new,courier;">gcd3</span> is a template that can accept values of arbitrary type.</p>
+<p>To wrap up my sententes, here is the output of the program.</p>
+<p>&nbsp;<img src="images/blog/Functional/ConceptPlaceholders2/conceptsIntegralVariations.png" alt="conceptsIntegralVariations" style="margin: 15px;" /></p>
+<p>I called this section "Syntactic sugar and more". But why more? You will see.</p>
+<h3>Syntactic sugar and<strong> more</strong></h3>
+<p>The function-templates <span style="font-family: courier new,courier;">gcd2</span> is more powerful than the function template <span style="font-family: courier new,courier;">gcd</span> or <span style="font-family: courier new,courier;">gcd1.</span> <span style="font-family: courier new,courier;">gcd2</span> has two type-parameters that have not to be the same. Both have to respect the concept Integral. The same observations holds for the function template <span style="font-family: courier new,courier;">gcd3.</span> <span style="font-family: courier new,courier;">a</span> and <span style="font-family: courier new,courier;">b</span> have not to be of the same type. The usage of the function-template <span style="font-family: courier new,courier;">twoTypes</span> in line 39 makes my point clear.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// placeholders.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;typeinfo&gt;</span>
+
+<span style="color: #0000ff;">template</span>&lt;<span style="color: #0000ff;">typename</span> T&gt;
+concept <span style="color: #2b91af;">bool</span> Integral(){
+  <span style="color: #0000ff;">return</span> std::is_integral&lt;T&gt;::value;
+}
+
+<span style="color: #2b91af;">void</span> overload(<span style="color: #0000ff;">auto</span> t){
+  std::cout &lt;&lt; <span style="color: #a31515;">"auto : "</span> &lt;&lt; t &lt;&lt; std::endl;
+}
+
+<span style="color: #2b91af;">void</span> overload(Integral t){
+  std::cout &lt;&lt; <span style="color: #a31515;">"Integral : "</span> &lt;&lt; t &lt;&lt; std::endl;
+}
+
+<span style="color: #2b91af;">void</span> overload(<span style="color: #2b91af;">long</span> t){
+  std::cout &lt;&lt; <span style="color: #a31515;">"long : "</span> &lt;&lt; t &lt;&lt; std::endl;
+}
+  
+<span style="color: #2b91af;">void</span> twoTypes(<span style="color: #0000ff;">auto</span> a, <span style="color: #0000ff;">auto</span> b){
+  std::cout &lt;&lt; <span style="color: #0000ff;">typeid</span>(a).name() &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #0000ff;">typeid</span>(b).name() &lt;&lt; std::endl;
+}
+
+
+<span style="color: #2b91af;">int</span> main(){
+  
+  std::cout &lt;&lt; std::endl;
+  
+  overload(3.14);
+  overload(2010);
+  overload(2020l);
+  
+  std::cout &lt;&lt; std::endl;
+  
+  twoTypes(2010, 3.14); 
+  
+  std::cout &lt;&lt; std::endl;
+
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>&nbsp;With a little bit of <strong>R</strong>un <strong>T</strong>ime <strong>T</strong>ype <strong>I</strong>nfomation (<a href="https://en.wikipedia.org/wiki/Run-time_type_information">RTTI)</a> in line 24 and 25, I get a string representation of the types. As expected, the types are <span style="font-family: courier new,courier;">int</span> and <span style="font-family: courier new,courier;">double. </span></p>
+<p><img src="images/blog/Functional/ConceptPlaceholders2/placeholders.png" alt="placeholders" style="margin: 15px;" /></p>
+<p>But the short example shows more. The interplay between the uncontrained function-template (line 11), the constrained function-template (line 15), and the function (line 19) is very smoothly. That is exactly the behaviour, I expected.</p>
+<p>In case you hate the classical way to declare template, there is a new way.</p>
+<h2>Template introduction</h2>
+<p>Instead of declaring your constrained template by using <span style="font-family: courier new,courier;">template&lt;Integral T&gt;</span>, you can now just right <span style="font-family: courier new,courier;">Integral{T}</span>. Once more, I wrote contrained templates. So, you have to use concepts.&nbsp;</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// templateIntroduction.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;type_traits&gt;</span>
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+
+<span style="color: #0000ff;">template</span>&lt;<span style="color: #0000ff;">typename</span> T&gt;
+concept <span style="color: #2b91af;">bool</span> Integral(){
+  <span style="color: #0000ff;">return</span> std::is_integral&lt;T&gt;::value;
+}
+
+Integral{T}
+Integral gcd(T a, T b){
+  <span style="color: #0000ff;">if</span>( b == 0 ){ <span style="color: #0000ff;">return</span> a; }
+  <span style="color: #0000ff;">else</span>{
+    <span style="color: #0000ff;">return</span> gcd(b, a % b);
+  }
+}
+
+Integral{T} 
+<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">ConstrainedClass</span>{};
+
+<span style="color: #008000;">/*</span>
+
+<span style="color: #008000;">auto{T}</span>
+<span style="color: #008000;">auto gcd(T a, T b){</span>
+<span style="color: #008000;">  if( b == 0 ){ return a; }</span>
+<span style="color: #008000;">  else{</span>
+<span style="color: #008000;">    return gcd(b, a % b);</span>
+<span style="color: #008000;">  }</span>
+<span style="color: #008000;">}</span>
+
+<span style="color: #008000;">auto{T} </span>
+<span style="color: #008000;">class ConstrainedClass{};</span>
+
+<span style="color: #008000;">*/</span>
+
+
+<span style="color: #2b91af;">int</span> main(){
+  
+  std::cout &lt;&lt; std::endl;
+  
+  <span style="color: #0000ff;">auto</span> res= gcd(100, 10); 
+
+  ConstrainedClass&lt;<span style="color: #2b91af;">int</span>&gt; constrainedClass;
+  ConstrainedClass&lt;<span style="color: #2b91af;">double</span>&gt; constrainedClass1;
+  
+  std::cout &lt;&lt; std::endl;
+
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>I used the new syntax for the function-template <span style="font-family: courier new,courier;">gcd</span> in line 11 and the class-template <span style="font-family: comic sans ms,sans-serif;">ConstrainedClass</span> in line <span style="font-family: courier new,courier;">19</span>. The concept wlll kick in if if try to instantiate <span style="font-family: courier new,courier;">ConstraintedClass</span> for <span style="font-family: courier new,courier;">double</span> (line 45).</p>
+<p><img src="images/blog/Functional/ConceptPlaceholders2/templateIntroductionError.png" alt="templateIntroductionError" width="864" height="214" /></p>
+<p>To be honest,&nbsp; I don't like it that I can not just replace <span style="font-family: courier new,courier;">Integral</span> with <span style="font-family: courier new,courier;">auto</span> such as in line 24 to 33. Up to this point in my posts, I have used a constrained placeholder instead of an unconstrained placeholder and the other way around. That is a simple principial.</p>
+<p>Of course, I can overcome this restriction by using a concept, that evaluates always to <span style="font-family: courier new,courier;">true.</span></p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// templateIntroductionGeneric.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;string&gt;</span>
+<span style="color: #0000ff;">#include &lt;typeinfo&gt;</span>
+<span style="color: #0000ff;">#include &lt;utility&gt;</span>
+
+
+<span style="color: #0000ff;">template</span>&lt;<span style="color: #0000ff;">typename</span> T&gt;
+concept <span style="color: #2b91af;">bool</span> Generic(){
+  <span style="color: #0000ff;">return</span> true;
+}
+
+Generic{T}
+Generic gcd(T a, T b){
+  <span style="color: #0000ff;">if</span>( b == 0 ){ <span style="color: #0000ff;">return</span> a; }
+  <span style="color: #0000ff;">else</span>{
+    <span style="color: #0000ff;">return</span> gcd(b, a % b);
+  }
+}
+
+Generic{T} 
+<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">ConstrainedClass</span>{
+public:
+  ConstrainedClass(){
+    std::cout &lt;&lt; <span style="color: #0000ff;">typeid</span>(decltype(std::declval&lt;T&gt;())).name() &lt;&lt; std::endl;
+  }
+};
+
+
+<span style="color: #2b91af;">int</span> main(){
+  
+  std::cout &lt;&lt; std::endl;
+  
+  std::cout &lt;&lt; <span style="color: #a31515;">"gcd(100, 10): "</span> &lt;&lt; gcd(100, 10) &lt;&lt; std::endl;
+  
+  std::cout &lt;&lt; std::endl;
+ 
+  ConstrainedClass&lt;<span style="color: #2b91af;">int</span>&gt; genericClassInt;
+  ConstrainedClass&lt;std::string&gt; genericClassString;
+  ConstrainedClass&lt;<span style="color: #2b91af;">double</span>&gt; genericClassDouble;
+  
+  std::cout &lt;&lt; std::endl;
+
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p><span style="font-family: courier new,courier;">Generic</span> (line 9 - 12) is my concept that returns <span style="font-family: courier new,courier;">true</span> for all types. Now, I can unify the syntax and define an unconstrained function-template (line 14 - 20) and an unconstrained class-template (line 22 - 28). Sorry for the expression<span style="font-family: courier new,courier;">&nbsp;typeid(decltype(std::declval&lt;T&gt;())).name()</span> in line 26 that works even for a type T without default constructor. This expression returns the string representation of the type parameter T. Here is the output of the program.&nbsp;</p>
+<p><img src="images/blog/Functional/ConceptPlaceholders2/templateIntroductionGeneric.png" alt="templateIntroductionGeneric" style="margin: 15px;" /></p>
+<h2>What's next?</h2>
+<p>I always use the same concept <span style="font-family: courier new,courier;">Integral</span> in my examples. Bored? That will change. I will write in my next post about defining concepts.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="166" height="212" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Get your e-book. Support my blog.</span></strong></p>
+<p>&nbsp;</p>
