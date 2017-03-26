@@ -1,0 +1,393 @@
+<p>C++11, C++14 und C++17. I denke, du siehst das Muster. Im Laufe des verbleibenden Jahres erhalten wir einen neuen C++ Standard. Im März 2017 erlangte C++17 die Draft International Standard Stufe. Bevor ich tiefer in die Details eintauche, möchte ich einen Überblick geben.</p>
+<hr id="system-readmore" />
+<p>Zuerst ein Blick auf das große Bild</p>
+<h2>Das große Bild</h2>
+<p><img src="images/blog/Cpp17/Overview/timeline.png" alt="timeline" width="700" height="338" style="margin: 15px;" />&nbsp;</p>
+<p>Was C++98 bis C++14 betrifft, habe ich nur die wichtigen Punkte aufgezählt. Aber halt, ein C++-Standard fehlt in meiner Aufzählung: C++03. Das ist Absicht, den C++98 ist ein sehr kleiner C++-Standard. Eigentlich mehr eine Bugfix-Release zu C++98. Falls du C++ kennst, weißt du, dass der erste ISO Standard C++98 und C++11 große Standards waren. Das gilt nicht für C++14 und insbesondere C++03.</p>
+<p>Daher habe ich natürlich die Frage. Ist C++17 ein großer oder ein kleiner Standard? Für mich ist der Antwort ziemlich einfach. C++17 liegt irgendwo zwischen C++14 und C++11. C++17 ist weder groß noch klein. Warum? Hier kommt meine kurze Antwort.</p>
+<h2>Überblick</h2>
+<p>C++17 hat viel anzubieten. Das gilt für die Kernsprache und für die Bibliothek. Lass uns zuerst auf die Kernsprache schauen.</p>
+<h3>Kernsprache</h3>
+<h4>Fold Expressions</h4>
+<p>C++11 unterstützt Variadic Templates. Dies sind Template, die eine beliebige Anzahl an Argumenten annehmen können. Die beliebige Anzahl wird von einem Parameter Pack gehalten. Neu ist mit C++17, dass dieses Parameter Pack direkt mit einem binären Operator reduziert werden kann.</p>
+<div style="background: #ffffff none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0px; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18</pre>
+</td>
+<td>
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #008000;">// foldExpressionAll.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+
+<span style="color: #0000ff;">template</span>&lt;<span style="color: #0000ff;">typename</span>... Args&gt;
+<span style="color: #2b91af;">bool</span> all(Args... args) { <span style="color: #0000ff;">return</span> (... &amp;&amp; args); }
+
+<span style="color: #2b91af;">int</span> main(){
+
+  std::cout &lt;&lt; std::boolalpha;
+
+  std::cout &lt;&lt; <span style="color: #a31515;">"all(): "</span> &lt;&lt; all() &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"all(true): "</span> &lt;&lt; all(true) &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"all(true, true, true, false): "</span> &lt;&lt; all(true, true, true, false) &lt;&lt; std::endl;
+
+  std::cout &lt;&lt; std::endl;
+
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Der binäre Operator in dem Beispiel ist das logische <span style="font-family: courier;">AND</span> in Zeile 6. Hier kommt die Ausgabe des Programms.</p>
+<p><img src="images/blog/Cpp17/Overview/foldExpression.png" alt="foldExpression" width="350" height="114" style="margin: 15px;" /></p>
+<p>Das ist alles, was ich über Fold Expressions zu sagen habe, da ich bereits einen Artikel zu <a href="http://www.grimm-jaud.de/index.php/blog/fold-expressions">Fold Expression </a>geschrieben habe. Dort gibt es die Details.</p>
+<p>Wir bleiben bei der Übersetzungszeit</p>
+<h4>constexpr if</h4>
+<p><span style="font-family: courier new,courier;">constexpr if</span> erlaubt dir, Sourcecode bedingt zu übersetzen.</p>
+<div style="background: #ffffff none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0px; line-height: 125%;">1
+2
+3
+4
+5
+6
+7</pre>
+</td>
+<td>
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0000ff;">template</span> &lt;<span style="color: #0000ff;">typename</span> T&gt;
+<span style="color: #0000ff;">auto</span> get_value(T t) {
+    <span style="color: #0000ff;">if</span> constexpr (std::is_pointer_v&lt;T&gt;)
+        <span style="color: #0000ff;">return</span> *t; <span style="color: #008000;">// deduces return type to int for T = int*</span>
+    <span style="color: #0000ff;">else</span>
+        <span style="color: #0000ff;">return</span> t;  <span style="color: #008000;">// deduces return type to int for T = int</span>
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Falls <span style="font-family: courier new,courier;">T</span> ein Zeiger ist, dann wird der<span style="font-family: Courier New,Courier,monospace;"> if </span>Zweig in Zeile 3 übersetzt. Falls nicht, der <span style="font-family: Courier New,Courier,monospace;">else</span> Zweig in Zeile 5. Zwei Punkte muss ich in dem Zusammenhang erwähnen. Die Funktion<span style="font-family: Courier New,Courier,monospace;"> get_value</span> besitzt zwei verschieden Rückgabetypen und beide Zweige der <span style="font-family: Courier New,Courier,monospace;">if </span>Anweisungen müssen gültig sein.</p>
+<p>Konsequenterweise können <span style="font-family: Courier New,Courier,monospace;">if</span> und<span style="font-family: Courier New,Courier,monospace;"> switch </span>Anweisungen in C++17 das, was <span style="font-family: Courier New,Courier,monospace;">for</span>&nbsp; Anweisungen schon lange können.</p>
+<h4>Initialisierer in if und switch Anweisungen</h4>
+<p>Du kannst deine Variable direkt in der <span style="font-family: Courier New,Courier,monospace;">if</span> und <span style="font-family: Courier New,Courier,monospace;">switch</span> Anweisungen initialisieren.</p>
+<div style="background: #ffffff none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0px; line-height: 125%;">1
+2
+3
+4
+5
+6
+7
+8
+9</pre>
+</td>
+<td>
+<pre style="margin: 0px; line-height: 125%;">std::map&lt;<span style="color: #2b91af;">int</span>,std::string&gt; myMap;
+
+<span style="color: #0000ff;">if</span> (<span style="color: #0000ff;">auto</span> result = myMap.insert(value); result.second){
+    useResult(result.first);  
+    <span style="color: #008000;">// ...</span>
+} 
+<span style="color: #0000ff;">else</span>{
+    <span style="color: #008000;">// ...</span>
+} <span style="color: #008000;">// result is automatically destroyed</span>
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Daher ist die Variable <span style="font-family: courier;">result</span> innerhalb des <span style="font-family: courier;">if</span> und <span style="font-family: courier;">else</span> Zweigs der <span style="font-family: courier;">if </span>Anweisung gültig. <span style="font-family: courier new,courier;">result</span> verschmutzt aber nicht den umgebenden Bereich.</p>
+<p>Falls du Initialisierer in if und switch Anweisungen zusammen mit Structured Binding Deklaration (<i>structured binding declaration</i>) verwendest, wird die C++ Syntax noch eleganter.</p>
+<h4>Structured Binding Deklaration</h4>
+<p>Dank Structured Binding kannst du <span style="font-family: Courier New,Courier,monospace;">std::tuple</span> oder ein <span style="font-family: Courier New,Courier,monospace;">struct</span> direkt an eine Variable binden. Daher kann ich mein letztes Beispiel weiter verbessern.</p>
+<div style="background: #ffffff none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0px; line-height: 125%;">1
+2
+3
+4
+5
+6
+7
+8
+9</pre>
+</td>
+<td>
+<pre style="margin: 0px; line-height: 125%;">std::map&lt;<span style="color: #2b91af;">int</span>,std::string&gt; myMap;
+                
+<span style="color: #0000ff;">if</span> (<span style="color: #0000ff;">auto</span> [iter, succeeded] = myMap.insert(value); succeeded) {
+    useIter(iter);  
+    <span style="color: #008000;">// ...</span>
+}
+<span style="color: #0000ff;">else</span>{
+    <span style="color: #008000;">// ...</span>
+} iter and succeded are automatically be destroyed
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p><span style="font-family: courier new,courier;">auto [iter, succeeded]</span> in Zeile 3 erzeugt automatisch die zwei Variablen <span style="font-family: courier new,courier;">iter</span> und <span style="font-family: courier new,courier;">succeeded. </span>In Zeile 9 werden sie wieder gelöscht.<span style="font-family: courier new,courier;"> </span></p>
+<p>Das ist ein Feature, mit dem Programmieren weniger mühselig wird. Das gleiche gilt für die automatische Template Ableitung von Konstruktoren.</p>
+<h4>Template Ableitung für Konstruktoren</h4>
+<p>Ein Funktions-Template kann seine Typ-Parameter von seinen Funktion-Argumenten ableiten. Aber das war für eine spezielles Funktons-Template nicht möglich: Den Konstruktor eines Klassen-Templates. Mit C++17 ist dieser Satz einfach falsch. Der Konstruktor kann seine Typ-Parameter von seinen Konstruktor-Argumenten ableiten.</p>
+<p>&nbsp;</p>
+<div style="background: #ffffff none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0px; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29</pre>
+</td>
+<td>
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #008000;">// templateArgumentDeduction.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+
+<span style="color: #0000ff;">template</span> &lt;<span style="color: #0000ff;">typename</span> T&gt;
+<span style="color: #2b91af;">void</span> showMe(<span style="color: #0000ff;">const</span> T&amp; t){
+  std::cout &lt;&lt; t &lt;&lt; std::endl;
+}
+
+<span style="color: #0000ff;">template</span> &lt;<span style="color: #0000ff;">typename</span> T&gt;
+<span style="color: #0000ff;">struct</span> ShowMe{
+  ShowMe(<span style="color: #0000ff;">const</span> T&amp; t){
+    std::cout &lt;&lt; t &lt;&lt; std::endl;
+  }
+};
+
+<span style="color: #2b91af;">int</span> main(){
+  
+  std::cout &lt;&lt; std::endl;
+    
+  showMe(5.5);          <span style="color: #008000;">// not showMe&lt;double&gt;(5.5);</span>
+  showMe(5);            <span style="color: #008000;">// not showMe&lt;int&gt;(5);</span>
+    
+  ShowMe&lt;<span style="color: #2b91af;">double</span>&gt;(5.5);  <span style="color: #008000;">// with C++17: ShowMe(5.5);</span>
+  ShowMe&lt;<span style="color: #2b91af;">int</span>&gt;(5);       <span style="color: #008000;">// with C++17: ShowMe(5);</span>
+  
+  std::cout &lt;&lt; std::endl;
+    
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Zeile 11 und Zeile 22 konnte bereits der erste C++98-Standard übersetzen. Für die Zeilen 24 und 25 ist ein C++17 Compiler notwendig. Daher musst du keine eckigen Klammern mehr verwenden um ein Klassen-Template zu instanziieren.</p>
+<p>Aber in C++17 geht es nicht nur um die Benutzerfreundlichkeit. Es geht auch um die Performanz.</p>
+<h4>Vermeidung von Kopieren</h4>
+<p><strong><a href="https://en.wikipedia.org/wiki/Return_value_optimization">RVO</a></strong> steht für <strong>R</strong>eturn <strong>V</strong>alue <strong>O</strong>ptimisation und bedeutet, das der Compiler unnötige Copy-Operation entfernen kann. Was bisher ein Optimierungsschritt war, muss der Compiler in C++17 zusichern.&nbsp;&nbsp;</p>
+<div style="background: #ffffff none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0px; line-height: 125%;">2
+3
+4</pre>
+</td>
+<td>
+<pre style="margin: 0px; line-height: 125%;">MyType func(){
+  <span style="color: #0000ff;">return</span> MyType{};         <span style="color: #008000;">// no copy with C++17</span>
+}
+MyType myType = func();    <span style="color: #008000;">// no copy with C++17</span>
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Zwei unnötige Copy-Operationen könne in den paar Zeilen stattfinden. Der erste in Zeile 2 und die zweite in Zeile 4. Mit C++17 darf das nicht mehr passieren.</p>
+<p>Falls der Rückgabewert einen Namen besitzt, nennen wir dieses Konstrukt<strong> NRVO.</strong> Ich denke, du ahnst es bereits. Das Akronym steht für<strong> N</strong>amed <strong>R</strong>eturn <strong>V</strong>alue <strong>O</strong>ptimization.</p>
+<div style="background: #ffffff none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0px; line-height: 125%;">1
+2
+3
+4
+5</pre>
+</td>
+<td>
+<pre style="margin: 0px; line-height: 125%;">MyType func(){
+  MyType myVal;
+  <span style="color: #0000ff;">return</span> myVal;            <span style="color: #008000;">// one copy allowed </span>
+}
+MyType myType = func();    <span style="color: #008000;">// no copy with C++17</span>
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Der feine Unterschied ist, das der Compiler mit C++17 den Wert <span style="font-family: Courier New,Courier,monospace;">myValue</span> kopieren darf. Aber in Zeile 5 findet definitiv kein kopieren statt.</p>
+<p>Falls ein Feature nicht mehr notwendig ist oder seine Anwendung sehr fehleranfällig ist, sollte es entfernt werden. Das passiert in C++17 mit <span style="font-family: Courier New,Courier,monospace;">std::auto_ptr</span> und Trigraphen.<span style="font-family: courier new,courier;"><br /></span></p>
+<h4>auto_ptr und Trigraphen entfernt</h4>
+<h5>auto_ptr</h5>
+<p><span style="font-family: courier new,courier;">std::auto_ptr</span> ist der erste Smart Pointer in C++. Sein Job ist, genau auf eine Ressource aufzupassen. Aber er besaß ein großes Problem. Wenn du einen <span style="font-family: Courier New,Courier,monospace;">std:auto_ptr</span> kopierst, findet ein Move-Operation unter der Decke statt. Das ist der Grund, dass wir <span style="font-family: Courier New,Courier,monospace;">std::unique_ptr</span> in C++11 als Ersatz erhielten. Ein <span style="font-family: Courier New,Courier,monospace;">std::unique_ptr</span> kann nicht kopiert werden.</p>
+<div style="background: #ffffff none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0px; line-height: 125%;">1
+2
+3
+4
+5
+6</pre>
+</td>
+<td>
+<pre style="margin: 0px; line-height: 125%;">std::auto_ptr&lt;<span style="color: #2b91af;">int</span>&gt; ap1(<span style="color: #0000ff;">new</span> <span style="color: #2b91af;">int</span>(2011));
+std::auto_ptr&lt;<span style="color: #2b91af;">int</span>&gt; ap2= ap1;              <span style="color: #008000;">// OK     (1)</span>
+
+std::unique_ptr&lt;<span style="color: #2b91af;">int</span>&gt; up1(<span style="color: #0000ff;">new</span> <span style="color: #2b91af;">int</span>(2011));
+std::unique_ptr&lt;<span style="color: #2b91af;">int</span>&gt; up2= up1;            <span style="color: #008000;">// ERROR  (2)</span>
+std::unique_ptr&lt;<span style="color: #2b91af;">int</span>&gt; up3= std::move(up1); <span style="color: #008000;">// OK     (3)</span>
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h5>Trigraphen</h5>
+<p>Trigraphen sind drei Zeichen im Sourcecode, die wie ein Zeichen behandelt werden. Sie sind dann notwendig, wenn die Tastatur das gewünschte Zeichen nicht unterstützt.</p>
+<p>Falls du unleserlichen Code in C++17 schreiben willst, ist C++17 vielleicht nicht mehr die Sprache deiner Wahl.</p>
+<div style="background: #ffffff none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0px; line-height: 125%;">1
+2
+3
+4
+5
+6
+7</pre>
+</td>
+<td>
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #008000;">// trigraphs.cpp</span>
+
+<span style="color: #2b91af;">int</span> main()??&lt;
+
+  ??(??)??&lt;??&gt;();
+
+??&gt;
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Ich nehme an, du weist, was das Programm tut? Falls nicht, musst du die Trigraphen in ihre entsprechenden Zeichen übersetzen.</p>
+<p>&nbsp;<img src="images/blog/Cpp17/Overview/trigraph.png" alt="trigraph" width="200" height="315" style="margin: 15px;" /></p>
+<p>Falls du die Tabelle anwendest, löst sich das Rätsel auf. Das Programm repräsentiert eine Lambda-Funktion, die just-in-place ausgeführt wird.</p>
+<div style="background: #ffffff none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0px; line-height: 125%;">1
+2
+3
+4
+5
+6
+7</pre>
+</td>
+<td>
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #008000;">// trigraphsLambda.cpp</span>
+
+<span style="color: #2b91af;">int</span> main(){
+
+  []{}();
+
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h2>Wie geht's weiter?</h2>
+<p>Das ist einfach. Im nächsten Artikel schreibe ich über die neuen Bibliotheken, die wir mit C++17 erhalten. Dies sind <span style="font-family: courier new,courier;">string_view,</span> die parallele STL und die Dateisystem Bibliothek. Zusätzlich bekommen wir die neuen Datentypen <span style="font-family: courier new,courier;">std::any, std::optional,</span> und <span style="font-family: courier new,courier;">std::variant.</span></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="166" height="212" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Hole dir dein E-Book. Unterstütze meinen Blog.</span></strong></p>
