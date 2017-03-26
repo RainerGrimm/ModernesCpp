@@ -1,0 +1,47 @@
+<p>Die zentrale Idee von <span style="font-family: courier new,courier;">std::atomic_thread_fence</span> ist es, Synchronisations- und Ordnungsbedingungen zwischen Threads ohne Operationen auf atomaren Variablen zu etablieren.</p>
+<hr id="system-readmore" />
+<p><span style="font-family: courier new,courier;">std::atomic_thread_fence</span> werden in der englischen Literatur <em>fences</em> oder auch <em>memory barriers</em> genannt. Übersetze ich die Begriffe in die deutsche Sprache mit Zaun oder Speicherbarriere, so ist direkt offensichtlich, was die Aufgabe eines <span style="font-family: courier new,courier;">std::atomic_thread_fence</span> ist.</p>
+<p>Ein<span style="font-family: courier new,courier;"> std::atomic_thread_fence</span> im Sourcecode verhindert,&nbsp;dass bestimmte Operationen die Speicherbarriere überwinden können.</p>
+<h2>Speicherbarrieren</h2>
+<p>Bisher habe ich relativ unscharf von bestimmten Operationen gesprochen, die Speicherbarrieren nicht überwinden können. Von welcher Klasse von Operationen spreche ich? Operationen lassen sich in zwei Klassen von Operationen unterteilen: Lesen und Schreiben oder auch Laden und Speichern. Um nicht eine Verwirrung mit der etablierten englischsprachigen Begrifflichkeit einzuführen, spreche ich nun einfach von load und store. So ist der Ausdruck <span style="font-family: courier new,courier;">if (resultReady) return result</span> ein Load gefolgt von einem Load, da sowohl<span style="font-family: courier new,courier;"> resultReady</span> als auch <span style="font-family: courier new,courier;">result</span> gelesen werden.</p>
+<p>Damit gibt es vier Kombinationsmöglichkeiten von load und store Operationen.</p>
+<ul>
+<li><strong>LoadLoad</strong>: Ein Lesen gefolgt von einem Lesen. <span style="font-family: courier new,courier;"></span></li>
+<li><strong>LoadStore:</strong> Ein Lesen gefolgt von einem Schreiben.</li>
+<li><strong>StoreLoad:</strong> Ein Schreiben gefolgt von einem Lesen.</li>
+<li><strong>StoreStore:</strong> Ein Schreiben gefolgt von einem Schreiben.</li>
+</ul>
+<p>Natürlich gibt es auch komplexere Operationen, die sowohl aus einem Lesen und Schreiben bestehen (<span style="font-family: courier new,courier;">count++</span>). Das widerspricht aber nicht meiner grundsätzlichen Klassifizierung.</p>
+<p>Wo kommen nun die Speicherbarrieren ins Spiel? Werden Speicherbarrieren zwischen die zwei Operationen wie LoadLoad, LoadStore, StoreLoad oder auch StoreStore platziert, stellen sie sicher, dass bestimme LoadLoad-, LoadStore-, StoreLoad- oder auch StoreStore-Operationen nicht umsortiert werden können. Diese Gefahr der Umsortierung ist immer dann gegeben,&nbsp;wenn nicht-atomare Variablen oder atomare Variablen mit <a href="index.php/blog/relaxed-semantik">Relaxed-Semantik</a> verwendet werden.</p>
+<p>Drei Arten von Speicherbarrieren werden gerne verwendet. Hier muss ich wieder in die englischsprachige Begrifflichkeit wechseln. Das sind <em>full fence</em>, <em>acquire fence</em> und <em>release fence</em>. acquire ist eine Lade-Operatione, release ist eine Speicher-Operation. Was passiert nun, wenn einer der drei Speicherbarrieren (fence) zwischen einer der vier Kombinationsmöglichkeiten von Lade und Speicher-Operationen platziert wird?</p>
+<ul>
+<li><strong>Full fence: </strong>Ein <em>full fence</em> <span style="font-family: courier new,courier;">std::atomic_thread_fence()</span> zwischen beliebigen Operationen verhindert, dass&nbsp;dies umsortiert werden können. Das gilt aber mit Ausnahme von StoreLoad Operationen.</li>
+<li><strong>Acquire fence:&nbsp;</strong>Ein <em>acquire fence </em><span style="font-family: courier new,courier;">std:.atomic_thread_fence(std::memory_order_acquire</span>) verhindert, dass eine Lese-Operation vor einem<em> acquire fence</em> mit einer Lese- oder Schreibe-Operation nach einem <em>acquire fence</em> umsortiert werden kann.</li>
+<li><strong>Release fence: </strong>Ein <em>release fence</em> <span style="font-family: courier new,courier;">std::memory_thread_fence(std::memory_order_release)</span> verhindert, dass eine Lese- oder Schreibe-Operation vor einem <em>release fence</em> mit einer&nbsp;Schreibe-Operationen nach einem <em>release fence</em> umsortiert werden kann.</li>
+</ul>
+<p>Ich gebe zu, dass ich einige Energien aufwenden musste, um die Definition der acquire und release fence und ihre Konsequenzen für lockfreie Programme zu verstehen. Insbesondere die feinen Unterschiede zur Acquire-Release-Semantik von atomaren Operationen bergen einiges an Verwirrungspotential. Bevor ich aber dazu komme, will ich die Definitionen veranschaulichen.</p>
+<h3>Speicherbarrieren veranschaulicht&nbsp;</h3>
+<p>Welche Operationen können die Speicherbarrieren überwinden? Das zeigen die drei Graphiken. Dabei steht ein durchgestrichener Pfeil dafür, dass der entsprechende fence diese Operationen unterbindet.</p>
+<h4>Full fence</h4>
+<p><img src="images/blog/Speichermodell/ZaeunceAlsSpeicherbarrieren/FullFence.png" alt="FullFence" width="600" height="234" style="margin: 15px;" /></p>
+<p><span style="font-family: courier new,courier;">std::atomic_thread_fence()</span> kann in bekannter Manier explizit als <span style="font-family: courier new,courier;">std::atomic_thread_fence(std::memory_order_seq_cst)</span> geschrieben werden. Den per Default gilt die <a href="index.php/blog/sequenzielle-konsistenz">Sequenzielle Konsistenz. </a>Wird die Sequenzielle Konsistenz beim <em>full fence</em> angewandt, besteht eine&nbsp;globale Ordnung auf den <span style="font-family: courier new,courier;">std::atomic_thread_fence</span> Aufrufen. <a href="index.php/blog/sequenzielle-konsistenz"></a></p>
+<h4>Acquire fence</h4>
+<p><img src="images/blog/Speichermodell/ZaeunceAlsSpeicherbarrieren/AcquireFence.png" alt="AcquireFence" width="600" height="177" style="margin: 15px;" /></p>
+<h4>Release fence</h4>
+<p><img src="images/blog/Speichermodell/ZaeunceAlsSpeicherbarrieren/ReleaseFence.png" alt="ReleaseFence" width="600" height="174" style="margin: 15px;" /></p>
+<p>Das drei Fences lassen sich noch komprimierter darstellen.</p>
+<h3>Speicherbarrieren auf einen Blick</h3>
+<p><img src="images/blog/Speichermodell/ZaeunceAlsSpeicherbarrieren/loadStore.png" alt="loadStore" width="600" height="397" style="margin: 15px;" /></p>
+<h2>Wie geht's weiter?</h2>
+<p>Das war die Theorie. Die Praxis folgt im <a href="index.php/blog/acquire-und-release-barriers">nächsten Artikel</a>. In diesem stelle ich im ersten Schritt einen <em>acquire fence</em> einer acquire Operation, ein <em>release fence</em> einer release Operation gegenüber. Im zweiten Schritt werde ich ein typisches Consumer-Producer Szenario mit Hilfe von acquire-release Operationen auf Speicherbarrieren (fences) portieren.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="166" height="212" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Hole dir dein E-Book. Unterstütze meinen Blog.</span></strong></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>

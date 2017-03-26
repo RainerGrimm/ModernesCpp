@@ -1,0 +1,102 @@
+<p>In dem Artikel&nbsp;<a href="index.php?option=com_content&amp;view=article&amp;id=83:referenzielle-transparenz&amp;catid=35:c&amp;Itemid=101">sequenzielle Konsistenz</a> habe ich bereits das Defaul-Speichermodell vorgestellt. Dieses Modell, in dem die Aktionen aller Threads einer globalen Reihenfolge oder auch eines globalen Zeittaks folgen, besitzt einen großen Vorteil und einen großen Nachteil.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<h2>Aufwändige Synchronisation</h2>
+<p>Der große Vorteil ist es, dass sich die sequenzielle Konsistenz mit unserer Intuition des Verhaltens mehrerer Threads deckt, der große Nachteil ist, dass die Synchronisation aller Threads aufwändig vom System sicherzustellen ist.</p>
+<p>Das kleine Programm synchronisiert seinen Producer-Thread mit seinem Consumer-Thread mit Hilfe der sequentiellen Konsistenz.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">#include &lt;atomic&gt;</span>
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;string&gt;</span>
+<span style="color: #0000ff;">#include &lt;thread&gt;</span>
+
+std::string work;
+std::atomic&lt;<span style="color: #2b91af;">bool</span>&gt; ready(false);
+
+<span style="color: #2b91af;">void</span> consumer(){
+  <span style="color: #0000ff;">while</span>(!ready.load()){}
+  std::cout&lt;&lt; work &lt;&lt; std::endl;   <span style="color: #008000;"></span>
+}
+
+<span style="color: #2b91af;">void</span> producer(){
+  work= <span style="color: #a31515;">"done"</span>;
+  ready=true; 
+}
+
+<span style="color: #2b91af;">int</span> main(){
+  std::<span style="color: #0000ff;">thread</span> prod(producer);
+  std::<span style="color: #0000ff;">thread</span> con(consumer);
+  prod.join(); 
+  con.join();
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Die Ausgabe des Programms ist kurz uns prägnant, aber dennoch interessant.</p>
+<p><img src="images/blog/Speichermodell/SequenzielleKonsistenzAngewandt/producerConsumer.png" alt="producerConsumer" /></p>
+<p>Dank der sequenziellen Konsistenz ist der Programmlauf vollkommen deterministisch. Das Programm gibt immer "<span style="font-family: courier new,courier;">done"</span> aus.</p>
+<p>Die Graphik bringt es auf den Punkt. Der Consumer-Thread wartet in der <span style="font-family: courier new,courier;">while</span>-Schleife, bis die atomare Variable <span style="font-family: courier new,courier;">ready</span> den Wert <span style="font-family: courier new,courier;">true</span> besitzt. Ist dies der Fall, fährt der Consumer Thread mit seiner Arbeit fort<span style="font-family: courier new,courier;"></span>.&nbsp;</p>
+<p>&nbsp;<span style="background-color: #ffffff;"><img src="images/blog/Speichermodell/SequenzielleKonsistenzAngewandt/SequenzielleKonsistenz.png" alt="SequenzielleKonsistenz" /></span></p>
+<p>Dass das Programm immer "done" ausgibt, lässt sich einfach begründen. Ich nütze dazu die zwei Eigenschaften der sequenziellen Konsistenz aus. Zum einen werden die Anweisungen beider Threads in Sourcecodereihenfolge ausgeführt, zum andern sehen&nbsp;die Threads die Anweisungen des anderen Threads in der gleichen Reihenfolge. Damt folgen alle Operationen dem globalem Takt. Diesem Takt&nbsp; folgt auch - mit Hilfe der while <span style="font-family: courier new,courier;">(!ready.load()){}</span>-Schleife -&nbsp; die Synchronisation des Producer-Threads mit dem Consumer-Thread .</p>
+<p>Es geht aber auch deutlich formaler. In der <a href="http://en.cppreference.com/w/cpp/atomic/memory_order">Begrifflichkeit des Speichermodells</a> lautet die Argumentationskette:</p>
+<p><span style="font-family: courier new,courier;"><span style="color: #ff0000;"><strong><span style="font-size: 12pt;">=&gt;</span></strong></span></span> Steht für die Schlussfolgerung in den nächsten Zeilen.</p>
+<ol><ol>
+<li><span style="font-family: courier new,courier;">work= "done"</span>&nbsp; ist <span style="color: #3366ff;">sequenced-before</span> <span style="font-family: courier new,courier;">ready=true<span style="color: #ff0000;"><strong><span style="font-size: 12pt;"> =&gt;</span> </strong> </span> </span><span style="color: #ff0000;"></span><span style="font-family: courier new,courier;">work= "done"</span><span style="background-color: #ffffff; color: #3366ff;"> happens-before</span> <span style="font-family: courier new,courier;">ready=true</span></li>
+<li><span style="font-family: courier new,courier;">while(!ready.load()){}</span> ist <span style="color: #3366ff;">sequenced-before</span> <span style="font-family: courier new,courier; color: #000000;">std::cout&lt;&lt; work &lt;&lt; std::end</span> <span style="color: #ff0000;"><span style="font-family: courier new,courier; color: #000000;">l <strong><span style="color: #ff0000;"><span style="font-size: 12pt;">=&gt;</span>&nbsp;</span> </strong> </span> </span><span style="font-family: courier new,courier;">while(!ready.load()){}</span><span style="color: #3366ff;"> happens-before</span> <span style="font-family: courier new,courier;">std::cout&lt;&lt; work &lt;&lt; std::endl</span></li>
+<li><span style="color: #000000; font-family: courier new,courier;"><span style="font-family: courier new,courier;">ready=true</span><span style="color: #ff0000; font-size: 12pt;"></span>&nbsp;</span><span style="color: #3366ff;"> synchronizes-with</span>&nbsp;<span style="font-family: courier new,courier;"><span style="color: #000000; font-family: courier new,courier;">while(!ready.load()){}</span></span><span style="color: #ff0000; font-size: 12pt;"><strong> =&gt;</strong></span> ready= true&nbsp;<span style="font-family: courier new,courier;"></span><span style="color: #3366ff;">inter-thread happens-before</span> <span style="font-family: courier new,courier;">while (!ready.load()){}&nbsp;</span><span style="color: #ff0000;"><span style="font-size: 12pt;"><strong>=&gt;</strong></span> </span>ready= true&nbsp;<span style="font-family: courier new,courier;"></span><span style="color: #3366ff;">happens-before <span style="color: #000000; font-family: courier new,courier;">whi</span></span><span style="font-family: courier new,courier;">le (!ready.load()){}</span></li>
+</ol></ol>
+<p><span style="font-size: 14pt; color: #ff0000;"><strong>=&gt;</strong> </span>Da die happens-before Relation transitiv ist, gilt: <span style="font-family: courier new,courier;">work= "done"</span> <span style="color: #3366ff;">happens-before</span> <span style="font-family: courier new,courier;">ready= true </span><span style="color: #3366ff;">happens-before&nbsp;</span><span style="font-family: courier new,courier;">while(!ready.load()){}</span> <span style="font-family: arial,helvetica,sans-serif; color: #3366ff;">happens-before</span> <span style="font-family: courier new,courier;">std::cout&lt;&lt; work &lt;&lt; std::endl</span></p>
+<h2>Von der Sequenzielle Konsistenz zur Acquire-Release-Semantik</h2>
+<p>Ein Thread sieht die Operationen eines anderen Threads und somit aller Threads in der gleichen Reihenfolge. Diese elemente Eigenschaft der sequenziellen Konsistenz gilt nicht mehr, wenn wir statt der sequenziellen Konsistenz die Acquire-Release Semantik für atomare Operationen auswählen. Hier geht C++ deutlich weiter als C# oder auch Java. Leider verlassen wir nun auch den Raum unserer natürlichen Intuition.</p>
+<p>Bei der Acquire-Release Semantik findet die Synchronisation nicht zwischen Threads, sondern zwischen atomaren Variablen der Threads statt. So synchronisiert sich eine Schreib-Operation&nbsp;eines Threads mit einer Lese-Operation eines anderen Threads auf der gleichen atomaren Variable. Diese Synchronisationsbeziehungen auf der gleichen atomaren Variablen helfen, happens-before Relation zwischen atomaren Variablen und damit zwischen Threads zu erzeugen.</p>
+<h2>Wie geht's weiter?</h2>
+<p>Die Details zur Acquire-Release Semantik zusammen mit dem optimierten Spinlock aus dem Artikel&nbsp;<a href="index.php?option=com_content&amp;view=article&amp;id=84:das-atomare-flag&amp;catid=35:c&amp;Itemid=101"> Das atomare Flag </a>folgen im<a href="index.php/blog/acquire-release-semantik"> nächsten Artikel</a>.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="166" height="212" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Hole dir dein E-Book. Unterstütze meinen Blog.</span></strong></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><span style="font-family: courier new,courier;"></span></p>

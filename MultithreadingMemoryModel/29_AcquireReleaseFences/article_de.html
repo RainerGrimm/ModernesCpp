@@ -1,0 +1,263 @@
+<p>Acquire und release Speicherbarrieren (fences) garantieren ähnliche <a href="index.php/blog/synchronisations-und-ordnungsbedingungen">Synchronisations- und Ordnungsbedingungen</a> wie atomare Operationen mit <a href="index.php/blog/acquire-release-semantik">Acquire-Release-Semantik</a>. Ähnliche, denn die Unterschiede stecken im Detail.</p>
+<hr id="system-readmore" />
+<p>Der offensichtlichste Unterschied zwischen acquire- und release-Speicherbarrieren und atomaren Operationen mit Acquire-Release-Semantik ist es, dass Speicherbarrieren ohne atomare Operationen auskommen. Es gibt aber einen viel feineren Unterschied. Die acquire- und release-Speicherbarrieren sind schwergewichtiger.</p>
+<h2>Atomare Operationen versus Speicherbarrieren</h2>
+<p>Der Einfachheit halber spreche ich nun nur noch von acquire-Operationen, wenn ich eine Speicherbarriere oder eine atomare Operation mit acquire-Semantik betrachte. Im gleichen Sinne spreche ich von&nbsp;release-Operartionen.</p>
+<p>Die zentrale Idee einer acquire- und einer release-Operation ist es, dass sie eine Synchronisations- und Ordnungsbedingung zwischen Threads etablieren, die auch für atomare Operationen mit <a href="index.php/blog/relaxed-semantik">Relaxed-Semantik</a> und nichtatomare Operationen gilt. Daher treten die acquire- und release-Operationen im Paar auf. Für die atomaren Operationen mit Acquire-Release-Semantik gilt darüber hinaus, dass sie auf der gleichen atomaren Variable stattfinden müssen. Trotzdem werde ich in erster Annäherung beide Operationen isoliert betrachten.</p>
+<p>Anfangen werde ich mit der acquire-Operation.</p>
+<h3>Acquire-Operation</h3>
+<p>Ein Lese-Operation auf einer atomaren Variable mit dem <span style="font-family: courier new,courier;">std::memory_order_acquire </span>versehen, ergibt eine acquire-Operation.</p>
+<p><img src="images/blog/Speichermodell/AcquireUndReleaseFences/acquireOperation.png" alt="acquireOperation" width="400" height="80" style="margin: 15px;" />&nbsp;</p>
+<p>&nbsp;Dem gegenüber steht der<span style="font-family: courier new,courier;"> std::atomic_thread_fence</span> mit acquire-Semantik.&nbsp;</p>
+<p><img src="images/blog/Speichermodell/AcquireUndReleaseFences/acquireFence.png" alt="acquireFence" width="500" height="118" style="margin: 15px;" /></p>
+<p>Die Gegenüberstellung zeigt schön zwei Punkte:</p>
+<ol>
+<li>Ein Speicherbarriere mit acquire-Semantik stellt strengere Ordnungsbedingungen auf. Zwar fordert sowohl die acquire-Operation auf der atomaren Variable als auch die acquire-Speicherbarriere, dass keine Lese- und Schreibe-Operationen vor die acquire-Operation verschoben werden können. Darüber hinaus garantiert die acquire-Speicherbarriere zusätzlich, dass keine Lese-Operationen hinter sie verschoben werden kann.</li>
+<li>Für das Lesen der atomaren Variable<span style="font-family: courier new,courier;"> var</span> ist die Relaxed-Semantik ausreichend. Der<span style="font-family: courier new,courier;"> std::atomic_thread_fence(std::memory_order_acquire)</span> verhindert, dass diese Operation hinter diesen umsortiert werden kann.</li>
+</ol>
+<p>Ähnlich Aussagen gelten für die release-Speicherbarriere</p>
+<h3>Release-Operation</h3>
+<p>Ein Schreibe-Operation auf einer atomaren Variable mit dem <span style="font-family: courier new,courier;">std::memory_order_release </span>versehen, ergibt eine release-Operation.</p>
+<p>&nbsp;<img src="images/blog/Speichermodell/AcquireUndReleaseFences/releaseOperation.png" alt="releaseOperation" width="400" height="105" style="margin: 15px;" /></p>
+<p>Weiter geht es mit der release-Speicherbarriere.</p>
+<p><img src="images/blog/Speichermodell/AcquireUndReleaseFences/releaseFence.png" alt="releaseFence" width="6ßß" height="NaN" style="margin: 15px;" /><img src="images/blog/Speichermodell/AcquireUndReleaseFences/releaseFence.png" alt="releaseFence" width="600" height="168" style="margin: 15px;" /></p>
+<p>Zusätzlich zur release-Operation auf der atomaren Variable <span style="font-family: courier new,courier;">var</span> sichert die release-Speicherbarriere zwei Eigenschaften zu:</p>
+<ol>
+<li>Schreibe-Operationen können nicht vor die Speicherbarriere verschoben werden.</li>
+<li>Für die Variable <span style="font-family: courier new,courier;">var </span>ist es ausreichend, dass sie der Relaxed-Semantik genügt.</li>
+</ol>
+<p>Wer den einfachen Überblick zu den Speicherbarrieren sucht, den verweise ich gerne auf den<a href="index.php/blog/zaeune-als-speicherbarrieren"> letzten Artikel</a> dieses Blogs. Nun will ich einen Schritt weiter gehen und aus den Bausteinen ein Programm zusammenstellen.</p>
+<h2>Synchronisation mit atomaren Operationen versus Speicherbarrieren</h2>
+<p>Als Ausgangspunkt für meinen Vergleich implementiere ich einen typischen Consumer-Producer Arbeitsablauf mit Acquire-Release-Semantik. Diesen Ablauf werde ich mit atomaren Variablen und Speicherbarrieren umsetzen.</p>
+<p>Los geht's mit atomaren Variablen, da viele Entwickler mit diesen bereits vertraut sind. Dies gilt aber nicht für Speicherbarrieren. Sie werden fast vollständig in der Literatur zum C++-Speichermodell ignoriert.</p>
+<h3>Atomare Operationen</h3>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// acquireRelease.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;atomic&gt;</span>
+<span style="color: #0000ff;">#include &lt;thread&gt;</span>
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;string&gt;</span>
+ 
+std::atomic&lt;std::string*&gt; ptr;
+<span style="color: #2b91af;">int</span> data;
+std::atomic&lt;<span style="color: #2b91af;">int</span>&gt; atoData;
+ 
+<span style="color: #2b91af;">void</span> producer(){
+    std::string* p  = <span style="color: #0000ff;">new</span> std::string(<span style="color: #a31515;">"C++11"</span>);
+    data = 2011;
+    atoData.store(2014,std::memory_order_relaxed);
+    ptr.store(p, std::memory_order_release);
+}
+ 
+<span style="color: #2b91af;">void</span> consumer(){
+    std::string* p2;
+    <span style="color: #0000ff;">while</span> (!(p2 = ptr.load(std::memory_order_acquire)));
+    std::cout &lt;&lt; <span style="color: #a31515;">"*p2: "</span> &lt;&lt; *p2 &lt;&lt; std::endl;
+    std::cout &lt;&lt; <span style="color: #a31515;">"data: "</span> &lt;&lt; data &lt;&lt; std::endl;
+    std::cout &lt;&lt; <span style="color: #a31515;">"atoData: "</span> &lt;&lt; atoData.load(std::memory_order_relaxed) &lt;&lt; std::endl;
+}
+ 
+<span style="color: #2b91af;">int</span> main(){
+    
+    std::cout &lt;&lt; std::endl;
+    
+    std::<span style="color: #0000ff;">thread</span> t1(producer);
+    std::<span style="color: #0000ff;">thread</span> t2(consumer);
+    
+    t1.join();
+    t2.join();
+    
+    <span style="color: #0000ff;">delete</span> ptr;
+    
+    std::cout &lt;&lt; std::endl;
+    
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Wem das Programm bekannt vorkommt, darf sich nicht wundern. Dies ist ein Klassiker, den ich bereits in dem Artikel zum<a href="index.php/blog/std-memory-order-consume"> memory_order_consume</a> verwendet habe. Die Graphik bringt direkt auf den Punkt, warum der Consumer-Thread<span style="font-family: courier new,courier;"> t2</span> alle Werte des Producer-Thread <span style="font-family: courier new,courier;">t1</span> sieht.</p>
+<p><img src="images/blog/Speichermodell/AcquireUndReleaseFences/acquireRelease.png" alt="acquireRelease" style="margin: 15px;" /></p>
+<p>Die Wohldefiniertheit des Programms ist gewährleistet, da die <em>happens-before</em> Beziehung transitiv ist. Dazu müssen die drei <em>happens-before</em> Beziehungen verknüpft werden:</p>
+<ol>
+<li>Die Zeile 13 - 15 <em>happens-before</em> Zeile 16<span style="font-family: courier new,courier;"> (ptr.store(p,std::memory_order_release)</span>.</li>
+<li>Die Zeile 21<span style="font-family: courier new,courier;"> while(!(p2= ptrl.load(std::memory_order_acquire)))</span><em> happens-before</em> den Zeilen 22 - 24.</li>
+<li>Die Zeile 16 <em>synchronizes-with</em> Zeile 21.<strong><span style="color: #ff0000;"> =&gt;</span></strong> Die Zeile 16<em> happens-before</em> Zeile 21.</li>
+</ol>
+<p>&nbsp;Jetzt wird es spannend. Wie lässt sich der Ablauf auf Speicherbarrieren umstellen?</p>
+<h3>Speicherbarrieren</h3>
+<p>Das Programm ist schnell auf Speichbarrieren portiert.&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// acquireReleaseFences.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;atomic&gt;</span>
+<span style="color: #0000ff;">#include &lt;thread&gt;</span>
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;string&gt;</span>
+ 
+std::atomic&lt;std::string*&gt; ptr;
+<span style="color: #2b91af;">int</span> data;
+std::atomic&lt;<span style="color: #2b91af;">int</span>&gt; atoData;
+ 
+<span style="color: #2b91af;">void</span> producer(){
+    std::string* p  = <span style="color: #0000ff;">new</span> std::string(<span style="color: #a31515;">"C++11"</span>);
+    data = 2011;
+    atoData.store(2014,std::memory_order_relaxed);
+    std::atomic_thread_fence(std::memory_order_release);
+    ptr.store(p, std::memory_order_relaxed);
+}
+ 
+<span style="color: #2b91af;">void</span> consumer(){
+    std::string* p2;
+    <span style="color: #0000ff;">while</span> (!(p2 = ptr.load(std::memory_order_relaxed)));
+    std::atomic_thread_fence(std::memory_order_acquire);
+    std::cout &lt;&lt; <span style="color: #a31515;">"*p2: "</span> &lt;&lt; *p2 &lt;&lt; std::endl;
+    std::cout &lt;&lt; <span style="color: #a31515;">"data: "</span> &lt;&lt; data &lt;&lt; std::endl;
+    std::cout &lt;&lt; <span style="color: #a31515;">"atoData: "</span> &lt;&lt; atoData.load(std::memory_order_relaxed) &lt;&lt; std::endl;
+}
+ 
+<span style="color: #2b91af;">int</span> main(){
+    
+    std::cout &lt;&lt; std::endl;
+    
+    std::<span style="color: #0000ff;">thread</span> t1(producer);
+    std::<span style="color: #0000ff;">thread</span> t2(consumer);
+    
+    t1.join();
+    t2.join();
+    
+    <span style="color: #0000ff;">delete</span> ptr;
+    
+    std::cout &lt;&lt; std::endl;
+    
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Zum einen füge ich an Stelle der atomaren Operationen mit acquire- und release-Semantik die entsprechenden Speicherbarrieren mit acquire- und release-Semantik (Zeile 16 und 23) ein, zum anderen verwende ich für die atomaren Operationen mit acquire- und release-Semantik die Relaxed-Semantik (Zeile 17 und 22). Das ist fast schon mechanisch. Natürlich kann ich auch nur eine acquire- oder release-Operation durch eine Speicherbarriere ersetzen. Der entscheidende Punkt ist, dass die release-Operation mit der acquire-Operation eine <em>synchronizes-with</em> Beziehung und damit eine <em>happens-before</em> Beziehung etabliert.</p>
+<p>Die ganzen Zusicherungen möchte ich noch in bekannter Manier anhand einer Graphik erläutern.</p>
+<p><img src="images/blog/Speichermodell/AcquireUndReleaseFences/acquireReleaseFences.png" alt="acquireReleaseFences" style="margin: 15px;" /></p>
+<p>Die entscheidende Frage ist, warum die Operationen, die der acquire-Speicherbarriere folgen, die Effekte der Operationen vor der release-Speicherbarriere sehen? Da <span style="font-family: courier new,courier;">data</span> eine nichtatomare Variable ist und die atomare Variable <span style="font-family: courier new,courier;">atoData</span> der Relaxed-Semantik folgt, können sie per se umsortiert werden. Dies ist aber nicht möglich, da <span style="font-family: courier new,courier;">std::atomic_thread_fence(std::memory_order_release)</span> als release-Speicherbarriere, <span style="font-family: courier new,courier;">std::atomic_thread_fence(std::memory_order_acquire)</span> als acquire-Speicherbarriere die potentielle Umsortierung unterbindet. Die detailiierte Begründung dazu findest du in der Analyse der acquire- und release-Speicherbarrieren am Anfang dieses Artikels.</p>
+<p>Der Übersichtlichkeit halber die ganze Argumentation kurz und knackig.</p>
+<ol>
+<li>Die acquire- und release-Speicherbarrieren verhindern das Umsortieren der atomaren und nichtatomaren Operationen über die Speicherbarrieren hinaus.</li>
+<li>Der Consumer-Thread <span style="font-family: courier new,courier;">t2</span> wartet in der Schleife <span style="font-family: courier new,courier;">while (!(p2= ptr.load(std::memory_order_relaxed)))</span> auf das Setzen des Zeigerwertes <span style="font-family: courier new,courier;">ptr.stor(p,std::memory_order_relaxed) </span>im Producer-Thread<span style="font-family: courier new,courier;"> t1.</span></li>
+<li>Die release-Speicherbarriere<em> synchronizes-with</em> der acquire-Speicherbarriere.</li>
+</ol>
+<p>Zum Abschluss noch die Ausgabe der beiden Programme.</p>
+<p><img src="images/blog/Speichermodell/AcquireUndReleaseFences/acquireReleaseAcquireReleaseFences.png" alt="acquireReleaseAcquireReleaseFences" style="margin: 15px;" /></p>
+<h2>Wie geht's weiter?</h2>
+<p>Wenn ich eines bei meiner Beschäftigung mit dem C++-Speichermodell gelernt habe, ist es, dass ich meiner Intuition nicht trauen kann. Daher sind formale Verifizierungswerkzeuge so wertvoll.&nbsp;Dank dem online&nbsp;verfügbaren C++-Speichermodell Evaluierer <a href="http://svr-pes20-cppmem.cl.cam.ac.uk/cppmem/">CppMem </a>ist es einfach möglich, die Wohldefiniertheit von Codeabschnitten zu verifizieren. Im <a href="index.php/blog/cppmem-ein-ueberblick">nächsten Artikel</a> werde ich&nbsp;CppMem genauer vorstellen.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="166" height="212" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Hole dir dein E-Book. Unterstütze meinen Blog.</span></strong></p>
+<p>&nbsp;</p>

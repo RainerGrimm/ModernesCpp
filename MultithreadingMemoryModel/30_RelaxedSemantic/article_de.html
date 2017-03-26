@@ -1,0 +1,117 @@
+<p>Mit der Relaxed-Semantik sind wir am Ende der Skala angelangt. Die Relaxed-Semantik ist das schwächste C++-Speichermodell und sichert nur zu, dass die Operationen auf atomaren Variablen atomar sind.</p>
+<hr id="system-readmore" />
+<h3>Keine Synchronisations- und Ordnungsbedingungen</h3>
+<p>Das hört sich einfach an. Wo es keine Regeln gibt, können diese auch nicht gebrochen werden. So einfach ist es aber nicht. Das Programm soll&nbsp;definiertes Verhalten besitzen. Das heißt in dem Fall konkret: Keine <a href="index.php?option=com_content&amp;view=article&amp;id=70:threads-teilen-daten&amp;catid=35:c&amp;Itemid=101#KritischerWettlauf">kritischen Wettläufe. </a>Um dies zu erreichen, werden typischerweise die Synchronisations- und Ordnungsbedingungen atomare Operationen mit strengerer Speicherordnung verwendet, um atomare Operationen mit Relaxed-Semantik zu kontrollieren. Wie funktioniert das? Ein Thread kann durchaus die Operationen eines anderen Threads in beliebiger Reihenfolge wahrnehmen. Es muss nur sichergestellt sein, dass es ein Punkt im Programm gibt, an dem alle bisherigen Operationen zwischen den Threads synchronisiert werden.</p>
+<p>Ein typisches Beispiel für eine atomare Operationen, dessen Ausführungsreihenfolge nicht wichtig ist, ist ein Zähler. Das entscheidende bei einem Zähler ist nicht, in welcher Reihenfolge die Threads den globalen Zähler inkrementieren. Das entscheidende ist, dass&nbsp;jedes Inkrementieren des Zählers atomar&nbsp;ist und das am Ende alle Threads mit ihrem inkrementieren fertig sind. Genau das zeigt das Beispiel.&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">#include &lt;vector&gt;</span>
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;thread&gt;</span>
+<span style="color: #0000ff;">#include &lt;atomic&gt;</span>
+ 
+std::atomic&lt;<span style="color: #2b91af;">int</span>&gt; cnt = {0};
+ 
+<span style="color: #2b91af;">void</span> f()
+{
+    <span style="color: #0000ff;">for</span> (<span style="color: #2b91af;">int</span> n = 0; n &lt; 1000; ++n) {
+        cnt.fetch_add(1, std::memory_order_relaxed);
+    }
+}
+ 
+<span style="color: #2b91af;">int</span> main()
+{
+    std::vector&lt;std::<span style="color: #0000ff;">thread</span>&gt; v;
+    <span style="color: #0000ff;">for</span> (<span style="color: #2b91af;">int</span> n = 0; n &lt; 10; ++n) {
+        v.emplace_back(f);
+    }
+    <span style="color: #0000ff;">for</span> (<span style="color: #0000ff;">auto</span>&amp; t : v) {
+        t.join();
+    }
+    std::cout &lt;&lt; <span style="color: #a31515;">"Final counter value is "</span> &lt;&lt; cnt &lt;&lt; <span style="color: #a31515;">'\n'</span>;
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Drei Zeilen verdienen besondere Aufmerksamkeit. Das sind die Zeilen 11, 22 und 24.</p>
+<p>Zum einen wird in der Zeile 11 die atomare ganze Zahl mit der Relaxed-Semantik inkrementiert. Damit besteht&nbsp;die Garantie, dass die Operationen auf der Variable <span style="font-family: courier new,courier;">cnt</span> atomar sind. Darüber hinaus erzeugen die<span style="font-family: courier new,courier;"> fetch_add</span> Aufrufe eine&nbsp;Ordnung auf <span style="font-family: courier new,courier;">cnt</span>. Die Funktion f in Zeile 8 - 13 stellt das Arbeitspaket der Threads dar. Dies Arbeitspaket wird in Zeile 19 dem Thread überreicht.</p>
+<p>Zum anderen synchronisiet sich in Zeile 22 der Erzeuger-Thread mit allen seinen Kindern. Deutlicher geht es nicht. Durch <span style="font-family: courier new,courier;">t.join()</span> wartet der Erzeuger, bis alle seine Kinder mit ihrer Arbeit fertig sind. Genau diese Regel benötigen die atomaren Operationen in dem Programm, denn durch <span style="font-family: courier new,courier;">t.join()</span> werden alle Ergebnisse veröffentlicht. Rein formal gilt: <span style="font-family: courier new,courier;">t.join()</span> ist eine release-Operation.&nbsp;</p>
+<p>Letztendlich gibt es zwischen all den Inkrementoperationen in Zeile 11 und dem Lesen des Zählers <span style="font-family: courier new,courier;">cnt</span> in Zeile 24 eine <em>happens-before</em> Beziehung.&nbsp;</p>
+<p>Das Ergebnis ist es, dass das Programm immer 10000 ausgibt. Einerseits langweilig.&nbsp; Andererseits beruhigend.</p>
+<p><img src="images/blog/Speichermodell/RelaxedSemantik/relaxed.png" alt="relaxed" /></p>
+<p>&nbsp;</p>
+<p>Ein prominentes Beispiel für einen atomaren Zähler, der der Relaxed-Semantik folgt, ist der Referenzzähler des <a href="index.php/blog/std-shared-ptr">std::shared_ptr</a>. Dies trifft aber nur auf das Inkrementieren zu. <span style="font-family: courier new,courier;"></span>Entscheidend beim Inkrementieren des Referenzzähler ist es, dass dieser atomar erhöht wird. Nicht entscheidend ist es, welcher Threads als Erstes zum Zuge kommt. Das gilt aber nicht für das Dekrementieren des Referenzzählers. Dieser verlange eine Acquire-Release Semantik mit dem Destruktor.</p>
+<p>Explizit möchte ich in dem Artikel Anthony Williams danken, Autor des Buches C++ Concurrency In Action, der mir wertvolle Tipps bei diesem Artikel gegeben hat. Anthony betreibt selber einen englischen Blog rund um Concurrency in modernem C++: <a href="https://www.justsoftwaresolutions.co.uk/blog/">https://www.justsoftwaresolutions.co.uk/blog/.</a></p>
+<h2>Auf die Pflicht folgt die Kür</h2>
+<p>Auf die Pflicht folgt die Kür. Diesem einfachen Motto will ich in den nächsten Artikeln folgen und die bisher vorgestellte Theorie zu <a href="index.php?option=com_content&amp;view=article&amp;id=84:das-atomare-flag&amp;catid=35:c&amp;Itemid=101">atomaren Datentypen</a> und dem <a href="index.php?option=com_content&amp;view=article&amp;id=82:das-c-speichermodell&amp;catid=35:c&amp;Itemid=101">C++-Speichermodell</a> am konkreten Beispiel vorzustellen.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #2b91af;">int</span> x= 0;
+<span style="color: #2b91af;">int</span> y= 0;
+
+<span style="color: #2b91af;">void</span> writing(){
+  x= 2000;
+  y= 11;
+}
+
+<span style="color: #2b91af;">void</span> reading(){ 
+  std::cout &lt;&lt; <span style="color: #a31515;">"y: "</span> &lt;&lt; y &lt;&lt; <span style="color: #a31515;">" "</span>;
+  std::cout &lt;&lt; <span style="color: #a31515;">"x: "</span> &lt;&lt; x &lt;&lt; std::endl;
+}
+
+<span style="color: #2b91af;">int</span> main(){
+  std::<span style="color: #0000ff;">thread</span> thread1(writing);
+  std:.<span style="color: #0000ff;">thread</span> thread2(reading);
+  thread1.join();
+  thread2.join();
+};
+</pre>
+</div>
+<p>&nbsp;</p>
+<h2>Wie geht's weiter?</h2>
+<p>Das Programm schaut sehr übersichtlich aus. Trotzdem besitzt es undefiniertes Verhalten. Warum? Diese Frage werde ich im nächsten Artikel beantworten und noch ein paar Schritte weiter gehen. Der Programmablauf soll nicht nur definiert sein, er soll auch noch darüber hinaus optimiert werden. In dem Zuge zäume ich in den<a href="index.php/blog/sukzessive-optimierung"> nächsten Artikel </a>die ganze Theorie nochmals von hinten im Schnelldurchlauf auf.</p>
+<p>Viele weitere Artikel zur Anwendung der Theorie gibt es unter der <a href="index.php/der-einstieg-in-modernes-c">Übersichsseite.</a></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="166" height="212" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Hole dir dein E-Book. Unterstütze meinen Blog.</span></strong></p>
+<p>&nbsp;</p>

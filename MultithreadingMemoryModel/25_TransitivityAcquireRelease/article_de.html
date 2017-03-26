@@ -1,0 +1,140 @@
+<p>Eine release-Operation synchronisiert sich mit einer acquire-Operation auf der gleichen atomaren Variable&nbsp;und&nbsp;erzeugt dazu noch eine Ordnungsbedingung.&nbsp;Damit lassen sich Threads auf performante Weise synchronisieren, wenn sie auf einer gemeinsamen atomaren Variablen agieren. Doch wie lassen sich zwei Threads mit der <a href="index.php/blog/acquire-release-semantik">Acquire-Release-Semantik</a> synchronisieren, wenn sie auf keiner gemeinsamen atomaren Variablen agieren? Eine globale Ordnung der Threads mit Hilfe der <a href="index.php/blog/sequenzielle-konsistenz">Sequenziellen Konsistenz</a> ist oft zu schwergewichtig.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p>Die Lösung aus der Zwickmühle ist naheliegend. Dank der Transitivität der Acquire-Release-Semantik lassen sich Threads miteinander synchronisieren, die voneinander unabhängig agieren.</p>
+<h2>Transitivität</h2>
+<p>&nbsp;In dem Beispiel ist Thread <span style="font-family: courier new,courier;">t2</span> mit seinem Arbeitspaket <span style="font-family: courier new,courier;">deliveryBoy</span> das Verbindungsglied zwischen den unabhängig agierenden Threads <span style="font-family: courier new,courier;">t1</span> und <span style="font-family: courier new,courier;">t3</span>.&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// transitivity.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;atomic&gt;</span>
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;thread&gt;</span>
+<span style="color: #0000ff;">#include &lt;vector&gt;</span>
+
+std::vector&lt;<span style="color: #2b91af;">int</span>&gt; mySharedWork;
+std::atomic&lt;<span style="color: #2b91af;">bool</span>&gt; dataProduced(false);
+std::atomic&lt;<span style="color: #2b91af;">bool</span>&gt; dataConsumed(false);
+
+<span style="color: #2b91af;">void</span> dataProducer(){
+    mySharedWork={1,0,3};
+    dataProduced.store(true, std::memory_order_release);
+}
+
+<span style="color: #2b91af;">void</span> deliveryBoy(){
+    <span style="color: #0000ff;">while</span>( !dataProduced.load(std::memory_order_acquire) );
+    dataConsumed.store(true,std::memory_order_release);
+}
+
+<span style="color: #2b91af;">void</span> dataConsumer(){
+    <span style="color: #0000ff;">while</span>( !dataConsumed.load(std::memory_order_acquire) );
+    mySharedWork[1]= 2;
+}
+
+<span style="color: #2b91af;">int</span> main(){
+    
+  std::cout &lt;&lt; std::endl;
+
+  std::<span style="color: #0000ff;">thread</span> t1(dataConsumer);
+  std::<span style="color: #0000ff;">thread</span> t2(deliveryBoy);
+  std::<span style="color: #0000ff;">thread</span> t3(dataProducer);
+
+  t1.join();
+  t2.join();
+  t3.join();
+  
+  <span style="color: #0000ff;">for</span> (<span style="color: #0000ff;">auto</span> v: mySharedWork){
+      std::cout &lt;&lt; v &lt;&lt; <span style="color: #a31515;">" "</span>;
+  }
+      
+  std::cout &lt;&lt; <span style="color: #a31515;">"\n\n"</span>;
+  
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>&nbsp;Die Ausgabe des Programms ist vollkommen deterministisch. <span style="font-family: courier new,courier;">mySharedWork</span> besitzt immer die Werte 1,2 und 3.</p>
+<p><img src="images/blog/Speichermodell/TransitivitaetAcquireReleaseSemantik/trans.png" alt="trans" /></p>
+<p>&nbsp;Wieso ist das Programm vollkommen deterministisch? Es gibt zwei wichtige Beobachtungen:</p>
+<ol>
+<li>Thread<span style="font-family: courier new,courier;"> t2</span> wartet in der Zeile 18 darauf, das Thread <span style="font-family: courier new,courier;">t3</span> in der Zeile 14 <span style="font-family: courier new,courier;">dataProduced</span> auf <span style="font-family: courier new,courier;">true</span> setzt.</li>
+<li>Thread<span style="font-family: courier new,courier;"> t1</span> wartet in der Zeile 23 darauf, das Thread <span style="font-family: courier new,courier;">t2</span> in der Zeile 19 <span style="font-family: courier new,courier;">dataConsumed</span> auf <span style="font-family: courier new,courier;">true</span> setzt.</li>
+</ol>
+<p>Der Rest lässt sich am besten an der Graphik aufzeigen.</p>
+<p><img src="images/blog/Speichermodell/TransitivitaetAcquireReleaseSemantik/transitivity.PNG" alt="transitivity" width="800" height="396" style="margin: 15px;" /></p>
+<p>&nbsp;Das Entscheidende an der Graphik sind die Pfeile.</p>
+<ul>
+<li>Die <span style="color: #3366ff;">blauen</span> Pfeile stehen für die <em>sequenced-before</em> Abhängigkeit. Das heißt, dass in einem Thread alle Operationen in der Sourcecodereihenfolge ausgeführt werden.</li>
+<li>Die <span style="color: #ff0000;">roten</span> Pfeile&nbsp;stehen für die <em>synchronize-with</em> Abhängigkeit. Diese ist in der Acquire-Release-Semantik der atomaren Operationen auf der gleichen atomaren Variable begründet. Damit findet die Synchronisation zwischen den Threads statt.</li>
+<li>Sowohl<em> sequenced-before</em> als auch <em>synchronizes-with</em>&nbsp;begründet eine <em>happens-before</em> Abhängigkeit.</li>
+</ul>
+<p>Der Rest ist ganz einfach. Die zeitliche Reihenfolge der Instruktionen (<em>happens-before</em>) entspricht der Richtung der Pfeile von oben nach unten. Damit ist gewährleistet, dass <span style="font-family: courier new,courier;">mySharedWork[1]= 2</span> als letzte Instruktion ausgeführt wird.</p>
+<h2>Wie geht's weiter?</h2>
+<p>Das war wieder ein kurz und knackiger Artikel. Es ist aber meine Absicht, dass die Happen&nbsp;verdaulich bleiben. Deutlich mehr zum Verdauen gibt es im <a href="index.php/blog/std-memory-order-consume">nächsten Artikel</a>, wenn wir uns die legendäre<span style="font-family: courier new,courier;"> std::memory_order_consume</span> Ordnung genauer anschauen.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="166" height="212" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Hole dir dein E-Book. Unterstütze meinen Blog.</span></strong></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>

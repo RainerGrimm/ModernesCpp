@@ -1,0 +1,226 @@
+<p><span style="font-family: courier new,courier;">std::memory_order_consume</span> ist das legendärste der<a href="index.php/blog/synchronisations-und-ordnungsbedingungen"> sechs Speichermodelle</a>. Dieser besondere Ruf ist zwei Tatsachen geschuldet. Zum einen ist die <span style="font-family: courier new,courier;">std::memory_order_consume</span> Ordnung sehr verständnisresistent. Zum andern hat es meines Wissens noch kein Compiler umgesetzt.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p>Wie kann es sein, dass ein Compiler den C++11-Standard unterstützt, wenn er den Speichermodell-Bezeichner<span style="font-family: courier new,courier;"> std::memory_order_consume</span> noch nicht umgesetzt hat? Die Antwort ist, dass <span style="font-family: courier new,courier;">std::memory_order_consume</span> von den&nbsp;Compilern auf <span style="font-family: courier new,courier;">std::memory_order_acquire</span> abgebildet wird. Das ist zulässig, denn beide&nbsp;sind load oder auch aquire-Operationen. <span style="font-family: courier new,courier;">std::memory_order_consume</span> stellt nur schwächere <a href="index.php/blog/synchronisations-und-ordnungsbedingungen">Synchronisations- und Ordnungsbedingungen</a>. Damit ist eine Release-Acquire-Ordnung potentiell langsamer als eine Release-Consume-Ordnung aber, und das ist der entscheidende Punkt,&nbsp;wohldefiniert.</p>
+<p>Um die Release-Consume-Ordnung zu verstehen, bietet es sich natürlich an, diese in Kontrast zu der Release-Acquire-Ordnung zu stellen. Ich spreche in diesem Artikel bewusst von Release-Acquire-Ordnung und nicht von <a href="index.php/blog/acquire-release-semantik">Acquire-Release-Semantik</a>, um die enge Verwandtschaft von <span style="font-family: courier new,courier;">std::memory_order_acquire</span> und s<span style="font-family: courier new,courier;">td::memory_order_consume</span> deutlich auf den Punkt zu bringen.</p>
+<h2>Release-Acquire-Ordnung</h2>
+<p>Als Ausgangsprogramm dienen mir die zwei Threads<span style="font-family: courier new,courier;"> t1</span> und <span style="font-family: courier new,courier;">t2</span>, in der <span style="font-family: courier new,courier;">t1 </span>die Rolle des Produzenten, in der&nbsp;<span style="font-family: courier new,courier;">t2</span> die Rolle des Konsumenten einnimmt. Die atomare Variable<span style="font-family: courier new,courier;"> ptr</span> dient dazu, Produzent und Konsument zu synchronisieren.&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// acquireRelease.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;atomic&gt;</span>
+<span style="color: #0000ff;">#include &lt;thread&gt;</span>
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;string&gt;</span>
+ 
+std::atomic&lt;std::string*&gt; ptr;
+<span style="color: #2b91af;">int</span> data;
+std::atomic&lt;<span style="color: #2b91af;">int</span>&gt; atoData;
+ 
+<span style="color: #2b91af;">void</span> producer(){
+    std::string* p  = <span style="color: #0000ff;">new</span> std::string(<span style="color: #a31515;">"C++11"</span>);
+    data = 2011;
+    atoData.store(2014,std::memory_order_relaxed);
+    ptr.store(p, std::memory_order_release);
+}
+ 
+<span style="color: #2b91af;">void</span> consumer(){
+    std::string* p2;
+    <span style="color: #0000ff;">while</span> (!(p2 = ptr.load(std::memory_order_acquire)));
+    std::cout &lt;&lt; <span style="color: #a31515;">"*p2: "</span> &lt;&lt; *p2 &lt;&lt; std::endl;
+    std::cout &lt;&lt; <span style="color: #a31515;">"data: "</span> &lt;&lt; data &lt;&lt; std::endl;
+    std::cout &lt;&lt; <span style="color: #a31515;">"atoData: "</span> &lt;&lt; atoData.load(std::memory_order_relaxed) &lt;&lt; std::endl;
+}
+ 
+<span style="color: #2b91af;">int</span> main(){
+    
+    std::cout &lt;&lt; std::endl;
+    
+    std::<span style="color: #0000ff;">thread</span> t1(producer);
+    std::<span style="color: #0000ff;">thread</span> t2(consumer);
+    
+    t1.join();
+    t2.join();
+    
+    std::cout &lt;&lt; std::endl;
+    
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Bevor ich zur genaueren Analyse des Programms komme, will ich erst eine kleine Variation einführen. In dieser ersetze ich in der Zeile 21 die Speicherordnung&nbsp;<span style="font-family: courier new,courier;">std::memory_order_acquire</span> durch <span style="font-family: courier new,courier;">std::memory_order_consume</span>.</p>
+<h2>Release-Consume-Ordnung</h2>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// acquireConsume.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;atomic&gt;</span>
+<span style="color: #0000ff;">#include &lt;thread&gt;</span>
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;string&gt;</span>
+ 
+std::atomic&lt;std::string*&gt; ptr;
+<span style="color: #2b91af;">int</span> data;
+std::atomic&lt;<span style="color: #2b91af;">int</span>&gt; atoData;
+ 
+<span style="color: #2b91af;">void</span> producer(){
+    std::string* p  = <span style="color: #0000ff;">new</span> std::string(<span style="color: #a31515;">"C++11"</span>);
+    data = 2011;
+    atoData.store(2014,std::memory_order_relaxed);
+    ptr.store(p, std::memory_order_release);
+}
+ 
+<span style="color: #2b91af;">void</span> consumer(){
+    std::string* p2;
+    <span style="color: #0000ff;">while</span> (!(p2 = ptr.load(std::memory_order_consume)));
+    std::cout &lt;&lt; <span style="color: #a31515;">"*p2: "</span> &lt;&lt; *p2 &lt;&lt; std::endl;
+    std::cout &lt;&lt; <span style="color: #a31515;">"data: "</span> &lt;&lt; data &lt;&lt; std::endl;
+    std::cout &lt;&lt; <span style="color: #a31515;">"atoData: "</span> &lt;&lt; atoData.load(std::memory_order_relaxed) &lt;&lt; std::endl;
+}
+ 
+<span style="color: #2b91af;">int</span> main(){
+    
+    std::cout &lt;&lt; std::endl;
+    
+    std::<span style="color: #0000ff;">thread</span> t1(producer);
+    std::<span style="color: #0000ff;">thread</span> t2(consumer);
+    
+    t1.join();
+    t2.join();
+    
+    std::cout &lt;&lt; std::endl;
+    
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Das war einfach. Leider besitzt das Programm undefiniertes Verhalten. Diese Aussage ist natürlich sehr hypothetisch, da mein Compiler <span style="font-family: courier new,courier;">std::memory_order_consume</span> durch <span style="font-family: courier new,courier;">std::memory_order_acquire</span> umsetzt.</p>
+<h2>Release-Acquire- versus Release-Consume-Ordnung</h2>
+<p>Die Ausgabe der beiden Programme ist identisch.</p>
+<p>&nbsp;<img src="images/blog/Speichermodell/MemoryOrderConsume/acquireReleaseConsume.png" alt="acquireReleaseConsume" /></p>
+<p>Auch wenn es mich natürlich wiederhole, will ich kurz skizzieren, warum das erste Programm<span style="font-family: courier new,courier;"> acquireRelease.cpp</span> wohldefiniert ist.</p>
+<p>Die store-Operation in Zeile 16 <span style="font-family: courier new,courier;">synchronizes-with</span> der load-Operation in 21. Das ist dadurch begründet, dass die store-Operation mit<span style="font-family: courier new,courier;"> std::memory_order_release</span>, dass die load-Operation mit <span style="font-family: courier new,courier;">std::memory_order_acquire </span>vers<span>ehen ist</span><span style="font-family: courier new,courier;"><span>.</span></span>Weiter gilt, das durch diese Release-Acquire-Ordnung alle Operation, die vor der store-Operation in Zeile 16 im Sourcecode stehen, nach der load-Operation in der Zeile 21 zur Verfügung stehen. Damit synchronisiert die Release-Acquire-Ordnung auch den Zugriff auf die nicht atomare Variable <span style="font-family: courier new,courier;">data</span> in Zeile 14 und die atomare Variable <span style="font-family: courier new,courier;">atoData</span> in Zeile 15, obwohl diese mit dem Bezeichner <span style="font-family: courier new,courier;">std::memory_order_relaxed</span> annotiert ist.</p>
+<p>Was ändert sich nun, wenn ich in dem Programm <span style="font-family: courier new,courier;">std::memory_order_acquire</span> durch <span style="font-family: courier new,courier;">std::memory_order_consume</span> ersetze?</p>
+<h3>Datenabhängigkeiten mit std::memory_order_consume</h3>
+<p>In der <span style="font-family: courier new,courier;">std::memory_order_consume</span> geht es um Datenabhängigkeiten auf atomaren Datentypen. Diese gibt es in zwei Formen. Zum einen <em>carries-a-dependency-to</em> in einem Thread und d<em>ependency-ordered-before</em> zwischen zwei Threads. Beide Abhängigkeiten implizieren eine <em>happens-before </em>Ordnung. Das ist genau die Beziehung, die ein wohldefiniertes Programm benötigt. Doch was heißt <em>carries-a-dependency-to</em> und <em>dependency-ordered-before</em>?</p>
+<ul>
+<li><em><strong>carries-a-dependency-to: </strong></em>Wenn das Ergebnis einer Operation A als Operand einer Operation B verwendet wird, dann gilt. A<em> carries-a-dependency-to</em> B.</li>
+<li><strong><em>dependecy-ordered-before: </em></strong>Eine store-Operation A (mit <span style="font-family: courier new,courier;">std::memory_order_release, std::memory_order_acq_rel </span>oder<span style="font-family: courier new,courier;"> std::memory_order_seq_cst</span> versehen), ist <em>dependency_ordered_before</em> einer load-Operation B (mit <span style="font-family: courier new,courier;">std::memory_order_consume</span> versehen), wenn das Ergebnis der load-Operation B in einer weiteren Operation C im selben Thread wie die Operation B verwendet wird.</li>
+</ul>
+<p>Mir ist natürlich klar, dass diese zwei Definitionen sehr schwer verdaulich sind. Daher will ich die Datenabhängigkeiten an der Graphik verdeutlichen.</p>
+<p><img src="images/blog/Speichermodell/MemoryOrderConsume/dependency.png" alt="dependency" style="margin: 15px;" /></p>
+<p>Der Ausdruck<span style="font-family: courier new,courier;">&nbsp;ptr.store(p, std::memory_order_release)</span>&nbsp;ist <em>dependency-ordered-before</em>&nbsp;<span style="font-family: courier new,courier;"> while (!(p2 = ptr.load(std::memory_order_consume)))</span>, da in der anschließenden Zeile&nbsp;<span style="font-family: courier new,courier;">std::cout &lt;&lt; "*p2: " &lt;&lt; *p2 &lt;&lt; std::endl</span> das Ergebnis der load-Operation gelesen wird. Dabei gilt:&nbsp;<span style="font-family: courier new,courier;">while (!(p2 = ptr.load(std::memory_order_consume))&nbsp;<em>carries-a-dependency-to</em>&nbsp;<span style="font-family: courier new,courier;">std::cout &lt;&lt; "*p2: " &lt;&lt; *p2 &lt;&lt; std::endl</span></span><span style="font-family: courier new,courier;">, </span>da die Ausgabe von<span style="font-family: courier new,courier;"> </span><span style="font-family: courier new,courier;">*p2</span><span style="font-family: courier new,courier;"> </span>das Ergebnis der <span style="font-family: courier new,courier;">ptr.load</span>-Operation verwendet.</p>
+<p>Für die anschließenden Ausgaben von <span style="font-family: courier new,courier;">data</span> und <span style="font-family: courier new,courier;">atoData</span> sind die Werte nicht zugesichert. Dies gilt, da ihre Werte keine <em>carries-a-dependency </em>Beziehung zu ptr.load-Operation besitzen. Es wird noch schlimmer. Da <span style="font-family: courier new,courier;">data</span> keine atomare Variable ist, besteht ein <a href="index.php?option=com_content&amp;view=article&amp;id=70:threads-teilen-daten&amp;catid=35:c&amp;Itemid=101#KritischerWettlauf">kritischer Wettlauf</a> um <span style="font-family: courier new,courier;">data</span>. Der Grund für den kritischen Wettlauf ist es, da beide Threads auf <span style="font-family: courier new,courier;">data</span> gleichzeitig zugreifen können und Thread <span style="font-family: courier new,courier;">t1 data </span>in der Funktion<span style="font-family: courier new,courier;"> producer&nbsp;</span>dabei modifiziert. Damit ist das Programmverhalten undefiniert.&nbsp;</p>
+<h2>Wie geht's weiter?</h2>
+<p>Zugegeben, das war&nbsp;ein anspruchsvoller Artikel. Im <a href="index.php/blog/acquire-release-semantik-der-typische-fehler">nächsten Artikel </a>gehe ich tiefer auf den typischen Fehler der Acquire-Rlease-Semantik ein. Dieser tritt ein, wenn die acquire-Operation vor der release-Operation stattfindet.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="166" height="212" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Hole dir dein E-Book. Unterstütze meinen Blog.</span></strong></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>

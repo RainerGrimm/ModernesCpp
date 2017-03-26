@@ -1,0 +1,110 @@
+<p>Mit der Acquire-Release-Semantik wird das C++-Speichermodell richtig spannend. Denn nun gilt es nicht mehr, die Synchronisation von Threads zu betrachten, sondern die Synchronisation auf der gleichen atomaren Variable in verschiedenen Threads.</p>
+<hr id="system-readmore" />
+<h2>Synchronisations- und Ordnungsbedingungen</h2>
+<p>Die Acquire-Release Semantik basiert auf einer entscheidenden Idee. Eine release-Operation synchronisiert sich mit einer acquire-Operation auf der gleichen atomaren Variable&nbsp;und&nbsp;erzeugt dazu noch eine Ordnungsbedingung. So können alle Lese- und Schreiboperationen nicht vor eine acquire-Operation, so können alle Lese- und Schreiboperationen nicht hinter eine Release-Operation verschoben werden. Was sind nun acquire- und release-Operationen? Das Lesen einer atomaren Variable, sei es mit <span style="font-family: courier new,courier;">load</span> oder auch<span style="font-family: courier new,courier;"> test_and_set</span> ist&nbsp;eine acquire-Operation. Aber auch das Anfordern eines Lock ist eine acquire-Operation. Das Gegenteil gilt natürlich auch, das Freigeben eines Locks ist eine release-Operation. Entsprechend gilt diese für eine <span style="font-family: courier new,courier;">store</span> oder auch <span style="font-family: courier new,courier;">clear </span>Operation auf einer atomaren Variablen.</p>
+<p>Den kleinen Abschnitt will ich gerne nochmal aus einem anderen Blickwinkel betrachten. Das Locken eines Mutex ist eine acquire-Operation, das Unlocken eines Mutex eine release-Operation. Bildlich gesprochen heißt dies, dass ein Variablenzugriff aus seinem<a href="index.php?option=com_content&amp;view=article&amp;id=70:threads-teilen-daten&amp;catid=35:c&amp;Itemid=101#KritischerBereich"> kritischen Bereich</a> nicht verschoben werden darf. Das gilt in beide Richtungen. Andererseits kann ein Variablenzugriff in einen kritischen Bereich verschoben werden, denn ein Variablenzugriff tauscht dadurch den unsicheren mit dem sicheren Bereich. Nach&nbsp;der bildlichen Beschreibung folgt&nbsp;mit leichter Verspätung das Bild dazu.</p>
+<p><img src="images/blog/Speichermodell/AcquireReleaseSemantik/criticalRegion.png" alt="criticalRegion" /></p>
+<p>Habe ich es nicht versprochen? Die Acquire-Release-Semantik hilft uns, das Locken und Unlocken eines Mutex besser zu verstehen. Die gleiche Argumentation lässt sich natürlich auch auf das&nbsp;<a href="index.php?option=com_content&amp;view=article&amp;id=67:threads&amp;catid=35:c&amp;Itemid=101">Starten eines Threads</a> als acquire- und den <span style="font-family: courier new,courier;">join</span>-Aufruf als release-Operation anwenden. Weiter geht es mit dem&nbsp;<span style="font-family: courier new,courier;">wait</span> und<span style="font-family: courier new,courier;"> notify_one</span>-Aufruf einer <a href="index.php?option=com_content&amp;view=article&amp;id=76:bedingungsvariablen&amp;catid=35:c&amp;Itemid=101">Bedingungsvariable</a>. <span style="font-family: courier new,courier;">wait</span> ist in diesem konkreten Fall die acquire-,<span style="font-family: courier new,courier;"> notify_one</span> die release-Operation. Die Argumentation trifft auch zu, falls die Bedingungsvariable mehrere wartende Threads mit dem <span style="font-family: courier new,courier;">notify_all</span>-Aufruf benachrichtigt. Hier ist wieder eine release-Operation im Einsatz.</p>
+<p>Nach der Theorie lässt sich der <a href="index.php?option=com_content&amp;view=article&amp;id=84:das-atomare-flag&amp;catid=35:c&amp;Itemid=101#AtomicFlagBeispiel">Spinlock</a> aus dem Artikel <a href="index.php?option=com_content&amp;view=article&amp;id=84:das-atomare-flag&amp;catid=35:c&amp;Itemid=101">Das Atomare Flag</a> effizienter schreiben, denn die Synchronisation findet auf der atomaren Variable<span style="font-family: courier new,courier;"> flag</span> statt.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">#include &lt;atomic&gt;</span>
+<span style="color: #0000ff;">#include &lt;thread&gt;</span>
+
+<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">Spinlock</span>{
+  std::atomic_flag flag;
+public:
+  Spinlock(): flag(ATOMIC_FLAG_INIT) {}
+
+  <span style="color: #2b91af;">void</span> lock(){
+    <span style="color: #0000ff;">while</span>( flag.test_and_set(std::memory_order_acquire) );
+  }
+
+  <span style="color: #2b91af;">void</span> unlock(){
+    flag.clear(std::memory_order_release);
+  }
+};
+
+Spinlock spin;
+
+<span style="color: #2b91af;">void</span> workOnResource(){
+  spin.lock();
+  <span style="color: #008000;">// shared resource</span>
+  spin.unlock();
+}
+
+
+<span style="color: #2b91af;">int</span> main(){
+
+  std::<span style="color: #0000ff;">thread</span> t(workOnResource);
+  std::<span style="color: #0000ff;">thread</span> t2(workOnResource);
+
+  t.join();
+  t2.join();
+
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Der <span style="font-family: courier new,courier;">flag.clear-</span> Aufruf in Zeile 14 ist eine release-, der <span style="font-family: courier new,courier;">flag.test_and_set</span> in Zeile 10 ist eine acquire-Operation. Und - das ist nun ein alter Hut- die acquire- synchronisiert mit der release-Operation. Damit wird die teure Synchronisation zweier Threads mittels <span style="font-family: courier new,courier;">std::memory_ord_seq_cst</span> durch die deutlich einfachere und daher auch performantere Acquire-Release-Semantik mittels <span style="font-family: courier new,courier;">std::memory_order_acquire</span> und <span style="font-family: courier new,courier;">std::memory_order_release</span> ersetzt. Das Verhalten ändert sich nicht.</p>
+<p>Verwenden mehr als zwei Threads den Spinlock, ist die acquire-Semantik der <span style="font-family: courier new,courier;">lock</span>-Methode nicht mehr ausreichend. In diesem Fall ist die lock-Operation ein acquire-release Operation. Daher muss das verwendete Speichermodell in Zeile 10 auf <span style="font-family: courier new,courier;">std::memory_order_acq_rel</span> geändert werden.</p>
+<h2>Wie geht's weiter?</h2>
+<p>Im <a href="index.php/blog/transitivitaet-der-acquire-release-semantik">nächsten Artikel</a> schaue ich mir genauer die Transitivität der Acquire-Release-Semantik an. Damit ist es möglich, Threads zu synchronisieren, die keine gemeinsame atomare Variable besitzen. <a href="index.php/blog/transitivitaet-der-acquire-release-semantik"> </a></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="166" height="212" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Hole dir dein E-Book. Unterstütze meinen Blog.</span></strong></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>

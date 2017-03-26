@@ -1,0 +1,34 @@
+<p>Die atomaren Datentypen sind die Grundlage für das C++-Speichermodell. Per Default gilt für sie&nbsp;die sequenzielle Konsistenz.</p>
+<hr id="system-readmore" />
+<h2>Das starke C++-Speichermodell</h2>
+<p>In 2004 erhielt Java 5.0 sein aktuelles <a href="https://en.wikipedia.org/wiki/Java_memory_model">Speichermodell</a>, in 2011 C++.&nbsp;Davor besaß Java ein fehlerhaftes, C++ gar kein Speichermodell. Wer nun glaubt, dass dies der Endpunkt eines langen Reifungsprozesses ist, der irrt sich. Tatsächlich wurden die Grundlagen für die Multithreading Programmierung bereits vor 40 bis 50 Jahren gelegt. So definierte <a href="https://de.wikipedia.org/wiki/Leslie_Lamport">Leslie Lamport </a>1979 das Konzept der sequenziellen Konsistenz.</p>
+<p>Die sequenzielle Konsistenz sichert zwei Eigenschaften zu.</p>
+<ol>
+<li>Die Anweisungen eines Programms werden in der Sourcecodereihenfolge ausgeführt.</li>
+<li>Es gibt eine globale Reihenfolge aller Operationen auf allen Threads.</li>
+</ol>
+<p>Bevor ich die zwei Eigenschaften genauer analysiere, will ich explizit darauf hinweisen. Diese Aussagen gelten nur für atomare Datentypen, besitzen aber Auswirkungen auf nichtatomare Datentypen.</p>
+<p>Die einfache Graphik symbolisiert zwei Threads, die jeweils den Wert 1 in einer Variable x bzw. y speichern, diese Variablen wieder laden und in den Variablen <span style="font-family: courier new,courier;">res1</span> bzw. <span style="font-family: courier new,courier;">res2</span> speichern.</p>
+<p><img src="images/blog/Speichermodell/SequenzielleKonsistenz/twoAtomics.png" alt="twoAtomics" /></p>
+<p>&nbsp;</p>
+<p>Die Operationen finden auf atomaren Datentypen statt und sind daher implizit atomar. Per Default gilt die sequenzielle Konsistenz. In welcher Reihenfolge können die Anweisungen nun ausgeführt werden?</p>
+<p>Eigenschaft 1 der sequenziellen Konsistenz sichert zu, dass die Befehle in der Reihenfolge ausgeführt werden, in der sie im Sourcecode stehen. Damit ist klar. Keine Speicher-Operatione (store)&nbsp;kann eine Lade-Operation (load) überholen.</p>
+<p>Eigenschaft 2 der sequenziellen Konsistenz sichert zu, dass es eine globale Reihenfolge aller Operationen auf allen Threads gibt. Das heißt in dem konkreten Fall, dass der Thread 2 die Operationen auf dem Thread&nbsp;1 in der gleichen Reihenfolge wahrnimmt, wie sie der Thread 1&nbsp;ausführt. Damit <strong>sieht Thread 2 alle Operationen des Thread 1 in der Sourcecodereihenfolge des Thread 1</strong>. Die gleiche Argumentation gilt natürlich auch aus der Sicht von Thread 1. Eigenschaft 2 lässt sich am einfachsten als globaler Zeittakt verstehen, dem alle Threads zu folgen haben. Dieser globale Zeittakt ist die globale Reihenfolge.</p>
+<p>Nun ist das Rätsel fast schon gelöst. Was noch übrig bleibt, ist es,&nbsp;alle zulässigen Verschränkungen der zwei Threads zu betrachten. Damit sind die sechs folgenen Ausführungsreihenfolgen der zwei Threads möglich.</p>
+<p><img src="images/blog/Speichermodell/SequenzielleKonsistenz/atomicInterleaving.png" alt="atomicInterleaving" width="800" height="600" /></p>
+<p>Das war einfach. Oder?</p>
+<h2>Vom starken zum schwachen C++-Speichermodell</h2>
+<p>Gerne wil ich&nbsp;auf das Bild des&nbsp;<a href="index.php?option=com_content&amp;view=article&amp;id=82:das-c-speichermodell&amp;catid=35:c&amp;Itemid=101">Vertrages </a>zwischen dem Programmierer und dem System zurückkommen.&nbsp;</p>
+<p>Der Programmierer verwendet in diesem konkreten Beispiell atomare Variablen. Sein Teil des Vertrages erfüllt er, indem er sie richtig anwendet. Da System sichert ihm ein definiertes Programmverhalten ohne<a href="index.php?option=com_content&amp;view=article&amp;id=70:threads-teilen-daten&amp;catid=35:c&amp;Itemid=101#KritischerWettlauf"> kritischen Wettlauf </a>zu. Darüber hinaus kann das System&nbsp;die vier Operationen in sechs verschiedenen Kombinationen ausführen. Wählt der Programmier anstelle der Sequenziellen Konsistenz die Relaxed Semantik, so verändern sich deutlich die Rahmenbedingungen für den Vertrag. Zum einen ist es deutlich schwieriger für den Programmierer, den Vertrag richtig zu anzuwenden, zum anderen stehen dem System deutlich mehrere Optimierungsmöglichkeiten offen. Mit der Relaxed Semantik oder auch dem schwachen C++-Speichermodell sind viel mehr Operationenreihenfolgen der 4 Operationen zulässig. Das verwirrend ist, dass der Thread 1 die vier Operationen in einer anderen Reihenfolge sehen kann als der Thread 2. Wir müssen uns in unserer Intuition vom globalen Zeittakt lösen.&nbsp;So kann der Thread 1 seine Anweisungen in Sourcecodeorder ausführen, aus Sicht von Thread 2 ist es aber möglich, dass die Operation <span style="font-family: courier new,courier;">res1= y.load()</span>&nbsp;die Operation<span style="font-family: courier new,courier;"> x.store()<span style="font-family: arial,helvetica,sans-serif;"> überholt.</span> </span></p>
+<p>Zwischen der sequenziellen Konsistenz oder auch dem starken C++-Speichermodell und der relaxed Semantik gibt es noch einige Abstufungen. Am wichtigsten ist&nbsp;die Acquire-Release-Semantik. Sie werden es sicher schon ahnen. Mit der Acquire-Release-Semantik hat der Programmierer strengere Regeln einzuhalten als mit der sequenziellen Konsistenz, dem System stehen dafür aber auch mehr Optimierungsmöglichkeiten offen.&nbsp; <span style="font-family: arial,helvetica,sans-serif;"></span>Die Acquire-Release-Semantik ist der Schlüssel zum tieferen Verständnis der Multithreading Programmierens, denn durch die Acquire-Release Semantik werden Threads an definierten Stellen <strong>miteinander</strong> synchronisiert. Ohne diese Synchronisation ist kein definiertes Verhalten von Threads, Task oder Bedingungsvariablen möglich. Dazu aber in einem späteren Artikel mehr.</p>
+<h2>Wie geht's weiter?</h2>
+<p>Im <a href="index.php/blog/das-atomare-flag">nächsten Artikel </a>werde ich tiefer auf atomare Datentypen in C++ eingehen. Damit bleiben wir beim starken C++-Speichermodell.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="166" height="212" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Hole dir dein E-Book. Unterstütze meinen Blog.</span></strong></p>
+<p>&nbsp;</p>
