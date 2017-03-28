@@ -1,28 +1,239 @@
-<p>Die atomaren Datentypen sind die Grundlage für das C++-Speichermodell. Per Default gilt für sie&nbsp;die sequenzielle Konsistenz.</p>
+<p>Atomare Datentypen sichern zwei Eigenschaften zu. Zum einen sind sie&nbsp;atomar, zu anderen setzen die Synchronisations- und Ordungsbedingungen an die Programmausführung.</p>
 <hr id="system-readmore" />
-<h2>Das starke C++-Speichermodell</h2>
-<p>In 2004 erhielt Java 5.0 sein aktuelles <a href="https://en.wikipedia.org/wiki/Java_memory_model">Speichermodell</a>, in 2011 C++.&nbsp;Davor besaß Java ein fehlerhaftes, C++ gar kein Speichermodell. Wer nun glaubt, dass dies der Endpunkt eines langen Reifungsprozesses ist, der irrt sich. Tatsächlich wurden die Grundlagen für die Multithreading Programmierung bereits vor 40 bis 50 Jahren gelegt. So definierte <a href="https://de.wikipedia.org/wiki/Leslie_Lamport">Leslie Lamport </a>1979 das Konzept der sequenziellen Konsistenz.</p>
-<p>Die sequenzielle Konsistenz sichert zwei Eigenschaften zu.</p>
-<ol>
-<li>Die Anweisungen eines Programms werden in der Sourcecodereihenfolge ausgeführt.</li>
-<li>Es gibt eine globale Reihenfolge aller Operationen auf allen Threads.</li>
-</ol>
-<p>Bevor ich die zwei Eigenschaften genauer analysiere, will ich explizit darauf hinweisen. Diese Aussagen gelten nur für atomare Datentypen, besitzen aber Auswirkungen auf nichtatomare Datentypen.</p>
-<p>Die einfache Graphik symbolisiert zwei Threads, die jeweils den Wert 1 in einer Variable x bzw. y speichern, diese Variablen wieder laden und in den Variablen <span style="font-family: courier new,courier;">res1</span> bzw. <span style="font-family: courier new,courier;">res2</span> speichern.</p>
-<p><img src="images/blog/Speichermodell/SequenzielleKonsistenz/twoAtomics.png" alt="twoAtomics" /></p>
 <p>&nbsp;</p>
-<p>Die Operationen finden auf atomaren Datentypen statt und sind daher implizit atomar. Per Default gilt die sequenzielle Konsistenz. In welcher Reihenfolge können die Anweisungen nun ausgeführt werden?</p>
-<p>Eigenschaft 1 der sequenziellen Konsistenz sichert zu, dass die Befehle in der Reihenfolge ausgeführt werden, in der sie im Sourcecode stehen. Damit ist klar. Keine Speicher-Operatione (store)&nbsp;kann eine Lade-Operation (load) überholen.</p>
-<p>Eigenschaft 2 der sequenziellen Konsistenz sichert zu, dass es eine globale Reihenfolge aller Operationen auf allen Threads gibt. Das heißt in dem konkreten Fall, dass der Thread 2 die Operationen auf dem Thread&nbsp;1 in der gleichen Reihenfolge wahrnimmt, wie sie der Thread 1&nbsp;ausführt. Damit <strong>sieht Thread 2 alle Operationen des Thread 1 in der Sourcecodereihenfolge des Thread 1</strong>. Die gleiche Argumentation gilt natürlich auch aus der Sicht von Thread 1. Eigenschaft 2 lässt sich am einfachsten als globaler Zeittakt verstehen, dem alle Threads zu folgen haben. Dieser globale Zeittakt ist die globale Reihenfolge.</p>
-<p>Nun ist das Rätsel fast schon gelöst. Was noch übrig bleibt, ist es,&nbsp;alle zulässigen Verschränkungen der zwei Threads zu betrachten. Damit sind die sechs folgenen Ausführungsreihenfolgen der zwei Threads möglich.</p>
-<p><img src="images/blog/Speichermodell/SequenzielleKonsistenz/atomicInterleaving.png" alt="atomicInterleaving" width="800" height="600" /></p>
-<p>Das war einfach. Oder?</p>
-<h2>Vom starken zum schwachen C++-Speichermodell</h2>
-<p>Gerne wil ich&nbsp;auf das Bild des&nbsp;<a href="index.php?option=com_content&amp;view=article&amp;id=82:das-c-speichermodell&amp;catid=35:c&amp;Itemid=101">Vertrages </a>zwischen dem Programmierer und dem System zurückkommen.&nbsp;</p>
-<p>Der Programmierer verwendet in diesem konkreten Beispiell atomare Variablen. Sein Teil des Vertrages erfüllt er, indem er sie richtig anwendet. Da System sichert ihm ein definiertes Programmverhalten ohne<a href="index.php?option=com_content&amp;view=article&amp;id=70:threads-teilen-daten&amp;catid=35:c&amp;Itemid=101#KritischerWettlauf"> kritischen Wettlauf </a>zu. Darüber hinaus kann das System&nbsp;die vier Operationen in sechs verschiedenen Kombinationen ausführen. Wählt der Programmier anstelle der Sequenziellen Konsistenz die Relaxed Semantik, so verändern sich deutlich die Rahmenbedingungen für den Vertrag. Zum einen ist es deutlich schwieriger für den Programmierer, den Vertrag richtig zu anzuwenden, zum anderen stehen dem System deutlich mehrere Optimierungsmöglichkeiten offen. Mit der Relaxed Semantik oder auch dem schwachen C++-Speichermodell sind viel mehr Operationenreihenfolgen der 4 Operationen zulässig. Das verwirrend ist, dass der Thread 1 die vier Operationen in einer anderen Reihenfolge sehen kann als der Thread 2. Wir müssen uns in unserer Intuition vom globalen Zeittakt lösen.&nbsp;So kann der Thread 1 seine Anweisungen in Sourcecodeorder ausführen, aus Sicht von Thread 2 ist es aber möglich, dass die Operation <span style="font-family: courier new,courier;">res1= y.load()</span>&nbsp;die Operation<span style="font-family: courier new,courier;"> x.store()<span style="font-family: arial,helvetica,sans-serif;"> überholt.</span> </span></p>
-<p>Zwischen der sequenziellen Konsistenz oder auch dem starken C++-Speichermodell und der relaxed Semantik gibt es noch einige Abstufungen. Am wichtigsten ist&nbsp;die Acquire-Release-Semantik. Sie werden es sicher schon ahnen. Mit der Acquire-Release-Semantik hat der Programmierer strengere Regeln einzuhalten als mit der sequenziellen Konsistenz, dem System stehen dafür aber auch mehr Optimierungsmöglichkeiten offen.&nbsp; <span style="font-family: arial,helvetica,sans-serif;"></span>Die Acquire-Release-Semantik ist der Schlüssel zum tieferen Verständnis der Multithreading Programmierens, denn durch die Acquire-Release Semantik werden Threads an definierten Stellen <strong>miteinander</strong> synchronisiert. Ohne diese Synchronisation ist kein definiertes Verhalten von Threads, Task oder Bedingungsvariablen möglich. Dazu aber in einem späteren Artikel mehr.</p>
+<p>Im letzten Artikel habe ich die <a href="index.php?option=com_content&amp;view=article&amp;id=83:referenzielle-transparenz&amp;catid=35:c&amp;Itemid=101">sequenzielle Konsistenz</a> vorgestellt als das Default-Verhalten für atomare Operationen. Was heißt das? Für jede atomare Operation lässt sich explizit die Speicherordnung setzen. Wird die Speicherordnung nicht explizit gesetzt, kommt implizit das Flag&nbsp;<span style="font-family: courier new,courier;">std<span class="sy4">::</span></span> <span class="me2"><span style="font-family: courier new,courier;">memory_order_seq_cs</span>t</span> zum Einsatz.</p>
+<p>Daher ist der Codeschnipsel</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">x.store(1);
+res= x.load();
+</pre>
+</div>
+<p>äquivalent zum folgenden Codeschnipsel.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">x.store(1,std::memory_order_seq_cst);
+res= x.load(std::memory_order_seq_cst);<span style="font-family: arial,helvetica,sans-serif;"></span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Der Einfachheit wegen werde ich natürlich im Verlauf des Artikels die erste Schreibweise vorziehen.</p>
+<h2>std::atomic_flag</h2>
+<p><span style="font-family: courier new,courier;">std::atomic_flag</span> bietet ein sehr einfaches Interface an. Mit der Methode <span style="font-family: courier new,courier;">clear</span> lässt sich sein Wert auf <span style="font-family: courier new,courier;">false</span> setzen, mit der Methode <span style="font-family: courier new,courier;">test_and_set</span> lässt sich sein Wert auf <span style="font-family: courier new,courier;">true</span> setzen. Dabei gibt <span style="font-family: courier new,courier;">test_and_set</span> den alten Wert zurück. Um <span style="font-family: courier new,courier;">std::atomic_flag</span> zu verwenden, muss er mit der Konstante <span style="font-family: courier new,courier;">ATOMIC_FLAG_INIT</span> auf <span style="font-family: courier new,courier;">false</span> initialisiert werden. Hört sich erst mal nicht besonders spannend an. <span style="font-family: courier new,courier;">std::atomic_flag</span> besitzt aber zwei sehr interessanten Eigenschaften. Zum einen ist er der einzige&nbsp;<a href="index.php?option=com_content&amp;view=article&amp;id=82:das-c-speichermodell&amp;catid=35:c&amp;Itemid=101#LockfreieProgrammierung">lockfrei</a> atomare Datentyp, zum anderen wird er gern als Baustein für höhere Threadabstraktionen verwendet.</p>
+<p>Der einzige lockfrei atomare Datentyp. Was soll das heißen? Die&nbsp;komplexeren verbleibenden atomaren Datentypen können laut C++-Standard ihre atomaren Operationen durch ein&nbsp;<a href="index.php?option=com_content&amp;view=article&amp;id=70:threads-teilen-daten&amp;catid=35:c&amp;Itemid=101">Mutex</a> implementieren. Daher bieten sie die Methode <span style="font-family: courier new,courier;">is_lock_free</span> an, die genau die Frage beantwortet, ob bei der Implementierung des atomaren Datentyps ein Mutex verwendet wurde. Auf den populären Plattformen gibt der Methodenaufruf <span style="font-family: courier new,courier;">is_lock_free <span style="font-family: arial,helvetica,sans-serif;">in der Regel </span>false</span> zurück.</p>
+<p>Mit Hilfe des Baustein <span style="font-family: courier new,courier;">std::atomic_flag</span> lässt sich ein Spinlock bauen. Ein Spinlock erlaubt es, ähnlich wie ein Mutex, einen <a href="index.php?option=com_content&amp;view=article&amp;id=70:threads-teilen-daten&amp;catid=35:c&amp;Itemid=101#KritischerBereich">kritischen Bereich </a>zu schützen. Im Gegensatz zum Mutex wartet ein Spinlock aber nicht passiv darauf, bis er den Lock erhält, sondern fordert das Lock&nbsp;fortwährend aktiv an. Das spart zwar den teueren Contextwechsel in den wait-Zustand, verbraucht aber die volle Power der CPU.</p>
+<p>Im <a id="AtomicFlagBeispiel">Beispiel</a> ist ein Splinlock mit Hilfe von <span style="font-family: courier new,courier;">std::atomic_flag</span> implementiert.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">#include &lt;atomic&gt;</span>
+<span style="color: #0000ff;">#include &lt;thread&gt;</span>
+
+<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">Spinlock</span>{
+  std::atomic_flag flag;
+public:
+  Spinlock(): flag(ATOMIC_FLAG_INIT) {}
+
+  <span style="color: #2b91af;">void</span> lock(){
+    <span style="color: #0000ff;">while</span>( flag.test_and_set() );
+  }
+
+  <span style="color: #2b91af;">void</span> unlock(){
+    flag.clear();
+  }
+};
+
+Spinlock spin;
+
+<span style="color: #2b91af;">void</span> workOnResource(){
+  spin.lock();
+  <span style="color: #008000;">// shared resource</span>
+  spin.unlock();
+}
+
+
+<span style="color: #2b91af;">int</span> main(){
+
+  std::<span style="color: #0000ff;">thread</span> t(workOnResource);
+  std::<span style="color: #0000ff;">thread</span> t2(workOnResource);
+
+  t.join();
+  t2.join();
+
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>In dem Beispiel konkurrieren die zwei Threads t und t2 (Zeile 29 und 30) um den kritischen Bereich,&nbsp;der in Zeile 22 durch einen Kommentar nur angedeutet ist. Wie funktioniert das ganze? Die Klasse <span style="font-family: courier new,courier;">Spinlock</span> bietet - ähnlich einem Mutex - die zwei Methoden <span style="font-family: courier new,courier;">lock </span>und <span style="font-family: courier new,courier;">unlock</span> an. Darüber hinaus wird im Konstruktor des Spinlock (Zeile 7) das <span style="font-family: courier new,courier;">std::atomic_flag</span> Flag auf <span style="font-family: courier new,courier;">false</span> initialisiert. Versucht nun Thread<span style="font-family: courier new,courier;"> t</span> die Funktion <span style="font-family: courier new,courier;">workOnRessource</span> auszuführen, sind zwei Szenarien möglich.</p>
+<p>Im ersten Szeanarium erhält der Thread t das Lock. Das bedeutet, das der <span style="font-family: courier new,courier;">lock</span>-Aufruf erfolgreich war. Der <span style="font-family: courier new,courier;">lock</span>-Aufruf ist dann erfolgreich, wenn der initiale Wert des <span style="font-family: courier new,courier;">Flags</span> in Zeile 10&nbsp;<span style="font-family: courier new,courier;">false</span> ist, so dass ihn Thread t in einer <span style="font-family: courier new,courier;">atomaren</span> Operation auf <span style="font-family: courier new,courier;">true</span> setzen kann. Genau diesen Wert <span style="font-family: courier new,courier;">true</span> gibt die <span style="font-family: courier new,courier;">while</span>-Schleife für den anderen Thread <span style="font-family: courier new,courier;">t2</span> zurück, falls dieser später versucht, den Lock zu erhalten. Damit ist er im Hamsterrad gefangen. Da er selbst nicht den Wert des Flags auf <span style="font-family: courier new,courier;">false</span> setzen kann, muss er aktiv warten, bis der Thread t die <span style="font-family: courier new,courier;">unlock</span>-Methode ausführt und das Flag auf <span style="font-family: courier new,courier;">false</span> zurücksetzt (Zeile 13 - 15).&nbsp;</p>
+<p>Im zweiten Szenarium erhält der Thread t nicht das Lock. Dann besitz der Thraed t2 betreits das Lock und wir sind in Szenarium 1 mit vertauschten Rollen.</p>
+<p>Besonders interessant ist es, das aktive Warten des Spinlocks mit dem passiven Warten des Mutex zu vergleichen.</p>
+<h2>Spinlock versus Mutex</h2>
+<p>Was passiert mit der CPU-Last, wenn die Funktion <span style="font-family: courier new,courier;">workOnRessource</span> den Spinlock für 2 Sekunden in Zeile 21 - 23 lockt?</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">#include &lt;atomic&gt;</span>
+<span style="color: #0000ff;">#include &lt;thread&gt;</span>
+
+<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">Spinlock</span>{
+  std::atomic_flag flag;
+public:
+  Spinlock(): flag(ATOMIC_FLAG_INIT) {}
+
+  <span style="color: #2b91af;">void</span> lock(){
+    <span style="color: #0000ff;">while</span>( flag.test_and_set() );
+  }
+
+  <span style="color: #2b91af;">void</span> unlock(){
+    flag.clear();
+  }
+};
+
+Spinlock spin;
+
+<span style="color: #2b91af;">void</span> workOnResource(){
+  spin.lock();
+  std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+  spin.unlock();
+}
+
+
+<span style="color: #2b91af;">int</span> main(){
+
+  std::<span style="color: #0000ff;">thread</span> t(workOnResource);
+  std::<span style="color: #0000ff;">thread</span> t2(workOnResource);
+
+  t.join();
+  t2.join();
+
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Stimmt die Theorie, dann muss in diesem Augenblick einer meiner vier Kerne voll ausgelastet sein. Genau das Ergebnis zeigt der Screenshot.</p>
+<p>&nbsp;<img src="images/blog/Speichermodell/atomic_flag/spinLockSleep.png" alt="spinLockSleep" /></p>
+<p>Schön ist in dem Screenshot zu sehen, dass&nbsp;durch das Ausführen des Programms <span style="font-family: courier new,courier;">spinLockSleep</span> die Last eines Kernes auf 100% steigt. Interessanterweise kommt auch immer ein anderer meiner Kerne zum Zuge.</p>
+<p>Statt einem Spinlock kommt im nächsten Programm ein Mutex zum Einsatz. Das Programm ist dadurch kurz und knapp.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">#include &lt;mutex&gt;</span>
+<span style="color: #0000ff;">#include &lt;thread&gt;</span>
+
+std::mutex mut;
+
+<span style="color: #2b91af;">void</span> workOnResource(){
+  mut.lock();
+  std::this_thread::sleep_for(std::chrono::milliseconds(5000));
+  mut.unlock();
+}
+
+<span style="color: #2b91af;">int</span> main(){
+
+  std::<span style="color: #0000ff;">thread</span> t(workOnResource);
+  std::<span style="color: #0000ff;">thread</span> t2(workOnResource);
+
+  t.join();
+  t2.join();
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Führe ich das Programm mehrfach aus, ist keine erhöhte Last der Kerne zu beobachten.</p>
+<p><img src="images/blog/Speichermodell/atomic_flag/mutex.png" alt="mutex" /></p>
+<p>&nbsp;</p>
 <h2>Wie geht's weiter?</h2>
-<p>Im <a href="index.php/blog/das-atomare-flag">nächsten Artikel </a>werde ich tiefer auf atomare Datentypen in C++ eingehen. Damit bleiben wir beim starken C++-Speichermodell.</p>
+<p>Weiter geht es im&nbsp;<a href="index.php/blog/der-atomare-wahrheitswert">nächsten Artikel </a>mit dem Klassen-Template <span style="font-family: courier new,courier;">std::atomic</span>. Die verschiedenen Spezialierungen für boolesche Werte, integrale Typen und Zeiger besitzen ein deutlich reichhaltigeres Interface als das <span style="font-family: courier new,courier;">std::atomic_flag</span>.</p>
 <p>&nbsp;</p>
 <p>&nbsp;</p>
 <p>&nbsp;</p>
