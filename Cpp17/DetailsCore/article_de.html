@@ -1,0 +1,311 @@
+<p>Nachdem ich das große Bild zur neuen C++ Kernsprache bereits in dem Artikel "<a href="http://www.grimm-jaud.de/index.php/blog/c-17-kern">C++17: Was gibt's Neues in der Kernsprache?</a>" präsentiert habe, gibt es heute weitere Details. In den Details geht es hauptsächlich um inline Variablen, Template, automatische Typableitung mit auto und Attribute.</p>
+<hr id="system-readmore" />
+<p>Hier ist das große Bild zu C++17 nochmals.</p>
+<p><img src="images/blog/Cpp17/CoreMoreDetails/timeline.png" alt="timeline" width="700" height="338" style="margin: 15px;" /></p>
+<p>Aber heute geht es um die nicht so bekannten Feature</p>
+<h2>Inline Variablen</h2>
+<p>Dank <span style="font-family: Courier New,Courier,monospace;">inline</span> Variablen existiert der entscheidende Grund nicht mehr, C++ Code als header-only Bibliothek zu verpacken. Du kannst nun globale Variablen und statische Variablen als <span style="font-family: Courier New,Courier,monospace;">inline</span> erklären. Dieselben Regeln, die für <span style="font-family: Courier New,Courier,monospace;">inline</span> Funktionen gelten, gelten nun auch für <span style="font-family: Courier New,Courier,monospace;">inline</span> Variablen.</p>
+<p>Das bedeutet:</p>
+<ul>
+<li>Es kann mehr als eine Definition einer <span style="font-family: Courier New,Courier,monospace;">inline</span> Variable geben.</li>
+<li>Die Definition einer inline Variable muss in jeder Übersetzungseinheit zur Verfügung stehen, in der sie verwendet wird.</li>
+<li>Eine globale <span style="font-family: Courier New,Courier,monospace;">inline</span> Variable (non-static <span style="font-family: courier new,courier;">inline</span> Variable) muss in jeder Übersetzungseinheit als <span style="font-family: Courier New,Courier,monospace;">inline</span> deklariert werden und besitzt in jeder Übersetzungseinheit dieselbe Adresse.&nbsp;</li>
+</ul>
+<p>Nochmals der große Vorteil von <span style="font-family: Courier New,Courier,monospace;">inline</span> Variablen. Du kannst deine Variablen direkt in der Headerdatei verwenden und sie mehrmals einbinden.</p>
+<p>&nbsp;</p>
+<div style="background: #ffffff none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0px; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19</pre>
+</td>
+<td>
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #008000;">// widget.h</span>
+
+<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">Widget</span>{
+  public:
+    Widget() = <span style="color: #0000ff;">default</span>;
+    Widget(<span style="color: #2b91af;">int</span> w): width(w), height(getHeight(w)){}
+    Widget(<span style="color: #2b91af;">int</span> w, <span style="color: #2b91af;">int</span> h): width(w), height(h){}
+
+  private:
+    <span style="color: #2b91af;">int</span> getHeight(<span style="color: #2b91af;">int</span> w){ <span style="color: #0000ff;">return</span> w*3/4; }
+    <span style="color: #0000ff;">static</span> <span style="color: #0000ff;">inline</span> <span style="color: #2b91af;">int</span> width= 640;
+    <span style="color: #0000ff;">static</span> <span style="color: #0000ff;">inline</span> <span style="color: #2b91af;">int</span> height= 480;
+    <span style="color: #0000ff;">static</span> <span style="color: #0000ff;">inline</span> <span style="color: #2b91af;">bool</span> frame= false;
+    <span style="color: #0000ff;">static</span> <span style="color: #0000ff;">inline</span> <span style="color: #2b91af;">bool</span> visible= true;
+
+    ...
+};
+
+<span style="color: #0000ff;">inline</span> Widget wVGA;
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><span style="font-family: courier new,courier;">auto</span> kann automatisch den Typ seiner Variable von seinem Initialisierer ableiten. Aber die Geschichte mit <span style="font-family: Courier New,Courier,monospace;">auto</span> geht weiter. Dank <span style="font-family: Courier New,Courier,monospace;">auto</span> ist es möglich, das Template-Parameter von Funktions-Templates und Konstruktoren automatischen von ihren Argumenten abgeleitet und das Nicht-Typ Template-Parameter automatisch von ihren Template-Argumenten abgeleitet werden können. Bist du irritiert über den letzten Teil meines Satzes? Das ist gut. Genau darüber schreibe ich im nächsten Kapitel.</p>
+<h2>Automatische Typableitung von Nicht-Typ Template-Parametern</h2>
+<p>Aber zuerst einmal. Was sind Nicht-Type Template-Parameter. Das sind nullptr-, Ganzzahl-, lvalue Referenz-, Zeiger- und Aufzählungstypen. In meinen Artikel werde ich mich fast nur auf Ganzzahltypen zurückziehen.</p>
+<p>Nach soviel Theorie, geht es mit einem Beispiel los.</p>
+<div style="background: #ffffff none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0px; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13</pre>
+</td>
+<td>
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0000ff;">template</span> &lt;<span style="color: #0000ff;">auto</span> N&gt;
+<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">MyClass</span>{
+  ...
+};
+
+<span style="color: #0000ff;">template</span> &lt;<span style="color: #2b91af;">int</span> N&gt; 
+<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">MyClass</span>&lt;N&gt; {
+  ...
+};
+
+
+MyClass&lt;<span style="color: #a31515;">'x'</span>&gt; myClass2;     <span style="color: #008000;">// Primary template for char</span>
+MyClass&lt;2017&gt;  myClass1;   <span style="color: #008000;">// Partial specialisation for int</span>
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Da ich <span style="font-family: Courier New,Courier,monospace;">auto</span> (Zeile 1) in der Template-Signatur verwende, ist <span style="font-family: Courier New,Courier,monospace;">N</span> ein Nicht-Typ Template-Parameter. Der Compiler kann diesen automatisch bestimmen. Die teilweise Spezialisierung für <span style="font-family: Courier New,Courier,monospace;">int</span> in Zeile 6 und 7 wird von C++17 auch unterstützt. Die Template-Instanziierung in Zeile 12 wird das primäre Template (Zeile 1-4) und die folgende Template-Instanziierung die teilweise Spezialisierung für <span style="font-family: Courier New,Courier,monospace;">int</span> verwenden.</p>
+<p>Die bekannten Typmodifizierer können eingesetzt werden um den Typ des Nicht-Typ Template-Parameters einzuschränken. Daher musst du keine teilweise Spezialisierung anwenden.</p>
+<div style="background: #ffffff none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<pre class="example"><span style="color: #0000ff;">template</span> &lt;<span style="color: #0000ff;">const</span> <span style="color: #0000ff;">auto</span>* p&gt; 
+<span style="color: #0000ff;">struct</span> S;
+<code class="prettyprint"><em></em><span style="font-family: courier new,courier;"> <br /></span></code></pre>
+</div>
+<p>In diesem Fall muss<span style="font-family: Courier New,Courier,monospace;"> p</span> ein Zeiger auf <span style="font-family: Courier New,Courier,monospace;">const</span> sein.&nbsp;</p>
+<p>Die automatische Typableitung für Nicht-Typ Template-Parameter funktioniert auch für Variadic Templates.</p>
+<div style="background: #ffffff none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0px; line-height: 125%;">1
+2
+3
+4
+5
+6
+7
+8
+9</pre>
+</td>
+<td>
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0000ff;">template</span> &lt;<span style="color: #0000ff;">auto</span>... ns&gt;
+<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">VariadicTemplate</span>{
+  ...
+};
+
+<span style="color: #0000ff;">template</span> &lt;<span style="color: #0000ff;">auto</span> n1, decltype(n1)... ns&gt;
+<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">TypedVariadicTemplate</span>{
+  ...
+};
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Daher kann das <span style="font-family: courier new,courier;">VariadicTemplate</span> in Zeile 1-4 eine beliebige Anzahl von Nicht-Typ Template-Parameter ableiten. <span style="font-family: courier new,courier;">TypeVariadicTemplate</span> bestimmt nur den ersten Parameter. Die verbleibenden Template-Parameter besitzen denselben Typ.</p>
+<p>Die Regeln für <span style="font-family: Courier New,Courier,monospace;">auto</span> in Kombination mit {}-Initialisierung ändern sich mit C++17.</p>
+<h2>auto in Kombination mit {}-Initialisierung</h2>
+<p>Falls du <span style="font-family: Courier New,Courier,monospace;">auto</span> in Kombination mit {}-Initialisierung verwendest, erhälst du eine <span style="font-family: courier new,courier;">std::initializer_list</span>.</p>
+<div style="background: #ffffff none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<pre style="margin: 0px; line-height: 125%;">  <span style="color: #0000ff;">auto</span> initA{1};          <span style="color: #008000;">// std::initializer_list&lt;int&gt;</span>
+  <span style="color: #0000ff;">auto</span> initB= {2};        <span style="color: #008000;">// std::initializer_list&lt;int&gt;</span>
+  <span style="color: #0000ff;">auto</span> initC{1, 2};       <span style="color: #008000;">// std::initializer_list&lt;int&gt;</span>
+  <span style="color: #0000ff;">auto</span> initD= {1, 2};     <span style="color: #008000;">// std::initializer_list&lt;int&gt;<br /></span>
+</pre>
+</div>
+<p>Das ist eine einfach Regel. Einfach zu behalten und einfach zu erklären. Leider ändert sich das mit C++17 und das meiner Ansicht nach nicht zum besseren.</p>
+<div style="background: #ffffff none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<pre style="margin: 0px; line-height: 125%;">  <span style="color: #0000ff;">auto</span> initA{1};          <span style="color: #008000;">// int</span>
+  <span style="color: #0000ff;">auto</span> initB= {2};        <span style="color: #008000;">// std::initializer_list&lt;int&gt;</span>
+  <span style="color: #0000ff;">auto</span> initC{1, 2};       <span style="color: #008000;">// error, no single element</span>
+  <span style="color: #0000ff;">auto</span> initD= {1, 2};     <span style="color: #008000;">// std::initializer_list&lt;int&gt;</span>
+</pre>
+</div>
+<p>Nun werde die Regeln kompliziert. Zuweisung mit {} gibt immer eine <span style="font-family: courier new,courier;">std::initializer_list. </span>Copy-Zuweisungen funktioniert nur für einen einzelnen Wert.<span style="font-family: courier new,courier;"> </span></p>
+<p>Nun zu einem kleinen aber feinen Feature</p>
+<h2>Verschachtelte Namensräume</h2>
+<p>Mit C++17 ist es recht einfach, verschachtelte Namensräume zu definieren.</p>
+<p>Anstelle von</p>
+<div style="background: #ffffff none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0000ff;">namespace</span> A {
+  <span style="color: #0000ff;">namespace</span> B {
+    <span style="color: #0000ff;">namespace</span> C {
+      ...
+    }
+  }
+}
+</pre>
+</div>
+<p>kannst du die einfachere Schreibweise verwenden:</p>
+<div style="background: #ffffff none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0000ff;">namespace</span> A::B::C {
+  ...
+}
+</pre>
+</div>
+<p>C++17 erhält die neuen Attribute<span style="font-family: courier new,courier;"> [[fallthrough]], [[nodiscard]]</span> und <span style="font-family: courier new,courier;">[[maybe_unused]]. </span></p>
+<h2>Die drei neuen Attribute fallthrough, nodiscard und maybe_unused</h2>
+<p>All drei beschäftigen sich mit Compiler Warnungen. Die Beispiele sind von <a href="http://en.cppreference.com/w/cpp/language/attributes">cppreference.com</a>.</p>
+<h3>fallthrough</h3>
+<p><span style="font-family: Courier New,Courier,monospace;">[[fallthrough]]</span> kann in einer <span style="font-family: courier new,courier;">switch</span> Anweisung verwendet werden. Es muss auf einer Zeile stehen, direkt vor einem <span style="font-family: courier new,courier;">case</span> Bezeichner. Das Attribut zeigt dem Compiler an, dass ein <i>Durchrutschen </i>durch den Anweisungsblock beabsichtigt ist und daher keine Compiler Warnung dies anzeigen soll.</p>
+<p>Hier ist ein kleines Beispiel:</p>
+<div style="background: #ffffff none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0px; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14</pre>
+</td>
+<td>
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #2b91af;">void</span> f(<span style="color: #2b91af;">int</span> n) {
+  <span style="color: #2b91af;">void</span> g(), h(), i();
+  <span style="color: #0000ff;">switch</span> (n) {
+    <span style="color: #0000ff;">case</span> 1:
+    <span style="color: #0000ff;">case</span> 2:
+      g();
+     [[fallthrough]];
+    <span style="color: #0000ff;">case</span> 3: <span style="color: #008000;">// no warning on fallthrough</span>
+      h();
+    <span style="color: #0000ff;">case</span> 4: <span style="color: #008000;">// compiler may warn on fallthrough</span>
+      i();
+      [[fallthrough]]; <span style="color: #008000;">// ill&shy;formed, not before a case label</span>
+  }
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Das<span style="font-family: courier new,courier;"> [[fallthrough]]</span> Attribut in Zeile 7 unterdrückt die Compiler Warnung. Das gilt nicht für die Zeile 10. Die Zeile 12 hingegen ist syntaktisch falsch, da kein <span style="font-family: Courier New,Courier,monospace;">case</span> Bezeichner folgt.</p>
+<p><span style="font-family: Courier New,Courier,monospace;">[[nodiscard]] </span>kann in Funktions-, Aufzähler- und Klassendeklaration verwendet werden. Falls du den Rückgabewert einer als <span style="font-family: Courier New,Courier,monospace;">nodiscard</span> deklarierten Funktion ignorierst, soll der Compiler eine Warnung ausgeben. Dasselbe gilt für eine Funktion, die eine Aufzählung oder eine Klasse zurückgibt. Dies gilt aber nicht, falls eine Konvertierung nach <span style="font-family: Courier New,Courier,monospace;">void</span> angewandt wird.</p>
+<p>Daher soll Zeile 5 eine Warnung ausgeben. Zeile 10 soll keine Warnung ausgeben, da die Funktion <span style="font-family: Courier New,Courier,monospace;">foo</span> eine Referenz zurückgibt.</p>
+<div style="background: #ffffff none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0px; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11</pre>
+</td>
+<td>
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0000ff;">struct</span> [[nodiscard]] error_info { };
+error_info enable_missile_safety_mode();
+<span style="color: #2b91af;">void</span> launch_missiles();
+<span style="color: #2b91af;">void</span> test_missiles() {
+   enable_missile_safety_mode(); <span style="color: #008000;">// compiler may warn on discarding a nodiscard value</span>
+   launch_missiles();
+}
+error_info&amp; foo();
+<span style="color: #2b91af;">void</span> f1() {
+    foo(); <span style="color: #008000;">// nodiscard type is not returned by value, no warning</span>
+} 
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h2>maybe_unused</h2>
+<p><span style="font-family: Courier New,Courier,monospace;">[[maybe_unused]]</span> kann für die Deklaration einer Klasse, eines typedef, einer Variable, eines Nicht-statischen Mitglied einer Klasse, einer Funktion, einer Aufzählung oder eines Aufzählers verwendet werden. Dank <span style="font-family: Courier New,Courier,monospace;">maybe_unused</span> unterdrückt seine Warnung zu einer nicht verwendeten Entität.</p>
+<div style="background: #ffffff none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0px; line-height: 125%;">1
+2
+3
+4
+5
+6</pre>
+</td>
+<td>
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #2b91af;">void</span> f([[maybe_unused]] <span style="color: #2b91af;">bool</span> thing1,
+       [[maybe_unused]] <span style="color: #2b91af;">bool</span> thing2)
+{
+   [[maybe_unused]] <span style="color: #2b91af;">bool</span> b = thing1;
+   assert(b); <span style="color: #008000;">// in release mode, assert is compiled out</span>
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Im Release-Modus wird Zeile 5 nicht kompiliert. Der Compiler soll aber keine Warnung ausgeben, da<span style="font-family: Courier New,Courier,monospace;"> b </span>als<span style="font-family: Courier New,Courier,monospace;"> maybe_unused </span>erklärt wird. Das gleiche gilt für die Variable <span style="font-family: Courier New,Courier,monospace;">thing2</span>.</p>
+<h2>Wie geht's weiter?</h2>
+<p>Nach meiner Einführung in die C++17 Kernsprache(<a href="http://www.grimm-jaud.de/index.php/blog/c-17-kern">C++17: Was gibt's Neues in der Kernsprache?</a>), lieferte ich in diesem Artikel mehr Details. Das gleiche gilt für meinen nächsten Artikel. I werde in meinem nächsten Artikel mehr Details zu den C++17 Bibliothek liefern. Daher, falls dich <a href="http://www.grimm-jaud.de/index.php/blog/c-17-was-gibts-neues-in-der-bibliothek">C++17: Was gibt´s Neues in der C++ Bibliothek&nbsp;</a> neugierig gemacht hat.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="166" height="212" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Hole dir dein E-Book. Unterstütze meinen Blog.</span></strong></p>
+<p>&nbsp;</p>
+<pre class="moz-signature">&nbsp;</pre>
