@@ -1,0 +1,166 @@
+<p>Wir bleiben im Jahr 2020. Mit C++20 werden wir Concepts Lite erhalten. Auch wenn verlässliche Aussagen über die Zukunft schwierig sind, so besitzt diese Aussage doch eine sehr hohe Wahrscheinlichkeit einzutreffen. Sie stammt aus dem Munde von Bjarne Stroustrup (<a href="http://meetingcpp.com/index.php/mcpp2016.html">Meeting C++ 2016).</a></p>
+<hr id="system-readmore" />
+<h2>Die klassischen Concepts</h2>
+<p>Die zentrale Idee der generischen Programmierung mit Templates in C++ ist es, Funktionen und Klassen zu definieren, die mit verschiedenen Typen verwendet werden können. Oft kommt es aber vor, dass ein Template mit einem ungeeigneten Typ instanziiert wird. Das Ergebnis sind gerne seitenlange, kryptische Fehlermeldungen zur Compilezeit, für die Templates traurige Berühmtheit erlangt haben. Daher waren Concepts als eines der wichtigsten Feature für den C++11 Standard geplant. Sie sollten es erlauben, Anforderungen an Templates zu stellen, die vom Compiler verifiziert werden. Im Juli 2009 wurden sie aber im wesentlichen aufgrund ihrer Komplexität aus dem Standard entfernt. "The C++0x concept design evolved into a monster of complexity." (Bjarne Stroustrup)</p>
+<h2>Concepts Lite</h2>
+<p><br />Mit C++20 erhält C++ Concepts Lite. Auch wenn Concepts Lite in der ersten Umsetzung vereinfachte Concepts sind, haben sie sehr viel zu bieten. Sie</p>
+<ul>
+<li>erlauben Programmierern direkt die Anforderungen an die Templates als Teil des Interfaces zu formulieren.</li>
+<li>unterstützen das Überladen von Funktionen und die Spezialisierung von Klassen-Templates, basierend auf den Anforderungen an die Templates.</li>
+<li>erzeugen deutlich verbesserte Fehlermeldungen, indem sie die Anforderungen an die Template-Parameter mit den aktuellen Template-Argumenten vergleichen.</li>
+</ul>
+<p>Diesen deutlichen Mehrwert gibt es ohne eine längere Übersetzungs- oder Laufzeit des Programms. Inspiriert sind Concepts Lite durch Haskell's Typklassen. So werden Concepts Lite semantische Kategorien und nicht syntaktische Einschränkungen beschreiben. Für Typen werden dies Kategorien wie <span style="font-family: courier new,courier;">DefaultConstructible, MoveConstructible, CopyConstructible, MoveAssignable, CopyAssignable</span> oder auch <span style="font-family: courier new,courier;">Destructible</span> sein. Für Container werden dies Kategorien wie <span style="font-family: courier new,courier;">ReversibleContainer, AllocatorAwareContainer, SequenceContainer, ContinousContainer, AssociativeContainer</span> oder <span style="font-family: courier new,courier;">UnorderedAssociativeContainer</span> sein. Einen genauen Überblick über Concepts Lite gibt die Webressource <a href="http://en.cppreference.com/w/cpp/concept">cppreference.com</a>.</p>
+<p>Bevor ich Concepts Lite genauer vorstelle, ist ein Blick auf Haskells Typklassen sehr interessant.</p>
+<h3>Typklassen in Haskell</h3>
+<p>Typklassen sind Interfaces für ähnliche Typen. Ist ein Typ Mitglied einer Typklasse, so bietet dieser Typ bestimmte Eigenschaften an. Typklassen erfüllen für die generische Programmierung eine ähnliche Rolle, wie Interfaces für die objektorientierte Programmierung. Hier ist ein Teil der Typklassenhierachie Haskell's.</p>
+<p><img src="images/blog/FunktionaleProgrammierung/ConceptsLite/typeclass.png" alt="typeclass" style="margin: 15px;" /></p>
+<p>Was zeichnet nun Typen aus, die Mitglied der Typklasse Eq sind. Eq steht in diesem Fall für Gleichheit (eng. Equality) und fordert von seinen Mitgliedern:</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">class</span> <span style="color: #2b91af;">Eq</span> a <span style="color: #0000ff;">where</span> 
+    (==) <span style="color: #0000ff;">::</span> a <span style="color: #0000ff;">-&gt;</span> a <span style="color: #0000ff;">-&gt;</span> <span style="color: #2b91af;">Bool</span> 
+    (/=) <span style="color: #0000ff;">::</span> a <span style="color: #0000ff;">-&gt;</span> a <span style="color: #0000ff;">-&gt;</span> <span style="color: #2b91af;">Bool</span> 
+    a == b <span style="color: #0000ff;">=</span> not (a /= b) 
+    a /= b <span style="color: #0000ff;">=</span> not (a == b) 
+</pre>
+</div>
+<p><span style="font-family: courier new,courier;">Eq</span> fordert, dass seine Typen eine Funktion Gleichheit (<span style="font-family: courier new,courier;">==</span>) und Ungleichheit (<span style="font-family: courier new,courier;">/=)</span> implementieren. Der Ausdruck<span style="font-family: courier new,courier;"> a -&gt; a -&gt; Bool</span> beschreibt die Signatur der Funktion. Die Funktion erwartet zwei gleiche Typen <span style="font-family: courier new,courier;">a</span> und gibt einen Wahrheitswert <span style="font-family: courier new,courier;">Bool</span> zurück. Tatsächlich reicht es aber aus, für einen Typ Gleichheit oder Ungleichheit zu definieren, da Gleichheit durch Ungleichheit, Ungleichheit durch Gleichheit definiert werden kann. Die Defaultimplemetierung für Gleichheit und Ungleichheit sind bereits in den letzten zwei Zeilen vorhanden.</p>
+<p>Durch den folgenden Codeschnipsel wird der built-in Typ <span style="font-family: courier new,courier;">Bool</span> zur Instanz der Typklasse <span style="font-family: courier new,courier;">Eq</span>.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">instance</span> <span style="color: #2b91af;">Eq</span> <span style="color: #2b91af;">Bool</span> <span style="color: #0000ff;">where</span> 
+    <span style="color: #2b91af;">True</span> == <span style="color: #2b91af;">True</span> <span style="color: #0000ff;">=</span> <span style="color: #2b91af;">True</span> 
+    <span style="color: #2b91af;">False</span> == <span style="color: #2b91af;">False</span> <span style="color: #0000ff;">=</span> <span style="color: #2b91af;">True</span> 
+    <span style="color: #0000ff;">_</span> == <span style="color: #0000ff;">_</span> <span style="color: #0000ff;">=</span> <span style="color: #2b91af;">False</span> 
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Haskells Typklassen&nbsp;bilden eine Hierarchie. Die Typklasse <span style="font-family: courier new,courier;">Ord</span> ist eine Unterklasse der Typklasse<span style="font-family: courier new,courier;"> Eq.</span> Instanzen der Typklasse <span style="font-family: courier new,courier;">Ord</span> müssen daher Mitglieder der Typklasse<span style="font-family: courier new,courier;"> Eq</span> sind und darüber hinaus die Vergleichsoperatoren unterstützen.</p>
+<p>Für einige Typklassen kann Haskell bereits automatisch die notwendigen Funktionen erzeugen. So lassen sich die Werte <span style="font-family: courier new,courier;">Morning</span> und <span style="font-family: courier new,courier;">Afternoon</span> des Datentyps <span style="font-family: courier new,courier;">Day</span>&nbsp;sowohl auf Gleichheit testen als auch ausgeben. Dazu leite ich&nbsp;<span style="font-family: courier new,courier;">Day</span> von der Typklasse <span style="font-family: courier new,courier;">Eq</span> und <span style="font-family: courier new,courier;">Show</span> ab.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">data</span> <span style="color: #2b91af;">Day</span><span style="color: #0000ff;">=</span> <span style="color: #2b91af;">Morning</span> | <span style="color: #2b91af;">Afternoon</span>
+     <span style="color: #0000ff;">deriving</span> (<span style="color: #2b91af;">Eq</span>,<span style="color: #2b91af;">Show</span>)
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Mein Datentyp <span style="font-family: courier new,courier;">Day</span> lässt sich direkt in Haskell's interaktiven Shell testen. Formal gesprochen heißt die interaktive Shell REPL und ist in vielen Programmiersprachen wie Python zu Hause. Dieses Akronym steht für <strong>R</strong>ead <strong>E</strong>valuate <strong>P</strong>rint <strong>L</strong>oop.</p>
+<p>&nbsp;<img src="images/blog/FunktionaleProgrammierung/ConceptsLite/day.png" alt="day" style="margin: 15px;" /></p>
+<p>Typklassen in Haskell bieten aber noch viel mehr. So können zum Beispiel eigene Typklassen definiert werden.</p>
+<h3>Concepts Lite für Funktionen, Klassen und Mitglieder einer Klasse</h3>
+<p>Concepts Lite sind Teil der Templatedeklaration.</p>
+<h4>Funktionen</h4>
+<p>Das Funktions-Template <span style="font-family: courier new,courier;">sort</span> fordert,</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">template</span>&lt;Sortable Cont&gt;
+<span style="color: #2b91af;">void</span> sort(Cont&amp; container){...}
+<br /><br /></pre>
+</div>
+<p>dass der Container sortierbar <span style="font-family: courier new,courier;">(Sortable)</span> sein muss. Äquivalent lässt sich die Anforderung an den Template-Parameter auch explizit formulieren:</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">template</span>&lt;<span style="color: #0000ff;">typename</span> Cont&gt;
+  requires Sortable&lt;Cont&gt;()
+<span style="color: #2b91af;">void</span> sort(Cont&amp; container){...}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p><span style="font-family: courier new,courier;">Sortable</span> selbst muss ein konstanter Ausdruck sein, der ein Prädikat ist. Das heißt, dass er zur Übersetzungszeit ausgewertet werden kann und einen Wahrheitswert zurückgibt.</p>
+<p>Wird nun der sort-Algorthmus mit einem Container <span style="font-family: courier new,courier;">ls</span>t verwendet, der nicht sortierbar ist, moniert das der Compiler mit einer eindeutigen Fehlermeldung.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">std::list&lt;<span style="color: #2b91af;">int</span>&gt; lst = {1998,2014,2003,2011};
+sort(lst); <span style="color: #008000;">// ERROR: lst is no random-access container with &lt;</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Concepts Lite lassen sich bei allen Templates verwenden.</p>
+<h4>Klassen</h4>
+<p>So lässt sich ein Klassen-Template <span style="font-family: courier new,courier;">MyVector</span> definieren, der nur Objekte als Elemente besitzen kann:</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">template</span>&lt;Object T&gt;
+<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">MyVector</span>{};
+
+MyVector&lt;<span style="color: #2b91af;">int</span>&gt; v1; <span style="color: #008000;">// OK</span>
+MyVector&lt;<span style="color: #2b91af;">int</span>&amp;&gt; v2 <span style="color: #008000;">// ERROR: int&amp; does not satisfy the constraint Object</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>In diesem Fall moniert der Compiler, das ein Zeiger <span style="font-family: courier new,courier;">(int&amp;</span>) kein Objekt ist. <span style="font-family: courier new,courier;">MyClass</span> kann noch weiter verfeinert werden.</p>
+<h4>Mitglieder einer Klasse</h4>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">template</span>&lt;Object T&gt;
+<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">MyVector</span>{
+  ...
+  requires Copyable&lt;T&gt;()
+  <span style="color: #2b91af;">void</span> push_back(<span style="color: #0000ff;">const</span> T&amp; e);
+  ...
+};
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Nun fordert die Methode <span style="font-family: courier new,courier;">push_back</span> von <span style="font-family: courier new,courier;">MyVector,</span> dass die Elemente kopierbar sein müssen.</p>
+<h3>Erweiterte Funktionalität</h3>
+<p>Ein Template kann mehrere Anforderungen an sein Template-Parameter stellen.</p>
+<h4>Mehrere Anforderungen</h4>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">template</span> &lt;SequenceContainer S,EqualityComparable&lt;value_type&lt;S&gt;&gt; T&gt;
+Iterator_type&lt;S&gt; find(S&amp;&amp; seq, <span style="color: #0000ff;">const</span> T&amp; val){...}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>So stellt das Funktion-Template find zwei Bedingungen. Zum einen muss sein Container seine Elemente wie eine Sequenz (<span style="font-family: courier new,courier;">SequenceContainer</span>) im Speicher ablegen, zum anderen müssen sich die Elemente des Containers auf Gleichheit (<span style="font-family: courier new,courier;">EqualityComparable&lt;value_type&lt;S&gt;&gt;</span>) vergleichen lassen.</p>
+<p>Aber auch das Überladen von Funktionen unterstützen Concepts Lite.</p>
+<h4>Überladen von Funktionen</h4>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">template</span>&lt;InputIterator I&gt;
+<span style="color: #2b91af;">void</span> advance(I&amp; iter, <span style="color: #2b91af;">int</span> n){...}
+
+<span style="color: #0000ff;">template</span>&lt;BidirectionalIterator I&gt;
+<span style="color: #2b91af;">void</span> advance(I&amp; iter, <span style="color: #2b91af;">int</span> n){...}
+
+<span style="color: #0000ff;">template</span>&lt;RandomAccessIterator I&gt;
+<span style="color: #2b91af;">void</span> advance(I&amp; iter, <span style="color: #2b91af;">int</span> n){...}
+
+std::list&lt;<span style="color: #2b91af;">int</span>&gt; lst{1,2,3,4,5,6,7,8,9};
+std::list&lt;<span style="color: #2b91af;">int</span>&gt;:: iterator i= lst.begin();
+std::advance(i,2);   <span style="color: #008000;">//  BidirectionalIterator</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Das Funktions-Template <span style="font-family: courier new,courier;">advance</span> setzt seinen Iterator <span style="font-family: courier new,courier;">iter</span> um <span style="font-family: courier new,courier;">n</span> Positionen weiter. Abhängig davon, ob der Iterator nur vorwärts, in beide Richtungen oder beliebig positioniert werden kann, kommen verschieden Funktions-Templates zum Einsatz. Im konkreten Fall der Liste, wird die <span style="font-family: courier new,courier;">BidirectionalIterator</span> vom Compiler ausgewählt.</p>
+<p>Concepts Lite unterstützen das Spezialisieren von Klassen-Templates.</p>
+<h4>Spezialisieren von Klassen-Templates</h4>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">template</span>&lt;<span style="color: #0000ff;">typename</span> T&gt;
+<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">MyVector</span>{};
+
+<span style="color: #0000ff;">template</span>&lt;Object T&gt;
+<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">MyVector</span>{};
+
+MyVector&lt;<span style="color: #2b91af;">int</span>&gt; v1; <span style="color: #008000;">// Object T</span>
+MyVector&lt;<span style="color: #2b91af;">int</span>&amp;&gt; v2 <span style="color: #008000;">// typename T</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>So bildet der Compiler <span style="font-family: courier new,courier;">MyVector&lt;int&amp;&gt; v2</span> auf das uneingeschränkte Template in erste&nbsp; Zeile ab, <span style="font-family: courier new,courier;">MyVector&lt;int&gt; v1</span> hingegen auf das eingeschränkte Template<span style="font-family: courier new,courier;"> template&lt;Object T&gt; class MyVector{};</span>.</p>
+<h2>Wie geht's weiter?</h2>
+<p>Haskell kennt die Typklasse Monade. Eine<span id="transmark"></span> bekannte Instanz ist die Maybe-Monade. Warum sage ich das?. Ganz einfach. C++17 erhält mit dem Datentyp <span style="font-family: courier new,courier;">std::optional</span> eine Monade, die wie die Maybe-Monade eine Berechnung repräsentiert, die ein oder kein Ergebnis zurückgeben kann. Die Details zu <span style="font-family: courier new,courier;">std::optional</span> folgen im <a href="index.php/blog/monaden-in-c">nächsten Artikel</a>.</p>
+<h2>&nbsp;</h2>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="166" height="212" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Hole dir dein E-Book. Unterstütze meinen Blog.</span></strong></p>
+<p>&nbsp;</p>

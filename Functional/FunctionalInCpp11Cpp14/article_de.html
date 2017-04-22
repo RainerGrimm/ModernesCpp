@@ -1,0 +1,239 @@
+<p>Wie schön die Features in modernem C++ ineinander greifen, zeigt mein Lieblingsbeispiel: Ein <em>dispatch table</em> mit modernem C++. Ein <a href="https://en.wikipedia.org/wiki/Dispatch_table">dispatch table </a>ist eine Tabelle von Zeigern auf Funktionen. In meinen konkreten Fall ist es eine Tabelle von Verweisen auf polymorphe Funktionswrapper.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p>Doch zuerst einmal. Was meine ich mit modernem C++? In dem <em>dispatch table</em> kommen Feature aus C++11 zum Einsatz. Auf der Zeitachse habe ich aus C++14 dargestellt. Dazu aber später mehr.</p>
+<p><img src="images/blog/FunktionaleProgrammierung/FunktionalInTR1Cpp11_2/FunktionalCpp11Cpp14.png" alt="FunktionalCpp11Cpp14" width="700" height="234" style="margin: 15px;" /></p>
+<h2>Dispatch table</h2>
+<p>Das Beispiel zeigt ein einfaches <em>dispatch table</em>, das Zeichen auf Funktionsobjekte abbildet.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// dispatchTable.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;cmath&gt;</span>
+<span style="color: #0000ff;">#include &lt;functional&gt;</span>
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;map&gt;</span>
+
+<span style="color: #2b91af;">int</span> main(){
+
+  std::cout &lt;&lt; std::endl;
+
+  <span style="color: #008000;">// dispatch table</span>
+  std::map&lt;<span style="color: #0000ff;">const</span> <span style="color: #2b91af;">char</span>, std::function&lt;<span style="color: #2b91af;">double</span>(<span style="color: #2b91af;">double</span>,<span style="color: #2b91af;">double</span>)&gt; &gt; dispTable;
+  dispTable.insert( std::make_pair(<span style="color: #a31515;">'+'</span>, [](<span style="color: #2b91af;">double</span> a, <span style="color: #2b91af;">double</span> b){ <span style="color: #0000ff;">return</span> a + b; }));
+  dispTable.insert( std::make_pair(<span style="color: #a31515;">'-'</span>, [](<span style="color: #2b91af;">double</span> a, <span style="color: #2b91af;">double</span> b){ <span style="color: #0000ff;">return</span> a - b; }));
+  dispTable.insert( std::make_pair(<span style="color: #a31515;">'*'</span>, [](<span style="color: #2b91af;">double</span> a, <span style="color: #2b91af;">double</span> b){ <span style="color: #0000ff;">return</span> a * b; }));
+  dispTable.insert( std::make_pair(<span style="color: #a31515;">'/'</span>, [](<span style="color: #2b91af;">double</span> a, <span style="color: #2b91af;">double</span> b){ <span style="color: #0000ff;">return</span> a / b; }));
+
+  <span style="color: #008000;">// do the math</span>
+  std::cout &lt;&lt; <span style="color: #a31515;">"3.5+4.5= "</span> &lt;&lt; dispTable[<span style="color: #a31515;">'+'</span>](3.5, 4.5) &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"3.5-4.5= "</span> &lt;&lt; dispTable[<span style="color: #a31515;">'-'</span>](3.5, 4.5) &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"3.5*4.5= "</span> &lt;&lt; dispTable[<span style="color: #a31515;">'*'</span>](3.5, 4.5) &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"3.5/4.5= "</span> &lt;&lt; dispTable[<span style="color: #a31515;">'/'</span>](3.5, 4.5) &lt;&lt; std::endl;
+
+  <span style="color: #008000;">// add a new operation</span>
+  dispTable.insert( std::make_pair(<span style="color: #a31515;">'^'</span>, [](<span style="color: #2b91af;">double</span> a, <span style="color: #2b91af;">double</span> b){ <span style="color: #0000ff;">return</span> std::pow(a, b);} ));
+  std::cout &lt;&lt; <span style="color: #a31515;">"3.5^4.5= "</span> &lt;&lt; dispTable[<span style="color: #a31515;">'^'</span>](3.5, 4.5) &lt;&lt; std::endl;
+
+  std::cout &lt;&lt; std::endl;
+
+};
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Wie funktioniert das ganze? Das <span style="font-family: courier new,courier;">dispatch table</span> ist eine <span style="font-family: courier new,courier;">std::map</span> in, die Paaren <span style="font-family: courier new,courier;">const char</span> und<span style="font-family: courier new,courier;">&nbsp;std::function&lt;double(double,double) </span>besitzt. Natürlich hätte ich auch anstelle des klassischen <span style="font-family: courier new,courier;">std::map</span> ein neue <span style="font-family: courier new,courier;">std::unordered_map</span> verwenden können. <span style="font-family: courier new,courier;"> std::function</span> ist ein sogenannter polymorpher Funktionswrapper. Als dieser kann er alles annehmen, was sich wie eine Funktion anfühlt. Dies kann eine Funktion, ein Funktionsobjekt oder auch wie in dem konkreten Beispiel (Zeile 14 - 17) eine Lambda-Funktion sein. Die einzige Bedingung, die <span style="font-family: courier new,courier;">std::function&lt;double(double,double)&gt;</span> an seine Objekte stellt, ist, das sie zwei <span style="font-family: courier new,courier;">double</span> Argumente erhalten und eine <span style="font-family: courier new,courier;">double</span> Argument zurückgeben. Genau diese Bedingung erfüllen die Lambda-Funktionen.</p>
+<p>In den Zeilen 20 - 23 kommen die Funktionsobjekte zum Einsatz. So gibt zum Beispiel der Aufruf<span style="font-family: courier new,courier;"> dispTable['+'] </span>in Zeile 20 das Funktionsobjekt zurück, dass mit der Lambda-Funktion <span style="font-family: courier new,courier;">[](double a, double b){ return a + b; }</span> in Zeile 14 initialisiert wurde. Damit das Funktionsobjekt ausgeführt wird, benötigt es noch seine zwei Argumente. Diese kommen in dem Ausdruck<span style="font-family: courier new,courier;"> dispTable['+'](3.5, 4.5)</span> zum Einsatz.&nbsp;</p>
+<p>Ein <span style="font-family: courier new,courier;">std::map</span> ist eine dynamische Datenstruktur. Daher kann ich die Arithmetik einfach um die Operation<span style="font-family: courier new,courier;"> '^'</span> erweitern (Zeile 27) und anschließend verwenden. Zum Abschluss die ganze Rechnerei.</p>
+<p><img src="images/blog/FunktionaleProgrammierung/FunktionalInTR1Cpp11_2/dispatchTable.png" alt="dispatchTable" style="margin: 15px;" /></p>
+<p>Eine kleine Erklärung bin ich noch schuldig geblieben. Warum ist das mein Lieblingsbeispiel?</p>
+<h3>Wie in Python</h3>
+<p>Ich halte häufig Python Schulungen. Eines meiner Beispiele, um den einfachen Umgang mit Python zu motivieren, ist ein <em><span style="font-family: courier new,courier;">dispatch table</span>.</em></p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;"># dispatchTable.py</span>
+
+dispTable={
+  <span style="color: #a31515;">"+"</span>: (<span style="color: #0000ff;">lambda</span> x, y: x+y),
+  <span style="color: #a31515;">"-"</span>: (<span style="color: #0000ff;">lambda</span> x, y: x-y),  
+  <span style="color: #a31515;">"*"</span>: (<span style="color: #0000ff;">lambda</span> x, y: x*y),
+  <span style="color: #a31515;">"/"</span>: (<span style="color: #0000ff;">lambda</span> x, y: x/y)
+}
+
+<span style="color: #0000ff;">print</span>
+
+<span style="color: #0000ff;">print</span> <span style="color: #a31515;">"3.5+4.5= "</span>, dispTable[<span style="color: #a31515;">'+'</span>](3.5, 4.5)
+<span style="color: #0000ff;">print</span> <span style="color: #a31515;">"3.5-4.5= "</span>, dispTable[<span style="color: #a31515;">'-'</span>](3.5, 4.5)
+<span style="color: #0000ff;">print</span> <span style="color: #a31515;">"3.5*4.5= "</span>, dispTable[<span style="color: #a31515;">'*'</span>](3.5, 4.5)
+<span style="color: #0000ff;">print</span> <span style="color: #a31515;">"3.5/4.5= "</span>, dispTable[<span style="color: #a31515;">'/'</span>](3.5, 4.5)
+
+dispTable[<span style="color: #a31515;">'^'</span>]= <span style="color: #0000ff;">lambda</span> x, y: pow(x,y)
+<span style="color: #0000ff;">print</span> <span style="color: #a31515;">"3.5^4.5= "</span>, dispTable[<span style="color: #a31515;">'^'</span>](3.5, 4.5)
+
+<span style="color: #0000ff;">print</span>
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Diese Implementierung basiert auf den funktionalen Featuren von Python. Dank<span style="font-family: courier new,courier;"> std::map,</span> <span style="font-family: courier new,courier;">std::function</span> und Lambda-Funktion kann ich jetzt das fast gleiche Beispiel in C++11 verwenden, um die Mächtigkeit von C++ zu unterstreichen. Das hätte ich mir vor 10 Jahren noch nicht ausgemalt.</p>
+<p><img src="images/blog/FunktionaleProgrammierung/FunktionalInTR1Cpp11_2/dispatchTablePython.png" alt="dispatchTablePython" style="margin: 15px;" />&nbsp;</p>
+<h2>Generische Lambda-Funktionen</h2>
+<p>Fast hätte ich es vergessen. Mit C++14 werden Lambda-Funktionen noch mächtiger. Lambda-Funktionen können automatisch den Typ ihrer Argumente bestimmen. Grundlage der neuen Funktionalität sind Lambda-Funktionen und die automatische Typableitung mit <span style="font-family: courier new,courier;">auto</span>. Es versteht sich von selbst, dass beide Feature Charakteristiken der funktionalen Programmierung sind.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// generalizedLambda.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;string&gt;</span>
+<span style="color: #0000ff;">#include &lt;typeinfo&gt;</span>
+
+<span style="color: #2b91af;">int</span> main(){
+    
+  std::cout &lt;&lt; std::endl;
+  
+  <span style="color: #0000ff;">auto</span> myAdd= [](<span style="color: #0000ff;">auto</span> fir, <span style="color: #0000ff;">auto</span> sec){ <span style="color: #0000ff;">return</span> fir+sec; };
+  
+  std::cout &lt;&lt; <span style="color: #a31515;">"myAdd(1, 10)= "</span> &lt;&lt; myAdd(1, 10) &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"myAdd(1, 10.0)= "</span> &lt;&lt; myAdd(1, 10.0) &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"myAdd(std::string(1),std::string(10.0)= "</span> 
+            &lt;&lt;  myAdd(std::string(<span style="color: #a31515;">"1"</span>),std::string(<span style="color: #a31515;">"10"</span>)) &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"myAdd(true, 10.0)= "</span> &lt;&lt; myAdd(true, 10.0) &lt;&lt; std::endl;
+  
+  std::cout &lt;&lt; std::endl;
+  
+  std::cout &lt;&lt; <span style="color: #a31515;">"typeid(myAdd(1, 10)).name()= "</span> &lt;&lt; <span style="color: #0000ff;">typeid</span>(myAdd(1, 10)).name() &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"typeid(myAdd(1, 10.0)).name()= "</span> &lt;&lt; <span style="color: #0000ff;">typeid</span>(myAdd(1, 10.0)).name() &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"typeid(myAdd(std::string(1), std::string(10))).name()= "</span> 
+            &lt;&lt; <span style="color: #0000ff;">typeid</span>(myAdd(std::string(<span style="color: #a31515;">"1"</span>), std::string(<span style="color: #a31515;">"10"</span>))).name() &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"typeid(myAdd(true, 10.0)).name()= "</span> &lt;&lt; <span style="color: #0000ff;">typeid</span>(myAdd(true, 10.0)).name() &lt;&lt; std::endl;
+    
+  std::cout &lt;&lt; std::endl;
+
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>In der Zeile 11 ist die generische Lambda-Funktion. Diese kann mit beliebigen Typen für ihre Argumente <span style="font-family: courier new,courier;">fir</span> und <span style="font-family: courier new,courier;">sec</span> aufgerufen werden und ermittelt als Lambda-Funktion ihren Rückgabetyp automatisch. Um sie in den folgen Zeilen verwenden zu können, binde ich sie an den Namen <span style="font-family: courier new,courier;">myAdd. </span>Zeile 13 - 17 zeigen die Lambda-Funktion in der Anwendung. Natürlich interessiert mich, welchen Typ der Compiler als Rückgabetype ermittelt. Dazu verwende ich den <span style="font-family: courier new,courier;">typeid</span> Operator in den Zeilen 21 - 25. Dieser setzt die Headerdatei <span style="font-family: courier new,courier;">&lt;typeinfo&gt;</span> voraus.<span style="font-family: courier new,courier;"></span></p>
+<p>Der <span style="font-family: courier new,courier;">typeid</span> Operator ist nicht besonders zuverlässig. Er gibt ein C String zurück, der von der Implementierung abhängt. Weder sichert der Operator zu, dass der String unterschiedlich für verschiedene Typen ist, noch das der String für jeden Aufruf des Programms identisch ist. Für unsere einfache Anwendung ist die Ausgabe des<a href="http://en.cppreference.com/w/cpp/types/type_info/name"> typeid Operator</a> aber ausreichend zuverlässig.</p>
+<p>Mein Rechner mit meinem C++14 Compiler ist gerade in Reparatur, daher habe ich das Programm auf <a href="http://en.cppreference.com/w/">cppreference.com</a> ausgeführt.</p>
+<p><img src="images/blog/FunktionaleProgrammierung/FunktionalInTR1Cpp11_2/generalizedLambdaFunctions.png" alt="generalizedLambdaFunctions" width="700" height="236" style="margin: 15px;" /></p>
+<p>Schön zeigt die Ausgabe die verschiedenen&nbsp;Rückgabetypen. Die C-String i und d stehen für die Typen <span style="font-family: courier new,courier;">int</span> und <span style="font-family: courier new,courier;">double.</span> Lediglich der Typ des C++-Strings ist nicht besonders schön zu lesen. Es lässt sich aber zu mindestens erkennen, dass <span style="font-family: courier new,courier;">std::string</span> ein<a href="http://en.cppreference.com/w/cpp/string/basic_string"><span style="font-family: courier new,courier;"> Synonym</span></a> für <span style="font-family: courier new,courier;">std::basic_string</span> ist.</p>
+<h2>Wie geht's weiter?</h2>
+<p>Im <a href="index.php/blog/funktional-in-c-nahe-und-ferne-zukunft">nächsten Artikel</a><span id="transmark"></span> werde ich ein wenig in die nahe und die ferne Zukunft&nbsp; von C++ aus einer funktionalen Perspektive blicken. Mit C++17 und C++20 werden die funktionalen Aspekte von C++ deutlich mächtiger.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="166" height="212" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Hole dir dein E-Book. Unterstütze meinen Blog.</span></strong></p>

@@ -1,0 +1,351 @@
+<p>In meinem Artikel <a href="index.php/blog/rekursion-verarbeitung-von-listen-und-bedarfsauswertung">Rekursion, Verarbeitung von Listen und Bedarfsauswertung</a> zu den Charakteristiken der funktionalen Programmierung habe ich geschrieben: Die Geschichte der Bedarfsauswertung in C++ ist kurz. Leider habe ich meine Rechnung ohne Templates gemacht. Die zwei fortgeschrittene Template Techniken CRTP und Expression Templates basieren auf der Bedarfsauswertung.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<h2>CRTP</h2>
+<p>Doch was heißt CRTP? Das Akronym CRTP steht für das C++ Idiom <strong>C</strong>uriously<strong> R</strong>ecurring <strong>T</strong>emplate <strong>P</strong>attern und bezeichnet eine Technik in C++, in der eine Klasse <span style="font-family: courier new,courier;">Derived</span> von einem Klassen-Template <span style="font-family: courier new,courier;">Base</span> abgeleitet wird, die <span style="font-family: courier new,courier;">Derived</span> als Template-Argument besitzt:&nbsp; <code></code><code></code></p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">template</span>&lt;<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">T</span>&gt;
+<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">Base</span>{
+...
+};
+
+<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">Derived</span> : <span style="color: #0000ff;">public</span> Base&lt;Derived&gt;{
+...
+};
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Wenn das nicht verwirrend ist und was hat das ganze mit Bedarfsauswertung zu tun? Zuerst zur Laziness (Bedarfsauswertung).</p>
+<h3>Lazy durch und durch</h3>
+<p>Die entscheidende Beobachtung für das Verständnis des CRTP Idiom ist, dass die Instanziierung einer Methode eines Klassen-Templates dann erst geschieht, wenn sie benötigt wird. Beweis gefällig?</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// lazy.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+
+<span style="color: #0000ff;">template</span>&lt;<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">T</span>&gt; 
+<span style="color: #0000ff;">struct</span> Lazy{
+    <span style="color: #2b91af;">void</span> func() { std::cout &lt;&lt; <span style="color: #a31515;">"func"</span> &lt;&lt; std::endl;}
+    <span style="color: #2b91af;">void</span> func2(); <span style="color: #008000;">// not defined</span>
+};
+
+<span style="color: #2b91af;">int</span> main(){
+  
+  std::cout &lt;&lt; std::endl;
+    
+  Lazy&lt;<span style="color: #2b91af;">int</span>&gt; lazy;
+  lazy.func();
+  
+  std::cout &lt;&lt; std::endl;
+    
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Obwohl die Methode <span style="font-family: courier new,courier;">func2</span> (Zeile 8) der Klasse <span style="font-family: courier new,courier;">Lazy</span> lediglich deklariert ist, akzeptiert der Compiler das Programm. Da die Funktion <span style="font-family: courier new,courier;">func2</span> nicht aufgerufen wird, benötigt sie auch keine Definition.</p>
+<p><img src="images/blog/FunktionaleProgrammierung/LazyInstantiation/lazy.png" alt="lazy" style="margin: 15px;" /></p>
+<p>Genau diese Beobachtung nützt das CRTP Idiom aus, da die Definition einer Methode eines Klassen-Templates dann erst benötigt wird, wenn diese Methode aufgerufen wird. Bei der Instanziierung der Basisklasse ist die Deklaration der Methode ausreichend. Damit lässt sich statischer Polymorphismus implementieren.</p>
+<h3>Statischer Polymorphismus</h3>
+<p>Statischer Polymorphismus ist dem dynamischen Polymorphismus sehr ähnlich.<span style="font-family: courier new,courier;"> </span>Im Gegensatz zum dynamischen Polymorphismus mit der Hilfe von virtuellen Methoden, findet beim statischen Polymorphismus der <em>Dispatch</em> des Methodenaufrufs zur Compilezeit statt. Damit sind wir mitten in der Domäne des CRTP Idioms.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// crtp.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+
+<span style="color: #0000ff;">template</span> &lt;<span style="color: #0000ff;">typename</span> Derived&gt;
+<span style="color: #0000ff;">struct</span> Base{
+  <span style="color: #2b91af;">void</span> interface(){
+    <span style="color: #0000ff;">static_cast</span>&lt;Derived*&gt;(<span style="color: #0000ff;">this</span>)-&gt;implementation();
+  }
+  <span style="color: #2b91af;">void</span> implementation(){
+    std::cout &lt;&lt; <span style="color: #a31515;">"Implementation Base"</span> &lt;&lt; std::endl;
+  }
+};
+
+<span style="color: #0000ff;">struct</span> Derived1: Base&lt;Derived1&gt;{
+  <span style="color: #2b91af;">void</span> implementation(){
+    std::cout &lt;&lt; <span style="color: #a31515;">"Implementation Derived1"</span> &lt;&lt; std::endl;
+  }
+};
+
+<span style="color: #0000ff;">struct</span> Derived2: Base&lt;Derived2&gt;{
+  <span style="color: #2b91af;">void</span> implementation(){
+    std::cout &lt;&lt; <span style="color: #a31515;">"Implementation Derived2"</span> &lt;&lt; std::endl;
+  }
+};
+
+<span style="color: #0000ff;">struct</span> Derived3: Base&lt;Derived3&gt;{};
+
+<span style="color: #0000ff;">template</span> &lt;<span style="color: #0000ff;">typename</span> T&gt;
+<span style="color: #2b91af;">void</span> execute(T&amp; base){
+    base.interface();
+}
+
+
+<span style="color: #2b91af;">int</span> main(){
+  
+  std::cout &lt;&lt; std::endl;
+  
+  Derived1 d1;
+  execute(d1);
+    
+  Derived2 d2;
+  execute(d2);
+  
+  Derived3 d3;
+  execute(d3);
+  
+  std::cout &lt;&lt; std::endl;
+  
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>In dem Funktions-Template <span style="font-family: courier new,courier;">execute</span> (Zeile 29 - 32) wende ich den statischen Polymorphismus an. Auf jedem Argument <span style="font-family: courier new,courier;">base</span> rufe ich die Methode <span style="font-family: courier new,courier;">base.interface</span> auf. Die Methode <span style="font-family: courier new,courier;">Base::interface</span> in Zeile 7 - 9 ist der Dreh -und Angelpunkt des CRTP Idioms. Die Methode <em>dispatched</em> auf die Implementierung der abgeleiteten Klasse: <span style="font-family: courier new,courier;">static_cast&lt;Derived*&gt;(this)-&gt;implementation()</span>. Dies ist möglich, da die Methode erst dann instanziiert wird, wenn sie aufgerufen wird. Zu diesem Zeitpunkt sind die abgeleiteten Klassen<span style="font-family: courier new,courier;"> <span style="font-family: courier new,courier;">Derived1,</span> <span style="font-family: courier new,courier;">Derived2</span> </span>und<span style="font-family: courier new,courier;"> <span style="font-family: courier new,courier;">Derived3</span> f</span>ertig definiert. Daher kann die Methode<span style="font-family: courier new,courier;"><span style="font-family: courier new,courier;"> Base::interface</span> </span>Details ihrer abgeleiteten Klassen verwenden. Besonders interessant ist die Methode <span style="font-family: courier new,courier;">Base::implementation</span> (Zeile 10 - 12). Sie dient <span style="font-family: courier new,courier;">Derived3</span> (Zeile 27) als Defaultimplementierung für den statischen Polymorphismus.&nbsp;<span style="font-family: courier new,courier;"> </span></p>
+<p>Zum Abschluss noch die Ausgabe des Programms.</p>
+<p><img src="images/blog/FunktionaleProgrammierung/LazyInstantiation/crtp.png" alt="crtp" style="margin: 15px;" /></p>
+<p>&nbsp;</p>
+<p>Zugegeben, das Beispiel hat nur einem Zweck gedient. Die Mechanismen hinter dem statischen Polymorphismus vorzustellen. Doch ein überzeugendes Beispiel bin ich bisher schuldig geblieben.</p>
+<h2>Mixins mit CRTP</h2>
+<p><a href="https://en.wikipedia.org/wiki/Mixin">Mixins</a> sind ein beliebtes Konzept im Entwurf von Klassen, neuen Code in eine bestehende Klasse einzumischen<em>.</em> So es in Python sehr beliebt, mittels Mehrfachvererbung das Verhalten einer Klasse zu verändern. Im Gegensatz zu C++ ist es in Python zulässig, dass die Definition einer Methode mehrfach in Basisklassen definiert werden kann. Python verwendet die Methode, die in der <a href="https://docs.python.org/3/glossary.html#term-method-resolution-order">Method Resolution Order </a>(MRO) an vorderster Stelle steht.</p>
+<p>Mixins lassen sich hingegen in C++ mit CRTP umsetzen. Ein prominentes Beispiel ist die Klasse <span style="font-family: courier new,courier;">std::enable_shared_from_this. </span>Mir ihr lassen sich Objekte erzeugen, die einen <span style="font-family: courier new,courier;">std::shared_ptr</span> auf sich zurückgeben. Dazu muss die Klasse der zu teilenden Objekte öffentlich von <span style="font-family: courier new,courier;">std::enable_shared_from_this</span> abgeleitet werden. Somit steht in der Klasse die Methode <span style="font-family: courier new,courier;">shared_from_this</span> zur Verfügung, mit der sich <span style="font-family: courier new,courier;">std::shared_ptr</span> auf sich erzeugen lassen. Die Details zu <span style="font-family: courier new,courier;">std::enable_shared_from_this</span> habe ich in dem Artikel <a href="index.php/blog/besonderheiten-des-std-shared-ptr">Besonderheiten des std::shared_ptr</a> vorgestellt.</p>
+<p>Ein weiteres typisches Beispiel für ein Mixin ist eine Klasse, die um die Fähigkeit erweitert werden soll, ihre Instanzen auf Gleichheit und Ungleichheit zu vergleichen.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+55
+56</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// crtpEquality.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;string&gt;</span>
+
+<span style="color: #0000ff;">template</span>&lt;<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">Derived</span>&gt;
+<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">Equality</span>{};
+
+<span style="color: #0000ff;">template</span> &lt;<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">Derived</span>&gt;
+<span style="color: #2b91af;">bool</span> <span style="color: #0000ff;">operator</span> == (Equality&lt;Derived&gt; <span style="color: #0000ff;">const</span>&amp; op1, Equality&lt;Derived&gt; <span style="color: #0000ff;">const</span> &amp; op2){
+  Derived <span style="color: #0000ff;">const</span>&amp; d1 = <span style="color: #0000ff;">static_cast</span>&lt;Derived <span style="color: #0000ff;">const</span>&amp;&gt;(op1);     
+  Derived <span style="color: #0000ff;">const</span>&amp; d2 = <span style="color: #0000ff;">static_cast</span>&lt;Derived <span style="color: #0000ff;">const</span>&amp;&gt;(op2); 
+  <span style="color: #0000ff;">return</span> !(d1 &lt; d2) &amp;&amp; !(d2 &lt; d1);
+}
+
+<span style="color: #0000ff;">template</span> &lt;<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">Derived</span>&gt;
+<span style="color: #2b91af;">bool</span> <span style="color: #0000ff;">operator</span> != (Equality&lt;Derived&gt; <span style="color: #0000ff;">const</span>&amp; op1, Equality&lt;Derived&gt; <span style="color: #0000ff;">const</span> &amp; op2){
+  Derived <span style="color: #0000ff;">const</span>&amp; d1 = <span style="color: #0000ff;">static_cast</span>&lt;Derived <span style="color: #0000ff;">const</span>&amp;&gt;(op1);     
+  Derived <span style="color: #0000ff;">const</span>&amp; d2 = <span style="color: #0000ff;">static_cast</span>&lt;Derived <span style="color: #0000ff;">const</span>&amp;&gt;(op2); 
+  <span style="color: #0000ff;">return</span> !(op1 == op2);
+}
+
+<span style="color: #0000ff;">struct</span> Apple:<span style="color: #0000ff;">public</span> Equality&lt;Apple&gt;{
+  Apple(<span style="color: #2b91af;">int</span> s): size{s}{};
+  <span style="color: #2b91af;">int</span> size;
+};
+
+<span style="color: #2b91af;">bool</span> <span style="color: #0000ff;">operator</span> &lt; (Apple <span style="color: #0000ff;">const</span>&amp; a1, Apple <span style="color: #0000ff;">const</span>&amp; a2){
+  <span style="color: #0000ff;">return</span> a1.size &lt; a2.size;
+}
+
+<span style="color: #0000ff;">struct</span> Man:<span style="color: #0000ff;">public</span> Equality&lt;Man&gt;{
+  Man(std::string n): name{n}{}
+  std::string name;
+};
+
+<span style="color: #2b91af;">bool</span> <span style="color: #0000ff;">operator</span> &lt; (Man <span style="color: #0000ff;">const</span>&amp; m1, Man <span style="color: #0000ff;">const</span>&amp; m2){
+  <span style="color: #0000ff;">return</span> m1.name &lt; m2.name;
+}
+
+
+<span style="color: #2b91af;">int</span> main(){
+  
+  std::cout &lt;&lt; std::boolalpha &lt;&lt; std::endl;
+  
+  Apple apple1{5};
+  Apple apple2{10}; 
+  std::cout &lt;&lt; <span style="color: #a31515;">"apple1 == apple2: "</span> &lt;&lt; (apple1 == apple2) &lt;&lt; std::endl;
+    
+  Man man1{<span style="color: #a31515;">"grimm"</span>};
+  Man man2{<span style="color: #a31515;">"jaud"</span>};
+  std::cout &lt;&lt; <span style="color: #a31515;">"man1 != man2: "</span> &lt;&lt; (man1 != man2) &lt;&lt; std::endl;
+  
+  std::cout &lt;&lt; std::endl;
+    
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>So ist für die Klassen <span style="font-family: courier new,courier;">Apple</span> und <span style="font-family: courier new,courier;">Man</span> lediglich der&nbsp; Kleiner-Operator (Zeile 28 und 37) überladen. Für meine weitere Argumentation verwende ich der Einfachheit halber nur noch die Klasse<span style="font-family: courier new,courier;"> Man</span>. <span style="font-family: courier new,courier;">Man</span> ist in Zeile 32 - 35 öffentlich von der Klasse <span style="font-family: courier new,courier;">Equality&lt;Man&gt;</span> abgeleitet. Für Klassen der Struktur <span style="font-family: courier new,courier;">Equality&lt;Derived&gt;</span> ist sowohl der Gleichheitsoperator (Zeile 9 - 14) als auch der Ungleichheitsoperator (Zeile 16 - 21) definiert. Während der Ungleichheitsoperator die Implementierung des Gleichheitsoperators(Zeile 20) verwendet, nützt der Gleichheitsoperator aus, das auf Instanzen der Struktur <span style="font-family: courier new,courier;">Derived </span>der Kleiner-Operator definiert ist (Zeile 13). Sowohl der Gleichheitsoperator als auch der Ungleichheitsoperator konvertieren ihre Operanden in <span style="font-family: courier new,courier;">Derived const&amp;: Derived const&amp; d1 = static_cast&lt;Derived const&amp;&gt;(op1).</span></p>
+<p>Damit lassen sich Instanzen von <span style="font-family: courier new,courier;">Apple</span> und <span style="font-family: courier new,courier;">Man</span> auf Gleichheit bzw. Ungleichheit prüfen.</p>
+<p>&nbsp;<img src="images/blog/FunktionaleProgrammierung/LazyInstantiation/crtpEquality.png" alt="crtpEquality" style="margin: 15px;" /></p>
+<h2>&nbsp;Wie geht's weiter?</h2>
+<p>&nbsp;</p>
+<p>Neben dem CRTP Idiom basieren Expression Templates auf der Bedarfsauswertung. Expression Templates sind "structures representing a computation at compile time, which structures are evaluated only <strong>as needed</strong> to produce efficient code for the entire computation" (<a href="https://en.wikipedia.org/wiki/Expression_templates">https://en.wikipedia.org/wiki/Expression_templates</a>). As needed, genau darum geht es bei der Bedarfsauswertung und damit im nächsten Artikel.&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="166" height="212" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Hole dir dein E-Book. Unterstütze meinen Blog.</span></strong></p>
+<p>&nbsp;</p>
