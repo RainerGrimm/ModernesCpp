@@ -1,0 +1,375 @@
+<p>Die Existenzberechtigung von <span style="font-family: courier new,courier;">std::string_view</span> ist es, kopieren zu vermeiden, falls die Daten bereits jemand anders gehören und diese nur lesend verwendet werden. Ganz einfach, in diesem Artikel geht es um Performanz.</p>
+<hr id="system-readmore" />
+<p>Heute geht es wieder um ein Hauptfeature von C++17.</p>
+<p><img src="images/blog/Cpp17/Overview/timeline.png" alt="timeline" width="700" height="338" style="margin: 15px;" /></p>
+<p>Ich nehme an, dass du <span style="font-family: courier new,courier;">std::string_view</span> bereits ein wenig kennst. Falls nicht, lies den früheren Artikel<a href="index.php/blog/c-17-was-gibts-neues-in-der-bibliothek"> C++17: Was gibts Neues in der Bibliothek? </a>durch.&nbsp; Ein C++-String ist ein dünner Wrapper um Daten, die auf dem Heap liegen. Daher passiert es sehr häufig, dass eine Speicheranforderung stattfindet, wenn du mit C-Strings oder C++-Strings arbeitetest. Das will ich mir genauer betrachten</p>
+<h2>Small string optimisation</h2>
+<p>In ein paar Zeilen wirst du sehen, warum ich den Abschnitt small string optimisation genannt habe.</p>
+<div style="background: #ffffff none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0px; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34</pre>
+</td>
+<td>
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #008000;">// sso.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;string&gt;</span>
+
+<span style="color: #2b91af;">void</span>* <span style="color: #0000ff;">operator</span> new(std::<span style="color: #2b91af;">size_t</span> count){
+    std::cout &lt;&lt; <span style="color: #a31515;">"   "</span> &lt;&lt; count &lt;&lt; <span style="color: #a31515;">" bytes"</span> &lt;&lt; std::endl;
+    <span style="color: #0000ff;">return</span> malloc(count);
+}
+
+<span style="color: #2b91af;">void</span> getString(<span style="color: #0000ff;">const</span> std::string&amp; str){}
+
+<span style="color: #2b91af;">int</span> main() {
+
+    std::cout &lt;&lt; std::endl;
+
+    std::cout &lt;&lt; <span style="color: #a31515;">"std::string"</span> &lt;&lt; std::endl;
+
+    std::string small = <span style="color: #a31515;">"0123456789"</span>;
+    std::string substr = small.substr(5);
+    std::cout &lt;&lt; <span style="color: #a31515;">"   "</span> &lt;&lt; substr &lt;&lt; std::endl;
+
+    std::cout &lt;&lt; std::endl;
+
+    std::cout &lt;&lt; <span style="color: #a31515;">"getString"</span> &lt;&lt; std::endl;
+
+    getString(small);
+    getString(<span style="color: #a31515;">"0123456789"</span>);
+    <span style="color: #0000ff;">const</span> <span style="color: #2b91af;">char</span> message []= <span style="color: #a31515;">"0123456789"</span>;
+    getString(message);
+
+    std::cout &lt;&lt; std::endl;
+
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Ich habe in den Zeilen 6-9 den globalen&nbsp;<span style="font-family: courier new,courier;">operator new</span> überladen. Daher können wir einfach nachvollziehen, wann das Programm Speicher anfordert. Das ist aber einfach. In den Zeilen 19, 20, 28 und 29 wird Speicher angefordert. Hier sind die Zahlen:</p>
+<p>&nbsp;<img src="images/blog/Cpp17/StringView/sso.png" alt="sso" style="margin: 15px;" /></p>
+<p>Was ist denn da los? Ich behauptete, der String speichert seine Daten auf dem Heap. Das ist aber nur richtig, wenn der String eine Mindestgröße besitzt. Die Mindestgröße hängt von der Implementierung ab. Für MSVC und GCC ist sie 15 und für Clang 23 für <span style="font-family: courier new,courier;">std::string</span>.</p>
+<p>Das bedeutet konkret, dass kurze Strings (small strings) direkt im String Objekt gespeichert werden. Daher ist natürlich keine Speicheranforderung notwendig.</p>
+<p>Von nun an werden meine Strings immer mindestens 30 Zeichen groß sein. Damit muss ich mir nicht mehr über small string optimisation Gedanken machen. Jetzt geht es nochmals los mit längeren Strings.</p>
+<h2>Keine Speicheranforderung notwendig</h2>
+<p>Nun glänzt<span style="font-family: courier new,courier;"> std::string_view</span> ganz hell. Im Gegensatz zu<span style="font-family: courier new,courier;"> std::string</span> fordert&nbsp; <span style="font-family: courier new,courier;">std::string_view</span> keinen Speicher an. Hier ist der Beweis.</p>
+<div style="background: #ffffff none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0px; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+55</pre>
+</td>
+<td>
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #008000;">// stringView.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;cassert&gt;</span>
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;string&gt;</span>
+
+<span style="color: #0000ff;">#include &lt;string_view&gt;</span>
+
+<span style="color: #2b91af;">void</span>* <span style="color: #0000ff;">operator</span> new(std::<span style="color: #2b91af;">size_t</span> count){
+    std::cout &lt;&lt; <span style="color: #a31515;">"   "</span> &lt;&lt; count &lt;&lt; <span style="color: #a31515;">" bytes"</span> &lt;&lt; std::endl;
+    <span style="color: #0000ff;">return</span> malloc(count);
+}
+
+<span style="color: #2b91af;">void</span> getString(<span style="color: #0000ff;">const</span> std::string&amp; str){}
+
+<span style="color: #2b91af;">void</span> getStringView(std::string_view strView){}
+
+<span style="color: #2b91af;">int</span> main() {
+
+    std::cout &lt;&lt; std::endl;
+
+    std::cout &lt;&lt; <span style="color: #a31515;">"std::string"</span> &lt;&lt; std::endl;
+
+    std::string large = <span style="color: #a31515;">"0123456789-123456789-123456789-123456789"</span>;
+    std::string substr = large.substr(10);
+
+    std::cout &lt;&lt; std::endl;
+
+    std::cout &lt;&lt; <span style="color: #a31515;">"std::string_view"</span> &lt;&lt; std::endl;
+
+    std::string_view largeStringView{large.c_str(), large.size()};
+    largeStringView.remove_prefix(10);
+
+    assert(substr == largeStringView);
+
+    std::cout &lt;&lt; std::endl;
+
+    std::cout &lt;&lt; <span style="color: #a31515;">"getString"</span> &lt;&lt; std::endl;
+
+    getString(large);
+    getString(<span style="color: #a31515;">"0123456789-123456789-123456789-123456789"</span>);
+    <span style="color: #0000ff;">const</span> <span style="color: #2b91af;">char</span> message []= <span style="color: #a31515;">"0123456789-123456789-123456789-123456789"</span>;
+    getString(message);
+
+    std::cout &lt;&lt; std::endl;
+
+    std::cout &lt;&lt; <span style="color: #a31515;">"getStringView"</span> &lt;&lt; std::endl;
+
+    getStringView(large);
+    getStringView(<span style="color: #a31515;">"0123456789-123456789-123456789-123456789"</span>);
+    getStringView(message);
+
+    std::cout &lt;&lt; std::endl;
+
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;Nochmals. Speicheranforderungen findet in den Zeilen 24, 25, 41 und 43 statt. Aber was passiert in den entsprechenden Zeilen 31, 32, 50 und 51? Keine Speicheranforderung!</p>
+<p><img src="images/blog/Cpp17/StringView/stringView.png" alt="stringView" style="margin: 15px;" /></p>
+<p>Das ist beeindruckend! Du kannst dir vorstellen, was für einen Performanzboost das ist, da Speicheranforderung eine sehr teure Operation ist. Du kannst die Performanzboost deutlich beobachten, wenn du Teilstrings aus bestehenden Strings erzeugst.</p>
+<h2>O(n) versus O(1)</h2>
+<p><span style="font-family: courier new,courier;">std::string</span> und <span style="font-family: courier new,courier;">std::string_view</span> besitzen beide die Methode <span style="font-family: courier new,courier;">substr.</span> Die Methode des <span style="font-family: courier new,courier;">std::string </span>gibt einen Teilstring zurück; die Methode <span style="font-family: courier new,courier;">std::string_view </span>gibt einen <span style="font-family: Courier New,Courier,monospace;">View </span>auf einen Teilstring zurück. Das hört sich nicht so spannend an. Aber es gibt einen entscheidenden Unterschied zwischen beiden Methoden. <span style="font-family: courier new,courier;">std::string::substr</span> besitzt lineare Komplexität. <span style="font-family: courier new,courier;">std::string_view::substr</span> besitzt hingegen konstante Komplexität. Das bedeutet, das die Performanz der Methode des <span style="font-family: courier new,courier;">std::string</span> direkt von der Größe des Teilstrings abhängt. Hingegen ist die Methode des <span style="font-family: courier new,courier;">std::string_view</span> unabhängig von der Größe des Teilstrings.</p>
+<p>Nun bin ich aber neugierig. Da mache ich doch gleich einen kleinen Performanztest.</p>
+<div style="background: #ffffff none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0px; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+55
+56
+57
+58
+59</pre>
+</td>
+<td>
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #008000;">// substr.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;chrono&gt;</span>
+<span style="color: #0000ff;">#include &lt;fstream&gt;</span>
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;random&gt;</span>
+<span style="color: #0000ff;">#include &lt;sstream&gt;</span>
+<span style="color: #0000ff;">#include &lt;string&gt;</span>
+<span style="color: #0000ff;">#include &lt;vector&gt;</span>
+
+<span style="color: #0000ff;">#include &lt;string_view&gt;</span>
+
+<span style="color: #0000ff;">static</span> <span style="color: #0000ff;">const</span> <span style="color: #2b91af;">int</span> count = 30;
+<span style="color: #0000ff;">static</span> <span style="color: #0000ff;">const</span> <span style="color: #2b91af;">int</span> access = 10000000;
+
+<span style="color: #2b91af;">int</span> main(){
+
+    std::cout &lt;&lt; std::endl;
+
+    std::ifstream inFile(<span style="color: #a31515;">"grimm.txt"</span>);
+
+    std::stringstream strStream;
+    strStream &lt;&lt;  inFile.rdbuf();
+    std::string grimmsTales = strStream.str();
+
+    <span style="color: #2b91af;">size_t</span> size = grimmsTales.size();
+
+    std::cout &lt;&lt; <span style="color: #a31515;">"Grimms' Fairy Tales size: "</span> &lt;&lt; size &lt;&lt; std::endl;
+    std::cout &lt;&lt; std::endl;
+
+    <span style="color: #008000;">// random values</span>
+    std::random_device seed;
+    std::mt19937 engine(seed());
+    std::uniform_int_distribution&lt;&gt; uniformDist(0, size - count - 2);
+    std::vector&lt;<span style="color: #2b91af;">int</span>&gt; randValues;
+    <span style="color: #0000ff;">for</span> (<span style="color: #0000ff;">auto</span> i = 0; i &lt;  access; ++i) randValues.push_back(uniformDist(engine));
+
+    <span style="color: #0000ff;">auto</span> start = std::chrono::steady_clock::now();
+    <span style="color: #0000ff;">for</span> (<span style="color: #0000ff;">auto</span> i = 0; i  &lt; access; ++i ) {
+        grimmsTales.substr(randValues[i], count);
+    }
+    std::chrono::duration&lt;<span style="color: #2b91af;">double</span>&gt; durString= std::chrono::steady_clock::now() - start;
+    std::cout &lt;&lt; <span style="color: #a31515;">"std::string::substr:      "</span> &lt;&lt; durString.count() &lt;&lt; <span style="color: #a31515;">" seconds"</span> &lt;&lt; std::endl;
+
+    std::string_view grimmsTalesView{grimmsTales.c_str(), size};
+    start = std::chrono::steady_clock::now();
+    <span style="color: #0000ff;">for</span> (<span style="color: #0000ff;">auto</span> i = 0; i  &lt; access; ++i ) {
+        grimmsTalesView.substr(randValues[i], count);
+    }
+    std::chrono::duration&lt;<span style="color: #2b91af;">double</span>&gt; durStringView= std::chrono::steady_clock::now() - start;
+    std::cout &lt;&lt; <span style="color: #a31515;">"std::string_view::substr: "</span> &lt;&lt; durStringView.count() &lt;&lt; <span style="color: #a31515;">" seconds"</span> &lt;&lt; std::endl;
+
+    std::cout &lt;&lt; std::endl;
+
+    std::cout &lt;&lt; <span style="color: #a31515;">"durString.count()/durStringView.count(): "</span> &lt;&lt; durString.count()/durStringView.count() &lt;&lt; std::endl;
+
+    std::cout &lt;&lt; std::endl;
+
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Lass mich erst ein paar Worte zu dem Performanztest verlieren, bevor ich die Zahlen präsentiere. Die zentrale Idee des Performanztests ist es, eine große Datei als <span style="font-family: courier new,courier;">std::string&nbsp;</span>einzulesen und eine Menge von Teistrings mit Hilfe von <span style="font-family: courier new,courier;">std::string</span> und <span style="font-family: courier new,courier;">std::string_view</span> zu erzeugen. Ich bin genau daran interessiert, wie lange das Erzeugen der Teilstrings benötigt.</p>
+<p>Ich verwendete "Grimms Märchen" als große Datei. Name verpflichtet! Der String <span style="font-family: courier new,courier;">grimmTales</span> (Zeile 24) besitzt den Inhalt der Datei. Danach fülle ich in Zeile 37 den Vektor <span style="font-family: courier new,courier;">std::vector&lt;int&gt;</span> mit einer <span style="font-family: courier new,courier;">access</span> Anzahl (10'000'000) von Werten zwischen [0, size - count - 2] (Zeile 34). Nun kann der Performanztest los gehen. In den Zeilen 39 bis 41 erzeuge <span style="font-family: courier new,courier;">access</span> Teilstrings der festen Länge <span style="font-family: courier new,courier;">count. </span>Der <span style="font-family: courier new,courier;">count </span>ist 30. Daher muss ich mir keine Gedanken zu small string optimisation machen. Dasselbe tue ich nochmals in den Zeilen 47 bis 49. Dieses Mal aber mit <span style="font-family: courier new,courier;">std::string_view. </span></p>
+<p>Hier sind die Zahlen. Du siehst die Länge der Datei, die Zahlen für <span style="font-family: courier new,courier;">std::string::substr</span> und <span style="font-family: courier new,courier;">std::string_view::substr</span> und das Verhältnis zwischen beiden. Als Compiler verwendete den GCC 6.3.0.</p>
+<h3>Größe 30</h3>
+<p>Nur da ich neugierig ist. Die Zahlen ohne Optimierung..</p>
+<p><img src="images/blog/Cpp17/StringView/substr.png" alt="substr" style="margin: 15px;" /></p>
+<p>Jetzt kommen aber die wichtigen Zahlen. GCC mit maximaler Optimierung.</p>
+<p><img src="images/blog/Cpp17/StringView/substrOptimized.png" alt="substrOptimized" style="margin: 15px;" /></p>
+<p>Die Optimierung zahlt sich im Falle des&nbsp;<span style="font-family: courier new,courier;">std::string</span> nicht so aus, macht aber einen großen Unterschied beim <span style="font-family: courier new,courier;">std::string_view</span>.&nbsp; Teilstrings mit <span style="font-family: courier new,courier;">std::string_view</span> zu erzeugen ist rund 45 Mal schneller als mit <span style="font-family: courier new,courier;">std::string</span>. Falls das kein Grund ist <span style="font-family: courier new,courier;">std::string_view </span>zu verwenden.</p>
+<h3>Verschiedene Größen</h3>
+<p>Nun werde ich aber noch neugieriger. Was passiert, wenn ich die Größe <span style="font-family: courier new,courier;">count</span> des Teilstrings variiere? Jetzt gibt's alle Zahlen noch mit maximaler Optimierung. Ich habe sie auf die dritte Nachkommastelle gerundet.</p>
+<h2>&nbsp;<img src="images/blog/Cpp17/StringView/numbers.png" alt="numbers" width="700" height="274" style="margin: 15px;" /></h2>
+<p>Das hat mich nicht verwundert. Die Zahlen spiegeln die Komplexitätszusicherungen von <span style="font-family: courier new,courier;">std::string::substr</span> versus <span style="font-family: courier new,courier;">std::string_view::substr</span> wider. Die Komplexität der ersten Methode hängt direkt von der Länge des Teilstrings ab. Die Komplexität der zweiten Methode ist unabhängig von der Größe des Teilstrings. Am Ende überflügelt die Performanz des <span style="font-family: courier new,courier;">std::string_view</span> die des <span style="font-family: courier new,courier;">std::string</span> deutlichst.</p>
+<h2>Wie geht's weiter?</h2>
+<p>Ich habe noch einiges über <span style="font-family: courier new,courier;">std::any</span>, <span style="font-family: courier new,courier;">std::optional</span> und <span style="font-family: courier new,courier;">std::variant</span> zu sagen. Warte auf den nächsten Artikel.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="166" height="212" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Hole dir dein E-Book. Unterstütze meinen Blog.</span></strong></p>
+<p><br /><span class="h3"></span></p>
