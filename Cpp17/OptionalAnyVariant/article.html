@@ -1,0 +1,127 @@
+<p>What have<span style="font-family: courier new,courier;"> std::optional</span>, <span style="font-family: courier new,courier;">std::any</span>, and <span style="font-family: courier new,courier;">std::variant</span> in common? You can construct them in-place. But that is not all. A <span style="font-family: courier new,courier;">std::variant</span> supports a visitor.</p>
+<hr id="system-readmore" />
+<p>But first of all. What's the job of the three new data types?</p>
+<ul>
+<li><span style="font-family: courier new,courier;">std::optional</span> is a wrapper that may or may not hold an object.</li>
+<li><span style="font-family: courier new,courier;">std::variant</span> is a type-safe union.</li>
+<li><span style="font-family: courier new,courier;">std::any</span> is a type that may hold an object of an arbitrary type.</li>
+</ul>
+<p>In order not to repeat me. In the post <a href="index.php/c-17-what-s-new-in-the-library">C++17 - What's New in the Library</a> are the details to the three data types that are part of C++17.</p>
+<p><img src="images/blog/Cpp17/Overview/timeline.png" alt="timeline" width="700" height="338" style="margin: 15px;" /></p>
+<h2>Construct in-place</h2>
+<p>What does construction in place mean? For simplicity reason, I will refer only to <span style="font-family: courier new,courier;">std::optional</span>. A <span style="font-family: courier new,courier;">std::optional&lt;std::string&gt; opt</span> may hold a value of type <span style="font-family: courier new,courier;">std::string</span>. You construct <span style="font-family: courier new,courier;">opt</span> by only providing the arguments for the <span style="font-family: courier new,courier;">std::string</span> constructor.&nbsp;</p>
+<p>A short example should make my point clear.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// inPlace.cpp</span>
+
+<span style="color: #009999;">#include &lt;optional&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;string&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  
+  <span style="color: #0099ff; font-style: italic;">// C string literal</span>
+  std<span style="color: #555555;">::</span>optional<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>string<span style="color: #555555;">&gt;</span> opt1(std<span style="color: #555555;">::</span>in_place, <span style="color: #cc3300;">"C++17"</span>);                        <span style="color: #0099ff; font-style: italic;">// 1</span>
+
+  <span style="color: #0099ff; font-style: italic;">// 5 characters 'C'</span>
+  std<span style="color: #555555;">::</span>optional<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>string<span style="color: #555555;">&gt;</span> opt2(std<span style="color: #555555;">::</span>in_place,<span style="color: #ff6600;">5</span>, <span style="color: #cc3300;">'C'</span>);                          <span style="color: #0099ff; font-style: italic;">// 2</span>
+
+  <span style="color: #0099ff; font-style: italic;">// initializer list</span>
+  std<span style="color: #555555;">::</span>optional<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>string<span style="color: #555555;">&gt;</span> opt3(std<span style="color: #555555;">::</span>in_place, {<span style="color: #cc3300;">'C'</span>, <span style="color: #cc3300;">'+'</span>, <span style="color: #cc3300;">'+'</span>, <span style="color: #cc3300;">'1'</span>, <span style="color: #cc3300;">'7'</span>});      <span style="color: #0099ff; font-style: italic;">// 3</span>
+
+  <span style="color: #0099ff; font-style: italic;">// Copy constructor</span>
+  std<span style="color: #555555;">::</span>optional<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>string<span style="color: #555555;">&gt;</span> opt4(opt3);                                          <span style="color: #0099ff; font-style: italic;">// 4</span>
+
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #555555;">*</span>opt1 <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #555555;">*</span>opt2 <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #555555;">*</span>opt3 <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #555555;">*</span>opt4 <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p><span style="font-family: courier new,courier;">opt1 </span>(1), <span style="font-family: courier new,courier;">opt2 </span>(2), and <span style="font-family: courier new,courier;">opt3 </span>(3) are constructed with the tag <span style="font-family: courier new,courier;">std::in_place</span>. This means that the constructor of <span style="font-family: courier new,courier;">std::string</span> is invoked with the provided argument. Therefore, the strings are in-place constructed from a C string (1), 5 characters 'C', and an initializer list. This will not hold for <span style="font-family: courier new,courier;">opt4 </span>(4). <span style="font-family: courier new,courier;">opt4</span> is copy constructed from <span style="font-family: courier new,courier;">opt3</span>.</p>
+<p>Here is the output of the program.</p>
+<p><img src="images/blog/Cpp17/OptionalAnyVariant/inPlace.png" alt="inPlace" style="margin: 15px;" /></p>
+<p>Does in-place construction looks unfamiliar to you? Why? We have it since C++11. The containers of the Standard Template Library support a bunch of new methods for adding elements. These methods start with the name<span style="font-family: courier new,courier;"> emplace </span>such as<span style="font-family: courier new,courier;"> emplace_back. </span>Therefore you can add a new element to a<span style="font-family: courier new,courier;"> std::vector&lt;int&gt;</span> <span style="font-family: courier new,courier;">vec</span> by just saying <span style="font-family: courier new,courier;">vec.emplace_back(5)</span>. This is equivalent to <span style="font-family: courier new,courier;">vec.push_back(int(5))</span>.<span style="font-family: courier new,courier;"> </span></p>
+<p>What a coincidence! This week, I will give a seminar about design patterns in Python. And now, I found the <span style="font-family: courier new,courier;">std::visit</span> function in the interface of<span style="font-family: courier new,courier;"> std::variant</span>. What sounds like the <a href="https://en.wikipedia.org/wiki/Visitor_pattern">visitor pattern</a> according to the classical design patterns is really a kind of a visitor for a list of variants.</p>
+<h2>Visit a list of variants</h2>
+<p><span style="font-family: courier new,courier;">std::visit</span> allows you to apply a visitor to a list of variants. The visitor must be a <a href="http://en.cppreference.com/w/cpp/concept/Callable">callable.</a> Callable is something, which you can invoke. Typically this can be a function, a function object, and lambda function. For simplicity reasons, I use a lambda function in my example.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// visit.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+<span style="color: #009999;">#include &lt;typeinfo&gt;</span>
+<span style="color: #009999;">#include &lt;type_traits&gt;</span>
+
+<span style="color: #009999;">#include &lt;variant&gt;</span>
+
+  
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  
+  std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>variant<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">char</span>, <span style="color: #007788; font-weight: bold;">long</span>, <span style="color: #007788; font-weight: bold;">float</span>, <span style="color: #007788; font-weight: bold;">int</span>, <span style="color: #007788; font-weight: bold;">double</span>, <span style="color: #007788; font-weight: bold;">long</span> <span style="color: #007788; font-weight: bold;">long</span><span style="color: #555555;">&gt;&gt;</span>      <span style="color: #0099ff; font-style: italic;">// 1</span>
+             vecVariant <span style="color: #555555;">=</span> {<span style="color: #ff6600;">5</span>, <span style="color: #cc3300;">'2'</span>, <span style="color: #ff6600;">5.4</span>, <span style="color: #ff6600;">100ll</span>, <span style="color: #ff6600;">2011l</span>, <span style="color: #ff6600;">3.5f</span>, <span style="color: #ff6600;">2017</span>};
+  
+  <span style="color: #0099ff; font-style: italic;">// display each value                                                             </span>
+  <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;</span> v<span style="color: #555555;">:</span> vecVariant){
+    std<span style="color: #555555;">::</span>visit([](<span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;&amp;</span> arg){std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> arg <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span>;}, v);                <span style="color: #0099ff; font-style: italic;">// 2</span>
+  }
+  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  
+  <span style="color: #0099ff; font-style: italic;">// display each type</span>
+  <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;</span> v<span style="color: #555555;">:</span> vecVariant){
+    std<span style="color: #555555;">::</span>visit([](<span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;&amp;</span> arg){std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #006699; font-weight: bold;">typeid</span>(arg).name() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span>;}, v); <span style="color: #0099ff; font-style: italic;">// 3</span>
+  }
+  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  
+  <span style="color: #0099ff; font-style: italic;">// get the sum</span>
+  std<span style="color: #555555;">::</span>common_type<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">char</span>, <span style="color: #007788; font-weight: bold;">long</span>, <span style="color: #007788; font-weight: bold;">float</span>, <span style="color: #007788; font-weight: bold;">int</span>, <span style="color: #007788; font-weight: bold;">double</span>, <span style="color: #007788; font-weight: bold;">long</span> <span style="color: #007788; font-weight: bold;">long</span><span style="color: #555555;">&gt;::</span>type res{};  <span style="color: #0099ff; font-style: italic;">// 4</span>
+ 
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"typeid(res).name(): "</span>  <span style="color: #555555;">&lt;&lt;</span> <span style="color: #006699; font-weight: bold;">typeid</span>(res).name() <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;  <span style="color: #0099ff; font-style: italic;"></span>
+  
+  <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;</span> v<span style="color: #555555;">:</span> vecVariant){
+    std<span style="color: #555555;">::</span>visit([<span style="color: #555555;">&amp;</span>res](<span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;&amp;</span> arg){res<span style="color: #555555;">+=</span> arg;}, v);                          <span style="color: #0099ff; font-style: italic;">// 5</span>
+  }
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"res: "</span> <span style="color: #555555;">&lt;&lt;</span> res <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  
+  <span style="color: #0099ff; font-style: italic;">// double each value</span>
+  <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;</span> v<span style="color: #555555;">:</span> vecVariant){
+    std<span style="color: #555555;">::</span>visit([<span style="color: #555555;">&amp;</span>res](<span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;&amp;</span> arg){arg <span style="color: #555555;">*=</span> <span style="color: #ff6600;">2</span>;}, v);                           <span style="color: #0099ff; font-style: italic;">// 6</span>
+    std<span style="color: #555555;">::</span>visit([](<span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;&amp;</span> arg){std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> arg <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span>;}, v);
+  }
+   
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>I create in (1) a<span style="font-family: courier new,courier;"> std::vector</span> of variants. Each variant can hold a <span style="font-family: courier new,courier;">char, long, float, int, double,</span> or<span style="font-family: courier new,courier;"> long long. </span>It's quite easy to traverse the vector of variants and apply the lambda function (2) to it. Thanks to the function <span style="font-family: courier new,courier;">typeid</span>, I get the types to the variants. I think, you see the visitor pattern. The <span style="font-family: courier new,courier;">std::vector</span> of variants is the visited data structure on which I apply various functions (visitors).</p>
+<p>Now, I want to sum up the elements of the variants. At first, I need the right result type at compile time. <span style="font-family: courier new,courier;">std::comon_type</span> (4) from the <a href="http://en.cppreference.com/w/cpp/header/type_traits">type traits</a> library will provide it for me. <span style="font-family: courier new,courier;">std::common_type</span> gives me the type, to which all types <span style="font-family: courier new,courier; color: #000000;">char, long, float, int, double, </span><span style="font-family: courier new,courier;">and</span><span style="color: #000000;"><span style="font-family: courier new,courier;"> long long</span>&nbsp;</span> can implicitly be converted to. The final {} in <span style="font-family: courier new,courier;">res{}</span> causes that it will be initialized to 0.0. <span style="font-family: courier new,courier;">res</span> is of type <span style="font-family: courier new,courier;">double. </span>(5) calculates the sum. I can even use a visitor to change the elements on the fly. Have a look at (6).<span style="font-family: courier new,courier;"><span style="font-family: courier new,courier;"> </span></span></p>
+<p>Here is the output of the program. <a href="https://en.wikipedia.org/wiki/Run-time_type_information">Run-time type information</a> with<a href="http://en.cppreference.com/w/cpp/types/type_info"> std::type_info</a> gives me with Visual C++ quite readable names.</p>
+<p><img src="images/blog/Cpp17/OptionalAnyVariant/visit.png" alt="visit" style="margin: 15px;" /></p>
+<p><em>It was not so easy, to get this output. To compile the program, you need a current GCC snapshot. Which I don't have and is not available online. Therefore, I used in the first step the compiler explorer at <a href="https://godbolt.org/">godbolt</a> to check the syntax of my program. In the second step, I compiled the program using the current Visual C++ compiler on <a href="http://webcompiler.cloudapp.net/">http://webcompiler.cloudapp.net/</a>. You have to use the flag <span style="font-family: courier new,courier;">std:c++latest. </span>Two out of three runs produced a Maximum execution time exceeded! error. But finally, I made it.</em></p>
+<h2>What's next?</h2>
+<p>With C++17, we get <a href="index.php/parallel-algorithm-of-the-standard-template-library">Parallel Algorithm of the Standard Template Library</a>. We even get a few new algorithm. You will see in the next post which one.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporter</a>: Eric Pederson</strong></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="166" height="212" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Get your e-book. Support my blog.</span></strong></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
