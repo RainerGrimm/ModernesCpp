@@ -1,0 +1,159 @@
+<p>Race conditions and data races are related but different concepts. Because they are related, they are often confused. In German we even translate both expressions with the term <em>kritischer Wettlauf</em>. To be honest, that is very bad. In order to reason about concurrency, your wording must be exact. Therefore, this post is about race conditions and data races.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p>At a starting point, let me define both terms in the domain of software.</p>
+<ul>
+<li><strong>Race condition: </strong>A race condition is a situation, in which the result of an operation depends on the interleaving of certain individual operations.</li>
+<li><strong>Data race</strong>: A data race is a situation, in which at least two threads access a shared variable at the same time. At least on thread tries to modify the variable.</li>
+</ul>
+<p>A race condition is per se not bad. A race condition can be the reason for a data race. In contrary, a data race is an undefined behaviour. Therefore, all reasoning about your program makes no sense anymore.</p>
+<p>Before I present you different kinds of race conditions that are not benign, I want to show you a program with a race condition and a data race.</p>
+<h2>A race condition and a data race</h2>
+<p>The classic example for&nbsp;a race condition and a data race is a function that transfers money from one account to another. In the single threaded case, all is fine.</p>
+<h3>Single threaded</h3>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// account.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">struct</span> Account{                                  <span style="color: #0099ff; font-style: italic;">// 1</span>
+  <span style="color: #007788; font-weight: bold;">int</span> balance{<span style="color: #ff6600;">100</span>};
+};
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">transferMoney</span>(<span style="color: #007788; font-weight: bold;">int</span> amount, Account<span style="color: #555555;">&amp;</span> from, Account<span style="color: #555555;">&amp;</span> to){
+  <span style="color: #006699; font-weight: bold;">if</span> (from.balance <span style="color: #555555;">&gt;=</span> amount){                  <span style="color: #0099ff; font-style: italic;">// 2</span>
+    from.balance -<span style="color: #555555;">=</span> amount;                    
+    to.balance +<span style="color: #555555;">=</span> amount;
+  }
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+  Account account1;
+  Account account2;
+
+  transferMoney(<span style="color: #ff6600;">50</span>, account1, account2);         <span style="color: #0099ff; font-style: italic;">// 3</span>
+  transferMoney(<span style="color: #ff6600;">130</span>, account2, account1);
+  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"account1.balance: "</span> <span style="color: #555555;">&lt;&lt;</span> account1.balance <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"account2.balance: "</span> <span style="color: #555555;">&lt;&lt;</span> account2.balance <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The workflow is quite simple to make my point clear. Each Account starts with a balance of 100 $ (1). To withdraw money, there must be enough money in the account (2). If enough money is available the amount will be at first removed from the old account and then added to the new. Two money transfers take place (3). One from <span style="font-family: courier new,courier;">account1</span> to <span style="font-family: courier new,courier;">account2</span>, and the other the other way around. Each invocation of <span style="font-family: courier new,courier;">transferMoney</span> happens after the other. They are kind of transactions that establishes a total order. That is fine.</p>
+<p>The balance of both accounts looks good.</p>
+<p><img src="images/blog/MultithreadingTheory/RaceConditionDataRace/account.png" alt="account" style="margin: 15px;" /></p>
+<p>&nbsp;In real life, <span style="font-family: courier new,courier;">transferMoney</span> will be executed concurrently.</p>
+<h3>Multithreading</h3>
+<p>&nbsp;No, we have a data race and a race condition.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// accountThread.cpp</span>
+
+<span style="color: #009999;">#include &lt;functional&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;thread&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">struct</span> Account{
+  <span style="color: #007788; font-weight: bold;">int</span> balance{<span style="color: #ff6600;">100</span>};
+};
+                                                      <span style="color: #0099ff; font-style: italic;">// 2</span>
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">transferMoney</span>(<span style="color: #007788; font-weight: bold;">int</span> amount, Account<span style="color: #555555;">&amp;</span> from, Account<span style="color: #555555;">&amp;</span> to){
+  <span style="color: #006699; font-weight: bold;">using</span> <span style="color: #006699; font-weight: bold;">namespace</span> std<span style="color: #555555;">::</span>chrono_literals;
+  <span style="color: #006699; font-weight: bold;">if</span> (from.balance <span style="color: #555555;">&gt;=</span> amount){
+    from.balance <span style="color: #555555;">-=</span> amount;  
+    std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>sleep_for(<span style="color: #ff6600;">1</span>ns);                 <span style="color: #0099ff; font-style: italic;">// 3</span>
+    to.balance <span style="color: #555555;">+=</span> amount;
+  }
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+  Account account1;
+  Account account2;
+                                                        <span style="color: #0099ff; font-style: italic;">// 1</span>
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> thr1(transferMoney, <span style="color: #ff6600;">50</span>, std<span style="color: #555555;">::</span>ref(account1), std<span style="color: #555555;">::</span>ref(account2));
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> thr2(transferMoney, <span style="color: #ff6600;">130</span>, std<span style="color: #555555;">::</span>ref(account2), std<span style="color: #555555;">::</span>ref(account1));
+  
+  thr1.join();
+  thr2.join();
+
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"account1.balance: "</span> <span style="color: #555555;">&lt;&lt;</span> account1.balance <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"account2.balance: "</span> <span style="color: #555555;">&lt;&lt;</span> account2.balance <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The calls of<span style="font-family: courier new,courier;"> transferMoney</span> will be executed concurrently (1). The arguments to a function, executed by a thread, have<span style="font-family: courier new,courier;"> </span>to be moved or copied by value. If a reference such as <span style="font-family: courier new,courier;"> account1</span> or <span style="font-family: courier new,courier;">account2</span> needs to be passed to the thread function, you have to wrap it in a reference wrapper like <a href="http://en.cppreference.com/w/cpp/utility/functional/ref">std::ref</a>. Because of the threads <span style="font-family: courier new,courier;">t1</span> and<span style="font-family: courier new,courier;"> t2,</span> there is a data race on the balance of the account in the function <span style="font-family: courier new,courier;">transferMoney</span> (2). But where is the race condition? To make the race condition visible, I put the threads&nbsp;for a short period of time to sleep (3). The built-in literal <span style="font-family: courier new,courier;">1ns</span> in the expression <span style="font-family: courier new,courier;">std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>sleep_for(<span style="color: #000000;">1</span>ns)</span> stands for a nanosecond. In the post <a href="index.php/raw-and-cooked">Raw and Cooked</a> are the details to the new built-in literals. We have them for time durations since C++14.</p>
+<p>By the way. Often a short sleep period in concurrent programs is sufficient to make an issue visible.</p>
+<p>Here is the output of the program.</p>
+<p><img src="images/blog/MultithreadingTheory/RaceConditionDataRace/accountThreads.png" alt="accountThreads" style="margin: 15px;" /></p>
+<p>And you see. Only the first function <span style="font-family: courier new,courier;">transferMoney </span>was executed. The second one was not performed because the balance was too small. The reason is that the second withdraw happened before the first transfer of money was completed. Here we have our race condition.</p>
+<p>Solving the data race is quite easy. The operations on the balance have to be protected. I did it with an atomic variable.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// accountThreadAtomic.cpp</span>
+
+<span style="color: #009999;">#include &lt;atomic&gt;</span>
+<span style="color: #009999;">#include &lt;functional&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;thread&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">struct</span> Account{
+  std<span style="color: #555555;">::</span>atomic<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> balance{<span style="color: #ff6600;">100</span>};
+};
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">transferMoney</span>(<span style="color: #007788; font-weight: bold;">int</span> amount, Account<span style="color: #555555;">&amp;</span> from, Account<span style="color: #555555;">&amp;</span> to){
+  <span style="color: #006699; font-weight: bold;">using</span> <span style="color: #006699; font-weight: bold;">namespace</span> std<span style="color: #555555;">::</span>chrono_literals;
+  <span style="color: #006699; font-weight: bold;">if</span> (from.balance <span style="color: #555555;">&gt;=</span> amount){
+    from.balance <span style="color: #555555;">-=</span> amount;  
+    std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>sleep_for(<span style="color: #ff6600;">1</span>ns);
+    to.balance <span style="color: #555555;">+=</span> amount;
+  }
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+  Account account1;
+  Account account2;
+  
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> thr1(transferMoney, <span style="color: #ff6600;">50</span>, std<span style="color: #555555;">::</span>ref(account1), std<span style="color: #555555;">::</span>ref(account2));
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> thr2(transferMoney, <span style="color: #ff6600;">130</span>, std<span style="color: #555555;">::</span>ref(account2), std<span style="color: #555555;">::</span>ref(account1));
+  
+  thr1.join();
+  thr2.join();
+
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"account1.balance: "</span> <span style="color: #555555;">&lt;&lt;</span> account1.balance <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"account2.balance: "</span> <span style="color: #555555;">&lt;&lt;</span> account2.balance <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Of course, the atomic variable will not solve the race condition. Only the data race is gone.</p>
+<h2>What's next?</h2>
+<p>I only presented an erroneous program having a data race and a race condition. But there are many different aspects of malicious race conditions. Breaking of invariants, locking issues such as deadlock or livelocks, or lifetime issues of detached threads. We have also deadlocks without race conditions. In the next post, I write about malicious effects of race conditions.</p>
+<p>&nbsp;</p>
+<p>&nbsp;<strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporter</a>: Eric Pederson.</strong><span id="transmark"></span><a href="http://en.cppreference.com/w/cpp/utility/functional/ref"></a></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="166" height="212" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Get your e-book. Support my blog.</span></strong></p>
+<p>&nbsp;</p>
