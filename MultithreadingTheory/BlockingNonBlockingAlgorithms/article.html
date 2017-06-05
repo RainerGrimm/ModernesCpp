@@ -1,0 +1,152 @@
+<p>Blocking, non-blocking, lock-free and wait-free. Each of these terms describes a key characteristic of an algorithm when executed in a concurrent environment. So, reasoning about the runtime behaviour of your program often means to put your algorithm in the right bucket. Therefore, this post is about buckets.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p>An algorithm fall in one of two buckets: blocking or non-blocking.</p>
+<p>&nbsp;</p>
+<p>&nbsp;<img src="images/blog/MultithreadingTheory/BlockingNonBlocking/BlockingNonBlocking.png" alt="BlockingNonBlocking" width="300" height="223" style="margin: 15px;" /></p>
+<p>Let's first talk about blocking.</p>
+<h2>Blocking</h2>
+<p>Intuitively, is quite clear, what blocking for an algorithm mean. But concurrency is not about intuition, it's about precise terms. The easiest way to define blocking is to define it with the help of non-blocking.</p>
+<ul>
+<li><strong>Non-blocking: </strong>An algorithm is called non-blocking if failure or suspension of any thread cannot cause failure or suspension of another thread.(<a href="http://jcip.net/">Java concurrency in practice</a>)</li>
+</ul>
+<p>There is not any word about locking in this definition. That's right. Non-blocking is a wider term.</p>
+<p>To block a program is quite easy. The typical use-case is to use more than one mutex and lock them in a different sequence. Nice timing and you have a deadlock. But there are a lot more ways to produce blocking behaviour.</p>
+<p>Each time, you have to wait for a resource, a block is possible.</p>
+<p>Here are a few examples for synchronising access to a resource:</p>
+<ul>
+<li>A condition variable with <span style="font-family: Courier New,Courier,monospace;">wait</span>.</li>
+<li>A future with <span style="font-family: Courier New,Courier,monospace;">wait </span>or <span style="font-family: Courier New,Courier,monospace;">get</span>.</li>
+</ul>
+<p>Even the join call of a thread can be used to block a thread.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// deadlockWait.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;mutex&gt;</span>
+<span style="color: #009999;">#include &lt;string&gt;</span>
+<span style="color: #009999;">#include &lt;thread&gt;</span>
+
+std<span style="color: #555555;">::</span>mutex coutMutex;
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t([]{
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Still waiting ..."</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;            <span style="color: #0099ff; font-style: italic;">// 2</span>
+    std<span style="color: #555555;">::</span>lock_guard<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span> lockGuard(coutMutex);         <span style="color: #0099ff; font-style: italic;">// 3</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"child: "</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>get_id() <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;}
+  );
+
+  {
+
+    std<span style="color: #555555;">::</span>lock_guard<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span> lockGuard(coutMutex);          <span style="color: #0099ff; font-style: italic;">// 1</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"creator: "</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>get_id() <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+    t.join();                                                  <span style="color: #0099ff; font-style: italic;">// 5</span>
+
+  }                                                            <span style="color: #0099ff; font-style: italic;">// 4</span>
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The program run will block immediately.&nbsp;</p>
+<p><img src="images/blog/MultithreadingTheory/BlockingNonBlocking/deadlockWait.png" alt="deadlockWait" width="400" height="152" style="margin: 15px;" /></p>
+<p>What is happening?&nbsp;The creator thread locks in (1) the mutex. Now, the child thread executes (2). To get the mutex in expression (3), the creator thread has at first unlock it. But the creator thread will only unlock the mutex if the lockGuard (1) goes in (4) out of scope. That&nbsp;will never happen because the child thread has at first to lock the mutex <span style="font-family: courier new,courier;">coutMutex</span>.</p>
+<p>Let's have a look at the non-blocking algorithms.</p>
+<h2>Non-blocking</h2>
+<p><img src="images/blog/MultithreadingTheory/BlockingNonBlocking/NonBlocking.png" alt="NonBlocking" width="400" height="388" style="margin: 15px;" /></p>
+<p>The main categories for non-blocking algorithms are lock-free and wait-free. Each wait-free algorithm is lock-free and each lock-free is non-blocking. Non-blocking and lock-free are not the same. There is an additional guarantee, called obstruction-free, which I will ignore in this post because it is not so relevant.</p>
+<p>Non-blocking algorithms are typically implemented with CAS instructions. CAS stands for compare and swap. CAS is called <span style="font-family: courier new,courier;">compare_exchange_strong</span> or <span style="font-family: courier new,courier;">compare_exchange_weak</span> in C++.</p>
+<p>I will in this post only refer to the strong version. For more information, read my previous post <a href="index.php/the-atomic-boolean">The Atomic Boolean</a>. The key idea of both operations is that a call of&nbsp;<span style="font-family: courier new,courier;">atomicValue.compare_exchange_strong(expected, desired</span>) obeys the following rules in an atomically fashion.</p>
+<ul>
+<li>If the atomic comparison of&nbsp;<span style="font-family: courier new,courier;">atomicValue</span> with expected returns&nbsp;<span style="font-family: courier new,courier;">true</span>,<span style="font-family: courier new,courier;">&nbsp;atomicValue</span> will be set in the same atomic operation to&nbsp;<span style="font-family: courier new,courier;">desired</span>.</li>
+<li>If the comparison returns&nbsp;<span style="font-family: courier new,courier;">false</span>, <span style="font-family: courier new,courier;">expected</span> will be set to&nbsp;<span style="font-family: courier new,courier;">atomicValue</span>.</li>
+</ul>
+<p>Let's know have a closer look at lock-free versus wait-free.&nbsp;</p>
+<p>At first, the definition of lock-free and wait-free. Both definitions are quite similar. Therefore, it makes a lot of sense to define them together.</p>
+<ul>
+<li><strong>Lock-free:</strong> A non-blocking algorithm is lock-free if there is guaranteed system-wide progress.</li>
+<li><strong>Wait-free:</strong> A non-blocking algorithm is wait-free if there is guaranteed per-thread progress.</li>
+</ul>
+<h3>Lock-free</h3>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// fetch_mult.cpp</span>
+
+<span style="color: #009999;">#include &lt;atomic&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+T fetch_mult(std<span style="color: #555555;">::</span>atomic<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;&amp;</span> shared, T mult){                          <span style="color: #0099ff; font-style: italic;">// 1</span>
+  T oldValue <span style="color: #555555;">=</span> shared.load();                                          <span style="color: #0099ff; font-style: italic;">// 2</span>
+  <span style="color: #006699; font-weight: bold;">while</span> (<span style="color: #555555;">!</span>shared.compare_exchange_strong(oldValue, oldValue <span style="color: #555555;">*</span> mult));  <span style="color: #0099ff; font-style: italic;">// 3</span>
+  <span style="color: #006699; font-weight: bold;">return</span> oldValue;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main(){
+  std<span style="color: #555555;">::</span>atomic<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> myInt{<span style="color: #ff6600;">5</span>};
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> myInt <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;          
+  fetch_mult(myInt,<span style="color: #ff6600;">5</span>);
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> myInt <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;         
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The algorithm<span style="font-family: courier new,courier;"> fetch_mult</span> (1) mutiplies an <span style="font-family: courier new,courier;">std::atomic shared</span> by <span style="font-family: courier new,courier;">mult</span>. The key observation is that there is a small-time window between the reading of the old value <span style="font-family: courier new,courier;">T oldValue = shared Load</span> (2) and the&nbsp;comparison with the new value (3). Therefore, another thread can always kick in and change the <span style="font-family: courier new,courier;">oldValue</span>. If you reason about such a bad interleaving of threads, you see, that there can be no&nbsp;per-thread progress progress guarantee.&nbsp;</p>
+<p>Therefore, the algorithm is lock-free, but not wait-free.</p>
+<p>Here is the output of the program.</p>
+<p><img src="images/blog/MultithreadingTheory/BlockingNonBlocking/fetch_mult.PNG" alt="fetch mult" width="500" height="84" style="margin: 15px;" /></p>
+<p>&nbsp;</p>
+<p>While a lock-free algorithm guarantees system-wide progress, a wait-free algorithm guarantees per-thread progress.</p>
+<h3>Wait-free</h3>
+<p>If you reason about the lock-free algorithm in the last example you will see. A<span style="font-family: courier new,courier;"> compare_exchange_strong</span> call involves&nbsp;synchronisation. First you read the old value and than you update the new value if the initial condition already holds. If the initial condition hold, you publish the new value. If not, you&nbsp;do it once more if put the call in a while loop. Therefore <span style="font-family: courier new,courier;">compare_exchange_strong</span> behaves like an atomic transaction.</p>
+<p>The key part <span style="font-family: courier new,courier;"> </span>of the next program needs no synchronisation.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// relaxed.cpp</span>
+
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;thread&gt;</span>
+<span style="color: #009999;">#include &lt;atomic&gt;</span>
+ 
+std<span style="color: #555555;">::</span>atomic<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> cnt <span style="color: #555555;">=</span> {<span style="color: #ff6600;">0</span>};
+ 
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">add</span>(){                                           <span style="color: #0099ff; font-style: italic;">// 1</span>
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #007788; font-weight: bold;">int</span> n <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>; n <span style="color: #555555;">&lt;</span> <span style="color: #ff6600;">1000</span>; <span style="color: #555555;">++</span>n) {
+        cnt.fetch_add(<span style="color: #ff6600;">1</span>, std<span style="color: #555555;">::</span>memory_order_relaxed);  <span style="color: #0099ff; font-style: italic;">// 2</span>
+    }
+}
+ 
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>()
+{
+    std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span><span style="color: #555555;">&gt;</span> v;
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #007788; font-weight: bold;">int</span> n <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>; n <span style="color: #555555;">&lt;</span> <span style="color: #ff6600;">10</span>; <span style="color: #555555;">++</span>n) {
+        v.emplace_back(add);
+    }
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;</span> t <span style="color: #555555;">:</span> v) {
+        t.join();
+    }
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Final counter value is "</span> <span style="color: #555555;">&lt;&lt;</span> cnt <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Have a closer look at function add (1). There is no synchronisation involved in expression (2). The value 1 is just added to the atomic <span style="font-family: courier new,courier;">cnt</span>.</p>
+<p>And here is the output of the program. We&nbsp;always get 1000. Because 10 threads increment the value 1000 times.</p>
+<p>&nbsp;<img src="images/blog/MultithreadingTheory/BlockingNonBlocking/relaxed.png" alt="relaxed" width="400" height="357" style="margin: 15px;" /></p>
+<p>For simplicity reason I ignored a few other guarantees in this post such as starvation-free as subset of blocking or wait-free bounded as subset of wait-free. You can read the details at the blog <a href="http://concurrencyfreaks.blogspot.de/2013/05/lock-free-and-wait-free-definition-and.html">Concurrency Freaks</a>.&nbsp;</p>
+<h2>What's next?</h2>
+<p>In the next post, I will write about a curiosity. It's the so called ABA problem which is a kind of false positive case for CAS instructions. That means,&nbsp; although it seems that old value of a CAS instruction is still the same, it changed in the meantime.<span id="transmark"></span></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporter</a>: Eric Pederson.</strong></p>
+<p>&nbsp;</p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="166" height="212" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Get your e-book. Support my blog.</span></strong></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
