@@ -1,0 +1,134 @@
+<p>A common problem in concurrency is the so-called ABA problem. That means you read a value twice and each time it returns the same value A. Therefore you conclude that nothing changed in between. But you forgot the B.</p>
+<hr id="system-readmore" />
+<p>Let me first use a simple scenario to introduce the problem.</p>
+<h2>An analogy</h2>
+<p>The scenario consist of you sitting in a car and waiting that the traffic light becomes green. Green stands in our case for B, and red for A. What's happening?</p>
+<ol>
+<li>You look at the traffic light and it is red (A).</li>
+<li>Because you are bored, you begin to check the news on your smart phone and forget the time.</li>
+<li>You look once more at the traffic light. Damn, is is still red (A).</li>
+</ol>
+<p>Of course, it happened that the traffic light became green (B) between your two checks. Therefore, what seems to be one red phase were actually two.</p>
+<p>What does this mean for threads (processes)? Now once more more formal.</p>
+<ol>
+<li><span class="mwe-math-element">Thread 1 reads a variable var with value A. <br /> </span></li>
+<li>Thread 1 is preempted and thread 2 runs.</li>
+<li>Thread 2 changes the variable var from A to B to A.</li>
+<li>Thread 1 starts to executes and checks the value of variable var; because the value of variable var is the same, thread 1 continues with its work,</li>
+</ol>
+<p>Often, that is a no-brainer. You can simply ignore it.</p>
+<h2>No-brainer</h2>
+<p>Have a look a here. The function<span style="font-family: courier new,courier;"> fetch_mult</span> (1) mutiplies a <span style="font-family: courier new,courier;">std::atomic&lt;T&gt;&amp; shared</span> by <span style="font-family: courier new,courier;">mult</span>.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// fetch_mult.cpp</span>
+
+<span style="color: #009999;">#include &lt;atomic&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+T fetch_mult(std<span style="color: #555555;">::</span>atomic<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;&amp;</span> shared, T mult){                          <span style="color: #0099ff; font-style: italic;">// 1</span>
+  T oldValue <span style="color: #555555;">=</span> shared.load();                                          <span style="color: #0099ff; font-style: italic;">// 2</span>
+  <span style="color: #006699; font-weight: bold;">while</span> (<span style="color: #555555;">!</span>shared.compare_exchange_strong(oldValue, oldValue <span style="color: #555555;">*</span> mult));  <span style="color: #0099ff; font-style: italic;">// 3</span>
+  <span style="color: #006699; font-weight: bold;">return</span> oldValue;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main(){
+  std<span style="color: #555555;">::</span>atomic<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> myInt{<span style="color: #ff6600;">5</span>};
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> myInt <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;          
+  fetch_mult(myInt,<span style="color: #ff6600;">5</span>);
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> myInt <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;         
+}
+</pre>
+</div>
+<p><br />The key observation is that there is a small-time window between the reading of the old value <span style="font-family: courier new,courier;">T oldValue = shared.load</span> (2) and the&nbsp;comparison with the new value (3). Therefore, another thread can kick in and change the <span style="font-family: courier new,courier;">oldValue</span> from <span style="font-family: Courier New,Courier,monospace;">oldValue</span> to <span style="font-family: Courier New,Courier,monospace;">anotherValue</span> to <span style="font-family: Courier New,Courier,monospace;">oldValue</span> back. The <span style="font-family: courier new,courier;">anotherValue</span> is the B in ABA.</p>
+<p>Often it makes no difference if the first read value is in the second read operation the original value. But in lock-free concurrent data structure ABA may have a great impact.</p>
+<h2>A lock-free data structure</h2>
+<p>I will not present here in detail a lock-free data structure. I will use a lock-free stack that is implemented as a singly linked list. The stack supports only two operations.&nbsp;</p>
+<ol>
+<li><span class="c1">Pops the top object and returns a pointer to it.</span></li>
+<li><span class="c1">Pushes the object specified&nbsp;to stack.</span></li>
+</ol>
+<p>Let me describe in pseudo-code the pop operation to get an idea of the ABA problem. The pop operation performs in essence the following steps in a loop until the operation was successful.</p>
+<ol>
+<li>Get the head node: <strong>head</strong></li>
+<li>Get the subsequent node: <strong>headNext</strong></li>
+<li>Make <strong>headNext</strong> to the new head if <strong>head</strong> is still the head of the stack</li>
+</ol>
+<p>Here are the first two nodes of the stack:</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">Stack: TOP <span style="color: #555555;">-&gt;</span> head <span style="color: #555555;">-&gt;</span> headNext -&gt; ...
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Let's construct the ABA problem.</p>
+<h2>ABA in action</h2>
+<p>Let's start with the following stack:</p>
+<div style="background: #f0f3f3 none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<pre style="margin: 0px; line-height: 125%;">Stack: TOP <span style="color: #555555;">-&gt;</span> A <span style="color: #555555;">-&gt;</span> B -&gt; C
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Thread 1 is active and want to pop the head of stack.</p>
+<ul>
+<li>Thread 1 stores
+<ul>
+<li>head = A</li>
+<li>headNext = B</li>
+</ul>
+<p>&nbsp;</p>
+</li>
+</ul>
+<p>Before thread 1 finishes the pop algorithm, thread 2 kicks in.</p>
+<ul>
+<li>Thread 2 pops A</li>
+</ul>
+<div style="background: #f0f3f3 none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<pre style="margin: 0px; line-height: 125%;">    Stack: TOP <span style="color: #555555;">-&gt;</span> <span style="color: #555555;"></span>B -&gt; C
+</pre>
+</div>
+<p>&nbsp;</p>
+<ul>
+<li>&nbsp;Thread 2 pops B and deletes B</li>
+</ul>
+<div style="background: #f0f3f3 none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<pre style="margin: 0px; line-height: 125%;">    Stack: TOP<span style="color: #555555;"></span><span style="color: #555555;"> </span>-&gt; C
+</pre>
+</div>
+<p>&nbsp;</p>
+<ul>
+<li>Thread 2 pushes A back</li>
+</ul>
+<div style="background: #f0f3f3 none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<pre style="margin: 0px; line-height: 125%;">    Stack: TOP <span style="color: #555555;">-&gt;</span> A <span style="color: #555555;">-&gt;</span> C
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Thread 1 is rescheduled and check if A == head. Because A == head, headNext which is B becomes the new head. But B was already deleted. Therefore, the program has undefined behaviour.</p>
+<p>There are a few remedies for the ABA problem.</p>
+<h2>Remedy for ABA</h2>
+<p>The conceptional problem of ABA is quite easy to get. A node such as B == headNext was deleted although another node A == head was referring to it. The solution to our problem is to get ride of the prematurely deletion of the node. Here are a few remedies.</p>
+<h3>Taged state reference</h3>
+<p>You can add a tag to each node indicating how often the node has been successfully modified. The result is that compare and swap method will eventually fail although the check returns true.&nbsp;</p>
+<p>The next three techniques are based on the idea of deferred reclamation.</p>
+<h3>Garbage collection</h3>
+<p>Garbage collection guarantees that the variables will only be deleted if it is not needed any more. That sounds promising but has a big drawback. The most garbage collector are not lock-free. Therefore, you have a lock-free data structure but the overall system is not lock-free.</p>
+<h3>Hazard pointers</h3>
+<p>From <a href="https://en.wikipedia.org/wiki/Hazard_pointer">Wikipedia: Hazard Pointers</a>:</p>
+<p>In a hazard-pointer system, each thread keeps a list<a href="https://en.wikipedia.org/wiki/List_%28computing%29" class="mw-redirect" title="List (computing)"></a> of hazard pointers indicating which nodes the thread is currently accessing. (In many systems this "list" may be provably limited to only one <sup id="cite_ref-Alexandrescu04_2-0" class="reference"><a href="https://en.wikipedia.org/wiki/Hazard_pointer#cite_note-Alexandrescu04-2"></a></sup>or two elements.) Nodes on the hazard pointer list must not be modified or deallocated by any other thread. ...&nbsp;When a thread wishes to remove a node, it places it on a list of nodes "to be freed later", but does not actually deallocate the node's memory until no other thread's hazard list contains the pointer.&nbsp;This manual garbage collection can be done by a dedicated garbage-collection thread (if the list "to be freed later" is shared by all the threads); alternatively, cleaning up the "to be freed" list can be done by each worker thread as part of an operation such as "pop".</p>
+<h3>RCU</h3>
+<p>RCU stands for <strong>R</strong>ead <strong>C</strong>opy<strong> U</strong>pdate and is a synchronisation technique for almost read-only data structures. RCU was created by Paul McKenney and is used in the Linux Kernel since 2002.&nbsp;</p>
+<p>The idea is quite simple and follows the acronym. In order to modify data, you make a copy of the data and modify that copy. In contrary all readers work with the original data. If there is no reader, you can safely replace the data structure with the copy.</p>
+<p>For more details about RCU, read the article<a href="https://lwn.net/Articles/262464/"> What is RCU, Fundamentally?</a> by Paul McKenney.</p>
+<p>&nbsp;</p>
+<p>As part of a concurrency toolkit there are two proposal for upcoming C++ standards. The proposal <a href="open-std.org/JTC1/SC22/WG21/docs/papers/2016/p0233r0.pdf">P0233r0</a> for hazard pointers and the proposal<a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2016/p0461r0.pdf"> P0461R0</a> for RCU.</p>
+<h2>What's next?</h2>
+<p>I'm not so sure. I have to go for the next big topic that has the potential for at least 20 exciting posts. Let yourself be suprised.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;<strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporter</a></strong><strong>: Eric Pederson.<span id="transmark"></span></strong></p>
+<p>&nbsp;</p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="166" height="212" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Get your e-book. Support my blog.</span></strong></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
