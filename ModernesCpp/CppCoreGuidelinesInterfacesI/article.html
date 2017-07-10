@@ -1,0 +1,127 @@
+<p>Interfaces are a contract between a service provider and a service consumer. The C++ Core Guidelines has 20 rules to make them right because "interfaces is probably the most importang single aspect of code organization".</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p><img src="images/blog/ModernCpp/CppCoreGuidelinesInterfaces/Lego_dimensions.svg.png" alt="Lego dimensions.svg" width="600" height="300" /></p>
+<p>Before I dive into the rules, here is an overview of the 20 rules.</p>
+<ul>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Ri-explicit">I.1: Make interfaces explicit</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Ri-global">I.2: Avoid global variables</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Ri-singleton">I.3: Avoid singletons</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Ri-typed">I.4: Make interfaces precisely and strongly typed</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Ri-pre">I.5: State preconditions (if any)</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Ri-expects">I.6: Prefer <code class="highlighter-rouge no-highlight">Expects()</code> for expressing preconditions</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Ri-post">I.7: State postconditions</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Ri-ensures">I.8: Prefer <code class="highlighter-rouge no-highlight">Ensures()</code> for expressing postconditions</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Ri-concepts">I.9: If an interface is a template, document its parameters using concepts</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Ri-except">I.10: Use exceptions to signal a failure to perform a required task</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Ri-raw">I.11: Never transfer ownership by a raw pointer (<code class="highlighter-rouge no-highlight">T*</code>)</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Ri-nullptr">I.12: Declare a pointer that must not be null as <code class="highlighter-rouge no-highlight">not_null</code></a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Ri-array">I.13: Do not pass an array as a single pointer</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Ri-global-init">I.22: Avoid complex initialization of global objects</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Ri-nargs">I.23: Keep the number of function arguments low</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Ri-unrelated">I.24: Avoid adjacent unrelated parameters of the same type</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Ri-abstract">I.25: Prefer abstract classes as interfaces to class hierarchies</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Ri-abi">I.26: If you want a cross-compiler ABI, use a C-style subset</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Ri-pimpl">I.27: For stable library ABI, consider the Pimpl idiom</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Ri-encapsulate">I.30: Encapsulate rule violations</a></li>
+</ul>
+<p>I will make my discussion of the rules not so elaborated because there are too many rules. My idea is that I write in this post about the first ten rules and in the next post about the remaning 10. So, let's start.</p>
+<h4><strong>I.1: Make interfaces explicit</strong></h4>
+<p>This rule is about correctness and means: assumptions should be stated in an interface. Otherwise, they are easily overlooked and hard to test.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">round</span>(<span style="color: #007788; font-weight: bold;">double</span> d)
+{
+    <span style="color: #006699; font-weight: bold;">return</span> (round_up) <span style="color: #555555;">?</span> ceil(d) <span style="color: #555555;">:</span> d;    <span style="color: #0099ff; font-style: italic;">// don't: "invisible" dependency</span>
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>For example, the function <span style="font-family: courier new,courier;">round</span> does not express that its result depends on the insivible dependency <span style="font-family: courier new,courier;">round_up.</span></p>
+<h4><strong>I.2: Avoid global variables</strong></h4>
+<p>This rule is kind of obvious but the emphasis lies on mutable global variables. Global constants are fine because they cannot introduce a dependency into the function and cannot be subject for race condtitions.</p>
+<h4><strong>I.3: Avoid singletons</strong></h4>
+<p>Singletons are global objects under the hood, therefore, you should avoid them.</p>
+<h4><strong>I.4: Make interfaces precisely and strongly typed</strong></h4>
+<p>The reason for this rule makes it clear: "Types are the simplest and best documentation, have well-defined meaning, and are guaranteed to be checked at compile time."</p>
+<p>Have a look at an example:</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">draw_rect</span>(<span style="color: #007788; font-weight: bold;">int</span>, <span style="color: #007788; font-weight: bold;">int</span>, <span style="color: #007788; font-weight: bold;">int</span>, <span style="color: #007788; font-weight: bold;">int</span>);   <span style="color: #0099ff; font-style: italic;">// great opportunities for mistakes</span>
+draw_rect(p.x, p.y, <span style="color: #ff6600;">10</span>, <span style="color: #ff6600;">20</span>);          <span style="color: #0099ff; font-style: italic;">// what does 10, 20 mean?</span>
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">draw_rectangle</span>(Point top_left, Point bottom_right);
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">draw_rectangle</span>(Point top_left, Size height_width);
+
+draw_rectangle(p, Point{<span style="color: #ff6600;">10</span>, <span style="color: #ff6600;">20</span>});  <span style="color: #0099ff; font-style: italic;">// two corners</span>
+draw_rectangle(p, Size{<span style="color: #ff6600;">10</span>, <span style="color: #ff6600;">20</span>});   <span style="color: #0099ff; font-style: italic;">// one corner and a (height, width) pair</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>How easy is it to use the function <span style="font-family: courier new,courier;">draw_rect</span> in the incorrect way. Compare this to the function <span style="font-family: courier new,courier;">draw_rectangle.</span> The compiler guarantees that the argument is a <span style="font-family: courier new,courier;">Point</span> or a <span style="font-family: courier new,courier;">Size</span> object.</p>
+<p>You should, therefore, look in your process of code improvement for functions with many built-in type arguments and even worse, for functions that accept <span style="font-family: courier new,courier;">void*</span> as parameter.</p>
+<h4><br /><strong>I.5: State preconditions (if any)</strong></h4>
+<p>If possible, preconditions such that<span style="font-family: courier new,courier;"> x</span> in double <span style="font-family: courier new,courier;">sqrt(double x)</span> must be non-negative, should be expressed as assertions.</p>
+<p><span style="font-family: courier new,courier;">Expects()</span> from the <a href="https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#S-gsl">Guideline support library</a> (GSL) let you express your precondition directly.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">double</span> <span style="color: #cc00ff;">sqrt</span>(<span style="color: #007788; font-weight: bold;">double</span> x) { Expects(x <span style="color: #555555;">&gt;=</span> <span style="color: #ff6600;">0</span>); <span style="color: #0099ff; font-style: italic;">/* ... */</span> }
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Contracts, consisting of preconditions, postconditions, and assertions may be part of the next C++20 standard. See the proposal <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2016/p0380r1.pdf">p03801.pdf</a>.</p>
+<h4><strong>I.6: Prefer Expects() for expressing preconditions</strong></h4>
+<p>That is similar to the previous rule, but the emphasis is on a different aspect. You should use <span style="font-family: courier new,courier;">Expects()</span> for expressing preconditions and not, for example, an if expression, a comment, or an <span style="font-family: courier new,courier;">assert()</span> statement.&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">area</span>(<span style="color: #007788; font-weight: bold;">int</span> height, <span style="color: #007788; font-weight: bold;">int</span> width)
+{
+    Expects(height <span style="color: #555555;">&gt;</span> <span style="color: #ff6600;">0</span> <span style="color: #555555;">&amp;&amp;</span> width <span style="color: #555555;">&gt;</span> <span style="color: #ff6600;">0</span>);            <span style="color: #0099ff; font-style: italic;">// good</span>
+    <span style="color: #006699; font-weight: bold;">if</span> (height <span style="color: #555555;">&lt;=</span> <span style="color: #ff6600;">0</span> <span style="color: #555555;">||</span> width <span style="color: #555555;">&lt;=</span> <span style="color: #ff6600;">0</span>) my_error();   <span style="color: #0099ff; font-style: italic;">// obscure</span>
+    <span style="color: #0099ff; font-style: italic;">// ...</span>
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The expression<span style="font-family: courier new,courier;"> Expects()</span> is easier to spot and may be checkable by the upcoming C++20 standard.</p>
+<h4><strong>I.7: State postconditions, I.8: Prefer Ensures() for expressing postconditions</strong></h4>
+<p>In accordance to the arguments of a function, you have to think about its results. Therefore, the postcondition rules are quite similar to previous precondtion rules.</p>
+<h4><strong>I.9: If an interface is a template, document its parameters using concepts</strong></h4>
+<p>We wil get with high probability with C++20 concepts. Concepts are predicates on template parameters that ca be evaluated at compile time. A concept may limit the set of arguments that are accepted as template parameters. I already wrote four posts about <a href="index.php/tag/concepts">concepts</a>, because there is a lot more to concepts.</p>
+<p>The rule of te C++ Core Guidelines is quite easy. You should apply them.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> Iter, <span style="color: #006699; font-weight: bold;">typename</span> Val<span style="color: #555555;">&gt;</span>
+requires InputIterator<span style="color: #555555;">&lt;</span>Iter<span style="color: #555555;">&gt;</span> <span style="color: #555555;">&amp;&amp;</span> EqualityComparable<span style="color: #555555;">&lt;</span>ValueType<span style="color: #555555;">&lt;</span>Iter<span style="color: #555555;">&gt;&gt;</span>, Val<span style="color: #555555;">&gt;</span>
+Iter find(Iter first, Iter last, Val v)
+{
+    <span style="color: #0099ff; font-style: italic;">// ...</span>
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The generic <span style="font-family: courier new,courier;">find</span> algorithm requires that the template parameter <span style="font-family: courier new,courier;">Iter</span> is an <span style="font-family: courier new,courier;">InputIterator</span> and the undelying value of the template parameter <span style="font-family: courier new,courier;">Iter</span> is <span style="font-family: courier new,courier;">EqualityComparable</span>. If you invoke the <span style="font-family: courier new,courier;">find</span> algorithm with a template argument that does not satisfy this requirement, you will get a <strong>readable and easy to understand</strong> error message.</p>
+<h4><br /><strong>I. 10: Use exceptions to signal a failure to perform a required task</strong></h4>
+<p>Here is the reason: "It should not be possible to ignore an error because that could leave the system or a computation in an undefined (or unexpected) state."</p>
+<p>The rule provides a bad and a good example.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">printf</span>(<span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">char</span><span style="color: #555555;">*</span> ...);    <span style="color: #0099ff; font-style: italic;">// bad: return negative number if output fails</span>
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">F</span>, <span style="color: #006699; font-weight: bold;">class</span> ...<span style="color: #00aa88; font-weight: bold;">Args</span><span style="color: #555555;">&gt;</span>
+<span style="color: #0099ff; font-style: italic;">// good: throw system_error if unable to start the new thread</span>
+<span style="color: #006699; font-weight: bold;">explicit</span> <span style="color: #006699; font-weight: bold;">thread</span>(F<span style="color: #555555;">&amp;&amp;</span> f, Args<span style="color: #555555;">&amp;&amp;</span>... args);
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>In the bad case, you can ignore the exception and your program has undefined behaviour.</p>
+<p>If you can't use exceptions, you should return a pair of values. Thanks to C++17 feature <a href="index.php/cpp17-core#h2-1-4-structured-binding-declarations">structured binding</a>, you can do it quite elegantly.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">auto</span> [val, error_code] <span style="color: #555555;">=</span> do_something();
+<span style="color: #006699; font-weight: bold;">if</span> (error_code <span style="color: #555555;">==</span> <span style="color: #ff6600;">0</span>) {
+    <span style="color: #0099ff; font-style: italic;">// ... handle the error or exit ...</span>
+}
+<span style="color: #0099ff; font-style: italic;">// ... use val ...</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<h2>What's next?</h2>
+<p>That is quite easy to guess. In the next post I write about the remaining rules to pointers, initialisation of globals objects, function parameters, abstract classes, and ABI (application binary interface)? There is a lot to know about good interface design.</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporter</a></strong><strong>: Eric Pederson.</strong></p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="166" height="212" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Get your e-book. Support my blog.</span></strong></p>
