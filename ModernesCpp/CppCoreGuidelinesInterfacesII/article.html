@@ -1,0 +1,150 @@
+<p>Interfaces are a contract between a service provider and a service consumer. The C++ Core Guidelines has 20 rules to make them right because "interfaces is probably the most important single aspect of code organization".</p>
+<hr id="system-readmore" />
+<p><img src="images/blog/ModernCpp/CppCoreGuidelinesInterfaces/Lego_dimensions.svg.png" alt="Lego dimensions.svg" width="600" height="300" /></p>
+<p>I wrote <a href="index.php/c-core-guidelines-interfaces">in my last post</a><a href="index.php/c-core-guidelines-interfaces"> </a>about the first 10 rules. Today I will finish my job and write about the remaining 10 rules.</p>
+<ul>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Ri-explicit">I.1: Make interfaces explicit</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Ri-global">I.2: Avoid global variables</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Ri-singleton">I.3: Avoid singletons</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Ri-typed">I.4: Make interfaces precisely and strongly typed</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Ri-pre">I.5: State preconditions (if any)</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Ri-expects">I.6: Prefer <code class="highlighter-rouge no-highlight">Expects()</code> for expressing preconditions</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Ri-post">I.7: State postconditions</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Ri-ensures">I.8: Prefer <code class="highlighter-rouge no-highlight">Ensures()</code> for expressing postconditions</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Ri-concepts">I.9: If an interface is a template, document its parameters using concepts</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Ri-except">I.10: Use exceptions to signal a failure to perform a required task</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Ri-raw">I.11: Never transfer ownership by a raw pointer (<code class="highlighter-rouge no-highlight">T*</code>)</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Ri-nullptr">I.12: Declare a pointer that must not be null as <code class="highlighter-rouge no-highlight">not_null</code></a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Ri-array">I.13: Do not pass an array as a single pointer</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Ri-global-init">I.22: Avoid complex initialization of global objects</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Ri-nargs">I.23: Keep the number of function arguments low</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Ri-unrelated">I.24: Avoid adjacent unrelated parameters of the same type</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Ri-abstract">I.25: Prefer abstract classes as interfaces to class hierarchies</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Ri-abi">I.26: If you want a cross-compiler ABI, use a C-style subset</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Ri-pimpl">I.27: For stable library ABI, consider the Pimpl idiom</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Ri-encapsulate">I.30: Encapsulate rule violations</a></li>
+</ul>
+<p>Let's directly dive into the details.</p>
+<h4><strong>I.11: Never transfer ownership by a raw pointer (T*)</strong></h4>
+<p>There is a conceptional issue with this code.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">X<span style="color: #555555;">*</span> <span style="color: #cc00ff;">compute</span>(args)    <span style="color: #0099ff; font-style: italic;">// don't</span>
+{
+    X<span style="color: #555555;">*</span> res <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">new</span> X{};
+    <span style="color: #0099ff; font-style: italic;">// ...</span>
+    <span style="color: #006699; font-weight: bold;">return</span> res;
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Who deletes the pointer X? There are at least three alternatives to deal with the ownership problem:</p>
+<ul>
+<li>return the value, if possible</li>
+<li>use a smart pointer</li>
+<li>use <span style="font-family: courier new,courier;">owner&lt;X*&gt;</span> from the <a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#S-gsl">guideline support library</a> (GSL)</li>
+</ul>
+<h4><strong>I.12: Declare a pointer that must not be null as not_null</strong></h4>
+<p>What is the semantic difference of the three variations of the following function <span style="font-family: courier new,courier;">length</span>?</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">length</span>(<span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">char</span><span style="color: #555555;">*</span> p);            <span style="color: #0099ff; font-style: italic;">// it is not clear whether length(nullptr) is valid</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">length</span>(not_null<span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">char</span><span style="color: #555555;">*&gt;</span> p);  <span style="color: #0099ff; font-style: italic;">// better: we can assume that p cannot be nullptr</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">length</span>(<span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">char</span><span style="color: #555555;">*</span> p);            <span style="color: #0099ff; font-style: italic;">// we must assume that p can be nullptr</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The intention of the variations two and three of <span style="font-family: courier new,courier;">length</span> is quite obvious. The second variation accepts only a non-null pointer, the third versions accepts a <span style="font-family: courier new,courier;">nullptr</span>. You may have already guessed it. <span style="font-family: courier new,courier;">not_null</span> if from the GSL.</p>
+<h4><br /><strong>I.13: Do not pass an array as a single pointer</strong></h4>
+<p>Passing arrays as a single pointer is quite error prone.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">copy_n</span>(<span style="color: #006699; font-weight: bold;">const</span> T<span style="color: #555555;">*</span> p, T<span style="color: #555555;">*</span> q, <span style="color: #007788; font-weight: bold;">int</span> n); <span style="color: #0099ff; font-style: italic;">// copy from [p:p+n) to [q:q+n)</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>What will happen if <span style="font-family: courier new,courier;">n</span> is too big? Right: undefined behaviour. The GSL offers a solution, called spans.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">copy</span>(span<span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">const</span> T<span style="color: #555555;">&gt;</span> r, span<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span> r2); <span style="color: #0099ff; font-style: italic;">// copy r to r2</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Spans deduce their number of arguments.</p>
+<h4><strong>I.22: Avoid complex initialization of global objects</strong></h4>
+<p>Global objects provide a lot of fun. For example, if they are in different translation units, their order of initialisation is not defined. The following code snippet has undefined behaviour.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// file1.c</span>
+
+<span style="color: #006699; font-weight: bold;">extern</span> <span style="color: #006699; font-weight: bold;">const</span> X x;
+
+<span style="color: #006699; font-weight: bold;">const</span> Y y <span style="color: #555555;">=</span> f(x);   <span style="color: #0099ff; font-style: italic;">// read x; write y</span>
+
+<span style="color: #0099ff; font-style: italic;">// file2.c</span>
+
+<span style="color: #006699; font-weight: bold;">extern</span> <span style="color: #006699; font-weight: bold;">const</span> Y y;
+
+<span style="color: #006699; font-weight: bold;">const</span> X x <span style="color: #555555;">=</span> g(y);   <span style="color: #0099ff; font-style: italic;">// read y; write x</span>
+</pre>
+</div>
+<h4><br /><strong>I.23: Keep the number of function arguments low</strong></h4>
+<p>There is a simple rule: one function should do exactly one job. If that is the case the number function arguments automatically become low and, therefore, the function is easy to use.</p>
+<p>To be honest, the&nbsp;<a href="index.php/c-17-new-algorithm-of-the-standard-template-library">New Parallel Algorithms of Standard Template Library</a> such as <a href="http://en.cppreference.com/w/cpp/algorithm/transform_reduce">std::transform_reduce</a><span style="font-family: courier new,courier;"></span> often break this rule.</p>
+<h4><br /><strong>I.24: Avoid adjacent unrelated parameters of the same type</strong></h4>
+<p>What is the source and the destination of the following <span style="font-family: courier new,courier;">copy_n</span> function?. Any educated guess?</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">copy_n</span>(T<span style="color: #555555;">*</span> p, T<span style="color: #555555;">*</span> q, <span style="color: #007788; font-weight: bold;">int</span> n); 
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>I often have to look for the documentation.</p>
+<h4><br /><strong>I.25: Prefer abstract classes as interfaces to class hierarchies</strong></h4>
+<p>Of course, that is an obvious and long established rule for object-oriented design. The guidelines provide two reasons for this rule.</p>
+<ul>
+<li>abstract classes are more likely to be stable than base classes</li>
+<li>bases classes with state and non-abstract methods put more constraints on derived classes</li>
+</ul>
+<h4><br /><strong>I.26: If you want a cross-compiler ABI, use a C-style subset</strong></h4>
+<p>ABI stands für <strong>A</strong>pplication <strong>B</strong>inary <strong>I</strong>nterface.</p>
+<p>This is a strange rule in C++ guidelines. The reason is that "Different compilers implement different binary layouts for classes, exception handling, function names, and other implementation details.". On some platforms there are common ABIs emergeing. If you use a single compiler, you can stick to the full C++ interface. In this case, you have to recompile the code.</p>
+<h4><br /><strong>I.27: For stable library ABI, consider the Pimpl idiom</strong></h4>
+<p>Pimpl stands for pointer to implementation and is the C++ variation of the<a href="https://en.wikipedia.org/wiki/Bridge_pattern"> bridge pattern</a>. The idea is that a non-polymorphic interface holds the pointer to its implementation, therefore, modification of the implementation don't require recompilation of the interface.</p>
+<p>Here is the example from the C++ Core Guidelines:</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">interface (widget.h)
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">widget</span> {
+    <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">impl</span>;
+    std<span style="color: #555555;">::</span>unique_ptr<span style="color: #555555;">&lt;</span>impl<span style="color: #555555;">&gt;</span> pimpl;
+<span style="color: #9999ff;">public:</span>
+    <span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">draw</span>(); <span style="color: #0099ff; font-style: italic;">// public API that will be forwarded to the implementation</span>
+    widget(<span style="color: #007788; font-weight: bold;">int</span>); <span style="color: #0099ff; font-style: italic;">// defined in the implementation file</span>
+    <span style="color: #555555;">~</span>widget();   <span style="color: #0099ff; font-style: italic;">// defined in the implementation file, where impl is a complete type</span>
+    widget(widget<span style="color: #555555;">&amp;&amp;</span>) <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">default</span>;
+    widget(<span style="color: #006699; font-weight: bold;">const</span> widget<span style="color: #555555;">&amp;</span>) <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">delete</span>;
+    widget<span style="color: #555555;">&amp;</span> <span style="color: #006699; font-weight: bold;">operator</span><span style="color: #555555;">=</span>(widget<span style="color: #555555;">&amp;&amp;</span>); <span style="color: #0099ff; font-style: italic;">// defined in the implementation file</span>
+    widget<span style="color: #555555;">&amp;</span> <span style="color: #006699; font-weight: bold;">operator</span><span style="color: #555555;">=</span>(<span style="color: #006699; font-weight: bold;">const</span> widget<span style="color: #555555;">&amp;</span>) <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">delete</span>;
+};
+
+implementation (widget.cpp)
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">widget</span><span style="color: #555555;">::</span>impl {
+    <span style="color: #007788; font-weight: bold;">int</span> n; <span style="color: #0099ff; font-style: italic;">// private data</span>
+<span style="color: #9999ff;">public:</span>
+    <span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">draw</span>(<span style="color: #006699; font-weight: bold;">const</span> widget<span style="color: #555555;">&amp;</span> w) { <span style="color: #0099ff; font-style: italic;">/* ... */</span> }
+    impl(<span style="color: #007788; font-weight: bold;">int</span> n) <span style="color: #555555;">:</span> n(n) {}
+};
+<span style="color: #007788; font-weight: bold;">void</span> widget<span style="color: #555555;">::</span>draw() { pimpl<span style="color: #555555;">-&gt;</span>draw(<span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">this</span>); }
+widget<span style="color: #555555;">::</span>widget(<span style="color: #007788; font-weight: bold;">int</span> n) <span style="color: #555555;">:</span> pimpl{std<span style="color: #555555;">::</span>make_unique<span style="color: #555555;">&lt;</span>impl<span style="color: #555555;">&gt;</span>(n)} {}
+widget<span style="color: #555555;">::~</span>widget() <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">default</span>;
+widget<span style="color: #555555;">&amp;</span> widget<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">operator</span><span style="color: #555555;">=</span>(widget<span style="color: #555555;">&amp;&amp;</span>) <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">default</span>;
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The <span style="font-family: courier new,courier;">pimpl</span> is the pointer that holds the handle to the implementation.</p>
+<p>For an in depth discussion of this C++ idiom, read the <a href="https://herbsutter.com/gotw/_100/">GOTW #100</a> article by Herb Sutter. GotW stands für Guro of the Week.</p>
+<h4><br /><strong>I.30: Encapsulate rule violations</strong></h4>
+<p>Sometimes code is ugly, unsafe, or error-prone because of various reasons. Put the code at one place and encapsulate it with an easy to use interface. That is called abstraction which you have sometimes to do. To be honest, I have no problem with that code, if the internal code used is stable and the interface let you only use it in the correct way.</p>
+<h2>What's next?</h2>
+<p>In the last posts including the current one I often mentioned the <a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#S-gsl">guideline support library</a>. Now it's time to have a look insight and I will write about it in the next post.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporter</a></strong><strong>: Eric Pederson.</strong></p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="166" height="212" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Get your e-book. Support my blog.</span></strong></p>
