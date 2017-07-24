@@ -1,0 +1,146 @@
+<p>The guidelines support library (GSL) is a small library for supporting the guidelines of the C++ core guidelines. It should help to write better C++ programs. Therefore, its key concerns are memory safety and type safety. They are already a few implementations of the GSL available.</p>
+<hr id="system-readmore" />
+<p>The GSL is a header only library, hence, you can use the functions and types of the library quite easily. The best-known implementation is the one from Microsoft, hosted at Github: <a href="https://github.com/Microsoft/GSL">Microsoft/GSL</a>. The Microsoft version requires C++14 support and runs on various platforms. Here are the main platforms.</p>
+<ul>
+<li>Windows using Visual Studio 2015</li>
+<li>Windows using Visual Studio 2017</li>
+<li>GNU/Linux using Clang/LLVM 3.6</li>
+<li>GNU/Linux using GCC 5.1</li>
+</ul>
+<p>But that is not all, there exist more implementations on GitHub. I want explicitly emphasise the <a href="https://github.com/martinmoene/gsl-lite">GSL-lite </a>implementation of Martin Moene. His implementation even works with C++98 and C++03.</p>
+<p>Before I dive into the details, there is one issue which makes my writing difficult: the lack of good documentation or tutorials. To get an idea, what the function and types should support, you have to install the library and analyse the unit-test. That is not the kind of documentation, I expect. In contrast, the installation and usage of Microsoft implementation&nbsp; of the GSL was quite easy on Windows and Linux.</p>
+<p>&nbsp;</p>
+<p><img src="images/blog/ModernCpp/GuidelineSupportLibrary/support.png" alt="support" width="400" height="400" style="margin: 15px; float: right;" /></p>
+<p>So, let me dive into the details. The GSL consists of five components. Here is a first overview:</p>
+<ul>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#SS-views">GSL.view: Views</a>
+<ul>
+<li><span style="font-family: courier new,courier;">span&lt;T&gt;</span></li>
+<li><span style="font-family: courier new,courier;">string_span&lt;T&gt;</span></li>
+<li><span style="font-family: courier new,courier;">(cw)zstring</span></li>
+</ul>
+</li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#SS-ownership">GSL.owner</a><br />
+<ul>
+<li><span style="font-family: courier new,courier;">owner&lt;T&gt;</span></li>
+<li><span style="font-family: courier new,courier;">unique_ptr&lt;T&gt;</span></li>
+<li><span style="font-family: courier new,courier;">shared_ptr&lt;T&gt;</span></li>
+<li><span style="font-family: courier new,courier;">dyn_array&lt;T&gt;</span></li>
+<li><span style="font-family: courier new,courier;">stack_array&lt;T&gt;</span></li>
+</ul>
+</li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#SS-assertions">GSL.assert: Assertions</a>
+<ul>
+<li><span style="font-family: courier new,courier;">Expects()</span></li>
+<li><span style="font-family: courier new,courier;">Ensures()</span></li>
+</ul>
+</li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#SS-utilities">GSL.util: Utilities</a>
+<ul>
+<li><span style="font-family: courier new,courier;">narrow</span></li>
+<li><span style="font-family: courier new,courier;">narrow_cast()</span></li>
+<li><span style="font-family: courier new,courier;">not_null&lt;T&gt;</span></li>
+<li><span style="font-family: courier new,courier;">finally</span></li>
+</ul>
+</li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#SS-gsl-concepts">GSL.concept: Concepts</a>
+<ul>
+<li><code class="highlighter-rouge no-highlight">Range</code></li>
+<li><code class="highlighter-rouge no-highlight">String</code></li>
+<li><code class="highlighter-rouge no-highlight">Number</code></li>
+<li><code class="highlighter-rouge no-highlight">Sortable</code></li>
+<li><code class="highlighter-rouge no-highlight">Pointer</code></li>
+<li>...</li>
+</ul>
+<p>&nbsp;</p>
+</li>
+</ul>
+<p>You may be wondering that the GSL has its own smart pointer <span style="font-family: courier new,courier;">gsl::unique_ptr</span> and <span style="font-family: courier new,courier;">gsl::shared_ptr</span> because the C++11 standard has <span style="font-family: courier new,courier;">std::unique_ptr</span> and <span style="font-family: courier new,courier;">std::shared_ptr.</span> The idea is quite simple: you can use the GSL with a compiler that does not support C++11. A lot of the functions and types that the GSL support may become part of C++20. That holds at least for the concepts and the assertions. Additionally, it is quite probable that the remaining parts will also become part of upcoming C++ standards.</p>
+<h2>The components</h2>
+<p>Let's have a look at the Views,</p>
+<h3>GSL.view: Views</h3>
+<p>A view is never an owner. In the case of a <span style="font-family: courier new,courier;">gsl::span&lt;T&gt;</span> it represents a non-owning range of continguous memory. This can be an array, a pointer with a size, or a <span style="font-family: courier new,courier;">std::vector</span>. The same holds for <span style="font-family: courier new,courier;">gsl::string_span&lt;T&gt;</span> or a zero terminated C strings:<span style="font-family: courier new,courier;"> gsl::(cw)zstring.</span>The main reason for having a <span style="font-family: courier new,courier;">gsl::span&lt;T&gt;</span> is that a plain array will be decayed to a pointer if passed to a function; therefore the size is lost.</p>
+<p><strong><span style="font-family: courier new,courier;">gsl::span&lt;T&gt;</span></strong> automatically deduces the size of the plain array or the <span style="font-family: courier new,courier;">std::vector.</span> If you use a pointer, you have to provide the size.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">void</span> copy_n(<span style="color: #006699; font-weight: bold;">const</span> T<span style="color: #555555;">*</span> p, T<span style="color: #555555;">*</span> q, <span style="color: #007788; font-weight: bold;">int</span> n){}
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">void</span> copy(gsl<span style="color: #555555;">::</span>span<span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">const</span> T<span style="color: #555555;">&gt;</span> src, gsl<span style="color: #555555;">::</span>span<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span> des){}
+
+<span style="color: #007788; font-weight: bold;">int</span> main(){
+    
+  <span style="color: #007788; font-weight: bold;">int</span> arr1[] <span style="color: #555555;">=</span> {<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>};
+  <span style="color: #007788; font-weight: bold;">int</span> arr2[] <span style="color: #555555;">=</span> {<span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">5</span>};
+  
+  copy_n(arr1, arr2, <span style="color: #ff6600;">3</span>);         <span style="color: #0099ff; font-style: italic;">// (1)</span>
+  copy(arr1, arr2);              <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>In contrast to the function<span style="font-family: courier new,courier;"> copy_n</span> (1), you have not to provide the number of elements for the function <span style="font-family: courier new,courier;">copy</span> (2). Hence, a common cause of errors is gone with <span style="font-family: courier new,courier;">gsl::span&lt;T&gt;</span>.</p>
+<p>There are various kinds of owners in the GSL.</p>
+<h3 id="gslowner-ownership-pointers">GSL.owner: Ownership pointers</h3>
+<p>I assume, you know <span style="font-family: courier new,courier;">std::unique_ptr</span> and <span style="font-family: courier new,courier;">std::shared_ptr</span> and, therefore, you know <span style="font-family: courier new,courier;">gsl::unique_ptr</span> and <span style="font-family: courier new,courier;">gsl::shared_ptr</span>. If not, here are my posts about <a href="index.php/tag/smart-pointers">smart pointers</a>.</p>
+<p><strong><span style="font-family: courier new,courier;">gsl::owner&lt;T*&gt;</span></strong> marks a pointer that has ownership of the referenced object. You should use <span style="font-family: courier new,courier;">gsl::owner&lt;T&gt;</span> if you can not use resource handles such as smart pointers or containers. The key point about the owner is that you have to free the resource explicitly. Raw pointers that are not marked as<span style="font-family: courier new,courier;"> gsl::owner&lt;T*&gt;</span> are considered to be non-owning in the C++ core guidelines. Therefore, you have not to free the resource.</p>
+<p><span style="font-family: courier new,courier;">gsl::dyn_array&lt;T</span>&gt; and <span style="font-family: courier new,courier;">gsl::stack_array&lt;T&gt;</span> are two new array types.</p>
+<ul>
+<li><strong><span style="font-family: courier new,courier;">gsl::dyn_array&lt;T&gt;</span></strong> is a heap-allocated array with a fixed size of elements that is specified at run-time.</li>
+<li><strong><span style="font-family: courier new,courier;">gsl::stack_array&lt;T&gt; </span></strong>is<span style="font-family: courier new,courier;"> a </span>stack-allocated array with a fixed size of elements that is specified at run-time.</li>
+</ul>
+<h3 id="gslassert-assertions">GSL.assert: Assertions</h3>
+<p>Thanks to <strong><span style="font-family: courier new,courier;">Expects()</span></strong> and <span style="font-family: courier new,courier;"><strong>Ensures()</strong>,</span> you can state preconditions and postconditions for your functions. Currently, you have to place them in the function body but this will later be moved to the function declaration. Both functions are part of the <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2016/p0380r1.pdf">contract proposal</a>.</p>
+<p>Here is a simple example using <span style="font-family: courier new,courier;">Expects()</span> and <span style="font-family: courier new,courier;">Ensures().</span></p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">area</span>(<span style="color: #007788; font-weight: bold;">int</span> height, <span style="color: #007788; font-weight: bold;">int</span> width)
+{
+    Expects(height <span style="color: #555555;">&gt;</span> <span style="color: #ff6600;">0</span>);            
+    <span style="color: #006699; font-weight: bold;">auto</span> res <span style="color: #555555;">=</span> height <span style="color: #555555;">*</span> width;
+    Ensures(res <span style="color: #555555;">&gt;</span> <span style="color: #ff6600;">0</span>);
+    <span style="color: #006699; font-weight: bold;">return</span> res;
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<h3 id="gslutil-utilities">GSL.util: Utilities</h3>
+<p><span style="font-family: courier new,courier;">gsl::narrow_cast&lt;T&gt;</span> and <span style="font-family: courier new,courier;">gsl::narrow</span> are two new casts.</p>
+<ul>
+<li><strong><span style="font-family: courier new,courier;">gsl::narrow_cast&lt;T&gt;</span></strong> is a <span style="font-family: courier new,courier;">static_cast&lt;T&gt;</span> that only expresses its intent. A narrowing conversion may happen.</li>
+<li><strong><span style="font-family: courier new,courier;">gsl::narrow</span></strong> is a <span style="font-family: courier new,courier;">static_cast&lt;T&gt;</span> that throws a<span style="font-family: courier new,courier;"> narrowing_error</span> exception if <code class="highlighter-rouge no-highlight">static_cast&lt;T&gt;(x) != x</code><code>. </code><code class="highlighter-rouge no-highlight"></code></li>
+</ul>
+<p><strong><span style="font-family: courier new,courier;">gsl::not_null&lt;T*&gt;</span></strong> models a pointer that never should be a <span style="font-family: courier new,courier;">nullptr.</span> If you set a <span style="font-family: courier new,courier;">gsl::not_null&lt;T*&gt;</span> pointer to a <span style="font-family: courier new,courier;">nullptr,</span> you will get a compiler error. You can even put a smart pointer such as <span style="font-family: courier new,courier;">std::unique_ptr</span> or <span style="font-family: courier new,courier;">std::shared_ptr</span> into a <span style="font-family: courier new,courier;">gsl::not_null&lt;T*&gt;. </span>Typically, you use<span style="font-family: courier new,courier;"> gsl::not_null&lt;T*&gt;</span> for function parameters and their return type. Therefore, you can not forget to check if a pointer holds a value.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">getLength</span>(gsl<span style="color: #555555;">::</span>not_null<span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">char</span><span style="color: #555555;">*&gt;</span> p); <span style="color: #0099ff; font-style: italic;">// p cannot be a nullptr</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">getLength</span>(<span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">char</span><span style="color: #555555;">*</span> p);                <span style="color: #0099ff; font-style: italic;">// p can be a nullptr</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Both functions state their intent explicitly. The second one can accept a <span style="font-family: courier new,courier;">nullptr.</span></p>
+<p><strong><span style="font-family: courier new,courier;">finally</span></strong> allows you to register a callable that will run at the end of the scope.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">f</span>(<span style="color: #007788; font-weight: bold;">int</span> n)
+{
+    <span style="color: #007788; font-weight: bold;">void</span><span style="color: #555555;">*</span> p <span style="color: #555555;">=</span> malloc(<span style="color: #ff6600;">1</span>, n);
+    <span style="color: #006699; font-weight: bold;">auto</span> _ <span style="color: #555555;">=</span> finally([p] { free(p); });
+    ...
+}
+    
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>At the end of the function <span style="font-family: courier new,courier;">f,</span> the lambda function <span style="font-family: courier new,courier;">[p] { free(p); }</span> will be invoked automatically.</p>
+<p>According to the C++ core guidelines, you should consider <span style="font-family: courier new,courier;">finally</span> as a last resort, if you can not use proper resource management such as smart pointers or STL containers. <code class="highlighter-rouge no-highlight"></code></p>
+<h3 id="gslconcept-concepts">GSL.concept: Concepts</h3>
+<p>I make it short because most of the concepts are defined in the <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2016/n4569.pdf">Ranges TS</a>.&nbsp; Here are my posts to <a href="index.php/tag/concepts">concepts</a>.</p>
+<h2>My last words</h2>
+<p>I'm impressed by the guideline support library. What I like in particular, is that it requires no C++11 conformant compiler. You can even use it in legacy code and make it a lot more memory safe and type safe.&nbsp; I forget to mention: the GSL "<strong>aim for zero-overhead when compared to equivalent hand-written checks.". </strong>That's a promise.<strong><br /></strong></p>
+<h2>What's next?</h2>
+<p>After my short detour to the GSL I will return to the rules of the C++ core guidelines. The next post is about functions in general, the parameters of functions, and their return value in particular.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporter</a></strong><strong>: Eric Pederson.</strong></p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="166" height="212" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Get your e-book. Support my blog.</span></strong></p>
+<p>&nbsp;</p>
