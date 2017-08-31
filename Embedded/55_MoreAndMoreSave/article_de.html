@@ -1,0 +1,439 @@
+<p>In dem Artikel <a href="index.php?option=com_content&amp;view=article&amp;id=106:statisch-geprueft&amp;catid=35:c&amp;Itemid=101">Statisch geprüft </a>habe ich die Funktionalität der Type-Traits Bibliothek als ideale Erweiterung für <span style="font-family: courier new,courier;">static_assert</span> vorgestellt. Benötigt doch der Operator <span style="font-family: courier new,courier;">static_assert</span> eine Funktion, die zur Compilezeit ihre Entscheidung fällt. Den Beweis bin ich bisher schuldig geblieben. Der Beweis folgt aber jetzt.</p>
+<hr id="system-readmore" />
+<h2><a id="ggtDieErste">ggt - Die Erste</a></h2>
+<p>Bevor ich systematisch die Funktionalität der Type-Traits Bibliothek vorstelle, werde ich in diesem Artikel mit einem&nbsp;Beispiel starten. Startpunkt ist der<a href="https://de.wikipedia.org/wiki/Euklidischer_Algorithmus"> euklidscher Algorithmus</a> zur Berechnung des größten gemeinsamen Teiler(ggT) (<span style="font-family: courier new,courier;"><em><span style="font-family: arial,helvetica,sans-serif;">greatest common divisor (gcd)</span></em> </span>) zweier natürlicher Zahlen.</p>
+<p>Schnell habe ich den Algorithmus als Funktions-Template umgesetzt und füttere ihn mit verschiedenen Argumenten.&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// gcd.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+
+<span style="color: #0000ff;">template</span>&lt;<span style="color: #0000ff;">typename</span> T&gt;
+T gcd(T a, T b){
+  <span style="color: #0000ff;">if</span>( b == 0 ){ <span style="color: #0000ff;">return</span> a; }
+  <span style="color: #0000ff;">else</span>{
+    <span style="color: #0000ff;">return</span> gcd(b, a % b);
+  }
+}
+
+<span style="color: #2b91af;">int</span> main(){
+
+  std::cout &lt;&lt; std::endl;
+
+  std::cout &lt;&lt; <span style="color: #a31515;">"gcd(100,10)= "</span> &lt;&lt;  gcd(100,10)  &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"gcd(100,33)= "</span> &lt;&lt; gcd(100,33) &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"gcd(100,0)= "</span> &lt;&lt; gcd(100,0)  &lt;&lt; std::endl;
+
+  std::cout &lt;&lt; gcd(3.5,4.0)&lt;&lt; std::endl;
+  std::cout &lt;&lt; gcd(<span style="color: #a31515;">"100"</span>,<span style="color: #a31515;">"10"</span>) &lt;&lt; std::endl;
+
+  std::cout &lt;&lt; gcd(100,10L) &lt;&lt; gcd(100,10L) &lt;&lt; std::endl;
+
+  std::cout &lt;&lt; std::endl;
+
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Das Compilieren des Programms schlägt lautstark fehl. Der Compiler versucht vergeblich&nbsp;die Templates zu instanziieren.</p>
+<p>&nbsp;<img src="images/blog/EmbeddedProgrammierung/ImmerSicherer/gcd.png" alt="gcd" width="800" height="553" /></p>
+<p>Leider besitzt das Funktions-Template zwei konzeptionelle Probleme. Zum einen ist der gcd<span style="font-family: courier new,courier;">-</span>Algorihmus zu generisch. So kann das Funktions-Template <span style="font-family: courier new,courier;">double</span>-Werte (Zeile 21) und C-Strings (Zeile 22) als Argumente annehmen. Der größte gemeinsame Teiler auf diesen beiden Datentypen ist nicht definiert. Konkret scheitern die double- und C-String-Werte an dem Modulo-Operator in Zeile 9. Dies ist aber nicht das einzige Problem des Funktions-Templates<span style="font-family: courier new,courier;"> gcd</span>. gcd hängt von dem Typparameter T ab. Die Signatur (Zeile 6) des Funktions-Templates verrät durch einen scharfen Blick (<span style="font-family: courier new,courier;">gcd(T a, T b)</span>), das die Werte a und b vom gleichen Typ sein müssen. Bei Template-Parametern findet keine Konvertierung statt. Das ist der Grund, warum der Aufruf des Funktions-Templates in Zeile 24 mit einem <span style="font-family: courier new,courier;">int </span>und einem <span style="font-family: courier new,courier;">long-int</span> Typ fehlschlägt.</p>
+<p>Das erste Problem ist mit Hilfe der Type-Traits Bibliothek schnell gefixt. Für das Zweite benötige ich einen zweiten, längeren Anlauf.</p>
+<h2>ggt - Die Zweite</h2>
+<p>Der Einfachheit halber ignoriere ich in den weiteren Ausführungen, dass die Argumente des Funktions-Templates positive Zahlen sein müssen. Der <span style="font-family: courier new,courier;">gcd</span>-Algorithmus fordert, dass seine Argumente <a href="https://de.wikipedia.org/wiki/Nat%C3%BCrliche_Zahl">natürliche Zahlen </a>sind. Nichts einfacher als das mit der neuen Type-Traits Bibliothek. Mit Hilfe des Operators <a href="index.php?option=com_content&amp;view=article&amp;id=106:statisch-geprueft&amp;catid=35:c&amp;Itemid=101"><span style="font-family: courier new,courier;">static_assert</span> </a>und dem Prädikat <span style="font-family: courier new,courier;">std::is_integral&lt;T&gt;::value</span>, das zur Compilezeit prüft, ob T ein integraler Typ ist, ist der <span style="font-family: courier new,courier;">gcd</span>-Algorithmus schnell verbessert. Ach ja. Ein Prädikat ist eine Funktion, die einen Wahrheitswert zurückgibt.&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// gcd_2.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;type_traits&gt;</span>
+
+<span style="color: #0000ff;">template</span>&lt;<span style="color: #0000ff;">typename</span> T&gt;
+T gcd(T a, T b){
+  static_assert(std::is_integral&lt;T&gt;::value, <span style="color: #a31515;">"T should be an integral type!"</span>);
+  <span style="color: #0000ff;">if</span>( b == 0 ){ <span style="color: #0000ff;">return</span> a; }
+  <span style="color: #0000ff;">else</span>{
+    <span style="color: #0000ff;">return</span> gcd(b, a % b);
+  }
+}
+
+<span style="color: #2b91af;">int</span> main(){
+
+  std::cout &lt;&lt; std::endl;
+
+  std::cout &lt;&lt; gcd(3.5,4.0)&lt;&lt; std::endl;
+  std::cout &lt;&lt; gcd(<span style="color: #a31515;">"100"</span>,<span style="color: #a31515;">"10"</span>) &lt;&lt; std::endl;
+
+  std::cout &lt;&lt; std::endl;
+
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Damit ist das erste konzeptionelle Problem des<span style="font-family: courier new,courier;"> gcd-</span>Algorithmus elegant gelöst. In dieser Version steigt der Compiler nicht unmotiviert aus, da der Modulo-Operator für einen <span style="font-family: courier new,courier;">double</span>-Wert und einen C-String nicht definiert ist, sondern weil er die Zusicherung in Zeile 8 nicht einhalten kann. Der feine Unterschied ist jetzt, dass wir eine eindeutige Fehlermeldung erhalten und keine kryptische Ausgabe einer&nbsp;fehlgeschlagenen Template-Instanziierung, wie im <a href="#ggtDieErste">Beispiel 1</a>.</p>
+<p>&nbsp;<img src="images/blog/EmbeddedProgrammierung/ImmerSicherer/gcd_2.png" alt="gcd 2" width="800" height="334" /></p>
+<p>Die Regel ist eigentlich ganz einfach.<strong> Der Compiler muss ein fehlerhaftes Programm zurückweisen und eine eindeutige Fehlermeldung zurückgeben.</strong></p>
+<p>Nun besteht nur noch das zweite konzeptionelle Problem. Der <span style="font-family: courier new,courier;">gcd</span>-Algorithmus soll mit Argumenten verschiedenen Typs umgehen können.</p>
+<h2>ggt- Die Dritte</h2>
+<p>Das ist einfach. Doch halt, welchen Rückgabetyp soll das Ergebnis besitzen?</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;">1
+2
+3
+4
+5
+6
+7
+8
+9</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">template</span>&lt;<span style="color: #0000ff;">typename</span> T1, <span style="color: #0000ff;">typename</span> T2&gt;
+??? gcd(T1 a, T2 b){
+  static_assert(std::is_integral&lt;T1&gt;::value, <span style="color: #a31515;">"T1 should be an integral type!"</span>);
+  static_assert(std::is_integral&lt;T2&gt;::value, <span style="color: #a31515;">"T2 should be an integral type!"</span>);
+  <span style="color: #0000ff;">if</span>( b == 0 ){ <span style="color: #0000ff;">return</span> a; }
+  <span style="color: #0000ff;">else</span>{
+    <span style="color: #0000ff;">return</span> gcd(b, a % b);
+  }
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Die drei Fragezeichen in Zeile 2 deuten es an. Soll der Rückgabetyp dem Typ des ersten Arguments oder dem des zweiten Arguments entsprechen? Oder soll er sich nur von den zwei Typen ableiten? Hier kommt die Rettung wieder in Form der Type-Traits Bibliothek. Zwei Variationen stelle ich vor.</p>
+<h3><a id="ggtDerkleinereTyp">Der kleinere Typ</a></h3>
+<p>Für den Rückgabetyp der zwei Template-Parameter bietet es sich, den kleineren der beiden Typen zu verwenden. Daher benötigen wir ein Pendant zum ternären Operator&nbsp;zur Compilezeit. Der ternäre Operator kann nur mit Werten, aber nicht mit Typen umgehen. Damit ist der folgende Ausdruck falsch: <span style="font-family: courier new,courier;">T=(sizeof(T1) &lt; sizeof(T2))? T1: T2</span>. Die Type-Traits Bibliothek agiert aber auf Typen. Mit<span style="font-family: courier new,courier;"> std::conditional</span> besitzt sie eine Funktion, die zur Compilezeit einen Ausdruck auswertet und abhängig vom Ergebnis, den ersten&nbsp;oder den zweiten Typ zurückgibt.</p>
+<p>Das folgende Programm zeigt die Entscheidung zur Compilezeit.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// gcd_3_smaller.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;type_traits&gt;</span>
+<span style="color: #0000ff;">#include &lt;typeinfo&gt;</span>
+
+<span style="color: #0000ff;">template</span>&lt;<span style="color: #0000ff;">typename</span> T1, <span style="color: #0000ff;">typename</span> T2&gt;
+<span style="color: #0000ff;">typename</span> std::conditional &lt;(<span style="color: #0000ff;">sizeof</span>(T1) &lt; <span style="color: #0000ff;">sizeof</span>(T2)), T1, T2&gt;::type gcd(T1 a, T2 b){
+  static_assert(std::is_integral&lt;T1&gt;::value, <span style="color: #a31515;">"T1 should be an integral type!"</span>);
+  static_assert(std::is_integral&lt;T2&gt;::value, <span style="color: #a31515;">"T2 should be an integral type!"</span>);
+  <span style="color: #0000ff;">if</span>( b == 0 ){ <span style="color: #0000ff;">return</span> a; }
+  <span style="color: #0000ff;">else</span>{
+    <span style="color: #0000ff;">return</span> gcd(b, a % b);
+  }
+}
+
+<span style="color: #2b91af;">int</span> main(){
+
+  std::cout &lt;&lt; std::endl;
+
+  std::cout &lt;&lt; <span style="color: #a31515;">"gcd(100,10)= "</span> &lt;&lt;  gcd(100,10)  &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"gcd(100,33)= "</span> &lt;&lt; gcd(100,33) &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"gcd(100,0)= "</span> &lt;&lt; gcd(100,0)  &lt;&lt; std::endl;
+
+  std::cout &lt;&lt; std::endl;
+
+  std::cout &lt;&lt; <span style="color: #a31515;">"gcd(100,10LL)= "</span> &lt;&lt; gcd(100,10LL) &lt;&lt; std::endl;
+
+  std::conditional &lt;(<span style="color: #0000ff;">sizeof</span>(100) &lt; <span style="color: #0000ff;">sizeof</span>(10LL)), <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span>, <span style="color: #2b91af;">long</span>&gt;::type uglyRes= gcd(100,10LL);
+  <span style="color: #0000ff;">auto</span> res= gcd(100,10LL);
+  <span style="color: #0000ff;">auto</span> res2= gcd(100LL,10L);
+
+  std::cout &lt;&lt; <span style="color: #a31515;">"typeid(gcd(100,10LL)).name(): "</span> &lt;&lt; <span style="color: #0000ff;">typeid</span>(res).name() &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"typeid(gcd(100LL,10L)).name(): "</span> &lt;&lt; <span style="color: #0000ff;">typeid</span>(res2).name() &lt;&lt; std::endl;
+
+  std::cout &lt;&lt; std::endl;
+
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Die entscheidende Zeile des Programms ist der Rückgabetyp des <span style="font-family: courier new,courier;">gcd</span>-Algorithmus in Zeile 8. Da er mit verschiedenen Typen von Template-Argumenten aufgerufen werden kann, kommt er natürlich auch mit gleichen Typen zurecht. Dies zeigen die Zeilen 21 - 24 und&nbsp;die Ausgabe des Programms. Spannender ist da schon die Zeile 27. In ihr wird die Zahl 100 vom Typ <span style="font-family: courier new,courier;">int</span> und die Zahl 10 vom Typ <span style="font-family: courier new,courier;">long long int</span> verwendet. Das Ergebnis für den größten gemeinsamen Teiler ist die 10. Besonders hässlich ist die Zeile 29. In dieser nimmt die Variable <span style="font-family: courier new,courier;">uglyRes</span> vom Typ&nbsp;<span style="font-family: courier new,courier;">std::conditional &lt;(sizeof(100) &lt; sizeof(10LL)), long long, long&gt;::type</span> das Ergebnis an. Das geht dank <a href="index.php?option=com_content&amp;view=article&amp;id=103:automatisch-initialisiert&amp;catid=35:c&amp;Itemid=101">auttomatischer Typableitung </a>mit <span style="font-family: courier new,courier;"> auto</span> in Zeile 30 und 31 viel leichter von der Hand und ist deutlich weniger fehleranfällig. Schön zeigt der <span style="font-family: courier new,courier;">typeid</span>-Aufruf in Zeile 33 und 34, dass der resultierende Typ für Argumente vom Typ <span style="font-family: courier new,courier;"> int</span> und <span style="font-family: courier new,courier;">long long int <strong>int</strong></span> ist, dass der resultierende Type für Argumente vom Typ<span style="font-family: courier new,courier;"> long long int</span> und <span style="font-family: courier new,courier;">long int <strong>long int</strong></span> ist.</p>
+<p>&nbsp;<img src="images/blog/EmbeddedProgrammierung/ImmerSicherer/gcd_3_smaller.png" alt="gcd 3 smaller" /></p>
+<h3>Der gemeinsame Typ</h3>
+<p>Es geht aber auch ganz anders. Oft ist es notwendig, nicht den kleineren der beiden Typen zu Compilezeit zu bestimmen, sondern einen Typ, zu dem alle Typen implizit konvertiert werden können. Genau das ist die Domäne des Funktions-Templates <span style="font-family: courier new,courier;">std::common_type</span> aus der - ich denke du weist es schon - Type-Traits Bibliothek. <span style="font-family: courier new,courier;">std::common_type</span> kann mit beliebig vielen Template-Argumenten umgehen. Formal gesprochen, <span style="font-family: courier new,courier;">std::common_type</span> ist ein <a href="index.php?option=com_content&amp;view=article&amp;id=69:datenuebergabe-an-threads&amp;catid=35:c&amp;Itemid=101#VariadicTemplates">Variadic Template</a>.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// gcd_3_common.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;type_traits&gt;</span>
+<span style="color: #0000ff;">#include &lt;typeinfo&gt;</span>
+
+<span style="color: #0000ff;">template</span>&lt;<span style="color: #0000ff;">typename</span> T1, <span style="color: #0000ff;">typename</span> T2&gt;
+<span style="color: #0000ff;">typename</span> std::common_type&lt;T1, T2&gt;::type gcd(T1 a, T2 b){
+  static_assert(std::is_integral&lt;T1&gt;::value, <span style="color: #a31515;">"T1 should be an integral type!"</span>);
+  static_assert(std::is_integral&lt;T2&gt;::value, <span style="color: #a31515;">"T2 should be an integral type!"</span>);
+  <span style="color: #0000ff;">if</span>( b == 0 ){ <span style="color: #0000ff;">return</span> a; }
+  <span style="color: #0000ff;">else</span>{
+    <span style="color: #0000ff;">return</span> gcd(b, a % b);
+  }
+}
+
+<span style="color: #2b91af;">int</span> main(){
+
+  std::cout &lt;&lt; std::endl;
+
+  std::cout &lt;&lt; <span style="color: #a31515;">"typeid(gcd(100,10)).name(): "</span> &lt;&lt; <span style="color: #0000ff;">typeid</span>(gcd(100,10)).name() &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"typeid(gcd(100,10L)).name(): "</span> &lt;&lt; <span style="color: #0000ff;">typeid</span>(gcd(100,10L)).name() &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"typeid(gcd(100,10LL)).name(): "</span> &lt;&lt; <span style="color: #0000ff;">typeid</span>(gcd(100,10LL)).name() &lt;&lt; std::endl;
+
+  std::cout &lt;&lt; std::endl;
+
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Der einzige Unterschied der&nbsp;<a href="#ggtDerkleinereTyp">letzten Implementierung</a> des <span style="font-family: courier new,courier;">gcd</span>-Algorithmus ist es, das <span style="font-family: courier new,courier;">std::common_type</span> in Zeile 8 den Rückgabetyp bestimmt. Auf das Ergebnis der Programmausführung habe ich verzichtet. Interessant&nbsp;hingegen sind die Rückgabetypen der Ergebnisse. So ergibt <span style="font-family: courier new,courier;">int</span> und <span style="font-family: courier new,courier;">int <strong>int</strong>, int</span> und<span style="font-family: courier new,courier;"> long int <strong>long int</strong> </span>und <span style="font-family: courier new,courier;">int</span> und l<span style="font-family: courier new,courier;">ong long int <strong>long long int.</strong></span></p>
+<p>&nbsp;<img src="images/blog/EmbeddedProgrammierung/ImmerSicherer/gcd_3_common.png" alt="gcd 3 common" /></p>
+<h2>ggt - Die Vierte</h2>
+<p>Eine weitere, sehr interessante Variante zu den bisherigen Variationen erlaubt die Funktion <span style="font-family: courier new,courier;">std::enable_if</span> aus der Type-Traits Bibliothek. Betrachten wir die bisherigen Implementierung des gcd-Algorithmus, so wird in diesen im Funktionskörper geprüft, ob die Typen natürliche Zahlen sind. Das bedeutet ganz konkret, dass der Compiler immer versucht, den <span style="font-family: courier new,courier;">gcd</span>-Algorithmus für seine Funktionsargumente zu instanziieren. Das Ergebnis ist bekannt. Ergibt der Aufruf von <span style="font-family: courier new,courier;">std::integral</span> für den Typ <span style="font-family: courier new,courier;">false</span>, schlägt die Instanziierung fehl. Das ist nicht optimal. Deutlich optimaler ist es, wenn nur die Funktions-Templates für die Typen zur Verfügung stehen, die die notwendigen Eigenschaften erfüllen. Aus diesem Grund wandert die Zusicherung an das Funktions-Template vom Template-Körper in die Template-Signatur.</p>
+<p>Um den Blick aufs Wesentliche zu lenken, sind die zwei Funktionsargumente vom gleichen Typ sein. Damit ist auch der Typ des Rückgabewerts bereits festgelegt.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// gcd_4.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;type_traits&gt;</span>
+
+<span style="color: #0000ff;">template</span>&lt;<span style="color: #0000ff;">typename</span> T,
+         <span style="color: #0000ff;">typename</span> std::enable_if&lt;std::is_integral&lt;T&gt;::value,T&gt;::type= 0&gt;       
+T gcd(T a, T b){
+  <span style="color: #0000ff;">if</span>( b == 0 ){ <span style="color: #0000ff;">return</span> a; }
+  <span style="color: #0000ff;">else</span>{
+    <span style="color: #0000ff;">return</span> gcd(b, a % b);
+  }
+}
+
+<span style="color: #2b91af;">int</span> main(){
+
+  std::cout &lt;&lt; std::endl;
+
+  std::cout &lt;&lt; <span style="color: #a31515;">"gcd(100,10)= "</span> &lt;&lt;  gcd(100,10)  &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"gcd(3.5,4)= "</span> &lt;&lt; gcd(3.5,4.0) &lt;&lt; std::endl;     
+
+  std::cout &lt;&lt; std::endl;
+
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Zeile 7 ist die entscheidende Zeile des Programms. In ihr bestimmt <span style="font-family: courier new,courier;">std::is_integral,</span> ob der Type-Parameter T integral ist. Ist T nicht integral, und somit der Rückgabewert der Funktion <span style="font-family: courier new,courier;">false</span>, bewirkt dies, dass für diesen Typ keine Templateinstanziierung zur Verfügung steht. Diesen Punkt will ich gerne noch genauer erläutern.</p>
+<p>Falls <span style="font-family: courier new,courier;">std::enable_if</span> als ersten Parameter<span style="font-family: courier new,courier;"> true</span> erhält, besitzt <span style="font-family: courier new,courier;">std::enable_if </span>ein Mitglied <span style="font-family: courier new,courier;">type.</span> Auf dieses Mitglied greift <span style="font-family: courier new,courier;">std::enable_if </span>in der Zeile 7 zu.&nbsp;Erhält <span style="font-family: courier new,courier;">std::enable_if </span>als ersten Parameter ein <span style="font-family: courier new,courier;">false,</span> besitzt es kein Mitglied <span style="font-family: courier new,courier;">type</span>. Damit ist die Zeile 7 nicht gültig. Das ist aber kein Fehler, sondern führt nur dazu, dass für diesen Typ kein Template instanziiert werden kann.</p>
+<p>Die Regel in C++ dazu lautet: Wenn das Substituieren des Template-Parameters durch ein Template-Argument bei einem Funktions-Template fehlschlägt, wird die Templatespezialisierung für den Typ des Template-Arguments aus der Menge aller möglichen Templatespezialisierungen ausgeschlossen. Für diese längliche Regel hat sich das Akronym <a href="http://en.cppreference.com/w/cpp/language/sfinae">SFINAE</a> (<strong>S</strong>ubstitution<strong> F</strong>ailure <strong>I</strong>s <strong>N</strong>ot <strong>A</strong>n <strong>E</strong>rror) etabliert.&nbsp;</p>
+<p>Die Ausgabe des Programms zeigt, das für den Datentyp <span style="font-family: courier new,courier;">double</span> keine Templatespezialisierung zur Verfügung steht.</p>
+<p>&nbsp;<img src="images/blog/EmbeddedProgrammierung/ImmerSicherer/gcd_4.png" alt="gcd 4" width="800" height="247" /></p>
+<h2><span id="Explanation" class="mw-headline">Wie geht's weiter?</span></h2>
+<p>Im nächsten Artikel wird es systematischer. Die Type-Traits Bibliothek bietet einen reichen Fundus an Funktionen. Sie erlaubt Typabfragen, -vergleiche und -modifikationen zu Compilezeit. Wie das ganze funktioniert und welche Funktion die Type-Traits Bibliothek zur Verfügung stellt um Typeigenschaften abzufragen, das stellt der&nbsp;<a href="index.php/blog/typeigenschaften-abfragen">nächsten Artikel</a> vor.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="166" height="212" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Hole dir dein E-Book. Unterstütze meinen Blog.</span></strong></p>
+<p>&nbsp;</p>

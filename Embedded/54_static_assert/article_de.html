@@ -1,0 +1,90 @@
+<p><span style="font-family: courier new,courier;">static_assert</span> ist das Mittel der Wahl in modernem C++, um den Code sicherer zu machen.</p>
+<hr id="system-readmore" />
+<h2>static_assert</h2>
+<p>Der Einsatz von <span style="font-family: courier new,courier;">static_assert</span> ist denkbar einfach. <span style="font-family: courier new,courier;">static_assert</span> verlangt einen Ausdruck und einen String. Der Ausdruck muss sich zur Übersetzungszeit auf <span style="font-family: courier new,courier;">true</span> oder <span style="font-family: courier new,courier;">false</span> evaluieren lassen. Evaluiert der Ausdruck zu <span style="font-family: courier new,courier;">false,</span> gibt der Compiler den String als Fehlermeldung aus und erzeugt konsequenterweise keine ausführbare Datei.</p>
+<p>Ein paar Punkte will ich&nbsp;noch ergänzen, bevor ein kleines Beispiel folgt.</p>
+<ul>
+<li>Der <span style="font-family: courier new,courier;">static_assert</span> Ausdruck wird zur Compilezeit ausgewertet. Es entstehen daher keine Laufzeiteinschränkungen.</li>
+<li>Ausdrücke, die zur Compilezeit ausgewertet werden können, heißen konstante Ausdrücke. Dazu gibt es mit dem neuen <span style="font-family: courier new,courier;">constexpr</span> Bezeichner eine mächtige Geschichte zu erzählen. Dazu aber mehr in einem der folgenden Artikel.</li>
+<li><span style="font-family: courier new,courier;">static_assert</span> Ausdrücke können in allen Bereichen des Programms angewandt werden. Daher ist es eine gute Idee, die <span style="font-family: courier new,courier;">static_assert</span> Ausdrücke in einer Headerdatei zu kapseln, so dass durch das Einbinden der Headerdatei automatisch die Typzusicherungen zur Compilezeit verifiziert werden.</li>
+</ul>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// static_assert.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;string&gt;</span>
+
+static_assert(<span style="color: #0000ff;">sizeof</span>(<span style="color: #2b91af;">void</span>*) == 4 ,<span style="color: #a31515;">"32-bit adressing is required!"</span>);
+static_assert(<span style="color: #0000ff;">sizeof</span>(<span style="color: #2b91af;">void</span>*) &gt;= 8 ,<span style="color: #a31515;">"64-bit adressing is required!"</span>);
+
+<span style="color: #0000ff;">template</span> &lt; <span style="color: #0000ff;">typename</span> T, <span style="color: #2b91af;">int</span> Line, <span style="color: #2b91af;">int</span> Column &gt;
+<span style="color: #0000ff;">struct</span> Matrix{
+   static_assert(Line &gt;= 0, <span style="color: #a31515;">"Line number must be positive."</span>);
+   static_assert(Column &gt;= 0, <span style="color: #a31515;">"Column number must be positive."</span>);
+   static_assert( Line + Column &gt; 0, <span style="color: #a31515;">"Line and Column must be greater than 0."</span>);
+};
+
+<span style="color: #2b91af;">int</span> main() {
+  
+  static_assert(<span style="color: #0000ff;">sizeof</span>(<span style="color: #2b91af;">int</span>) == <span style="color: #0000ff;">sizeof</span>(<span style="color: #2b91af;">long</span> <span style="color: #2b91af;">int</span>),<span style="color: #a31515;">"int and long int must be of the same length."</span>);
+  
+  Matrix&lt;<span style="color: #2b91af;">int</span>,10,5&gt; intArray;
+  Matrix&lt;std::string,3,4&gt; strArray;
+  Matrix&lt;<span style="color: #2b91af;">double</span>,0,1&gt; doubleArray;
+  Matrix&lt;<span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span>,1,0&gt; longArray;
+  
+  Matrix&lt;<span style="color: #2b91af;">char</span>,0,0&gt; charArray;
+
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Das Programm verwendet <span style="font-family: courier new,courier;">static_assert</span> im globalen, (Zeile 5 und 6), aber&nbsp;auch im Klassen- (Zeile 10 -&nbsp;Zeile 12) oder Block-Gültigkeitsbereich (Zeile 17). Eine der beiden Zusicherungen in Zeile 5 und 6 muss zwangsläufig zuschlagen. Die Zusicherungen in der Klassendefinition stellen sicher, dass die Anzahl der Spalten und Zeilen positiv, als auch, dass deren Summe größer als 0 ist. Damit kann die Templateinstanziierung in Zeile 24 nicht gültig sein. Auf meiner Computerarchitektur ist der Datentyp <span style="font-family: courier new,courier;">i</span>nt kleiner als long int. Das hingegen <span style="font-family: courier new,courier;">int</span> nicht größer als long int ist, sichert bereits der C++-Standard zu.</p>
+<p>Nun fehlt nur noch Ausgabe meines fehlgeschlagenen Compilierungsversuchs.</p>
+<p><img src="images/blog/EmbeddedProgrammierung/StatischGeprueft/static_assert.png" alt="static assert" width="800" height="284" /></p>
+<h2>Wie geht's weiter?</h2>
+<p>Die ganze Mächtigkeit von <span style="font-family: courier new,courier;">static_assert</span> hängt an dem konstanten Ausdruck, der vom Compiler&nbsp;evaluiert wird. Da trifft es sich äußerst gut, dass mit der neuen Type-Traits Bibliothek eine mächtige Bibliothek zur Verfügung steht. Die Type-Traits Bibliothek erlaubt es, Typabfragen-, vergleiche und sogar -modifikationen zur Compilezeit durchzuführen. Genau davon handelt der <a href="index.php/blog/immer-sicherer">nächste Artike</a>l.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="166" height="212" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Hole dir dein E-Book. Unterstütze meinen Blog.</span></strong></p>
+<p>&nbsp;</p>

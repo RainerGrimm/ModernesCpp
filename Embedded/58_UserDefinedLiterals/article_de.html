@@ -1,0 +1,346 @@
+<p>Benutzerdefinierte Literale in C++ stellen ein einmaliges Feature unter allen Mainstream-Programmiersprachen dar. Erlauben sie es doch, Werte direkt mit Einheiten zu verknüpfen.</p>
+<hr id="system-readmore" />
+<h2>Die Syntax</h2>
+<p>Literale repräsentieren explizite Werte in einem Programm. Dies kann der Wahrheitswert <span style="font-family: courier new,courier;">true</span>, die Zahl <span style="font-family: courier new,courier;">3</span> oder <span style="font-family: courier new,courier;">4.15</span>, dies können aber auch das Zeichen '<span style="font-family: courier new,courier;">a</span>' oder&nbsp;der C-String&nbsp;"<span style="font-family: courier new,courier;">hallo</span>" sein. Selbst die&nbsp;Lambda-Funktion<span style="font-family: courier new,courier;"> [](int a, int b){ return a+b; }</span> ist ein sogenanntes Funktions-Literal. Mit C++ ist es möglich, aus built-in Literale für natürliche Zahlen, Fließkommazahlen, Zeichen und C-Strings durch Anhängen eines Suffix ein benutzerdefiniertes Literal zu erzeugen.&nbsp;</p>
+<p>Für die benutzerdefinierten Literale gilt die folgende Syntax:<span style="font-family: courier new,courier;"> built-in Literal + _ + Suffix.</span></p>
+<p>Typischerweise werden Suffixe für Einheiten verwendet:</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">101000101_b
+63_s
+10345.5_dm
+123.45_km
+100_m
+131094_cm
+33_cent
+<span style="color: #a31515;">"Hallo"</span>_i18n
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Was ist nun die entscheidende Idee der benutzerdefinierten Literalen? Der C++-Compiler bildet die benutzerdefinierten Literale auf die entsprechenden Literal-Opertoren ab.&nbsp;Dieser Literal Operator muss natürlich vom Programmierer implementiert werden.</p>
+<p>Die Magie ist am einfachsten an dem benutzerdefinierten Literal <span style="font-family: courier new,courier; color: #000080;"><span style="color: #339966;">0101001000</span></span><span style="color: #ff0000;"><span style="font-family: courier new,courier;">_b</span></span> erklärt, das für einen binären Wert steht. Der C++-Compiler bildet dieses benutzerdefiniertes Literal <span style="font-family: courier new,courier; color: #000080;"><span style="color: #339966;">0101001000</span></span><span style="color: #ff0000;"><span style="font-family: courier new,courier;">_b</span> <span style="color: #000000;">auf den Literal-Operator <span style="font-family: courier new,courier;">operator"" <span style="color: #ff0000;">_b</span>(long long int <span style="color: #339966;">bin</span>)</span> ab. Ein paar Besonderheiten der benutzerdefinierten Literale und Literal-Operatoren fehlen noch. </span> </span></p>
+<ul>
+<li><span style="color: #ff0000;"><span style="color: #000000;">Zwischen den doppelten Anführungszeiten ("") und dem Unterstrich mit Suffix (<span style="color: #ff0000;">_b</span>) ist eine Leerzeichen notwendig. </span></span></li>
+<li><span style="color: #ff0000;"><span style="color: #000000;">Der binäre Wert (<span style="font-family: courier new,courier; color: #000080;"><span style="color: #339966;">0101001000</span></span>) steht in der Variable&nbsp;<span style="color: #ff0000;"><span style="color: #000000;"><span style="font-family: courier new,courier;"><span style="color: #339966;">bin</span></span> </span> </span> im Körper des Literal-Operators zur Verfügung. </span> </span></li>
+<li>Findet der Compiler zu einem benutzerdefinierten Literal keinen Literal-Operator, steigt er mit einer Fehlermeldung aus.</li>
+</ul>
+<p>Mit C++14 gibt es die neue, alternative Syntax für benutzerdefinierte Literale. Diese unterscheidet sich von der vorgestellten C++11-Syntax dadurch, dass sie keine Leerzeichen besitzt. Dadurch ist es möglich, <a href="http://en.cppreference.com/w/cpp/language/identifiers">reservierte Bezeichner</a> wie <span style="font-family: courier new,courier;">_C</span> als Suffix zu verwenden.&nbsp; So ist zum Beispiel <span style="font-family: courier new,courier; color: #000000;">11_C</span> als benutzerdefiniertes Literal erlaubt. Im konkreten Fall wird <span style="font-family: courier new,courier;"><span style="color: #339966;">11</span><span style="color: #ff0000;">_C</span></span> auf den <span style="font-family: courier new,courier;">Literal-Operator""<span style="color: #ff0000;">_C</span>(unsigned long long<span style="color: #339966;"> int</span>)</span> abgebildet. Die einfache Regel ist es, dass ein Suffix nun mit einem Grossbuchstabe beginnen kann.</p>
+<p>Benutzerdefinierten Literale sind das Killerfeature in modernem C++, wenn es darum geht, sicherheitskritische Software zu schreiben. Warum? Durch die automatische Abbildung des benutzerdefinierten Literals auf seinen Literal-Operator ist es möglich, typsichere Arithmethik zu betreiben. Die Compiler sorgt automatisch dafür, dass keine Äpfel mit Birnen verrechnet werden. Beispiel gefällig?</p>
+<p>Wie viele Meter fahre ich im Schnitt als Vielfahrer in der Woche? Diese Frage hat mich schon öfters beschäftigt.</p>
+<h2>Typsicheres Rechnen mit Entfernungen</h2>
+<p>Bevor ich auf die Details eingehe, zuerst das Hauptprogramm.&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// average.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;distance.h&gt;</span>
+<span style="color: #0000ff;">#include &lt;unit.h&gt;</span>
+
+<span style="color: #0000ff;">using</span> <span style="color: #0000ff;">namespace</span> Distance::Unit;
+
+<span style="color: #2b91af;">int</span> main(){
+
+  std:: cout &lt;&lt; std::endl;
+
+  std::cout &lt;&lt; <span style="color: #a31515;">"1.0_km: "</span> &lt;&lt; 1.0_km &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"1.0_m: "</span> &lt;&lt; 1.0_m &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"1.0_dm: "</span> &lt;&lt; 1.0_dm &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"1.0_cm: "</span> &lt;&lt; 1.0_cm &lt;&lt; std::endl;
+  
+  std::cout &lt;&lt; std::endl;
+
+  std::cout &lt;&lt; <span style="color: #a31515;">"0.001 * 1.0_km: "</span> &lt;&lt; 0.001 * 1.0_km &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"10 * 1_dm: "</span> &lt;&lt; 10 * 1.0_dm &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"100 * 1.0cm: "</span> &lt;&lt; 100 * 1.0_cm &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"1_km / 1000: "</span> &lt;&lt; 1.0_km / 1000 &lt;&lt; std::endl;
+
+  std::cout &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"1.0_km + 2.0_dm +  3.0_dm + 4.0_cm: "</span> &lt;&lt; 1.0_km + 2.0_dm +  3.0_dm + 4.0_cm &lt;&lt; std::endl;
+  std::cout &lt;&lt; std::endl;
+  
+  <span style="color: #0000ff;">auto</span> work= 63.0_km;
+  <span style="color: #0000ff;">auto</span> workPerDay= 2 * work;
+  <span style="color: #0000ff;">auto</span> abbrevationToWork= 5400.0_m;
+  <span style="color: #0000ff;">auto</span> workout= 2 * 1600.0_m;
+  <span style="color: #0000ff;">auto</span> shopping= 2 * 1200.0_m;
+  
+  <span style="color: #0000ff;">auto</span> distPerWeek1= 4*workPerDay-3*abbrevationToWork+ workout+ shopping;
+  <span style="color: #0000ff;">auto</span> distPerWeek2= 4*workPerDay-3*abbrevationToWork+ 2*workout;
+  <span style="color: #0000ff;">auto</span> distPerWeek3= 4*workout + 2*shopping;
+  <span style="color: #0000ff;">auto</span> distPerWeek4= 5*workout + shopping;
+
+  std::cout &lt;&lt; <span style="color: #a31515;">"distPerWeek1: "</span> &lt;&lt; distPerWeek1 &lt;&lt; std::endl;
+  
+  <span style="color: #0000ff;">auto</span> averageDistance= getAverageDistance({distPerWeek1,distPerWeek2,distPerWeek3,distPerWeek4});
+  std::cout&lt;&lt; <span style="color: #a31515;">"averageDistance: "</span> &lt;&lt; averageDistance &lt;&lt; std::endl;
+  
+  std::cout &lt;&lt; std::endl;
+
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Die Literal-Operatoren sind im Namensraum<span style="font-family: courier new,courier;"> Distance::Unit</span> implementiert. Für benutzerdefinierte Literale sollen Namensräume verwendet werden, da die Gefahr von Namenskonflikten aus zwei Gründen relativ hoch ist. Zum einen sind die Suffixe in der Regel kurz, zum anderen repräsentieren die Suffixe gerne Einheiten, für die sich schon Abkürzungen etabliert haben. So verwende ich die Suffixe<span style="font-family: courier new,courier;"> km, m, dm </span>und <span style="font-family: courier new,courier;">cm.</span></p>
+<p>Nun aber zu Ausgabe des Programms. Als Grundeinheit für die Entfernung verwende ich den Meter.</p>
+<p><img src="images/blog/EmbeddedProgrammierung/BenutzerdefinierteLiterale/average.png" alt="average" /></p>
+<p>In den Zeilen 12 - 15 gebe ich dir verschiedenen Entfernungen aus, in den Zeilen 19 - 22 berechne ich einen Meter in verschiedenen Variationen. Ein letzter Test ist sehr vielversprechend:<br /><span style="font-family: courier new,courier;">1.0_km + 2.0_dm +&nbsp; 3.0_dm + 4.0_cm</span>&nbsp; sind <span style="font-family: courier new,courier;">1000.54 m</span> (Zeile 54).&nbsp;Der Compiler sorgt dafür, dass alle Einheiten richtig verrechnet werden.</p>
+<p>Nun gilt es. Wie viele Meter lege ich im Schnitt pro Woche zurück? Dazu definiere ich mir erst die Konstanten<span style="font-family: courier new,courier;"> work, workPerDay, abbrevationToWork </span>und <span style="font-family: courier new,courier;">shopping.</span> Aus diesen Komponenten lassen sich einfach die Entfernungen für die 4 Wochen zusammenstellen (Zeile 34 - 37). In der ersten Woche lege ich gut 493 km zurück. Die Funktion <span style="font-family: courier new,courier;">getAverageDistance</span> (Zeile 41) wird mit einer Initialisiererliste befüllt und ermittelt den Durchschnitt. Im Schnitt fahre ich pro Woche 255900 m. Das muss weniger werden!</p>
+<p>Beeindruckt? Ich denke schon. Bevor ich aber auf die Details zu den Literal-Operatoren im Namensraum <span style="font-family: courier new,courier;">Distance::Unit </span>und den <span style="font-family: courier new,courier;">MyDistance</span>-Objekten im Namensraum <span style="font-family: courier new,courier;">Distance</span> eingehe, möchte ich erst die Automatismen vorstellen, die bei der Arithmetik der benutzerdefinierten Literale <span style="font-family: courier new,courier;"></span>stattfinden.</p>
+<h3>Automatismen</h3>
+<p>Eine Kleinigkeit habe ich verschwiegen. Wo kommen die <span style="font-family: courier new,courier;">MyDistance</span>-Objekte her? Diese verbergen sich hinter&nbsp;der automatischen Typableitung im Beispielprogramm. So lautet der explizite Typ hinter der Variable <span style="font-family: courier new,courier;">work</span> in dem Ausdruck&nbsp;<span style="font-family: courier new,courier;">auto work= 63.0_km</span> (Zeile 28) <span style="font-family: courier new,courier;">Distance::MyDistance.</span> Damit ist die Zeile 28 äquivalent zu <span style="font-family: courier new,courier;">Distance::MyDistance work= 63.0_km;</span></p>
+<p>&nbsp;</p>
+<p><img src="images/blog/EmbeddedProgrammierung/BenutzerdefinierteLiterale/arithmetik.png" alt="arithmetik" width="800" height="486" /></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>Wird im Sourcecode <span style="font-family: courier new,courier;">1.5_km + 105.1_m</span> verwendet, starten unter der Decke der Automatismus. Zum einen bildet der Compiler die Suffixe <span style="font-family: courier new,courier;">km</span> und <span style="font-family: courier new,courier;">m</span> auf die entsprechenden Literal-Operatoren ab, zum andern bildet der Compiler den +-Operator auf den überladen +-Operator des <span style="font-family: courier new,courier;">MyDistanc</span>e-Objektes ab. Diese zwei Schritte setzten natürlich voraus, dass der Programmierer seinen Teil des Vertrages erfüllt hat. Das bedeutet in diesem konkreten Fall, er muss die Literale-Operatoren und den +-Operator für <span style="font-family: courier new,courier;">MyDistance</span>-Objekte implementieren haben. Die durch den Compiler automatisch vollzogene Schritte sind in der Graphik durch schwarze Pfeile angedeutet. Die roten Pfeile stehen für die Funktionalität, die der Programmierer zu implementieren hat.</p>
+<p>Was fehlt nun noch? Genau das Fleisch hinter den roten Pfeilen.</p>
+<h3>Aufgaben des Programmierers</h3>
+<p>Zuerst zum klassischen Überladen von Operatoren. Für die Klasse <span style="font-family: courier new,courier;">MyDistance</span> habe ich die Grundrechenarten (Zeile 15 - 28)&nbsp; und den Ausgabeoperator (Zeile 30 - 33) überladen. Die Operatoren sind globalen Funktionen und können dank der <span style="font-family: courier new,courier;">friend</span>-Deklaration auf die Internas der Klasse zugreifen. In der privaten Variable m speichere ich die Entfernung. Die Funktion <span style="font-family: courier new,courier;">getAverageDistance</span> in Zeile 41 - 45 verwendet bereits den überladenen Additions- und Divisions-Operator.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// distance.h</span>
+
+<span style="color: #0000ff;">#ifndef DISTANCE_H</span>
+<span style="color: #0000ff;">#define DISTANCE_H</span>
+
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;ostream&gt;</span>
+
+
+<span style="color: #0000ff;">namespace</span> Distance{
+  <span style="color: #0000ff;">class</span> <span style="color: #2b91af;">MyDistance</span>{
+    public:
+      MyDistance(<span style="color: #2b91af;">double</span> i):m(i){}
+
+      <span style="color: #0000ff;">friend</span> MyDistance <span style="color: #0000ff;">operator</span>+(<span style="color: #0000ff;">const</span> MyDistance&amp; a, <span style="color: #0000ff;">const</span> MyDistance&amp; b){
+        <span style="color: #0000ff;">return</span> MyDistance(a.m + b.m);
+      }
+      <span style="color: #0000ff;">friend</span> MyDistance <span style="color: #0000ff;">operator</span>-(<span style="color: #0000ff;">const</span> MyDistance&amp; a,<span style="color: #0000ff;">const</span> MyDistance&amp; b){
+        <span style="color: #0000ff;">return</span> MyDistance(a.m - b.m);
+      }
+	 <br />      <span style="color: #0000ff;">friend</span> MyDistance <span style="color: #0000ff;">operator</span>*(<span style="color: #2b91af;">double</span> m, <span style="color: #0000ff;">const</span> MyDistance&amp; a){
+        <span style="color: #0000ff;">return</span> MyDistance(m*a.m);
+      }
+	  
+      <span style="color: #0000ff;">friend</span> MyDistance <span style="color: #0000ff;">operator</span>/(<span style="color: #0000ff;">const</span> MyDistance&amp; a, <span style="color: #2b91af;">int</span> n){
+        <span style="color: #0000ff;">return</span> MyDistance(a.m/n);
+      }
+	  
+      <span style="color: #0000ff;">friend</span> std::ostream&amp; <span style="color: #0000ff;">operator</span>&lt;&lt; (std::ostream &amp;out, <span style="color: #0000ff;">const</span> MyDistance&amp; myDist){
+        out &lt;&lt; myDist.m &lt;&lt; <span style="color: #a31515;">" m"</span>;
+        <span style="color: #0000ff;">return</span> out;
+      }
+	private:
+	  <span style="color: #2b91af;">double</span> m;
+	  
+  };
+  
+}
+  
+Distance::MyDistance getAverageDistance(std::initializer_list&lt;Distance::MyDistance&gt; inList){
+  <span style="color: #0000ff;">auto</span> sum= Distance::MyDistance{0.0};
+  <span style="color: #0000ff;">for</span> (<span style="color: #0000ff;">auto</span> i: inList) sum = sum + i ;
+  <span style="color: #0000ff;">return</span> sum/inList.size(); 
+}
+
+
+<span style="color: #0000ff;">#endif</span>
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Kürzer, aber spannender sind da schon die Literal-Operatoren.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// unit.h</span>
+
+<span style="color: #0000ff;">#ifndef UNIT_H</span>
+<span style="color: #0000ff;">#define UNIT_H</span>
+
+<span style="color: #0000ff;">#include &lt;distance.h&gt;</span>
+
+<span style="color: #0000ff;">namespace</span> Distance{
+
+  <span style="color: #0000ff;">namespace</span> Unit{
+    MyDistance <span style="color: #0000ff;">operator</span> <span style="color: #a31515;">""</span> _km(<span style="color: #2b91af;">long</span> <span style="color: #2b91af;">double</span> d){
+      <span style="color: #0000ff;">return</span> MyDistance(1000*d);
+    }
+    MyDistance <span style="color: #0000ff;">operator</span> <span style="color: #a31515;">""</span> _m(<span style="color: #2b91af;">long</span> <span style="color: #2b91af;">double</span> m){
+      <span style="color: #0000ff;">return</span> MyDistance(m);
+    }
+    MyDistance <span style="color: #0000ff;">operator</span> <span style="color: #a31515;">""</span> _dm(<span style="color: #2b91af;">long</span> <span style="color: #2b91af;">double</span> d){
+      <span style="color: #0000ff;">return</span> MyDistance(d/10);
+    }
+    MyDistance <span style="color: #0000ff;">operator</span> <span style="color: #a31515;">""</span> _cm(<span style="color: #2b91af;">long</span> <span style="color: #2b91af;">double</span> c){
+      <span style="color: #0000ff;">return</span> MyDistance(c/100);
+    }
+  }
+}
+
+<span style="color: #0000ff;">#endif</span>
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Die Literal-Operatoren nehmen als Argument<span style="font-family: courier new,courier;"> long double</span> an und geben ein <span style="font-family: courier new,courier;">MyDistance-</span>Objekt zurück. Die erzeugten<span style="font-family: courier new,courier;"> MyDistance</span>-Objekte werden dabei automatisch auf Meter geeicht. Und nun? Das war schon die ganze Funktionalität, die in der ToDo-Liste des Programmieres steht.</p>
+<p>Ein großes Optimierungspotential habe ich bei meinem Programm ignoriert. Fast alle Operationen können zur Compilezeit ausgeführt, fast alle Objekte zur Compilezeit instanziiert werden. Dazu ist&nbsp;notwendig, dass die entsprechenden Operationen und Objekte als <span style="font-family: courier new,courier;">constexpr</span> deklariert wrerden. Dies ist aber ein Feature, das&nbsp;im Artikel<a href="index.php/blog/konstante-ausdruecke-mit-constexpr"> Konstante Ausdrücke</a> genauer vorstelle.</p>
+<h2>Wie geht's weiter?</h2>
+<p>Benutzerdefinierte Literale gibt es nicht nur für Fließkommazahlen, sondern auch für natürliche Zahlen, Zeichen und C-Strings. Darüber hinaus existieren für natürliche Zahlen und Fließkommazahlen zwei syntaktische Formen:<em> Cooked</em> und <em>raw. </em>Es gibt noch einiges zu erzählen im<a href="index.php/blog/raw-und-cooked"> nächsten Artikel.</a></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="166" height="212" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Hole dir dein E-Book. Unterstütze meinen Blog.</span></strong></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
