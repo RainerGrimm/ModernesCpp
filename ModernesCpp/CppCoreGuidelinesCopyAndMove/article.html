@@ -1,0 +1,257 @@
+<p>The rules for copy and move of objects are quite obvious. But before I describe them I have to write about the two remaining rules for constructors. They are about delegating and inheriting constructors.</p>
+<hr id="system-readmore" />
+<p>Here are the two remaining rules:</p>
+<h2>Constructor Rules</h2>
+<p><img src="images/blog/ModernCpp/CppCoreGuidelinesConstructor/stork-1324371_1280.png" alt="stork 1324371 1280" width="400" height="323" style="float: right;" /></p>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rc-delegating">C.51: Use delegating constructors to represent common actions for all constructors of a class</a></h3>
+<p>Since C++11 a constructor can delegate its work to another constructor of the same class. This is the modern way in C++ to put common actions for all constructors in one constructor. In C++ code before C++11, you often used for such a job an <span style="font-family: courier new,courier;">init</span> function.</p>
+<div style="background: #f0f3f3 none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Degree</span>{
+<span style="color: #9999ff;">public:</span>
+  Degree(<span style="color: #007788; font-weight: bold;">int</span> deg){                                           <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    degree<span style="color: #555555;">=</span> deg <span style="color: #555555;">%</span> <span style="color: #ff6600;">360</span>;
+    <span style="color: #006699; font-weight: bold;">if</span> (degree <span style="color: #555555;">&lt;</span> <span style="color: #ff6600;">0</span>) degree <span style="color: #555555;">+=</span> <span style="color: #ff6600;">360</span>;
+  }
+
+  Degree()<span style="color: #555555;">:</span> Degree(<span style="color: #ff6600;">0</span>){}                                      <span style="color: #0099ff; font-style: italic;">// (2)</span>
+
+  Degree(<span style="color: #007788; font-weight: bold;">double</span> deg)<span style="color: #555555;">:</span> Degree(<span style="color: #006699; font-weight: bold;">static_cast</span><span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span>(ceil(deg))){}  <span style="color: #0099ff; font-style: italic;">// (3)</span>
+
+<span style="color: #9999ff;">private:</span>
+  <span style="color: #007788; font-weight: bold;">int</span> degree;
+};
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The constructors (2) and (3) of the class <span style="font-family: courier new,courier;">Degree</span> delegates all it's initialisation work to the constructor (1) which verifies its arguments. Invoking constructors recursively is undefined behaviour.</p>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rc-inheriting">C.52: Use inheriting constructors to import constructors into a derived class that does not need further explicit initialization</a></h3>
+<p>If you can reuse constructors of the base class in the derived class do it. If you don't do it, you violate the <a href="https://en.wikipedia.org/wiki/Don%27t_repeat_yourself">DRY</a> (Don't Repeat Yourself) principle.</p>
+<div style="background: #f0f3f3 none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Rec</span> {
+    <span style="color: #0099ff; font-style: italic;">// ... data and lots of nice constructors ...</span>
+};
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Oper</span> <span style="color: #555555;">:</span> <span style="color: #006699; font-weight: bold;">public</span> Rec {
+    <span style="color: #006699; font-weight: bold;">using</span> Rec<span style="color: #555555;">::</span>Rec;
+    <span style="color: #0099ff; font-style: italic;">// ... no data members ...</span>
+    <span style="color: #0099ff; font-style: italic;">// ... lots of nice utility functions ...</span>
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> Rec2 <span style="color: #555555;">:</span> <span style="color: #006699; font-weight: bold;">public</span> Rec {
+    <span style="color: #007788; font-weight: bold;">int</span> x;
+    <span style="color: #006699; font-weight: bold;">using</span> Rec<span style="color: #555555;">::</span>Rec;
+};
+
+Rec2 r {<span style="color: #cc3300;">"foo"</span>, <span style="color: #ff6600;">7</span>};
+<span style="color: #007788; font-weight: bold;">int</span> val <span style="color: #555555;">=</span> r.x;            <span style="color: #0099ff; font-style: italic;">// uninitialized  (1)</span>  
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>There is a danger using inheriting constructors. If your derived class such as <span style="font-family: Courier New,Courier,monospace;">Rec2</span> has own members, they are uninitialised (1).</p>
+<h2>Copy and Move</h2>
+<p><img src="images/blog/ModernCpp/CppCoreGuidelinesCopyAndMove/movers-24402_1280.png" alt="movers 24402 1280" width="400" height="638" style="float: right;" /></p>
+<p>The chapter starts with a meta-rule. Values types, also known as types that behave like an int, should be copyable, but interfaces in class hierarchies not. The last rule C.67 refers to this meta-rule.</p>
+<p>Here are the eight rules:</p>
+<ul>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rc-copy-assignment">C.60: Make copy assignment non-<code class="highlighter-rouge no-highlight">virtual</code>, take the parameter by <code class="highlighter-rouge no-highlight">const&amp;</code>, and return by non-<code class="highlighter-rouge no-highlight">const&amp;</code></a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rc-copy-semantic">C.61: A copy operation should copy</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rc-copy-self">C.62: Make copy assignment safe for self-assignment</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rc-move-assignment">C.63: Make move assignment non-<code class="highlighter-rouge no-highlight">virtual</code>, take the parameter by <code class="highlighter-rouge no-highlight">&amp;&amp;</code>, and return by non-<code class="highlighter-rouge no-highlight">const&amp;</code></a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rc-move-semantic">C.64: A move operation should move and leave its source in a valid state</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rc-move-self">C.65: Make move assignment safe for self-assignment</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rc-move-noexcept">C.66: Make move operations <code class="highlighter-rouge no-highlight">noexcept</code></a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rc-copy-virtual">C.67: A base class should suppress copying, and provide a virtual <code class="highlighter-rouge no-highlight">clone</code> instead if “copying” is desired</a></li>
+</ul>
+<p>The first 6 rules for copy and move consist of 3 quite similar pairs; therefore, I can explain them together.</p>
+<ul>
+<li><b>C.60</b> and <b>C.63 </b>state that you should make the copy (move) assignment non-virtual and return a non-const reference. There is a difference in the way, you should take the parameter.</li>
+</ul>
+<ul>
+<ul>
+<li>Copy assignment should take its parameter by a <b>const lvalue reference (&amp;)</b>, because you should not change the source of your assignment</li>
+<li>Move assignment should take its parameter by a<b> non-const rvalue reference (&amp;&amp;)</b>, because you have to modify the source of your assignment</li>
+<li>This is the pattern the assignment operators of the standard template library follow. Here is a simplified look at <span style="font-family: Courier New,Courier,monospace;">std::vector.</span></li>
+</ul>
+</ul>
+<blockquote>
+<blockquote>
+<div style="background: #f0f3f3 none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<pre style="margin: 0px; line-height: 125%;">vector<span style="color: #555555;">&amp;</span> <span style="color: #006699; font-weight: bold;">operator</span><span style="color: #555555;">=</span>( <span style="color: #006699; font-weight: bold;">const</span> vector<span style="color: #555555;">&amp;</span> other ); 	
+vector<span style="color: #555555;">&amp;</span> <span style="color: #006699; font-weight: bold;">operator</span><span style="color: #555555;">=</span>( vector<span style="color: #555555;">&amp;&amp;</span> other );          <span style="color: #0099ff; font-style: italic;">// (since C++11, until C++17)</span>
+vector<span style="color: #555555;">&amp;</span> <span style="color: #006699; font-weight: bold;">operator</span><span style="color: #555555;">=</span>( vector<span style="color: #555555;">&amp;&amp;</span> other ) noexcept  <span style="color: #0099ff; font-style: italic;">// since C++17)<br /></span></pre>
+</div>
+</blockquote>
+</blockquote>
+<ul>
+<li><strong>C.61</strong> and <strong>C.64</strong> say that a copy (move) operation should actually copy (move). This is the expected semantic for a = b.</li>
+</ul>
+<blockquote>
+<ul>
+<li>In case of copying, this means that after copying&nbsp; a and b (a = b) a must be the same: (a ==b).</li>
+<li>Copying can be a deep or shallow. Deep copying means that both objects a and b are afterwards totally independent of each other (<a href="https://isocpp.org/wiki/faq/value-vs-ref-semantics">value semantic</a>). Shallow copying means that both objects a and b share an object afterwards (<a href="https://isocpp.org/wiki/faq/value-vs-ref-semantics">reference semantic</a>).</li>
+<li>C.64 states the moved-from object should be in a valid state. Most of the times this is the default state of the source. The C++ standard requires, that the moved-from object must be afterwards in an unspecified but valid state.</li>
+</ul>
+</blockquote>
+<ul>
+<li><b>C.62</b> and <b>C.65 </b>state the same. Copy (move) assignment should be safe for self-assignment. x = x should not change the value of x.
+<ul>
+<li>Copy (move) assignment of the containers of the STL, <span style="font-family: Courier New,Courier,monospace;">std::string</span> and built- type such as <span style="font-family: Courier New,Courier,monospace;">int</span> is safe for self-assignment; therefore, the default generated copy (move) assignment operator is in this case safe for self-assignment. The same will hold for an automatic generated copy (move) assignment operator which uses types that are safe for self-assignment.</li>
+</ul>
+</li>
+</ul>
+<blockquote>
+<blockquote>
+<div style="background: #f0f3f3 none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Foo</span> {
+    string s;
+    <span style="color: #007788; font-weight: bold;">int</span> i;
+<span style="color: #9999ff;">public:</span>
+  Foo<span style="color: #555555;">&amp;</span> Foo<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">operator</span><span style="color: #555555;">=</span>(<span style="color: #006699; font-weight: bold;">const</span> Foo<span style="color: #555555;">&amp;</span> a){
+    s <span style="color: #555555;">=</span> a.s;
+    i <span style="color: #555555;">=</span> a.i;
+    <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">this</span>;
+  }
+  Foo<span style="color: #555555;">&amp;</span> Foo<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">operator</span><span style="color: #555555;">=</span>(Foo<span style="color: #555555;">&amp;&amp;</span> a) noexcept {
+    s <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>move(a.s);
+    i <span style="color: #555555;">=</span> a.i;
+    <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">this</span>;<br />&nbsp; }<br />  // ....<br />};</pre>
+</div>
+<strong><br /> </strong>The code snippet shows that there is no test for self-assignment such as in the next example necessa<b>r</b>y. Here is the version of the type <span style="font-family: Courier New,Courier,monospace;">Foo</span> with redundant (expensive) checks (1) and (2) for self-assignment.<strong><br /> </strong></blockquote>
+<blockquote>
+<div style="background: #f0f3f3 none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Foo</span> {
+    string s;
+    <span style="color: #007788; font-weight: bold;">int</span> i;
+<span style="color: #9999ff;">public:</span>
+  Foo<span style="color: #555555;">&amp;</span> Foo<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">operator</span><span style="color: #555555;">=</span>(<span style="color: #006699; font-weight: bold;">const</span> Foo<span style="color: #555555;">&amp;</span> a){
+    <span style="color: #006699; font-weight: bold;">if</span> (<span style="color: #006699; font-weight: bold;">this</span> <span style="color: #555555;">==</span> <span style="color: #555555;">&amp;</span>a) <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">this</span>;          <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    s <span style="color: #555555;">=</span> a.s;
+    i <span style="color: #555555;">=</span> a.i;
+    <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">this</span>;
+  }
+  Foo<span style="color: #555555;">&amp;</span> Foo<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">operator</span><span style="color: #555555;">=</span>(Foo<span style="color: #555555;">&amp;&amp;</span> a) noexcept {   <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    <span style="color: #006699; font-weight: bold;">if</span> (<span style="color: #006699; font-weight: bold;">this</span> <span style="color: #555555;">==</span> <span style="color: #555555;">&amp;</span>a) <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">this</span>;
+    s <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>move(a.s);
+    i <span style="color: #555555;">=</span> a.i;
+    <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">this</span>;
+  }
+  <span style="color: #0099ff; font-style: italic;">// ....</span>
+};</pre>
+</div>
+</blockquote>
+</blockquote>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rc-move-noexcept">C.66: Make move operations <code class="highlighter-rouge no-highlight">noexcept</code></a></h3>
+<p>M<a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rc-move-noexcept"><code class="highlighter-rouge no-highlight"></code></a>ove operations should not throw; therefore, you should declare them as <span style="font-family: courier new,courier;">noexcept. </span>You can implement your move constructor and move assignment operators that do not throw. <span style="font-family: courier new,courier;"><br /></span></p>
+<p>This is the pattern the move operators of the standard template library follow. Have a look at <span style="font-family: Courier New,Courier,monospace;">std::vector.</span></p>
+<div style="background: #f0f3f3 none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Vector</span> {
+    <span style="color: #0099ff; font-style: italic;">// ...</span>
+    Vector(Vector<span style="color: #555555;">&amp;&amp;</span> a) noexcept <span style="color: #555555;">:</span>elem{a.elem}, sz{a.sz} { a.sz <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>; a.elem <span style="color: #555555;">=</span> nullptr; }
+    Vector<span style="color: #555555;">&amp;</span> <span style="color: #006699; font-weight: bold;">operator</span><span style="color: #555555;">=</span>(Vector<span style="color: #555555;">&amp;&amp;</span> a) noexcept { elem <span style="color: #555555;">=</span> a.elem; sz <span style="color: #555555;">=</span> a.sz; a.sz <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>; a.elem <span style="color: #555555;">=</span> nullptr; }
+    <span style="color: #0099ff; font-style: italic;">// ...</span>
+<span style="color: #9999ff;">public:</span>
+    T<span style="color: #555555;">*</span> elem;
+    <span style="color: #007788; font-weight: bold;">int</span> sz;
+};</pre>
+</div>
+<p>&nbsp;</p>
+<p>The last rule C.67 deserves more attention.</p>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rc-copy-virtual">C.67: A base class should suppress copying, and provide a virtual <code class="highlighter-rouge no-highlight">clone</code> instead if “copying” is desired</a><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rc-copy-virtual"> <code class="highlighter-rouge no-highlight"></code></a></h3>
+<p>The main reason for this rule is that slicing is not possible. Slicing is one of this phenomenon in C++, my colleagues always warned me. There exists also an article on Wikipedia about <a href="https://en.wikipedia.org/wiki/Object_slicing">object slicing</a>.</p>
+<p>Slicing will happen when an object of a derived classe will be copied to an object of a base class.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">struct</span> Base { <span style="color: #007788; font-weight: bold;">int</span> base_; };
+ 
+<span style="color: #006699; font-weight: bold;">struct</span> Derived <span style="color: #555555;">:</span> Base { <span style="color: #007788; font-weight: bold;">int</span> derived_; };
+ 
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+  Derived d;
+  Base b <span style="color: #555555;">=</span> d;   <span style="color: #0099ff; font-style: italic;">// slicing, only the Base parts of (base_) are copied</span>
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>In this scenario, the copy operations of the base class are used; therefore, only the base part of <span style="font-family: courier new,courier;">d</span> is copied.</p>
+<p>From the object-oriented perspective an instance of <span style="font-family: courier new,courier;">Derived</span> <a href="https://en.wikipedia.org/wiki/Is-a">is-a</a>&nbsp; instance of <span style="font-family: courier new,courier;">Base.</span> That means, whenever you need an instance of Base you can use an instance of Derived. But you have to be careful. If you take the instance of <span style="font-family: courier new,courier;">Base</span> by copy (value-semantic), you will only get the base parts of an instance of <span style="font-family: courier new,courier;">Derived.</span></p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">needBase</span>(Base b){ .... };
+
+Derived der;
+needBase(der);      <span style="color: #0099ff; font-style: italic;">// slicing kicks in</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The cure which the guidelines suggest is: the base class should suppress copying but provide instead a virtual <span style="font-family: courier new,courier;">clone</span> method if copying is desired. Here is the example from the guidelines.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">B</span> { <span style="color: #0099ff; font-style: italic;">// GOOD: base class suppresses copying</span>
+    B(<span style="color: #006699; font-weight: bold;">const</span> B<span style="color: #555555;">&amp;</span>) <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">delete</span>;
+    B<span style="color: #555555;">&amp;</span> <span style="color: #006699; font-weight: bold;">operator</span><span style="color: #555555;">=</span>(<span style="color: #006699; font-weight: bold;">const</span> B<span style="color: #555555;">&amp;</span>) <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">delete</span>;
+    <span style="color: #006699; font-weight: bold;">virtual</span> unique_ptr<span style="color: #555555;">&lt;</span>B<span style="color: #555555;">&gt;</span> clone() { <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #0099ff; font-style: italic;">/* B object */</span>; }
+    <span style="color: #0099ff; font-style: italic;">// ...</span>
+};
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">D</span> <span style="color: #555555;">:</span> <span style="color: #006699; font-weight: bold;">public</span> B {
+    string more_data; <span style="color: #0099ff; font-style: italic;">// add a data member</span>
+    unique_ptr<span style="color: #555555;">&lt;</span>B<span style="color: #555555;">&gt;</span> clone() override { <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #0099ff; font-style: italic;">/* D object */</span>; }
+    <span style="color: #0099ff; font-style: italic;">// ...</span>
+};
+
+<span style="color: #006699; font-weight: bold;">auto</span> d <span style="color: #555555;">=</span> make_unique<span style="color: #555555;">&lt;</span>D<span style="color: #555555;">&gt;</span>();
+<span style="color: #006699; font-weight: bold;">auto</span> b <span style="color: #555555;">=</span> d.clone(); <span style="color: #0099ff; font-style: italic;">// ok, deep clone</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The clown method returns the newly created object in a <span style="font-family: courier new,courier;">std::unique_ptr;</span> therefore, the ownership goes to the caller. Such a <span style="font-family: courier new,courier;">clone</span> method is better known as a factory method. A factory method is one of the creational patterns from the book:&nbsp;<a href="https://en.wikipedia.org/wiki/Design_Patterns">Design Pattern: Elements of Reusable Object-Oriented Software. </a></p>
+<h2>What's next?</h2>
+<p>There are a few rules for default operations left. The next post deals with comparisons, <span style="font-family: courier new,courier;">swap,</span> and <span style="font-family: courier new,courier;">hash.</span></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporter</a></strong><strong>: Eric Pederson.</strong></p>
+<p>&nbsp;</p>
+<table border="0" style="width: 800px; height: 250px;" cellpadding="8"><caption>
+<h2>Get your e-book at leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img src="images/books/cover.png" alt="cover" width="173" height="220" style="border: medium none #000000;" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="169" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11</strong> and <strong>C++14</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 500 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
