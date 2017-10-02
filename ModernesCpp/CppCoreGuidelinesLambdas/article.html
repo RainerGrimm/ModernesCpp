@@ -1,0 +1,194 @@
+<p>I can not think about modern C++ without lambda expressions. So my wrong assumption was that they are a lot of rules for lambda expressions. Wrong! There are less than ten rules. But as ever I learned something new.</p>
+<hr id="system-readmore" />
+<p>Here are the first four rules to lambda expressions (short lambdas).</p>
+<p><img src="images/blog/ModernCpp/CppCoreGuidelinesLambdas/Lambda.jpg" alt="Lambda" width="200" height="443" style="float: right;" /></p>
+<h2>Function objects and lambdas</h2>
+<ul>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rf-capture-vs-overload">F.50: Use a lambda when a function won’t do (to capture local variables, or to write a local function)</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rf-reference-capture">F.52: Prefer capturing by reference in lambdas that will be used locally, including passed to algorithms</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rf-value-capture">F.53: Avoid capturing by reference in lambdas that will be used nonlocally, including returned, stored on the heap, or passed to another thread</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Res-lambda-init">ES.28: Use lambdas for complex initialization, especially of <code class="highlighter-rouge no-highlight">const</code> variables</a></li>
+</ul>
+<p>I said I want to write about lambda functions. Maybe you are surprised that the headline is called function objects and lambdas. If you know that lambdas are just function objects automatically created by the compiler then this will not surprise you. If you don't know, read the following section because knowing this magic helps a lot for getting a deeper understanding of lambda expressions.&nbsp;</p>
+<p>I will make it short because my plan is to write about lambda expression.</p>
+<h3>Lambda functions under the hood</h3>
+<p>First, a function object is an instance of a class, for which the call operator ( <span style="font-family: courier new,courier;">operator()</span> ) is overloaded. This means that a function object is an object that behaves like a function. The main difference between a function and a function object is: a function object is an object and can, therefore, have a state.</p>
+<p>Here is a simple example.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">addFunc</span>(<span style="color: #007788; font-weight: bold;">int</span> a, <span style="color: #007788; font-weight: bold;">int</span> b){ <span style="color: #006699; font-weight: bold;">return</span> a <span style="color: #555555;">+</span> b; }
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+    
+    <span style="color: #006699; font-weight: bold;">struct</span> AddObj{
+        <span style="color: #007788; font-weight: bold;">int</span> <span style="color: #006699; font-weight: bold;">operator</span>()(<span style="color: #007788; font-weight: bold;">int</span> a, <span style="color: #007788; font-weight: bold;">int</span> b) <span style="color: #006699; font-weight: bold;">const</span> { <span style="color: #006699; font-weight: bold;">return</span> a <span style="color: #555555;">+</span> b; }
+    };
+    
+    AddObj addObj;
+    addObj(<span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>) <span style="color: #555555;">==</span> addFunc(<span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>);<br />
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Instances of the struct <span style="font-family: courier new,courier;">AddObj</span> and the function <span style="font-family: courier new,courier;">addFunc</span> are both callables.&nbsp; I defined the struct <span style="font-family: courier new,courier;">AddObj</span> just in place. That is the C++ compiler implicitly doing if I use a lambda expression.</p>
+<p>Have a look.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">addFunc</span>(<span style="color: #007788; font-weight: bold;">int</span> a, <span style="color: #007788; font-weight: bold;">int</span> b){ <span style="color: #006699; font-weight: bold;">return</span> a <span style="color: #555555;">+</span> b; }
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+    
+    <span style="color: #006699; font-weight: bold;">auto</span> addObj <span style="color: #555555;">=</span> [](<span style="color: #007788; font-weight: bold;">int</span> a, <span style="color: #007788; font-weight: bold;">int</span> b){ <span style="color: #006699; font-weight: bold;">return</span> a <span style="color: #555555;">+</span> b; };
+    
+    addObj(<span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>) <span style="color: #555555;">==</span> addFunc(<span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>);
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p><strong>That's all!</strong> If the lambda expression captures it's environment and therefore has state, the corresponding struct <span style="font-family: courier new,courier;">AddOb</span>j gets a constructor for initialising its members. If the lambda expression captures its argument by reference, so the constructor. The same holds for capturing by value.</p>
+<p>With C++14 we have generic lambdas; therefore, you can define a lambda expression such as <span style="font-family: courier new,courier;">[](auto a, auto b){ return a + b; };. </span>What does that mean for the call operator of <span style="font-family: courier new,courier;">AddObj</span>? I assume you can already guess it. The call operator becomes a template. I want to emphasise it explicitly: <strong>a generic lambda is a function template</strong>.&nbsp;<span style="font-family: courier new,courier;"> </span></p>
+<p>I hope this section was not too concise. Let's continue with the four rules.</p>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rf-capture-vs-overload">F.50: Use a lambda when a function won’t do (to capture local variables, or to write a local function)</a></h3>
+<p>The difference of the usage of functions and lambda functions boils down to two points.&nbsp;<span style="font-family: courier new,courier;"> </span></p>
+<ol>
+<li>You can not overload lambdas.</li>
+<li>A lambda function can capture local variables.</li>
+</ol>
+<p>Here is a contrived example to the second point.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #009999;">#include &lt;functional&gt;</span>
+
+std<span style="color: #555555;">::</span>function<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>(<span style="color: #007788; font-weight: bold;">int</span>)<span style="color: #555555;">&gt;</span> makeLambda(<span style="color: #007788; font-weight: bold;">int</span> a){    // (1)
+    <span style="color: #006699; font-weight: bold;">return</span> [a](<span style="color: #007788; font-weight: bold;">int</span> b){ <span style="color: #006699; font-weight: bold;">return</span> a <span style="color: #555555;">+</span> b; };
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main(){
+    
+    <span style="color: #006699; font-weight: bold;">auto</span> add5 <span style="color: #555555;">=</span> makeLambda(<span style="color: #ff6600;">5</span>);                // (2)
+    
+    <span style="color: #006699; font-weight: bold;">auto</span> add10 <span style="color: #555555;">=</span> makeLambda(<span style="color: #ff6600;">10</span>);              // (3)
+    
+    add5(<span style="color: #ff6600;">10</span>) <span style="color: #555555;">==</span> add10(<span style="color: #ff6600;">5</span>);                     // (4)
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The function<span style="font-family: courier new,courier;"> makeLambda</span> returns a lambda expression. The lambda expression takes an <span style="font-family: courier new,courier;">int</span> and returns an<span style="font-family: courier new,courier;"> int</span>. &nbsp;This is the type of the polymorph function wrapper<span style="font-family: courier new,courier;"> std::function: std::function&lt;int(int)&gt;. <span style="font-family: andale mono,times;">(1).</span></span> Invoking <span style="font-family: courier new,courier;">makeLambda(5)</span> (2) creates a lambda expression that captures <span style="font-family: courier new,courier;">a </span>which is in this case 5. The same argumentation holds for makeLambda(10) (3); therefore <span style="font-family: courier new,courier;">add5(10)</span> and <span style="font-family: courier new,courier;">add10(5)</span> are 15 (4).<span style="font-family: courier new,courier;"><span style="font-family: andale mono,times;"><br /></span></span></p>
+<p>The next two rules are explicitly dealing with capturing by reference. Both are quite similar; therefore, I will present them together.</p>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rf-reference-capture">F.52: Prefer capturing by reference in lambdas that will be used locally, including passed to algorithms, </a><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rf-value-capture">F.53: Avoid capturing by reference in lambdas that will be used nonlocally, including returned, stored on the heap, or passed to another thread</a></h3>
+<p>For efficiency and correctness reasons, your lambda expression should capture its variables by reference if the lambda expression is locally used. Accordingly, if the lambda expression is not used locally, you should not capture the variables by reference but copy the arguments. If you break the last statement you will get undefined behaviour.</p>
+<p>Here is an example of undefined behaviour with lambda expressions.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// lambdaCaptureReference.cpp</span>
+
+<span style="color: #009999;">#include &lt;functional&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+std<span style="color: #555555;">::</span>function<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>(<span style="color: #007788; font-weight: bold;">int</span>)<span style="color: #555555;">&gt;</span> makeLambda(<span style="color: #007788; font-weight: bold;">int</span> a){
+    <span style="color: #007788; font-weight: bold;">int</span> local <span style="color: #555555;">=</span> <span style="color: #ff6600;">2</span> <span style="color: #555555;">*</span> a;
+    <span style="color: #006699; font-weight: bold;">auto</span> lam <span style="color: #555555;">=</span> [<span style="color: #555555;">&amp;</span>local](<span style="color: #007788; font-weight: bold;">int</span> b){ <span style="color: #006699; font-weight: bold;">return</span> local <span style="color: #555555;">+</span> b; };           <span style="color: #0099ff; font-style: italic;">// 1</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"lam(5): "</span><span style="color: #555555;">&lt;&lt;</span>  lam(<span style="color: #ff6600;">5</span>) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;            <span style="color: #0099ff; font-style: italic;">// 2</span>
+    <span style="color: #006699; font-weight: bold;">return</span> lam;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main(){
+  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  
+  <span style="color: #007788; font-weight: bold;">int</span> local <span style="color: #555555;">=</span> <span style="color: #ff6600;">10</span>;
+    
+  <span style="color: #006699; font-weight: bold;">auto</span> addLocal <span style="color: #555555;">=</span> [<span style="color: #555555;">&amp;</span>local](<span style="color: #007788; font-weight: bold;">int</span> b){ <span style="color: #006699; font-weight: bold;">return</span> local <span style="color: #555555;">+</span> b; };        <span style="color: #0099ff; font-style: italic;">// 3</span>
+    
+  <span style="color: #006699; font-weight: bold;">auto</span> add10 <span style="color: #555555;">=</span> makeLambda(<span style="color: #ff6600;">5</span>);
+    
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"addLocal(5): "</span> <span style="color: #555555;">&lt;&lt;</span> addLocal(<span style="color: #ff6600;">5</span>) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;    <span style="color: #0099ff; font-style: italic;">// 4</span>
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"add10(5): "</span> <span style="color: #555555;">&lt;&lt;</span> add10(<span style="color: #ff6600;">5</span>) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;          <span style="color: #0099ff; font-style: italic;">// 5</span>
+  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The definition of the lambda <span style="font-family: courier new,courier;">addLocal</span> (3) and its usage (4) is fine. The same holds for the definition of the lambda expression <span style="font-family: courier new,courier;">lam</span> (1) and its usage (2) inside the function. The undefined behaviour is that the function <span style="font-family: courier new,courier;">makeLambda</span> returns a lambda expression with a reference to the local variable <span style="font-family: courier new,courier;">local.</span></p>
+<p>Any guess what value the call <span style="font-family: courier new,courier;">add10(5)</span> will have in line (5)? Here we are.</p>
+<p>&nbsp;<img src="images/blog/ModernCpp/CppCoreGuidelinesLambdas/LambdaCaptureReference.png" alt="LambdaCaptureReference" /></p>
+<p>Each execution of the program gives a different result for the expression (5).</p>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Res-lambda-init">ES.28: Use lambdas for complex initialization, especially of <code class="highlighter-rouge no-highlight">const</code> variables</a></h3>
+<p>To be honest, I like this rule because it makes your code more robust. Why does the guidelines call the following program bad?</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">widget x;   <span style="color: #0099ff; font-style: italic;">// should be const, but:</span>
+<span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> i <span style="color: #555555;">=</span> <span style="color: #ff6600;">2</span>; i <span style="color: #555555;">&lt;=</span> N; <span style="color: #555555;">++</span>i) {             <span style="color: #0099ff; font-style: italic;">// this could be some</span>
+    x <span style="color: #555555;">+=</span> some_obj.do_something_with(i);  <span style="color: #0099ff; font-style: italic;">// arbitrarily long code</span>
+}                                        <span style="color: #0099ff; font-style: italic;">// needed to initialize x</span>
+<span style="color: #0099ff; font-style: italic;">// from here, x should be const, but we can't say so in code in this style</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Conceptually, you only want to initialise <span style="font-family: courier new,courier;">widget x.</span> If it is initialised it should stay constant. This is an idea we can not express in C++. If <span style="font-family: courier new,courier;">widget x</span> is used in a multithreading program, you have to synchronise it.</p>
+<p>This synchronisation would not be necessary if <span style="font-family: courier new,courier;">widget x</span> was constant. Here is the good pendant with lambda expressions.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">const</span> widget x <span style="color: #555555;">=</span> [<span style="color: #555555;">&amp;</span>]{
+    widget val;                                <span style="color: #0099ff; font-style: italic;">// assume that widget has a default constructor</span>
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> i <span style="color: #555555;">=</span> <span style="color: #ff6600;">2</span>; i <span style="color: #555555;">&lt;=</span> N; <span style="color: #555555;">++</span>i) {            <span style="color: #0099ff; font-style: italic;">// this could be some</span>
+        val <span style="color: #555555;">+=</span> some_obj.do_something_with(i);  <span style="color: #0099ff; font-style: italic;">// arbitrarily long code</span>
+    }                                          <span style="color: #0099ff; font-style: italic;">// needed to initialize x</span>
+    <span style="color: #006699; font-weight: bold;">return</span> val;
+}();
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Thanks to the in-place executed lambda, you can define the <span style="font-family: courier new,courier;">widget x</span> as a constant. You can not change its value and , therefore, you can use it in a multithreading program without expensive synchronisation.</p>
+<h2>What's next?</h2>
+<p>One of the key characteristics of object-orientation is inheritance. The C++ Core Guidelines has roughly 25 rules for class hierarchies. I the next post I will write about the concepts interfaces and implementations in class hierarchies.</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporter</a></strong><strong>: Eric Pederson.</strong></p>
+<p>&nbsp;</p>
+<table border="0" style="width: 800px; height: 250px;" cellpadding="8"><caption>
+<h2>Get your e-book at leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img src="images/books/cover.png" alt="cover" width="173" height="220" style="border: medium none #000000;" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="169" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11</strong> and <strong>C++14</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 500 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
