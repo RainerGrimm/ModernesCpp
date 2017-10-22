@@ -1,0 +1,251 @@
+<p>Die Idee ist schnell skizziert. Die Standard Template Library enthält gut 100 Algorithmen für das Suchen, Zählen, Manipulieren von Bereichen und deren Elemente. Mit C++17 wurden 69 der Algorithmen überladen und neue Algorithmen hinzugefügt. Diese überladenen und neuen Algorithmen können mit einer sogenannte <em>Execution Policy</em> aufgerufen werden. Mit dieser <em>Execution Policy</em> lässt sich spezifizieren, ob der Algorithmus sequentiell, parallel oder parallel und vektorisiert ausgeführt wird.</p>
+<hr id="system-readmore" />
+<h2>Ein einfaches Beispiel</h2>
+<p>Vektorisierung bezeichnet die <a href="https://en.wikipedia.org/wiki/SIMD">SIMD</a> (<strong>S</strong>ingle <strong>I</strong>nstruction, <strong>M</strong>ultiple <strong>D</strong>ata) Erweiterung des Befehlssatzes moderner Prozessoren, die eine Operation parallel auf mehreren Daten ausführen können. Welche überladene Version eines Algorithmus ausgewählt wird, steuert der Anwender über das sogenannte <em>Policy Tag</em>. Wie funktioniert das ganze?</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;">vector&lt;<span style="color: #2b91af;">int</span>&gt; v = ...
+
+<span style="color: #008000;">// standard sequential sort</span>
+std::sort(v.begin(), v.end());
+
+<span style="color: #008000;">// sequential execution</span>
+std::sort(std::parallel::seq, v.begin(), v.end());
+
+<span style="color: #008000;">// permitting parallel execution</span>
+std::sort(std::parallel::par, v.begin(), v.end());
+
+<span style="color: #008000;">// permitting parallel and vectorized execution</span>
+std::sort(std::parallel::par_unseq, v.begin(), v.end());
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><br />Schön ist an dem kleinen Beispiel zu sehen, dass die klassische Variante von <span style="font-family: courier new,courier;">std::sort</span> (Zeile 4) mit C++17 immer noch zu Verfügung steht. Dagegen lässt sich jetzt mit C++17 explizit die sequentielle (Zeile 7), die parallele (Zeile 10) oder auch die parallele und vektorisierende Variante (Zeile 13) von <span style="font-family: courier new,courier;">std::sort</span> anfordern.</p>
+<p>Zwei Besonderheiten gilt es aber im Kopf zu behalten.</p>
+<h2>Zwei Besonderheiten</h2>
+<p>Zum einen muss ein mit der <em>Exection Policy </em><span style="font-family: courier new,courier;">std::parallel</span><span style="font-family: courier new,courier;">::par_unseq</span> versehener Algorithmus nicht parallel und vektorisiert ausgeführt werden. Zum anderen ist der Anwender für die richtige Anwendung des Algorithmus verantwortlich.</p>
+<h3>Parallele und vektorisierte Ausführung</h3>
+<p>Ob ein Algorithmus parallel und vektorisierende (<span style="font-family: courier new,courier;">std::parallel::par_unseq</span>) ausgeführt werden kann, hängt von vielen Faktoren ab. Das hängt davon ab, ob die CPU und das Betriebssystem SIMD Anweisungen unterstützt. Natürlich ist es auch eine Frage des Compilers und Optimierungslevels, mit dem der Code übersetzt wird.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">const</span> <span style="color: #2b91af;">int</span> SIZE= 8;
+
+<span style="color: #2b91af;">int</span> vec[]={1,2,3,4,5,6,7,8};
+<span style="color: #2b91af;">int</span> res[]={0,};
+
+<span style="color: #2b91af;">int</span> main(){
+  <span style="color: #0000ff;">for</span> (<span style="color: #2b91af;">int</span> i= 0; i &lt; SIZE; ++i) {
+    res[i]= vec[i]+5;
+  }
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Die entscheidende Zeile an dem kleinen Programm ist die Zeile 8. Dank dem Compiler Explorer auf <a href="https://godbolt.org/">https://godbolt.org/ </a>kann ich die Assembleranweisungen des clang 3.6 Compilers mit maximaler (-03) und ohne Optimierung erzeugen.<a href="https://godbolt.org/"> </a></p>
+<h4>Ohne Optimierung</h4>
+<p>Auch wenn ich mich nicht wirklich mit Assembler Instruktionen auskennen, ist unmittelbar klar, hier findet alles sequentiell statt.</p>
+<p><img src="images/blog/FutureMultithreading/ParallelSTL/seq.png" alt="seq" style="margin: 15px;" /></p>
+<h4>Mit maximaler Optimierung</h4>
+<p>Bei maximaler Optimierung kommen hingegen Instruktionen zum Einsatz, die auf mehreren Elementen gleichzeitig arbeiten.</p>
+<p><img src="images/blog/FutureMultithreading/ParallelSTL/vec.png" alt="vec" style="margin: 15px;" /></p>
+<p>Sowohl die move-Operationen <span style="font-family: courier new,courier;">(movdqa)</span> als auch die add-Operationen <span style="font-family: courier new,courier;">(paddd) </span>arbeiten auf den besonderen Registern <span style="font-family: courier new,courier;">xmm0</span> und <span style="font-family: courier new,courier;">xmm1.</span> Beide Register sind sogenannte SSE Register und 128 Bits groß. <a href="https://en.wikibooks.org/wiki/X86_Assembly/SSE">SSE</a> steht für <strong>S</strong>treaming <strong>S</strong>IMD <strong>E</strong>xternsions.&nbsp;</p>
+<h3>Gefahr von kritischen Wettläufen und Verklemmungen</h3>
+<p>&nbsp;Die Algorithmen schützen nicht automatisch vor <a href="index.php/blog/threads-teilen-daten">kritischen Wettläufen </a>(data races<a href="index.php/blog/threads-teilen-daten">) </a>oder <a href="index.php/blog/gefahren-von-mutexen">Verklemmungen </a>(deadlocks). Beispiel gefällig?</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #2b91af;">int</span> numComp= 0;
+
+std::vector&lt;<span style="color: #2b91af;">int</span>&gt; vec={1,3,8,9,10};
+
+std::sort(std::parallel::vec, vec.begin(), vec.end(), 
+         [&amp;numComp](<span style="color: #2b91af;">int</span> fir, <span style="color: #2b91af;">int</span> sec){ numComp++; <span style="color: #0000ff;">return</span> fir &lt; sec; });
+         
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Der kleine Programmschnipsel enthält bereits einen kritischen Wettlauf um die Variable <span style="font-family: courier new,courier;">numComp.numComp </span>soll die Anzahl der Operationen zählen. Das heißt insbesondere, in der Lambda-Funktion wird auf sie lesend und schreibend zugegriffen. Damit besitzt der Code undefiniertes Verhalten. Um ein wohldefiniertes Programm zu erhalten, muss der Zugriff auf <span style="font-family: courier new,courier;">numComp</span> atomar sein.</p>
+<h2>Statische versus dynamische Execution Policy</h2>
+<p><em><strong>Die Execution Policy schaffte es leider nicht in den C++17 Standard. Wir müssen noch bis C++20 warten.</strong></em></p>
+<p>Die Erzeugung eines Threads ist eine teure Operation. Daher macht es keinen Sinn, ein kleinen Container mit einer parallelen (<span style="font-family: courier new,courier;">std::parallel::par</span>) oder parallel und vektorisierenden (<span style="font-family: courier new,courier;">std::parallel::par_unseq</span>) Strategie zu sortieren. In diesem Fall, frisst der Verwaltungsoverhead den Vorteil der Parallelisierung auf. Noch drastischer können die Nebenwirkungen sein, wenn ein <a href="https://en.wikipedia.org/wiki/Divide_and_conquer_algorithm">teile und herrsche Algorithmus </a>wie Quicksort zum Einsatz kommt.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">template</span> &lt;<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">ForwardIt</span>&gt;
+<span style="color: #2b91af;">void</span> quicksort(ForwardIt first, ForwardIt last){
+  <span style="color: #0000ff;">if</span>(first == last) <span style="color: #0000ff;">return</span>;
+  <span style="color: #0000ff;">auto</span> pivot = *std::next(first, std::distance(first,last)/2);
+  ForwardIt middle1 = std::partition(std::parallel::par, first, last, 
+                      [pivot](<span style="color: #0000ff;">const</span> <span style="color: #0000ff;">auto</span>&amp; em){ <span style="color: #0000ff;">return</span> em &lt; pivot; });
+  ForwardIt middle2 = std::partition(std::parallel::par, middle1, last, 
+                      [pivot](<span style="color: #0000ff;">const</span> <span style="color: #0000ff;">auto</span>&amp; em){ <span style="color: #0000ff;">return</span> !(pivot &lt; em); });
+  quicksort(first, middle1);
+  quicksort(middle2, last);
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Hier ist die Gefahr natürlich groß, das die Anzahl der gestarteten Threads deutlich zu groß für das System wird. Umso besser, dass es in C++17 auch eine dynamische Execution Policy gibt.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;">std::<span style="color: #2b91af;">size_t</span> threshold= ...;  <span style="color: #008000;">// some value </span>
+
+<span style="color: #0000ff;">template</span> &lt;<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">ForwardIt</span>&gt;
+<span style="color: #2b91af;">void</span> quicksort(ForwardIt first, ForwardIt last){
+  <span style="color: #0000ff;">if</span>(first == last) <span style="color: #0000ff;">return</span>;
+  std::<span style="color: #2b91af;">size_t</span> distance= std::distance(first,last);
+  <span style="color: #0000ff;">auto</span> pivot = *std::next(first, distance/2);
+
+  std::parallel::execution_policy exec_pol= std::parallel::par;
+  <span style="color: #0000ff;">if</span> ( distance &lt; threshold ) exec_pol= std::parallel_execution::seq;
+
+  ForwardIt middle1 = std::partition(exec_pol, first, last, 
+                      [pivot](<span style="color: #0000ff;">const</span> <span style="color: #0000ff;">auto</span>&amp; em){ <span style="color: #0000ff;">return</span> em &lt; pivot; });
+  ForwardIt middle2 = std::partition(exec_pol, middle1, last, 
+                      [pivot](<span style="color: #0000ff;">const</span> <span style="color: #0000ff;">auto</span>&amp; em){ <span style="color: #0000ff;">return</span> !(pivot &lt; em); });
+  quicksort(first, middle1);
+  quicksort(middle2, last);
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>In Zeile 9 und 10 kommt die dynamische Execution Policy zu Einsatz. Per Default wird Quicksort parallel ausgeführt (Zeile 9). Falls aber die Länge des zu sortierenden Bereichs kleiner als eine vorgegebene Schwelle <span style="font-family: courier new,courier;">threshold</span> (Zeile 1) ist, wird Quicksort sequentiell ausgeführt (Zeile 10).</p>
+<h2>Alle Algorithmen</h2>
+<p>69 der Algorithmen unterstützen eine parallel oder parallele und vektorisierende Ausführung. Hier sind die Kandidaten.</p>
+<p><img src="images/blog/FutureMultithreading/ParallelSTL/ParallelAlgorithmn.png" alt="ParallelAlgorithmn" width="700" height="457" style="margin: 15px;" /></p>
+<p>Dazu gibt es 8 neue Algorithmen.</p>
+<h3>Neue Algorithmen</h3>
+<p>Die neue Variante des Algorithmus <span style="font-family: courier new,courier;">std::for_each </span>und die neuen Algorithmen<span style="font-family: courier new,courier;"> std::for_each_n, std::exclusive_scan, std::inclusive_scan, std::transfom_exclusive_scan,</span> s<span style="font-family: courier new,courier;">td::transform_inclusive_scan, std::reduce</span> und <span style="font-family: courier new,courier;">std::transform_reduce</span>&nbsp; sind im <span style="font-family: courier new,courier;">std</span> Namensraum. <span style="font-family: courier new,courier;"></span><span style="font-family: courier new,courier;"></span><span style="font-family: courier new,courier;"></span></p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">std::for_each
+std::for_each_n
+std::exclusive_scan
+std::inclusive_scan
+std::transform_exclusive_scan
+std::transform_inclusive_scan
+std::reduce
+std::transform_reduce<br />
+</pre>
+</div>
+<p>Besonders interessant finde ich <span style="font-family: courier new,courier;">std::transform_reduce.</span></p>
+<h3>Aus transform wird map</h3>
+<p>Die aus Haskell bekannte Funktion <span style="font-family: courier new,courier;">map</span> entspricht der Funktion <span style="font-family: courier new,courier;">std::transform</span> in C++. Wenn das kein Wink mit dem Zaunpfahl ist. Den ersetze ich in den Namen <span style="font-family: courier new,courier;">std::transform_reduce</span><span>&nbsp; <span style="font-family: courier new,courier;"></span>transform durch map</span><span style="font-family: courier new,courier;"><span></span>,</span> so erhalte ich <span style="font-family: courier new,courier;">std::map_reduce. </span><a href="https://en.wikipedia.org/wiki/MapReduce">MapReduce </a>ist das parallele Framework, das im ersten Schritt jeden Wert auf einen neuen Wert abbildet und im zweiten Schritt diese neuen Werte auf das Ergebnis reduziert.<span style="font-family: courier new,courier;"> <br /></span></p>
+<p>Dieser zweistufige Algorithmus lässt sich jetzt direkt in C++17 anwenden. Zwar lasse ich meinen Algorithmus jetzt nicht auf einem großen, verteilten System laufen. Doch die Verarbeitungslogik ist dieselbe. So bilde ich in der map Phase in dem Beispiel jedes Wort auf seine Länge ab und summiere die Längen der Worte in der reduce Phase auf. Damit erhalte ich die Gesamtlänge aller Worte eines Vektors.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">std::vector&lt;std::string&gt; str{<span style="color: #a31515;">"Only"</span>,<span style="color: #a31515;">"for"</span>,<span style="color: #a31515;">"testing"</span>,<span style="color: #a31515;">"purpose"</span>};
+
+
+std::<span style="color: #2b91af;">size_t</span> result= std::transform_reduce(std::parallel::par, 
+                         str.begin(), str.end(), 
+                         [](std::string s){ <span style="color: #0000ff;">return</span> s.length(); }, 
+                         0, [](std::<span style="color: #2b91af;">size_t</span> a, std::<span style="color: #2b91af;">size_t</span> b){ <span style="color: #0000ff;">return</span> a + b; });
+
+std::cout &lt;&lt; result &lt;&lt; std::endl;      <span style="color: #008000;">//   21</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Leider konnte ich die parallelen Algorithmen mit keinem Compiler übersetzen. Das werde ich aber nachholen, sobdald ich einen passenden Compiler finde. Daher ist der Code mit Vorsicht zu genießen.</p>
+<h2>Wie geht's weiter?</h2>
+<p>Mit dem <a href="index.php/blog/atomare-smart-pointer">nächsten Artikel</a> geht es drei Jahre weiter in die Zukunft. In C++20 wird es atomare Smart Pointer geben. In Anlehnung an ihrer C++11 Pendants heißen sie <span style="font-family: courier new,courier;">std::atomic_shared_ptr</span> und <span style="font-family: courier new,courier;">std::atomic_weak_ptr.&nbsp;</span></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="166" height="212" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Hole dir dein E-Book. Unterstütze meinen Blog.</span></strong></p>

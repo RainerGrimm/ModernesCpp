@@ -1,0 +1,138 @@
+<p>C++20 wird atomare Smart Pointer erhalten. Ganz genau wird es ein <span style="font-family: courier new,courier;">std::atomic_shared_ptr</span> und ein <span style="font-family: courier new,courier;">std::atomic_weak_ptr</span> sein. Warum eigentlich, <span style="font-family: courier new,courier;">std::shared_pt</span>r und <span style="font-family: courier new,courier;">std::weak_ptr</span> sind doch schon thread-sicher. Jein. Da muss ich ein wenig ausholen.</p>
+<hr id="system-readmore" />
+<p>Bevor ich aushole, noch eine kleine Bemerkung. Diese soll nur unterstreichen, wie wichtig es ist, dass einerseits <span style="font-family: courier new,courier;">std::shared_ptr</span> eine klar definierte Multithreading Semantik besitzen und dass du andererseits diese Semantik kennst und richtig anwendest. Aus der Multithreading-Perspektive betrachtet, sind <span style="font-family: courier new,courier;">std::shared_ptr</span> die Datenstruktur, die du nach Problemen in Multithrading Programmen schreien. Den sie sind geteilte, veränderliche Daten. Damit sind sie ideale Kandidaten für <a href="index.php/blog/threads-teilen-daten">kritische Wettläufe </a>und somit von undefiniertem Programmverhalten. Andererseits gilt natürlich die einfache Richtlinie in modernem C++: Fasse Speicher nicht direkt an. Das heißt, Smart Pointer sollen in Multithreading Programmen eingesetzt werden.</p>
+<h2>Halb thread-sicher</h2>
+<p>In meinen C++ Schulungen taucht immer wieder die Frage auf: Sind die Smart Pointer thread-sicher? Meine eindeutige Antwort ist jein. Warum? Ein <span style="font-family: courier new,courier;">std::shared_ptr</span> besteht aus einem Kontrollblock und seiner Ressource. Der Kontrollblock ist thread-sicher, die Ressource jedoch nicht. Das heißt, dass das Ändern des Referenzzählers eine atomare Operation ist und dass die Ressource genau einmal freigegeben wird. Mehr Garantie gibt der <span style="font-family: courier new,courier;">std::shared_ptr</span> nicht.</p>
+<p>Die Zusicherung, die ein <span style="font-family: courier new,courier;">std::shared_ptr</span> liefert, fasst <a href="http://www.boost.org/doc/libs/1_57_0/libs/smart_ptr/shared_ptr.htm#ThreadSafety">Boost</a> schön zusammen.</p>
+<ol>
+<li>A shared_ptr instance can be "read" (accessed using only const operations) simultaneously by multiple threads.</li>
+<li>Different shared_ptr instances can be "written to" (accessed using mutable operations such as operator= or reset) simultaneosly by multiple threads (even when these instances are copies, and share the same reference count underneath.)</li>
+</ol>
+<p>Dies lässt sich einfach an zwei Beispielen verdeutlichen. Wird eine <span style="font-family: courier new,courier;">std::shared_ptr</span> in einen Thread kopiert, ist alles gut.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">std::shared_ptr&lt;<span style="color: #2b91af;">int</span>&gt; ptr = std::make_shared&lt;<span style="color: #2b91af;">int</span>&gt;(2011);
+
+<span style="color: #0000ff;">for</span> (<span style="color: #0000ff;">auto</span> i= 0; i&lt;10; i++){
+   std::<span style="color: #0000ff;">thread</span>([ptr]{                           (1)
+     std::shared_ptr&lt;<span style="color: #2b91af;">int</span>&gt; localPtr(ptr);        (2)
+     localPtr= std::make_shared&lt;int&gt;(2014);     (3)
+    }).detach(); 
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Zuerst zu (2). Durch die Copy-Konstruktion des <span style="font-family: courier new,courier;">std::shared_ptr localPtr</span> wird nur der Kontrollblock modifiziert. Dies ist thread-sicher. (3) ist da schon ein wenig spannender. Das <span style="font-family: courier new,courier;">localPtr</span>&nbsp; (3)<span style="font-family: courier new,courier;"> </span>auf einen neuen <span style="font-family: courier new,courier;">std::shared_ptr</span> gesetzt wird, ist aus der Multithreading Perspektive betrachtet kein Problem: Die Lambda-Funktion<span style="font-family: courier new,courier;"> </span>(1) bindet <span style="font-family: courier new,courier;">ptr</span> per Kopie. Damit finden die Modifikationen auf <span style="font-family: courier new,courier;">localPtr</span> auf einer Kopie statt.</p>
+<p>Das gilt aber nicht, wenn der Thread den <span style="font-family: courier new,courier;">std::shared_ptr</span> per Referenz annimmt.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">std::shared_ptr&lt;<span style="color: #2b91af;">int</span>&gt; ptr = std::make_shared&lt;<span style="color: #2b91af;">int</span>&gt;(2011);  
+<span style="color: #2b91af;"></span><span style="color: #2b91af;"></span>
+<span style="color: #0000ff;">for</span> (<span style="color: #0000ff;">auto</span> i= 0; i&lt;10; i++){
+   std::<span style="color: #0000ff;">thread</span>([&amp;ptr]{                         (1)
+     ptr= std::make_shared&lt;<span style="color: #2b91af;">int</span>&gt;(2014);         (2)
+   }).detach(); 
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Nun bindet die Lambda-Funktion den <span style="font-family: courier new,courier;">std::shared_ptr</span> <span style="font-family: courier new,courier;">ptr</span> per Referenz (1). Damit stellt die Zuweisung (2) einen kritischen Wettlauf um die Ressource dar und das Programm ist undefiniert.</p>
+<p>Zugegeben, das war einige Gehirngymnastik. <span style="font-family: courier new,courier;">std::shared_ptr</span> verlangen besondere Aufmerksamkeit in Mulitthreading Umgebung. Daher besitzen sie eine Sonderstellung. Sie sind die einzigen nicht-atomaren Datentypen, für die es atomare Operationen gibt.</p>
+<h2>Atomare Operationen für std::shared_ptr</h2>
+<p>Die bekannten freien atomaren Operationen wie <span style="font-family: courier new,courier;">load,</span> <span style="font-family: courier new,courier;">store,</span> <span style="font-family: courier new,courier;">compare</span> und <span style="font-family: courier new,courier;">exchange</span> sind für <span style="font-family: courier new,courier;">std::shared_ptr </span>spezialisiert. Natürlich lässt sich in der <span style="font-family: courier new,courier;">explicit</span> Variante das Speichermodell direkt spezifizieren. Hier sind alle freien atomaren Operationen für <span style="font-family: courier new,courier;">std::shared_ptr.</span></p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">std::atomic_is_lock_free(std::shared_ptr)
+std::atomic_load(std::shared_ptr)
+std::atomic_load_explicit(std::shared_ptr)
+std::atomic_store(std::shared_ptr)
+std::atomic_store_explicit(std::shared_ptr)
+std::atomic_exchange(std::shared_ptr)
+std::atomic_exchange_explicit(std::shared_ptr)
+std::atomic_compare_exchange_weak(std::shared_ptr)
+std::atomic_compare_exchange_strong(std::shared_ptr)
+std::atomic_compare_exchange_weak_explicit(std::shared_ptr)
+std::atomic_compare_exchange_strong_explicit(std::shared_ptr)
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Die genaue Übersicht liefert <a href="http://en.cppreference.com/w/cpp/memory/shared_ptr">cppreference.com.</a> Jetzt ist es ein leichtes, einen per Referenz gebunden <span style="font-family: courier new,courier;">std::shared_ptr</span> thread-sicher zu modifizieren.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">std::shared_ptr&lt;<span style="color: #2b91af;">int</span>&gt; ptr = std::make_shared&lt;<span style="color: #2b91af;">int</span>&gt;(2011);<br />
+<span style="color: #0000ff;">for</span> (<span style="color: #0000ff;">auto</span> i =0;i&lt;10;i++){
+   std::<span style="color: #0000ff;">thread</span>([&amp;ptr]{ 
+     <span style="color: #0000ff;">auto</span> localPtr= std::make_shared&lt;<span style="color: #2b91af;">int</span>&gt;(2014);
+     std::atomic_store(&amp;ptr, localPtr);            (1)
+   }).detach(); 
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Jetzt ist der Update des <span style="font-family: courier new,courier;">std::shared_ptr ptr</span> (1) thread-sicher. Ist jetzt alles gut? <strong>Nein.&nbsp;</strong>Jetzt sind wir endlich bei den neuen atomaren Smart Pointern mit C++20 gelandet.</p>
+<h2>Atomare Smart Pointer</h2>
+<p><span class="vote-count-post " itemprop="upvoteCount">Der Proposal </span><a href="http://wg21.link/n4162" rel="nofollow">N4162</a> für atomare Smart Pointer bringt die Unzulänglichkeit der bisherigen Implementierung direkt auf den Punkt. Die Unzulänglichkeiten werden an den drei Punkten Konsistenz <em>(consistency),</em> Korrektheit <em>(correctness)</em> und Performanz <em>(performance)</em> festgemacht. Hier die Punkte kurz und knapp zusammengefasst. Die Details lassen sich im Proposal nachlesen.</p>
+<p><strong>Konsistenz: </strong>Die atomaren Operationen für den <span style="font-family: courier new,courier;">std::shared_ptr</span> sind die einzigen Operationen, die nicht explizit durch einen atomaren Typ angeboten werden.</p>
+<p><strong>Korrektheit:</strong> Die Verwendung der freien atomaren Operationen ist sehr fehleranfällig, da sie auf der Disziplin der Anwender basiert. Wie schnell wird (wie im letzten Beispiel (1)) statt einem <span style="font-family: courier new,courier;">std::atomic_store(&amp;ptr, localPtr)</span> ein einfaches<span style="font-family: courier new,courier;"> ptr= localPtr</span> verwendet. Das Ergebnis ist ein kritischer Wettlauf und damit undefiniertes Verhalten. Ist hingegen der Smart Pointer ein atomarer Datentyp, unterbindet dies der Compiler.</p>
+<p><strong>Performanz:</strong> Die <span style="font-family: courier new,courier;">std::atomic_shared_ptr</span> und <span style="font-family: courier new,courier;">std::atomic_weak_ptr</span> besitzen einen deutlichen Vorteil gegenüber den freien <span style="font-family: courier new,courier;">atomic_*</span> Funktionen. Sie sind für den speziellen Anwendungsfall Multithreading konzipiert und können zum Beispiel ein <span style="font-family: courier new,courier;">std::atomic_flag</span> besitzen um einen billigen <a href="index.php/blog/das-atomare-flag">Spinlock</a> zu verwenden. (Die Details zu <span style="font-family: courier new,courier;">std::atomic_flag</span> und einem Spinlock basierend auf <span style="font-family: courier new,courier;">std::atomic_flag</span> kannst du im Artikel <a href="index.php/blog/das-atomare-flag">Das Atomare Flag </a>nachlesen). Auf Verdacht macht es natürlich im Gegensatz dazu wenig Sinn, in jeden allgemein einsetzbaren <span style="font-family: courier new,courier;">std::shared_ptr</span> oder <span style="font-family: courier new,courier;">std::weak_ptr</span> ein <span style="font-family: courier new,courier;">std::atomic_flag</span> zu verpacken. Dies wäre aber die Konsequenz, wenn beide einen Spinlock im Multithreading Anwendungsfall verwenden wollen und es keine atomare Smart Pointer gäbe. Damit würde <span style="font-family: courier new,courier;">std::shared_ptr</span> und <span style="font-family: courier new,courier;">std::weak_ptr</span> für den speziellen Anwendungsfall optimiert.</p>
+<p>Für mich ist das Korrektheit Argument mit Abstand das wichtigste. Warum? Genau darauf gibt das Proposal eine sehr schön die Antwort. Das Proposal stellte eine thread-sichere einfach verkette Liste vor, die das Einfügen, Löschen und Finden von Elemente unterstützt. Diese ist lockfrei mit atomaren Smart Pointern implementiert.</p>
+<h3>Eine thread-sichere einfach verkettete Liste</h3>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0000ff;">template</span>&lt;<span style="color: #0000ff;">typename</span> T&gt; <span style="color: #0000ff;">class</span> <span style="color: #2b91af;">concurrent_stack</span> {
+    <span style="color: #0000ff;">struct</span> Node { T t; shared_ptr&lt;Node&gt; next; };
+    <span style="color: #ff0000;">atomic_</span>shared_ptr&lt;Node&gt; head;
+          <span style="color: #ff0000;">// in C++11: remove “atomic_” and remember to use the special
+          // functions every time you touch the variable</span>
+    concurrent_stack( concurrent_stack &amp;) =<span style="color: #0000ff;">delete</span>;
+    <span style="color: #2b91af;">void</span> <span style="color: #0000ff;">operator</span>=(concurrent_stack&amp;) =<span style="color: #0000ff;">delete</span>;
+
+public:
+    concurrent_stack() =<span style="color: #0000ff;">default</span>;
+    ~concurrent_stack() =<span style="color: #0000ff;">default</span>;
+    <span style="color: #0000ff;">class</span> <span style="color: #2b91af;">reference</span> {
+        shared_ptr&lt;Node&gt; p;
+    public:
+       reference(shared_ptr&lt;Node&gt; p_) : p{p_} { }
+       T&amp; <span style="color: #0000ff;">operator</span>* () { <span style="color: #0000ff;">return</span> p-&gt;t; }
+       T* <span style="color: #0000ff;">operator</span>-&gt;() { <span style="color: #0000ff;">return</span> &amp;p-&gt;t; }
+    };
+
+    <span style="color: #0000ff;">auto</span> find( T t ) <span style="color: #0000ff;">const</span> {
+        <span style="color: #0000ff;">auto</span> p = head.load(); <span style="color: #ff0000;"> // in C++11: atomic_load(&amp;head)</span>
+        <span style="color: #0000ff;">while</span>( p &amp;&amp; p-&gt;t != t )
+            p = p-&gt;next;
+        <span style="color: #0000ff;">return</span> reference(move(p));
+    }
+    <span style="color: #0000ff;">auto</span> front() <span style="color: #0000ff;">const</span> {
+       <span style="color: #0000ff;">return</span> reference(head); <span style="color: #ff0000;">// in C++11: atomic_load(&amp;head)</span>
+    }
+    <span style="color: #2b91af;">void</span> push_front( T t ) {
+      <span style="color: #0000ff;">auto</span> p = make_shared&lt;Node&gt;();
+      p-&gt;t = t;
+      p-&gt;next = head;         <span style="color: #ff0000;">// in C++11: atomic_load(&amp;head)</span>
+      <span style="color: #0000ff;">while</span>( !head.compare_exchange_weak(p-&gt;next, p) ){ }
+      <span style="color: #ff0000;">// in C++11: atomic_compare_exchange_weak(&amp;head, &amp;p-&gt;next, p);</span>
+    }
+    <span style="color: #2b91af;">void</span> pop_front() {
+       <span style="color: #0000ff;">auto</span> p = head.load();
+       <span style="color: #0000ff;">while</span>( p &amp;&amp; !head.compare_exchange_weak(p, p-&gt;next) ){ }
+      <span style="color: #ff0000;"> // in C++11: atomic_compare_exchange_weak(&amp;head, &amp;p, p-&gt;next);</span>
+    }
+};
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>Alle Modifikationen, die notwendig sind, um den Code mit einem C++11 Compiler zu übersetzen, sind in rot angedeutet. Die Implementierung mit expliziten atomaren Datentypen ist deutlich einfacher und damit weniger fehleranfällig. C++20 erlaubt es einfach nicht, eine nicht-atomare Datenoperation auf einem <span style="font-family: courier new,courier;">std::atomic_shared_ptr</span> anzuwenden.</p>
+<h2>Wie geht's weiter?</h2>
+<p>Mit Tasks in der Form von Promisen und Futuren führte C++11 ein neues Multithreading Konzept in C++ ein. Trotz ihres großen Mehrwertes besitzen sie eine große Unzulänglichkeit. Futures in C++11 können nicht komponiert werden. Erweiterte Futures in C++20 räumen mit dieser Unzulänglichkeit auf. Wie? Das zeigt der <a href="index.php/blog/std-future-erweiterungen">nächste Artikel</a>.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="166" height="212" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Hole dir dein E-Book. Unterstütze meinen Blog.</span></strong></p>

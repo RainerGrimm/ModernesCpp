@@ -1,0 +1,203 @@
+<p>Tasks in der Form von Promisen und Futuren in C++11 genießen einen ambivalenten Ruf. Zum einen sind sie deutlich leichter zu verwenden als Threads oder Bedingungsvariablen, zum anderen besitzen sie eine große Unzulänglichkeit. Sie können nicht komponiert werden. Mit dieser Unzulänglichkeit räumt C++20 auf.</p>
+<hr id="system-readmore" />
+<p>Bevor ich auf die erweiterten Futures eingehen, noch ein paar Worte zu den Vorteilen von Tasks gegenüber Threads im Schnelldurchlauf.</p>
+<h2>Die Abstraktion von Tasks</h2>
+<p>Der entscheidende Vorteil von Tasks gegenüber Threads ist es, dass sich der Programmierer bei Tasks nur Gedanken darum machen muss, was berechnet wird und nicht wie bei Threads, wie es berechnet wird. Der Programmierer gibt dem System eine zu berechnende Aufgabe und das System sorgt dafür, dass diese Aufgabe möglichst intelligent von der C++ Laufzeit ausgeführt wird. Das kann bedeuten, dass die Aufgabe im gleichen Prozess ausgeführt oder in einem separaten Thread gestartet wird. Das kann aber auch bedeuten, dass sich ein Thread automatisch eine Aufgabe von einem anderen Thread schnappt, falls er gerade nichts zu tun hat. Unter der Decke wartet ein Threadpool, der die Aufgaben annimmt und intelligent verteilt. Wenn das keine Fortschritt ist.</p>
+<p>Ich habe schon einige Artikel zu Tasks in Form von <span style="font-family: courier new,courier;">std::async</span>, <span style="font-family: courier new,courier;">std::packaged_task</span> und <span style="font-family: courier new,courier;">std::promise</span> und <span style="font-family: courier new,courier;">std::future</span> geschrieben. Die Details gibt es unter dem Tag&nbsp;<a href="index.php/blog/tag/tasks">Tasks. </a>Nun aber zur Zukunft von Tasks in C++.</p>
+<p>Der Name erweiterte Futures erklärt sich recht einfach. Zu einen wurde das Interface von <span style="font-family: courier new,courier;">std::future</span> erweitert, zum anderen gibt es neue Funktionen, die besondere Futures erzeugen, die zur Komposition geeignet sind. Zuerst zu dem erweiterten <span style="font-family: courier new,courier;">std::future</span>'s.</p>
+<h2>Erweiterte Futures</h2>
+<p><span style="font-family: courier new,courier;">std::future</span> besitzt drei neue <a href="http://en.cppreference.com/w/cpp/experimental/future">Methoden.</a></p>
+<h3>std::future</h3>
+<p>Die drei neuen Methoden im Überblick:<span id="transmark"></span></p>
+<ul>
+<li>Den <strong><em>unwrapping constructor</em>,</strong> der einen in einem Future verpackten Future (<span style="font-family: courier new,courier;">future&lt;future&lt;T&gt;&gt;</span>) vom äußeren Future befreit.</li>
+<li>Das Prädikat <span style="font-family: courier new,courier;"><strong>is_ready</strong>,</span> das zurückgibt, ob der gemeinsame Zustand zur Verfügung steht.</li>
+<li>Die Methode <strong><span style="font-family: courier new,courier;">then,</span></strong> die eine Continuation an ein Future anheftet.&nbsp;</li>
+</ul>
+<p>Zuerst zu einer Spitzfindigkeit. Der Zustand eines Futures kann valid oder ready sein.</p>
+<h4>valid versus ready</h4>
+<ul>
+<li><strong>valid</strong> ist ein Future, wenn er einen gemeinsamen Zustand (mit einem Promise) hat. Das muss nicht sein, da<span style="font-family: courier new,courier;"> std::future</span> einen Default-Konstruktor besitzt. <span style="font-family: courier new,courier;"></span></li>
+<li><strong>ready</strong> ist ein Future, wenn der gemeinsame Zustand zur Verfügung steht. Oder anders ausgedrückt, wenn der Promise seinen Wert produziert hat.</li>
+</ul>
+<p>Damit ist (<span style="font-family: courier new,courier;">valid == true</span>) Voraussetzung für (<span style="font-family: courier new,courier;">ready==true</span>).</p>
+<p>Wer wie ich Promise und Future als zwei Endpunkte ansieht, die durch einen Datenkanal verbunden sind, dem will ich mein mentales Bild von valid und ready nicht vorenthalten. Im Artikel <a href="index.php/blog/tasks">Tasks</a> ist ein Bild zu meinem mentalen Modell.</p>
+<p>Der Future is valid, wenn er einen Datenkanal zu einem Promise besitzt. Der Future ist ready, wenn der Promise seinen Wert in den Datenkanal geschoben hat.</p>
+<p>Nun aber zu der neuen Methode <span style="font-family: courier new,courier;">then.</span></p>
+<h4>Continuation mit then</h4>
+<p><span style="font-family: courier new,courier;">then</span> erlaubt es, einen Future an einen anderen Future anzuhängen. Hier tritt häufig das Phänomen auf, das ein Future in einem Future verpackt wird. Dies löst die <em><span style="font-family: courier new,courier;">unwrapping constructor</span> </em>Methode automatisch.</p>
+<p><em>Bevor ich den ersten Beispielcode zeige, eine Bemerkung zum Proposal <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2013/n3721.pdf">n3721</a>. Aus dem Proposal zu "Improvements for std::future&lt;T&gt; and Releated APIs" habe ich viel herausgezogen um diesen Artikel zu schreiben. Auch meine Beispiele stammen aus dem Proposal. Seltsamerweise fehlt in den Beispielen des Proposals oft die entscheidende <span style="font-family: courier new,courier;">get</span> Abfrage des resultierenden Futures <span style="font-family: courier new,courier;">res</span> um das Ergebnis der Futurekomposition zu erhalten. Daher habe ich in den Beispielen die<span style="font-family: courier new,courier;"> res.get()</span> Abfrage hinzugefügt und speichere das Ergebnis in der Variable <span style="font-family: courier new,courier;">myResult. </span>Zusätzlich habe ich ein paar Typos gefixt.<span style="font-family: courier new,courier;"><br /></span></em></p>
+<p>&nbsp;</p>
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">#include &lt;future&gt;</span>
+<span style="color: #0000ff;">using</span> <span style="color: #0000ff;">namespace</span> std;
+<span style="color: #2b91af;">int</span> main() {
+
+  future&lt;<span style="color: #2b91af;">int</span>&gt; f1 = async([]() { <span style="color: #0000ff;">return</span> 123; });
+  future&lt;string&gt; f2 = f1.then([](future&lt;<span style="color: #2b91af;">int</span>&gt; f) {
+    <span style="color: #0000ff;">return</span> to_string(f.get());      <span style="color: #008000;">// here .get() won’t block</span>
+  });
+
+  <span style="color: #0000ff;">auto</span> myResult= f1.get();
+
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Es gibt einen feinen Unterschied zwischen dem <span style="font-family: courier new,courier;">f.get().to_string()</span> - Aufruf (Zeile 7) und dem <span style="font-family: courier new,courier;">f1.get()</span>-Aufruf in Zeile 10.&nbsp; Wie bereits in dem Code angedeutet, ist der erste Aufruf nicht blockierend oder auch asynchron, hingegen ist der zweite Aufruf blockierend oder auch synchron. Der <span style="font-family: courier new,courier;">f1.get()</span> - Aufruf wartet, bis das Ergebnis der verketteten Futures zur Verfügung steht. Diese Aussage trifft nicht nur auf Future-Kompositionen wie <span style="font-family: courier new,courier;">f1.then(...).then(...).then(...).then(...)</span> zu, sondern auf alle Kompositionen von erweiterten Futures zu. Der finale <span style="font-family: courier new,courier;">f1.get()</span> Aufruf ist blockierend.</p>
+<h3>std::async, std::packaged_task und std::promise</h3>
+<p>Zu den Erweiterungen von<span style="font-family: courier new,courier;"> std::async, </span><span style="font-family: courier new,courier;">std::package_task </span>und<span style="font-family: courier new,courier;"> std::promise</span> gibt es nicht viel zu sagen. Nur, dass alle drei in C++20 erweiterte Futures zurückgeben. Richtig interessant ist die Komposition von Futures. Erlaubt sie doch Kompositionen von asynchronen Aufgaben.</p>
+<h2>Neue Futures erzeugen</h2>
+<p>C++20 erhält 4 weitere Funktionen, die das Erzeugen von besonderen Futuren erlaubt. Diese sind <span style="font-family: courier new,courier;">std::make_ready_future, std::make_execptional_future, std::when_all</span> und <span style="font-family: courier new,courier;">std::when_any. </span>Zuerst zu den beiden Funktionen<span style="font-family: courier new,courier;"> std::make_ready_future </span>und<span style="font-family: courier new,courier;"> std::make_exceptional_future.</span></p>
+<h3>std::make_ready_future und std::make_exception_future</h3>
+<p>Beide Funktionen erzeugen einen Future, der sofort <em>ready</em> ist. Im ersten Fall besitzt der Future einen Wert, im zweiten Fall als Wert eine Ausnahme. Was sich am Anfang seltsam anhört, macht durchaus Sinn. Das Erzeugen eins ready Futures setzte mit C++11 einen Promise voraus. Dies ist selbst dann notwendig, wenn der Wert des gemeinsamen Zustands sofort zur Verfügung steht.</p>
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">future&lt;<span style="color: #2b91af;">int</span>&gt; compute(<span style="color: #2b91af;">int</span> x) {
+  <span style="color: #0000ff;">if</span> (x &lt; 0) <span style="color: #0000ff;">return</span> make_ready_future&lt;<span style="color: #2b91af;">int</span>&gt;(-1);
+  <span style="color: #0000ff;">if</span> (x == 0) <span style="color: #0000ff;">return</span> make_ready_future&lt;<span style="color: #2b91af;">int</span>&gt;(0);
+  future&lt;<span style="color: #2b91af;">int</span>&gt; f1 = async([]() { <span style="color: #0000ff;">return</span> do_work(x); });
+  <span style="color: #0000ff;">return</span> f1;
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>So muss in dem Beispiel das Ergebnis nur aufwändig mit Hilfe eines Promise berechnet werden, wenn (<span style="font-family: courier new,courier;">x &gt; 0</span>) gilt. Nur als Hinweis. Die beiden Funktionen sind das Pendant zur return Funktion in einer Monade. Im Artikel <a href="index.php/blog/monaden-in-c">Monaden in C++ </a>bin ich bereits auf diesen sehr interessanten Aspekt von erweiterten Futures in C++ eingegangen. In dem Artikel lag mein Fokus aber auf der funktionalen Programmierung mit C++20.</p>
+<p>Nun geht es aber los mit der Future-Komposition.</p>
+<h3>std::when_all und std::when_any</h3>
+<p>Beide Funktionen habe einige Ähnlichkeiten.</p>
+<p>Zuerst zur Eingabe. Beide Funktionen nehmen entweder ein Iteratorpaar oder eine beliebige Anzahl von Futuren an. Der große Unterschied ist aber, dass im Fall der Iteratorpaare die Future den gleichen Typ besitzen müssen, dass im Fall der beliebigen Anzahl von Futuren die Future verschiedene Typen haben können und somit auch <span style="font-family: courier new,courier;">std::future</span> und <span style="font-family: courier new,courier;">std::shared_future</span> gleichzeitig verwendet werden können.</p>
+<p>Die Ausgabe der Funktionen hängt davon ab, ob ein Iteratorpaar oder eine beliebige Anzahl von Futuren (Variadic Template) verwendet wurde. Beide Funktionen geben eine Futur <span style="font-family: courier new,courier;">fut</span> zurück. Wird ein Iteratorpaar verwendet, ist der Rückgabetyp ein Future von Futuren in einem Vektor verpackt: <span style="font-family: courier new,courier;">futur&lt;vector&lt;futureR&gt;&gt;&gt;</span>. Wird ein Variadic Template verwendet, ist der Rückgabetyp ein Future von Futuren in einem Tuple:&nbsp;<span style="font-family: courier new,courier;">future&lt;tuple&lt;future&lt;R0&gt;, future&lt;R1&gt;, ...&gt;&gt; </span>verpackt.<span style="font-family: courier new,courier;"><br /></span></p>
+<p>Das war mit den Gemeinsamkeiten. Der Future, den die beiden Funktionen zurückgeben, ist dann <em>ready,</em> wenn alle Eingabe-Future <em>ready</em> sind (<span style="font-family: courier new,courier;">when_all</span>), oder wenn einer der Eingabe-Future <em>ready</em> ist (<span style="font-family: courier new,courier;">when_any</span>).</p>
+<p>Die zwei Beispiele sollen die Verwendung von <span style="font-family: courier new,courier;">when_all</span> und <span style="font-family: courier new,courier;">when_any</span> verdeutlichen.</p>
+<h4>when_all</h4>
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">#include &lt;future&gt;</span>
+<span style="color: #0000ff;">using</span> <span style="color: #0000ff;">namespace</span> std;
+
+<span style="color: #2b91af;">int</span> main() {
+
+  shared_future&lt;<span style="color: #2b91af;">int</span>&gt; shared_future1 = async([] { <span style="color: #0000ff;">return</span> intResult(125); });
+  future&lt;string&gt; future2 = async([]() { <span style="color: #0000ff;">return</span> stringResult(<span style="color: #a31515;">"hi"</span>); });
+
+  future&lt;tuple&lt;shared_future&lt;<span style="color: #2b91af;">int</span>&gt;, future&lt;string&gt;&gt;&gt; all_f = when_all(shared_future1, future2);
+
+  future&lt;<span style="color: #2b91af;">int</span>&gt; result = all_f.then([(future&lt;tuple&lt;shared_future&lt;<span style="color: #2b91af;">int</span>&gt;,
+                                                 future&lt;string&gt;&gt;&gt; f){ <span style="color: #0000ff;">return</span> doWork(f.get()); });
+
+  <span style="color: #0000ff;">auto</span> myResult= result.get();
+
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Der Future <span style="font-family: courier new,courier;">all_f </span>(Zeile 9) komponiert die beiden Future <span style="font-family: courier new,courier;">shared_future1</span> (Zeile 6) und <span style="font-family: courier new,courier;">future2</span> (Zeile 7).&nbsp; Future <span style="font-family: courier new,courier;">result</span> in Zeile 11 wird dann ausgeführt, wenn beide Future <span style="font-family: courier new,courier;">(when_all)</span> <em>ready</em> sind. In diesem Fall wird auf dem Future <span style="font-family: courier new,courier;">all_f get()</span> in Zeile 12 ausgeführt. Das Ergebnis steht in dem Future <span style="font-family: courier new,courier;">result</span> zur Verfügung und kann in Zeile 14 abgefragt werden.</p>
+<h4>when_any</h4>
+<p>Der resultierende Future in <span style="font-family: courier new,courier;">when_any</span> kann mit einer einfachen Struktur <span style="font-family: courier new,courier;">when_any_result</span> angenommen, die die Information enthält, welcher der Eingabe-Future ready ist. Ansonsten müsste im Falle von <span style="font-family: courier new,courier;">when_any</span> jeder Eingabe-Future abgefragt werden, ob er ready ist. Das ist natürlich umständlich.</p>
+<p>&nbsp;</p>
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">#include &lt;future&gt;</span>
+<span style="color: #0000ff;">#include &lt;vector&gt;</span>
+
+<span style="color: #0000ff;">using</span> <span style="color: #0000ff;">namespace</span> std;
+
+<span style="color: #2b91af;">int</span> main(){
+
+  vector&lt;future&lt;<span style="color: #2b91af;">int</span>&gt;&gt; v{ .... };
+  <span style="color: #0000ff;">auto</span> future_any = when_any(v.begin(), v.end());
+
+  when_any_result&lt;vector&lt;future&lt;<span style="color: #2b91af;">int</span>&gt;&gt;&gt; result= future_any.get();
+
+  future&lt;<span style="color: #2b91af;">int</span>&gt;&amp; ready_future = result.futures[result.index];
+
+  <span style="color: #0000ff;">auto</span> myResult= ready_future.get();
+
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p><span style="font-family: courier new,courier;">future_any</span> ist der Future, der ready ist, wenn einer seiner Future fertig ist. <span style="font-family: courier new,courier;">future_any.get()</span> in Zeile 11 gibt den Future&nbsp; <span style="font-family: courier new,courier;">result</span> zurück. Mittels der Abfrage <span style="font-family: courier new,courier;">result.futures[result.index]</span> (Zeile 13) steht der ready Future zur Verfügung und das Ergebnis der Berechnung kann dank <span style="font-family: courier new,courier;">ready_future.get()</span> abgefragt werden.&nbsp;</p>
+<h2>Wie geht's weiter?</h2>
+<p>Latches und Barriers erlauben es, dass mehrere Threads an einem Synchronisationspunkt warten, bis eine Bedingung erfüllt ist. Die neue Multithreading Konzept in C++20 werde ich mir im <a href="index.php/blog/latches-und-barriers">nächsten Artikel genauer anschauen.</a></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="166" height="212" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Hole dir dein E-Book. Unterstütze meinen Blog.</span></strong></p>
