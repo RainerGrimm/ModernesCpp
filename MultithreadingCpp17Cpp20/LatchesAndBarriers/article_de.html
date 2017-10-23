@@ -1,0 +1,215 @@
+<p>Latches und Barriers sind einfache Thread Synchronisierungsmechanismen, die es erlauben, mehrere Threads warten zu lassen, bis eine Operation fertig ist. Latches und Barriers soll es in drei Geschmacksrichtungen in C++20 geben: <span style="font-family: courier new,courier;">std::latch,</span> <span style="font-family: courier new,courier;">std::barrier</span> und <span style="font-family: courier new,courier;">std::flex_barrier.</span></p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p>Zuerst einmal stellen sich für mich zwei Fragen:</p>
+<ol>
+<li>Worin unterscheiden sich die drei Mechanismen um Threads zu synchronisieren? Während ein <span style="font-family: courier new,courier;">std::latch</span> nur einmal verwendet werden kann, können <span style="font-family: courier new,courier;">std::barrier</span> und <span style="font-family: courier new,courier;">std::flex_barrier</span> mehrmals verwendet werden. <span style="font-family: courier new,courier;">std::flex_barrier</span> bietet mehr Flexibilität als <span style="font-family: courier new,courier;">std::barrier. </span>Ein <span style="font-family: courier new,courier;">std::flex_barrier</span> erlaubt es eine Aktion zu hinterlegen, wenn die Operation fertig ist.<span style="font-family: courier new,courier;"> <br /></span></li>
+<li>Was können Latches und Barriers, was Koordinationsmechanismen in C++11 und C++14 wie Futures und Bedingungsvariablen in Kombination mit Locks nicht konnten? Latches und Barriers können nicht mehr. Sie sind aber wesentlich einfacher in der Anwendung und performanter, da sie oft intern lockfreie Mechanismen verwenden.</li>
+</ol>
+<p>Jetzt werde ich mir die drei Koordinationsmechanismen genauer anschauen.</p>
+<p>Die kurzen Codebeispiele sind aus dem Proposal <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2014/n4204.html#h.9fyt9rmi4g2z">n4204</a>.<em> <br /></em></p>
+<h2>std::latch</h2>
+<p><span style="font-family: courier new,courier;">std::latch</span> ist ein Abwärtszähler. Sein Wert wird im Konstruktor gesetzt. Ein Thread <span style="font-family: courier new,courier;">thread</span>&nbsp;kann mit der Methode <span style="font-family: courier new,courier;"><strong>thread.count_down_and_wait </strong></span>den Zähler um 1 herunter setzen und warten, bis dieser 0 erreicht hat oder er kann mit <span style="font-family: courier new,courier;"><strong>thread.count_down</strong></span> nur den Zähler um 1 heruntersetzen. Neben diesen beiden Methoden besitzt der <span style="font-family: courier new,courier;">std::latch</span> die Methode <span style="font-family: courier new,courier;"><strong>thread.is_ready</strong></span>, um zu testen, ob der Zähler 0 ist und die Methode <span style="font-family: courier new,courier;">thread.wait.</span> Mit <span style="font-family: courier new,courier;"><strong>thread.wait</strong></span> wartet (blockiert) er, bis der Zähler den Wert 0 besitzt. Da <span style="font-family: courier new,courier;">std::latch</span> nicht erlaubt, den Zähler zu inkrementieren oder auch zurücksetzen, lässt er sich nur einmal verwenden.&nbsp;<span style="font-family: courier new,courier;"> </span></p>
+<p>Die Details zu <span style="font-family: courier new,courier;">std::latch</span> lassen sich bereits auf <a href="http://en.cppreference.com/w/cpp/experimental/latch">cppreference.com</a> nachlesen. Zum Abschluss noch ein Beispiel zum <span style="font-family: courier new,courier;">std::latch</span>.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #2b91af;">void</span> DoWork(threadpool* pool) {
+    latch completion_latch(NTASKS);
+    <span style="color: #0000ff;">for</span> (<span style="color: #2b91af;">int</span> i = 0; i &lt; NTASKS; ++i) {
+      pool-&gt;add_task([&amp;] {
+        <span style="color: #008000;">// perform work</span>
+        ...
+        completion_latch.count_down();
+      }));
+    }
+    <span style="color: #008000;">// Block until work is done</span>
+    completion_latch.wait();
+  }
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Der <span style="font-family: courier new,courier;">std::latch completion_latch</span> wird im Konstruktor auf <span style="font-family: courier new,courier;">NTASKS</span> (Zeile 2) gesetzt. Der Threadpool führt die <span style="font-family: courier new,courier;">NTASKS</span> Aufgaben (Zeile 4 - 8) aus. Am Ende jeder Aufgabe (Zeile 7) wird der Zähler dekrementiert. Zeile 11 ist die Barriere für den Thread, der <span style="font-family: courier new,courier;">DoWork</span> ausführt. Damit ist die Zeile die Barriere für den ganzen Workflow, der die NTASKS Aufgaben ausführt.</p>
+<h2>std::barrier</h2>
+<p>&nbsp;Ein <span style="font-family: courier new,courier;">std::barrier</span> ist einem <span style="font-family: courier new,courier;">std::latch</span> sehr ähnlich. Der feine Unterschied ist aber, dass ein <span style="font-family: courier new,courier;">std::barrier</span> mehrmals verwendet werden kann und der Zähler dabei auf den alten Wert zurückgesetzt wird. Unmittelbar nachdem der Zähler den Wert 0 besitzt, findet eine sogenannte Abschlussphase (eng.: <em>completion phase</em>) statt. Die ist im Falle des <span style="font-family: courier new,courier;">std::barrier</span> leer. Das ändert sich mit dem <span style="font-family: courier new,courier;">std::flex_barrier.</span> <span style="font-family: courier new,courier;">std::barrier</span> besitzt zwei interessante Methoden: <span style="font-family: courier new,courier;">std::arrive_and_wait</span> und <span style="font-family: courier new,courier;">std::arrive_and_drop. </span>Während <strong><span style="font-family: courier new,courier;">std::arrive_and_wait</span></strong> am Synchronisationspunkt wartet, entfernt sich <span style="font-family: courier new,courier;"><strong>std::arrive_and_drop</strong></span> aus dem Synchronisationsmechanismus.&nbsp;<span id="transmark"></span><span style="font-family: courier new,courier;"> </span></p>
+<p>Bevor ich aber genauer auf den <span style="font-family: courier new,courier;">std::flex_barrier</span> und die Abschlussphase eingehe, noch ein kleines Beispiel zum <span style="font-family: courier new,courier;">std::barrier</span>.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #2b91af;">void</span> DoWork() {
+    Tasks&amp; tasks;
+    <span style="color: #2b91af;">int</span> n_threads;
+    vector&lt;<span style="color: #0000ff;">thread</span>*&gt; workers;
+
+    barrier task_barrier(n_threads);
+
+    <span style="color: #0000ff;">for</span> (<span style="color: #2b91af;">int</span> i = 0; i &lt; n_threads; ++i) {
+      workers.push_back(<span style="color: #0000ff;">new</span> <span style="color: #0000ff;">thread</span>([&amp;] {
+        <span style="color: #2b91af;">bool</span> active = true;
+        <span style="color: #0000ff;">while</span>(active) {
+          Task task = tasks.get();
+          <span style="color: #008000;">// perform task</span>
+          ...
+          task_barrier.arrive_and_wait();
+         }
+       });
+    }
+    <span style="color: #008000;">// Read each stage of the task until all stages are complete.</span>
+    <span style="color: #0000ff;">while</span> (!finished()) {
+      GetNextStage(tasks);
+    }
+  }
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Der <span style="font-family: courier new,courier;">std::barrier task_barrier</span> in Zeile 6 wird in diesem Beispiel dazu verwendet eine Anzahl von Threads zu koordinieren, die eine Aufgabe mehrmalig wiederholen. Die Anzahl der Threads ist <span style="font-family: courier new,courier;">n_threads </span>(Zeile 3). Jeder Thread holt sich seine Aufgabe in Zeile 12 mittels<span style="font-family: courier new,courier;"> <span style="font-family: courier new,courier;">task.get() </span></span>ab, führt diese aus und wartet - sobald er seine Aufgabe erledigt hat (Zeile 15) - bis alle Threads ihre Aufgabe erledigt haben. Dann holt er sich eine neue Aufgabe in Zeile 12, solange <span style="font-family: courier new,courier;">active</span> in Zeile 11 <span style="font-family: courier new,courier;">true</span> ergibt.<span style="font-family: courier new,courier;"> </span></p>
+<h2>std::flex_barrier</h2>
+<p><em>In dem Beispiel zu <span style="font-family: courier new,courier;">std::flex_barrier</span> sind die Namen unglücklich gewählt. So wird der <span style="font-family: courier new,courier;">std::flex_barrier</span> als <span style="font-family: courier new,courier;">notifying_barrier</span> bezeichnet. Da das verwirrt, habe ich den Namen <span style="font-family: courier new,courier;">std::flex_barrier</span> verwendet.</em></p>
+<p>Der <span style="font-family: courier new,courier;">std::flex_barrier</span> besitzt im Gegensatz zum <span style="font-family: courier new,courier;">std::barrier</span> einen zusätzlichen Konstruktor. Dieser kann mit einer aufrufbaren Einheit parametrisiert werden, die automatisch in der&nbsp;Abschlussphase<em> </em>ausgeführt wird. Diese aufrufbare Einheit muss einen Wert zurückgeben. Dieser Wert setzt den Wert des Zählers in der Abschlussphase. Ein Wert von -1 bedeutet, dass in der nächsten Iteration der Zähler unverändert bleibt. Kleiner Wert wie -1 sind nicht zulässig.</p>
+<p>Was geschieht genau in der Abschlussphase?</p>
+<ol>
+<li>Alle Threads sind blockiert.</li>
+<li>Ein Thread wird entsperrt (eng. unblocked) und führt die aufrufbare Einheit aus.</li>
+<li>Wenn die Abschlussphase fertig ist, werden alle Thread entsperrt.</li>
+</ol>
+<p>Das Code Schnipsel zeigt <span style="font-family: courier new,courier;">std::flex_barrier</span> in der Anwendung.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"> <span style="color: #2b91af;">void</span> DoWork() {
+    Tasks&amp; tasks;
+    <span style="color: #2b91af;">int</span> initial_threads;
+    atomic&lt;<span style="color: #2b91af;">int</span>&gt; current_threads(initial_threads)
+    vector&lt;<span style="color: #0000ff;">thread</span>*&gt; workers;
+
+    <span style="color: #008000;">// Create a flex_barrier, and set a lambda that will be</span>
+    <span style="color: #008000;">// invoked every time the barrier counts down. If one or more</span>
+    <span style="color: #008000;">// active threads have completed, reduce the number of threads.</span>
+    std::function rf = [&amp;] { <span style="color: #0000ff;">return</span> current_threads;};
+    flex_barrier task_barrier(n_threads, rf);
+
+    <span style="color: #0000ff;">for</span> (<span style="color: #2b91af;">int</span> i = 0; i &lt; n_threads; ++i) {
+      workers.push_back(<span style="color: #0000ff;">new</span> <span style="color: #0000ff;">thread</span>([&amp;] {
+        <span style="color: #2b91af;">bool</span> active = true;
+        <span style="color: #0000ff;">while</span>(active) {
+          Task task = tasks.get();
+          <span style="color: #008000;">// perform task</span>
+          ...
+          <span style="color: #0000ff;">if</span> (finished(task)) {
+            current_threads--;
+            active = false;
+          }
+          task_barrier.arrive_and_wait();
+         }
+       });
+    }
+
+    <span style="color: #008000;">// Read each stage of the task until all stages are complete.</span>
+    <span style="color: #0000ff;">while</span> (!finished()) {
+      GetNextStage(tasks);
+    }
+  }
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Das Beispiel verwendet eine ähnliche Strategie wie das Beispiel zum <span style="font-family: courier new,courier;">std::barrier.</span> Die Besonderheit ist aber, dass beim <span style="font-family: courier new,courier;">std::flex_barrrier</span> zur Laufzeit der Zähler angepasst wird. Dazu erhält der<span style="font-family: courier new,courier;"> std::flex_barrier task_barrier</span> in Zeile 11 eine Lambda-Funktion. Diese bindet ihre Variable <span style="font-family: courier new,courier;">current_thread</span> per Referenz. In der Zeile 21 wird diese Variable dekrementiert und <span style="font-family: courier new,courier;">active</span> auf <span style="font-family: courier new,courier;">false</span> gesetzt, wenn der Thread seine Aufgabe erledigt hat. Damit wird auch der Zähler in der Abschlussphase entsprechend dekrementiert.<span style="font-family: courier new,courier;"></span><span style="font-family: courier new,courier;"></span></p>
+<p>Eine Besonderheit besitzt <span style="font-family: courier new,courier;">std::flex_barrier</span> gegenüber dem <span style="font-family: courier new,courier;">std::barrier</span> und <span style="font-family: courier new,courier;">std::latch.</span> Er kann als einziger der drei seinen Zähler erhöhen.</p>
+<p>&nbsp;</p>
+<p><em>Die Details zu <a href="http://en.cppreference.com/w/cpp/experimental/latch"><span style="font-family: courier new,courier;">std::latch</span></a><span style="font-family: courier new,courier;">, </span><span style="font-family: courier new,courier;"><a href="http://en.cppreference.com/w/cpp/experimental/barrier">std::barrier</a></span> und <span style="font-family: courier new,courier;"><a href="http://en.cppreference.com/w/cpp/experimental/flex_barrier">std::flex_barrier</a> </span>lassen sich bereits auf cppreference.com nachlesen.</em></p>
