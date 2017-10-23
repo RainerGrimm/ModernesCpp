@@ -1,0 +1,133 @@
+<p>Task Blocks setzen das beliebte Fork-Join Paradigma für die parallele Ausführung von Aufgaben um.</p>
+<hr id="system-readmore" />
+<p>Wer hat es erfunden? Sowohl Microsoft mit ihrer<a href="https://en.wikipedia.org/wiki/Parallel_Patterns_Library"> Parallel Patterns Library</a> (PPL) als auch Intels <a href="https://en.wikipedia.org/wiki/Threading_Building_Blocks">Threading Building Blocks</a> (TBB) waren federführend bei dem Proposal <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2015/n4411.pdf">N4441</a>. Intel hat zusätzlich seine Erfahrung mit <a href="https://en.wikipedia.org/wiki/Cilk">Cilk Plus </a>eingebracht.</p>
+<p>Der Name Fork-Join lässt sich einfach erklären.</p>
+<h2>Fork und Join</h2>
+<p>Die einfachste Annäherung an das Fork-Join Paradigma gibt eine Graphik.</p>
+<p><img src="images/blog/FutureMultithreading/TaskBlocks/ForkJoin.png" alt="ForkJoin" width="600" height="153" /></p>
+<p>Wie funktioniert das ganze?</p>
+<p>Der Erzeuger ruft <span style="font-family: courier new,courier;">define_task_block</span> oder <span style="font-family: courier new,courier;">define_task_block_restore_thread</span> auf. Dadurch steht ein Task Block zur Verfügung, der neue Tasks erzeugen oder auf diese warten kann. Am Ende des Task Blocks findet die Synchronisation statt. Das Erzeugen der neuen Task ist die Fork Phase, die Synchronisation der Taks die Join Phase des Fork-Join Prozesses. Zugegen, das war einfach. Wie schaut das ganze im Code aus?</p>
+<p>&nbsp;</p>
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table style="width: 525px; height: 186px;">
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">template</span> &lt;<span style="color: #0000ff;">typename</span> Func&gt; 
+<span style="color: #2b91af;">int</span> traverse(node&amp; n, Func &amp;&amp; f){ 
+    <span style="color: #2b91af;">int</span> left = 0, right = 0; 
+    define_task_block(                 
+        [&amp;](task_block&amp; tb){ 
+            <span style="color: #0000ff;">if</span> (n.left) tb.run([&amp;]{ left = traverse(*n.left, f); }); 
+            <span style="color: #0000ff;">if</span> (n.right) tb.run([&amp;]{ right = traverse(*n.right, f); });
+         }
+    );                                                         
+    <span style="color: #0000ff;">return</span> f(n) + left + right; 
+} </pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p><span style="font-family: courier new,courier;">traverse</span> ist eine Funktions-Template, das auf jedem Knoten des Baumes <span style="font-family: courier new,courier;">node</span> mit zwei Kindern die Funktion <span style="font-family: courier new,courier;">Func</span> aufruft. Das Schlüsselwort<span style="font-family: courier new,courier;"> define_task_block</span> definiert den Task Block. In diesem kann der Task Block <span style="font-family: courier new,courier;">tb</span> neue Tasks starten. Genau das findet für den linken und rechten Zweig des Baumes in Zeile 6 und 7 statt. Zeile 9 ist das Ende des Task Blocks und damit der Synchronisationspunkt.</p>
+<p>Das war schon der grobe Überblick. Jetzt folgen die fehlenden Details zu der Definition des Task Blocks, dem Task Block und seinem Interface und dem Scheduler.</p>
+<h2>Task Blocks</h2>
+<p>Der Task Block wird durch die zwei Funktionen <span style="font-family: courier new,courier;">define_task_block</span> oder <span style="font-family: courier new,courier;">define_task_block_restore_thread</span> definiert.</p>
+<h3>define_task_block versus define_task_block_restore_thread</h3>
+<p>Der feine Unterschied ist, dass <span style="font-family: courier new,courier;">define_task_block_restore_thread</span> zusichert, dass der Erzeuger-Thread des Task Blocks nach dem Ende des Task Blocks auch wieder der Thread ist, der die weiteren Anweisungen ausführt.</p>
+<p>&nbsp;</p>
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;">...
+define_task_block([&amp;](<span style="color: #0000ff;">auto</span>&amp; tb){  
+  tb.run([&amp;]{[] func(); });
+  define_task_block_restore_thread([&amp;](<span style="color: #0000ff;">auto</span>&amp; tb){
+    tb.run([&amp;]([]{ func2(); });
+    define_task_block([&amp;](<span style="color: #0000ff;">auto</span>&amp; tb){
+       tb.run([&amp;]{ func3(); }
+    });
+    ...
+    ...
+  });
+  ...
+  ...
+});
+...
+...
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Task Bocks sichern zu, das der Erzeuger-Thread des äußerste Task Block (Zeile 2 - 14) nach dem Beenden des Task Blocks auch wieder zu Zuge kommt. Das heißt, der Thread der die Anweisung in Zeile 2 ausgeführt, führt auch die Anweisungen in Zeile 15&nbsp; und 16 wieder aus. Diese Zusicherung gilt aber nicht für alle verschachtelten Task Blöcke. Daher führt der Erzeuger-Thread des Task Block in Zeile 6 - 8 nicht automatisch die Zeilen 9 und 10 aus. Ist diese Anforderungen notwendig, musst die Funktion <span style="font-family: courier new,courier;">define_task_block_restore_thread</span> (Zeile 4) angewandt werden. Nun gilt, der Thread der die Anweisung in Zeile 4 ausgeführt, führt auch die Anweisungen in Zeile 12 und 13 aus.</p>
+<h3>task_block</h3>
+<p><em>Um nicht zur Verwirrung beizutragen, werde ich in diesem Abschnitt zwischen Task Block und <span style="font-family: courier new,courier;">task_block</span> unterscheiden. Mit Task Block bezeichne ich den Bereich, der durch die zwei Funktionen <span style="font-family: courier new,courier;">define_task_block</span> oder <span style="font-family: courier new,courier;">define_task_block_restore_thread</span> erzeugt wurde. Hingegen steht&nbsp;<span style="font-family: courier new,courier;">task_block tb </span>für das Objekt, das mittel <span style="font-family: courier new,courier;">tb.run</span> neue Aufgaben starten kann.</em></p>
+<p>Ein <span style="font-family: courier new,courier;">task_block </span>besitzt ein sehr eingeschränktes Interface. Er kann nicht explizit erzeugt werden. Dazu sind die zwei bekannten Funktionen <span style="font-family: courier new,courier;">define_task_block</span> oder <span style="font-family: courier new,courier;">define_task_block_restore_thread </span>notwendig.<span style="font-family: courier new,courier;"> </span>Der <span style="font-family: courier new,courier;">task_block tb</span> ist dem Bereich seines Task Block sofort aktiv und kann daher eine neue Aufgabe starten <span style="font-family: courier new,courier;">tb.run</span> oder warten <span style="font-family: courier new,courier;">tb.wait</span>, bis seine Aufgabe fertig ist.&nbsp;<span style="font-family: courier new,courier;"> </span></p>
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;">1
+2
+3
+4
+5</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;">define_task_block([&amp;](<span style="color: #0000ff;">auto</span>&amp; tb){  
+  tb.run([&amp;]{ process(x1, x2) });
+  <span style="color: #0000ff;">if</span> (x2 == x3) tb.wait();
+  process(x3, x4);
+});
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Wie ist der Code zu verstehen? In Zeile wird wird eine neue Aufgabe gestartet, die die Daten <span style="font-family: courier new,courier;">x1</span> und <span style="font-family: courier new,courier;">x2</span> benötigt. Hingegen werden in Zeile 4 die Daten von <span style="font-family: courier new,courier;">x3</span> und <span style="font-family: courier new,courier;">x4</span> prozessiert. Im Falle, dass <span style="font-family: courier new,courier;">x2 == x3</span> ist, gilt es diese vor dem gemeinsamen Zugriff zu schützen. Daher warten in diesem Fall der Task Block <span style="font-family: courier new,courier;">tb,</span> bis seine Aufgabe in Zeile 2 fertig ist.</p>
+<h2>Der Scheduler</h2>
+<p>Der Scheduler sorgt dafür, welcher Thread zum Zuge kommt. Genau das liegt bei Task Blocks nicht mehr in der Verantwortung des Programmierers. Damit sind Threads genau auf die Rolle reduziert, die sie einnehmen sollten: Ein Implementierungsdetail.</p>
+<p>Für das Scheduling gibt es zwei Strategien für die durch den Task Block<span style="font-family: courier new,courier;"> tb</span> mittels <span style="font-family: courier new,courier;">tb.run</span> gestartete Aufgaben. Dabei bezeichnet Parent den Erzeuger-Thread und Child die neue Aufgabe.</p>
+<p><strong>Child stealing</strong>: Der Scheduler klaut die Aufgabe und führt sie aus.</p>
+<p><strong>Parent stealing</strong>: Der Task Block <span style="font-family: courier new,courier;">tb</span> führt seine Aufgabe selber aus. Der Scheduler schnappt sich in diesem Fall aber den Parent.</p>
+<p>Das Proposal <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2015/n4411.pdf">N4441</a> ermöglicht beide Strategien.</p>

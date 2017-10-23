@@ -1,0 +1,264 @@
+<p>Coroutinen sind Funktionen, die ihren Ablauf unterbrechen und wieder aufnehmen können und dabei ihren Zustand behalten. Die Evolution in C++20 geht einen deutlichen Schritt weiter.</p>
+<hr id="system-readmore" />
+<p>Was ich in diesem Artikel als neues Konzept in C++20 verkaufe, ist tatsächlich ein alter Hut. Der Begriff Coroutine stammt von <a href="https://en.wikipedia.org/wiki/Melvin_Conway">Melvin Conway</a>, der ihn 1963 in einer Veröffentlichung über Compilerbau einführte. <a href="https://en.wikipedia.org/wiki/Donald_Knuth">Donald Knuth</a> bezeichnet Prozeduren als Spezialfall von Coroutinen. Manchmal dauert es einfach ein bisschen länger.</p>
+<p>Obwohl ich Coroutinen bereits von Python kenne, fand ich es relativ anspruchsvoll, die neuen Konzepte in C++20 wiederzufinden. Bevor ich daher auf weitere Details zu Coroutinen eingehen, gibt es eine erste Berührung.</p>
+<h2>Eine erste Berührung</h2>
+<p>Mit den neuen Schlüsselwörtern <span style="font-family: courier new,courier;">co_await</span> und <span style="font-family: courier new,courier;">co_yield </span>verallgemeinert C++20 den Ablauf einer Funktion um zwei neue Aspekte.</p>
+<p>Dank <strong><span style="font-family: courier new,courier;">co_await expression</span></strong> ist es möglich, die Ausführung des Ausdrucks <span style="font-family: courier new,courier;">expression</span> zu unterbrechen und später wieder aufzunehmen. Wird <span style="font-family: courier new,courier;">co_await expression</span> in einer Funktion <span style="font-family: courier new,courier;">func</span> verwendet, ist ein Aufruf der Form <span style="font-family: courier new,courier;">auto getResult= func()</span> nicht zwangsläufig blockierend, wenn das Ergebnis der Funktion noch nicht zur Verfügung steht. Ein ressourcenintensives Blockieren lässt sich in ein ressourcenschonendes Warten umformulieren.</p>
+<p><span style="font-family: courier new,courier;"><strong>co_yield expression</strong></span> erlaubt es, eine Generator-Funktion zu schreiben. Diese Generator-Funktion liefert auf jede Anfrage den nächsten Wert. Eine Generator-Funktion verhält sich wie ein Datenstrom, aus dem sukzessive die Werte abgefragt werden können. Dabei kann der Datenstrom auch unendlich sein. Damit sind wir mitten in der <a href="index.php/blog/rekursion-verarbeitung-von-listen-und-bedarfsauswertung">Bedarfsauswertung</a> mit C++.</p>
+<h3>Ein einfaches Beispiel</h3>
+<p>Das Programm ist denkbar einfach. Die Funktion <span style="font-family: courier new,courier;">getNumbers</span> gibt alle ganzen Zahlen von <span style="font-family: courier new,courier;">begin</span> bis <span style="font-family: courier new,courier;">end</span> um <span style="font-family: courier new,courier;">inc</span> inkrementiert zurück. Dabei muss <span style="font-family: courier new,courier;">begin</span> kleiner als <span style="font-family: courier new,courier;">end</span> und <span style="font-family: courier new,courier;">inc</span> positiv sein.</p>
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #888888;">// greedyGenerator.cpp</span>
+
+<span style="color: #557799;">#include &lt;iostream&gt;</span>
+<span style="color: #557799;">#include &lt;vector&gt;</span>
+
+std<span style="color: #333333;">::</span>vector<span style="color: #333333;">&lt;</span><span style="color: #333399; font-weight: bold;">int</span><span style="color: #333333;">&gt;</span> getNumbers(<span style="color: #333399; font-weight: bold;">int</span> begin, <span style="color: #333399; font-weight: bold;">int</span> end, <span style="color: #333399; font-weight: bold;">int</span> inc<span style="color: #333333;">=</span> <span style="color: #0000dd; font-weight: bold;">1</span>){
+  
+  std<span style="color: #333333;">::</span>vector<span style="color: #333333;">&lt;</span><span style="color: #333399; font-weight: bold;">int</span><span style="color: #333333;">&gt;</span> numbers;
+  <span style="color: #008800; font-weight: bold;">for</span> (<span style="color: #333399; font-weight: bold;">int</span> i<span style="color: #333333;">=</span> begin; i <span style="color: #333333;">&lt;</span> end; i <span style="color: #333333;">+=</span> inc){
+    numbers.push_back(i);
+  }
+  
+  <span style="color: #008800; font-weight: bold;">return</span> numbers;
+  
+}
+
+<span style="color: #333399; font-weight: bold;">int</span> main(){
+
+  std<span style="color: #333333;">::</span>cout <span style="color: #333333;">&lt;&lt;</span> std<span style="color: #333333;">::</span>endl;
+
+  <span style="color: #008800; font-weight: bold;">auto</span> numbers<span style="color: #333333;">=</span> getNumbers(<span style="color: #333333;">-</span><span style="color: #0000dd; font-weight: bold;">10</span>, <span style="color: #0000dd; font-weight: bold;">11</span>);
+  
+  <span style="color: #008800; font-weight: bold;">for</span> (<span style="color: #008800; font-weight: bold;">auto</span> n<span style="color: #333333;">:</span> numbers) std<span style="color: #333333;">::</span>cout <span style="color: #333333;">&lt;&lt;</span> n <span style="color: #333333;">&lt;&lt;</span> <span style="background-color: #fff0f0;">" "</span>;
+  
+  std<span style="color: #333333;">::</span>cout <span style="color: #333333;">&lt;&lt;</span> <span style="background-color: #fff0f0;">"</span><span style="color: #666666; font-weight: bold; background-color: #fff0f0;">\n\n</span><span style="background-color: #fff0f0;">"</span>;
+
+  <span style="color: #008800; font-weight: bold;">for</span> (<span style="color: #008800; font-weight: bold;">auto</span> n<span style="color: #333333;">:</span> getNumbers(<span style="color: #0000dd; font-weight: bold;">0</span>,<span style="color: #0000dd; font-weight: bold;">101</span>,<span style="color: #0000dd; font-weight: bold;">5</span>)) std<span style="color: #333333;">::</span>cout <span style="color: #333333;">&lt;&lt;</span> n <span style="color: #333333;">&lt;&lt;</span> <span style="background-color: #fff0f0;">" "</span>;
+
+  std<span style="color: #333333;">::</span>cout <span style="color: #333333;">&lt;&lt;</span> <span style="background-color: #fff0f0;">"</span><span style="color: #666666; font-weight: bold; background-color: #fff0f0;">\n\n</span><span style="background-color: #fff0f0;">"</span>;
+
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Mit getNumbers erfinde ich das Rad natürlich neu, den für diesen Job gibt es seit C++11 <a href="http://en.cppreference.com/w/cpp/algorithm/iota"><span style="font-family: courier new,courier;">std::iota. </span></a>Nur zur Vervollständigung die Ausgabe des Programms.<a href="http://en.cppreference.com/w/cpp/algorithm/iota"><span style="font-family: courier new,courier;"> </span></a></p>
+<p><img src="images/blog/FutureMultithreading/Coroutines/greedyGenerator.png" alt="greedyGenerator" width="600" height="155" style="margin: 15px;" /></p>
+<p>Das Entscheidende an dem Programm ist natürlich das Ergebnis. Zwei Punkte sind mir besonders wichtig. Zum einen wird der Vektor <span style="font-family: courier new,courier;">numbers</span> in Zeile 8 immer vollständig gefüllt. Das trifft auch zu, wenn ich nur an den erste fünf Elementen des Vektors mit 1000 Elementen interessiert bin. Zum anderen lässt sich der <span style="font-family: courier new,courier;">getNumbers</span> direkt in einen Generator umschreiben.</p>
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #888888;">// lazyGenerator.cpp</span>
+
+<span style="color: #557799;">#include &lt;iostream&gt;</span>
+<span style="color: #557799;">#include &lt;vector&gt;</span>
+
+generator<span style="color: #333333;">&lt;</span><span style="color: #333399; font-weight: bold;">int</span><span style="color: #333333;">&gt;</span> generatorForNumbers(<span style="color: #333399; font-weight: bold;">int</span> begin, <span style="color: #333399; font-weight: bold;">int</span> inc<span style="color: #333333;">=</span> <span style="color: #0000dd; font-weight: bold;">1</span>){
+  
+  <span style="color: #008800; font-weight: bold;">for</span> (<span style="color: #333399; font-weight: bold;">int</span> i<span style="color: #333333;">=</span> begin;; i <span style="color: #333333;">+=</span> inc){
+    co_yield i;
+  }
+  
+}
+
+<span style="color: #333399; font-weight: bold;">int</span> main(){
+
+  std<span style="color: #333333;">::</span>cout <span style="color: #333333;">&lt;&lt;</span> std<span style="color: #333333;">::</span>endl;
+
+  <span style="color: #008800; font-weight: bold;">auto</span> numbers<span style="color: #333333;">=</span> generatorForNumbers(<span style="color: #333333;">-</span><span style="color: #0000dd; font-weight: bold;">10</span>);
+  
+  <span style="color: #008800; font-weight: bold;">for</span> (<span style="color: #008800; font-weight: bold;"></span><span style="color: #333333;">int i= 1; i &lt;= 20; ++i</span>) std<span style="color: #333333;">::</span>cout <span style="color: #333333;">&lt;&lt;</span> numbers <span style="color: #333333;">&lt;&lt;</span> <span style="background-color: #fff0f0;">" "</span>;
+  
+  std<span style="color: #333333;">::</span>cout <span style="color: #333333;">&lt;&lt;</span> <span style="background-color: #fff0f0;">"</span><span style="color: #666666; font-weight: bold; background-color: #fff0f0;">\n\n</span><span style="background-color: #fff0f0;">"</span>;
+
+  <span style="color: #008800; font-weight: bold;">for</span> (<span style="color: #008800; font-weight: bold;">auto</span> n<span style="color: #333333;">:</span> getForNumbers(<span style="color: #0000dd; font-weight: bold;">0</span>, <span style="color: #0000dd; font-weight: bold;">5</span>)) std<span style="color: #333333;">::</span>cout <span style="color: #333333;">&lt;&lt;</span> n <span style="color: #333333;">&lt;&lt;</span> <span style="background-color: #fff0f0;">" "</span>;
+
+  std<span style="color: #333333;">::</span>cout <span style="color: #333333;">&lt;&lt;</span> <span style="background-color: #fff0f0;">"</span><span style="color: #666666; font-weight: bold; background-color: #fff0f0;">\n\n</span><span style="background-color: #fff0f0;">"</span>;
+
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Während die Funktion <span style="font-family: courier new,courier;">getNumbers</span> in der Datei <span style="font-family: courier new,courier;">greedyGenerator.cpp</span> einen <span style="font-family: courier new,courier;">std::vector&lt;int&gt;</span> zurück gibt, gibt die Coroutine <span style="font-family: courier new,courier;">getGeneratorNumbers</span> in der Datei <span style="font-family: courier new,courier;">lazyGenerator.cpp</span> einen Generator zurück. Der Generatoren <span style="font-family: courier new,courier;">numbers</span> in Zeile 18 oder <span style="font-family: courier new,courier;">getForNumbers(0,5)</span> in Zeile 24 geben auf Anfrage eine neue Zahl zurück. Diese Anfrage wird durch die Range-based for-Schleife angestoßen. Dabei stößt die Anfrage die Coroutine an, gibt den aktuellen Wert i mittels <span style="font-family: courier new,courier;">co_yield i</span> zurück und pausiert anschließend. Wird der nächste Wert angefragt, setzt die Coroutine genau an dieser Stelle ihre Arbeit fort.</p>
+<p>Der Ausdruck <span style="font-family: courier new,courier;">getForNumbers(0, 5)</span> in Zeile 24 mag befremdlich wirken. Dadurch wird ein Generator an Ort und Stelle verwendet.</p>
+<p>Auf eine Besonderheit will ich ganz explizit hinweisen. Die Coroutine <span style="font-family: courier new,courier;">generatorForNumbers</span> erzeugt einen unendlichen Datenstrom, denn die <span style="font-family: courier new,courier;">for</span> Schleife in Zeile 8 besitzt keine Endbedingung. Alles kein Problem, solange ich nur endlich viele Werte von dem Generator wie in Zeile 20 anfordere. Das gilt natürlich nicht für die Zeile 24. Hier verwende ich keine Endbedingung.</p>
+<p>&nbsp;Null will ich - wie versprochen - noch ein paar Details nachliefern. Dabei werde ich insbesondere die Fragen beantworten:</p>
+<ul>
+<li>In welchen Anwendungsfällen werden Coroutinen gerne eingesetzt?</li>
+<li>Welche Konzepte setzen Coroutinen um?</li>
+<li>Welche Design Ziele wurden mit Coroutinen verfolgt?</li>
+<li>Durch was wird eine Funktion zur Coroutine?</li>
+<li>Was zeichnet die zwei neuen Schlüsselwörter <span style="font-family: courier new,courier;">co_wait</span> und <span style="font-family: courier new,courier;">co_yield</span> aus?</li>
+</ul>
+<h2>Mehr Details</h2>
+<p>Zuerst zur einfachsten Fragen.</p>
+<h3>In welchen Anwendungsfällen werden Coroutinen gerne eingesetz?</h3>
+<p>Coroutinen sind eine natürliche Art <a href="https://en.wikipedia.org/wiki/Event-driven_programming">Event-getriebene Applikationen</a> zu schreiben. Das können Simulationen, Spiele, Server, Guis oder einfach nur Algorithmen sein. Sie werden auch gerne für <a href="https://de.wikipedia.org/wiki/Multitasking">kooperatives Multitasking</a> eingesetzt. Beim kooperativen Multitasking nehmen sich die Tasks soviel Zeit heraus, wie sie benötigen. Dem entgegen steht das präemptive Multitasking. Hier entscheidet ein zentraler Scheduler, wie lange jede Task die CPU erhält.</p>
+<p>Coroutinen gibt es in verschiedene Variationen.</p>
+<h3>Welche Konzepte setzen Coroutinen um?</h3>
+<p>Coroutinen in C++20 sind asymmetrisch, First-Class Coroutinen und stackless.&nbsp;</p>
+<p>Bei einer asymmetrisch Coroutine kann der Kontrollfluss nur wieder zum Aufrufer zurückgehen. Eine symmetrische Coroutine muss nicht zum Aufrufer zurückspringen. Sie kann sie zum Beispiel den Kontrollfluss an eine andere Coroutine weitergeben.</p>
+<p>First-Class Coroutinen sind in Anlehnung and <a href="index.php/blog/first-class-funktionen">First-Class Funktionen</a> Coroutinen, die sich wie Daten verhalten. Das heißt, sie können an Funktionen übergeben oder von Funktionen zurückgegeben werden. Natürlich können sie auch in eine Variable gespeichert werden.</p>
+<p>Eine stackless Coroutine erlaubt es nur, die Top-Level Coroutine zu unterbrechen. Diese Coroutine kann hingegen nicht selber eine weitere Coroutine aufrufen.</p>
+<p>Das Proposal <a href="https://isocpp.org/files/papers/N4402.pdf">n4402 </a>bringt die Design Ziele von Coroutinen schön auf den Punkt.</p>
+<h3>Welche Design Ziele wurden mit Coroutinen verfolgt?</h3>
+<p>Coroutinen sollen</p>
+<ul>
+<li>hoch skalierbar sein (Bis zu Milliarden von gleichzeitigen Coroutinen).</li>
+<li>hoch effizient ihren Ablauf unterbrechen und wieder aufnehmen können (Vergleichbar zu einem gewöhnlichen Funktionsaufruf).</li>
+<li>sich nahtlos in bestehende Applikationen integrieren lassen. So sieht der Aufrufer einer Coroutine nicht, dass der Aufruf tatsächlich ein Aufruf einer Coroutine ist. Dies zeigt schön der Aufruf des Generators in der <span style="font-family: courier new,courier;">main</span>-Funktion des einführenden Beispiels. &nbsp;</li>
+<li>eine offene Architektur anbieten, so dass sie es ermöglichen, Coroutinen Bibliotheken zu implementieren, die höherer Abstraktionen anbieten.</li>
+<li>auch in Umgebungen verwendet werden können, in den Ausnahmen nicht erlaubt sind oder verfügbar stehen.</li>
+</ul>
+<p>Es gibt vier Gründe, warum eine Funktion ein Coroutine wird.</p>
+<h3>Durch was wird eine Funktion zur Coroutine?</h3>
+<p>Eine Funktion wird zu Coroutine, wenn sie einen</p>
+<ul>
+<li><span style="font-family: courier new,courier;">co_return</span> Ausdruck verwendet,</li>
+<li><span style="font-family: courier new,courier;">co_await</span> Ausdruck verwendet,</li>
+<li><span style="font-family: courier new,courier;">co_yield</span> Ausdruck verwendet,</li>
+<li>oder ein <span style="font-family: courier new,courier;">co_await</span> Ausdruck in einer Range-bases for-Schleife verwendet.</li>
+</ul>
+<p>Zum Abschluss noch die neuen Schlüsselwörter <span style="font-family: courier new,courier;">co_return</span>, <span style="font-family: courier new,courier;">co_yield </span>und <span style="font-family: courier new,courier;">co_await</span>.<span style="font-family: courier new,courier;"></span></p>
+<h3>co_return, co_yield und co_await</h3>
+<p><strong><span style="font-family: courier new,courier;">co_return:</span></strong> Duch <span style="font-family: courier new,courier;">co_return</span> verlässt die Coroutine ihren Funktionskörper.</p>
+<p><span style="font-family: courier new,courier;"><strong>co_yield:</strong></span> Dank <span style="font-family: courier new,courier;">co_yield</span> lässt sich ein Generator schreiben. Damit kann die Coroutine wie im Beispiel <span style="font-family: courier new,courier;">lazyGenerator.cpp</span> eine unendlichen Datenstrom zurückgeben, dessen Elemente sukzessive angefordert werden. Der Rückgabetyp der Coroutine <span style="font-family: courier new,courier;"><span style="color: #000000;">generator<span style="color: #333333;">&lt;</span><span style="color: #000000;">int</span><span style="color: #333333;">&gt;</span> <span style="color: #000000;">generatorForNumbers(int</span> begin, int inc= <span style="font-weight: bold;">1</span></span>) </span>ist in diesem konkreten Fall<span style="font-family: courier new,courier;"> generator&lt;int&gt;. generator&lt;int&gt; </span>hält intern einen speziellen Promise<span style="font-family: courier new,courier;"> p</span><span style="font-family: courier new,courier;">, </span>so dass ein Aufruf der Form<span style="font-family: courier new,courier;"> co_yield i&nbsp;</span>äquivalent zu einem Aufruf der Form<span style="font-family: courier new,courier;"> co_await p.yield_value(i) </span>ist. Der Aufruf von<span style="font-family: courier new,courier;"> <span style="font-family: courier new,courier;">co_yield i</span> </span>ist beliebig oft möglich. Unmittelbar nach jedem Aufruf wird der Programmfluss der Coroutine unterbrochen.<span style="font-family: courier new,courier;"> </span></p>
+<p><strong>co<span style="font-family: courier new,courier;">_await</span></strong>: <span style="font-family: courier new,courier;">co_await</span> führt in einer Coroutine dazu, dass ihr Programmfluss eventuell nur einmal angehalten und wieder aufgenommen wird. In dem Ausdruck <span style="font-family: courier new,courier;">co_await e</span> muss <span style="font-family: courier new,courier;">e</span> ein sogenannter <em>awaitable</em> Ausdruck sein. Als awaitable Ausdruck muss er ein vorgegebenes Interface unterstützen, dass insbesondere aus den drei Methoden <span style="font-family: courier new,courier;">e.await_ready</span>, <span style="font-family: courier new,courier;"></span><span style="font-family: courier new,courier;">e.await_suspend</span> und <span style="font-family: courier new,courier;">e.await_resume</span> besteht.</p>
+<p>Das klassische Beispiel zu <span style="font-family: courier new,courier;">co_await</span> ist ein Server, der blockierend auf seine Events wartet.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;">1
+2
+3
+4
+5
+6
+7</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;">Acceptor acceptor{<span style="color: #0000dd; font-weight: bold;">443</span>};
+<span style="color: #008800; font-weight: bold;">while</span> (<span style="color: #007020;">true</span>){
+  Socket socket<span style="color: #333333;">=</span> acceptor.accept();              <span style="color: #888888;">// blocking</span>
+  <span style="color: #008800; font-weight: bold;">auto</span> request<span style="color: #333333;">=</span> socket.read();                   <span style="color: #888888;">// blocking</span>
+  <span style="color: #008800; font-weight: bold;">auto</span> response<span style="color: #333333;">=</span> handleRequest(request);     
+  socket.write(response);                        <span style="color: #888888;">// blocking  </span>
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Der Server ist denkbar einfach, denn er beantwortet seine Anfragen sequentiell im gleichen Thread. Dabei lauscht er auf den Port 443 (Zeile 1), nimmt Verbindungen an (Zeile 3), liest die ankommenden Daten vom Client (Zeile 4) und schreibt seine Antwort an den Client zurück (Zeile 6). Die Aufrufe in den Zeile 3, 4 und 6 sind blockierend.</p>
+<p>Dank drei <span style="font-family: courier new,courier;">co_await </span>Ausdrücken werden aus den blockierenden Aufrufen Aufrufe, die unterbrochen und gegebenenfalls wieder aufgenommen werden.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;">1
+2
+3
+4
+5
+6
+7</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;">Acceptor acceptor{<span style="color: #0000dd; font-weight: bold;">443</span>};
+<span style="color: #008800; font-weight: bold;">while</span> (<span style="color: #007020;">true</span>){
+  Socket socket<span style="color: #333333;">=</span> co_await acceptor.accept();           
+  <span style="color: #008800; font-weight: bold;">auto</span> request<span style="color: #333333;">=</span> co_await socket.read();              
+  <span style="color: #008800; font-weight: bold;">auto</span> response<span style="color: #333333;">=</span> handleRequest(request);     
+  co_await socket.write(responste);                 
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
