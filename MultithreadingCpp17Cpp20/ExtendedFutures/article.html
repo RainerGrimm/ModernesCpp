@@ -2,31 +2,31 @@
 <hr id="system-readmore" />
 <p>Before I write about extended futures, let me say a few word about the advantages of tasks over threads.</p>
 <h2>The higher abstraction of tasks</h2>
-<p>The key advantage of tasks over threads is that programmer has only to think what have to be done and not how&nbsp; - such as for threads - is has to be done. The programmer gives the system some job to perform and the system takes care that the job will be executed as smart as possible by the c++ runtime. That can mean that the job will be executed in the same process or a separate thread will be started. That can mean that another thread steals the job because it is idle. Under the hood, there is a thread pool that accepts the job and distributes it in a smart way. If that is not an abstraction?</p>
-<p>I have written a few posts about tasks in the form of  <span style="font-family: courier new,courier;">std::async</span>, <span style="font-family: courier new,courier;">std::packaged_task</span>, and <span style="font-family: courier new,courier;">std::promise</span> and <span style="font-family: courier new,courier;">std::future</span>. The details are here <a href="index.php/tag/tasks">tasks</a>:&nbsp; But now the future of tasks.</p>
+<p>The key advantage of tasks over threads is that the programmer has only to think what have to be done and not how&nbsp; - such as for threads - is has to be done. The programmer gives the system some job to perform and the system takes care that the job will be executed by the C++ runtime as smart as possible. That can mean that the job will be executed in the same process or a separate thread will be started. That can mean that another thread steals the job because it is idle. Under the hood, there is a thread pool that accepts the job and distributes it in a smart way. If that is not an abstraction?</p>
+<p>I have written a few posts about tasks in the form of <span style="font-family: courier new,courier;">std::async</span>, <span style="font-family: courier new,courier;">std::packaged_task</span>, and <span style="font-family: courier new,courier;">std::promise</span> and <span style="font-family: courier new,courier;">std::future</span>. The details are here <a href="index.php/tag/tasks">tasks</a>:&nbsp; But now the future of tasks.</p>
 <p>The name extended futures is quite easy to explain. Firstly, the interface of&nbsp;<span style="font-family: courier new,courier;">std::future</span> was extended; secondly, there are new functions for creating special futures that are compensable. I will start with my first point.&nbsp;</p>
 <h2>Extended futures</h2>
 <p><span style="font-family: courier new,courier;">std::future</span> has three new <a href="http://en.cppreference.com/w/cpp/experimental/future">methods.</a></p>
 <h3>std::future</h3>
 <p>An overview of the three new methods.</p>
 <ul>
-<li>The <strong><em>unwrapping constructor</em> </strong>that unwraps the outer future of a wrapped future ( <span style="font-family: courier new,courier;">future&lt;future&lt;T&gt;&gt;</span>).</li>
-<li>The predicate <span style="font-family: courier new,courier;"><strong>is_ready&nbsp;</strong></span>that returns of a shared state is available.</li>
+<li>The <strong><em>unwrapping constructor</em> </strong>that unwraps the outer future of a wrapped future (<span style="font-family: courier new,courier;">future&lt;future&lt;T&gt;&gt;</span>).</li>
+<li>The predicate <span style="font-family: courier new,courier;"><strong>is_ready&nbsp;</strong></span>that returns wheter a shared state is available.</li>
 <li>The method <strong><span style="font-family: courier new,courier;">then</span></strong> that attaches a continuation to a future.</li>
 </ul>
 <p>At first, to something quite sophisticated. The state of a future can be valid or ready.</p>
 <h4>valid versus ready</h4>
 <ul>
 <li>A future is<strong> valid</strong>,&nbsp; if the futures has a shared state (with a promise). That has not to be because you can default-construct a&nbsp; <span style="font-family: courier new,courier;">std::future</span>. <span style="font-family: courier new,courier;"></span></li>
-<li>A future is <strong>ready,&nbsp;</strong> if the shared state is available. Or to say it differently, if the promise has already produces its value.</li>
+<li>A future is <strong>ready,&nbsp;</strong> if the shared state is available. Or to say it differently, if the promise has already produced its value.</li>
 </ul>
-<p>Therefore (<span style="font-family: courier new,courier;">valid == true</span>) is a requirement for (<span style="font-family: courier new,courier;">ready==true</span>).</p>
-<p>Whom such as me perceives promise and future as the endpoints of a data channel, them I will present my mental picture of valid and ready. You can see a picture in my post <a href="index.php/tasks">Tasks</a>.</p>
-<p>The future is valid, if there is a data channel to a promise. The future is ready, if the promise put its value into the data channel.</p>
+<p>Therefore (<span style="font-family: courier new,courier;">valid == true</span>) is a requirement for (<span style="font-family: courier new,courier;">ready == true</span>).</p>
+<p>Whom such as me perceive promise and future as the endpoints of a data channel, them I will present my mental picture of valid and ready. You can see a picture in my post <a href="index.php/tasks">Tasks</a>.</p>
+<p>The future is valid, if there is a data channel to a promise. The future is ready, if the promise has already put its value into the data channel.</p>
 <p>Now, to the method <span style="font-family: Courier New,Courier,monospace;">then</span>.</p>
 <h4>Continuations with then</h4>
-<p><span style="font-family: courier new,courier;">then</span> empowers you to attach a future to another future. Here if often happens that a future will be packed into another future. To unwrap the outer future that is the job of the <em><span style="font-family: courier new,courier;">unwrapping constructor</span>.</em></p>
-<p><em>Before I show the first code snippet, I have to say a few words about the proposal  <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2013/n3721.pdf">n3721</a>.&nbsp; The most of this post is from the proposal to "Improvements for std::future&lt;T&gt; and Releated APIs". That includes my examples too. Strange, they often did not use the final <span style="font-family: Courier New,Courier,monospace;">get </span>call to get the result from the <span style="font-family: Courier New,Courier,monospace;">res </span>future. Therefore, I added to the examples the  <span style="font-family: Courier New,Courier,monospace;">res.get</span> call and saved the result in a variable  <span style="font-family: courier new,courier;">myResult. </span>Additionally, I fixed a few typos.<span style="font-family: courier new,courier;"><br /></span></em></p>
+<p><span style="font-family: courier new,courier;">then</span> empowers you to attach a future to another future. Here if often happens that a future will be packed into another future. To unwrap the outer future this is the job of the <em><span style="font-family: courier new,courier;">unwrapping constructor</span>.</em></p>
+<p><em>Before I show the first code snippet, I have to say a few words about the proposal <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2013/n3721.pdf">n3721</a>.&nbsp; Most of this post is from the proposal to "Improvements for std::future&lt;T&gt; and Releated APIs". That also holds for my examples. Strange, they often did not use the final <span style="font-family: Courier New,Courier,monospace;">get </span>call to get the result from the <span style="font-family: Courier New,Courier,monospace;">res </span>future. Therefore, I added to the examples the <span style="font-family: Courier New,Courier,monospace;">res.get</span> call and saved the result in a variable <span style="font-family: courier new,courier;">myResult. </span>Additionally, I fixed a few typos.<span style="font-family: courier new,courier;"><br /></span></em></p>
 <div style="background: #ffffff none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
 <table>
 <tbody>
@@ -65,14 +65,14 @@
 </table>
 </div>
 <p>&nbsp;</p>
-<p>There is a subtle difference between the <span style="font-family: courier new,courier;">to_string(f.get())</span> - call (line 7) and the <span style="font-family: courier new,courier;">f2.get()</span>-call in line 10.&nbsp; As I already mentioned it in the code snippet: the first call is non-blocking or asynchronous and the second call is blocking or synchronous. The&nbsp; <span style="font-family: courier new,courier;">f2.get()</span> -&nbsp;&nbsp; call waits until the result of the future-chain is available. This statement will also hold for chains such as <span style="font-family: courier new,courier;">f1.then(...).then(...).then(...).then(...)</span> as is will hold for the composition of extended futures. The final<span style="font-family: Courier New,Courier,monospace;"> f2.get()</span> call is blocking.</p>
+<p>There is a subtle difference between the <span style="font-family: courier new,courier;">to_string(f.get())</span> - call (line 7) and the <span style="font-family: courier new,courier;">f2.get()</span>-call in line 10: the first call is non-blocking or asynchronous and the second call is blocking or synchronous. The&nbsp; <span style="font-family: courier new,courier;">f2.get()</span> -&nbsp;&nbsp; call waits until the result of the future-chain is available. This statement will also hold for chains such as <span style="font-family: courier new,courier;">f1.then(...).then(...).then(...).then(...)</span> as is will hold for the composition of extended futures. The final<span style="font-family: Courier New,Courier,monospace;"> f2.get()</span> call is blocking.</p>
 <h3>std::async, std::packaged_task, and std::promise</h3>
-<p>There is not so much to say about the extensions of <span style="font-family: courier new,courier;">std::async, </span><span style="font-family: courier new,courier;">std::package_task, a</span>nd<span style="font-family: courier new,courier;"> std::promise</span>. I&nbsp; have only to add that all three return in C++20 extended futures.</p>
-<p>Therefore the composition of futures is more exciting. Now we can compose asynchronous tasks.</p>
+<p>There is not so much to say about the extensions of <span style="font-family: courier new,courier;">std::async, </span><span style="font-family: courier new,courier;">std::package_task, </span>and<span style="font-family: courier new,courier;"> std::promise</span>. I&nbsp; have only to add that all three return in C++20 extended futures.</p>
+<p>Therefore, the composition of futures is more exciting. Now we can compose asynchronous tasks.</p>
 <h2>Creating new futures</h2>
 <p>C++20 gets four new functions for creating special futures. These functions are <span style="font-family: courier new,courier;">std::make_ready_future, std::make_execptional_future, std::when_all</span>, and <span style="font-family: courier new,courier;">std::when_any. </span>At first, to the functions<span style="font-family: courier new,courier;"> std::make_ready_future, </span>and<span style="font-family: courier new,courier;"> std::make_exceptional_future.</span></p>
-<h3>std::make_ready_future and std::make_exception_future</h3>
-<p>Both functions create a future that is immediately <b>ready</b>. In the first case, the future has a value; in the second case an exception. What seems to be strange makes a lot of sense. The creation of a ready futures requires in C++11 a promise. That is even necessary if the shared state is immediately available.</p>
+<h3>std::make_ready_future and std::make_exceptional_future</h3>
+<p>Both functions create a future that is <strong>immediately</strong> ready. In the first case, the future has a value; in the second case an exception. What seems to be strange makes a lot of sense. The creation of a ready futures requires in C++11 a promise. That is even necessary if the shared state is immediately available.</p>
 <div style="background: #ffffff none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
 <pre style="margin: 0px; line-height: 125%;">future&lt;<span style="color: #2b91af;">int</span>&gt; compute(<span style="color: #2b91af;">int</span> x) {
   <span style="color: #0000ff;">if</span> (x &lt; 0) <span style="color: #0000ff;">return</span> make_ready_future&lt;<span style="color: #2b91af;">int</span>&gt;(-1);
@@ -82,13 +82,13 @@
 }
 </pre>
 </div>
-<p>Hence, the result must only be calculated a promise, if ( <span style="font-family: courier new,courier;">x &gt; 0</span>)&nbsp; holds. A short remark. Both functions are the pendant to the return function in a monad. I have already written about this very interesting aspect of <a href="index.php/monads-in-c">extended futures</a>. My emphasis in this post was more about the functional programming in C++20.</p>
+<p>Hence, the result must only be calculated using a promise, if (<span style="font-family: courier new,courier;">x &gt; 0</span>)&nbsp; holds. A short remark. Both functions are the pendant to the return function in a monad. I have already written about this very interesting aspect of <a href="index.php/monads-in-c">extended futures</a>. My emphasis in this post was more about the functional programming in C++20.</p>
 <p>Now, let's finally begin with future-composition.</p>
 <h3>std::when_all und std::when_any</h3>
 <p>Both functions have a lot in common.</p>
-<p>At first, to the input. Both functions accept a pair of iterators for a future range or an arbitrary number of futures. The big difference is that in the case of the pair of iterators the futures have to be of the same type; that in the case of the arbitrary number of futures can have different type and even <span style="font-family: courier new,courier;">std::future</span> and <span style="font-family: courier new,courier;">std::shared_future</span> can<span id="transmark"></span> be used.</p>
-<p>The output of the function depends if a pair of iterators or an arbitrary numbers of futures (variadic template) was used. Both functions return a future. If a pair of iterators was used, you will get a future of futures in a <span style="font-family: Courier New,Courier,monospace;">std::vector</span>: : <span style="font-family: courier new,courier;">futur&lt;vector&lt;futureR&gt;&gt;&gt;</span>.&nbsp; If you use use a variadic template, you will get a futures of futures in a <span style="font-family: Courier New,Courier,monospace;">std::tuple</span>: <span style="font-family: courier new,courier;">future&lt;tuple&lt;future&lt;R0&gt;, future&lt;R1&gt;, ...&gt;&gt;</span>.<span style="font-family: courier new,courier;"><br /></span></p>
-<p>That was it with their commonalities. The future, that both functions return, will be ready, if all input futures ( <span style="font-family: Courier New,Courier,monospace;">when_all</span>), or if any of (<span style="font-family: Courier New,Courier,monospace;">when_any</span>) input futures is ready.</p>
+<p>At first, to the input. Both functions accept a pair of iterators for a future range or an arbitrary number of futures. The big difference is that in the case of the pair of iterators the futures have to be of the same type; that in the case of the arbitrary number of futures they can have a different type and even <span style="font-family: courier new,courier;">std::future</span> and <span style="font-family: courier new,courier;">std::shared_future</span> can<span id="transmark"></span> be used.</p>
+<p>The output of the function depends if a pair of iterators or an arbitrary numbers of futures (variadic template) was used. Both functions return a future. If a pair of iterators was used, you will get a future of futures in a <span style="font-family: Courier New,Courier,monospace;">std::vector</span>: : <span style="font-family: courier new,courier;">futur&lt;vector&lt;futureR&gt;&gt;&gt;</span>.&nbsp; If you use use a variadic template, you will get a future of futures in a <span style="font-family: Courier New,Courier,monospace;">std::tuple</span>: <span style="font-family: courier new,courier;">future&lt;tuple&lt;future&lt;R0&gt;, future&lt;R1&gt;, ...&gt;&gt;</span>.<span style="font-family: courier new,courier;"><br /></span></p>
+<p>That was it with their commonalities. The future, that both functions return, will be ready, if all input futures (<span style="font-family: Courier New,Courier,monospace;">when_all</span>), or if any of (<span style="font-family: Courier New,Courier,monospace;">when_any</span>) the input futures is ready.</p>
 <p>The next two examples show the usage of <span style="font-family: Courier New,Courier,monospace;">when_all</span> and <span style="font-family: Courier New,Courier,monospace;">when_any</span>.</p>
 <p>&nbsp;</p>
 <h4>when_all</h4>
@@ -137,6 +137,7 @@
 </tbody>
 </table>
 </div>
+<p>&nbsp;</p>
 <p>The future<span style="font-family: Courier New,Courier,monospace;"> all_f</span> (line 9) composes the both futures<span style="font-family: courier new,courier;"> shared_future1</span> (line 6) and <span style="font-family: courier new,courier;">future2</span> (Zeile 7).&nbsp; The future <span style="font-family: courier new,courier;">result</span> in line 11 will be executed if all underlying futures are ready<em></em>. In this case, the future <span style="font-family: courier new,courier;">all_f </span>in line 12 will be executed. The result is in the future <span style="font-family: courier new,courier;">result</span> available and can be used in line 14.</p>
 <h4>when_any</h4>
 <p>The future in <span style="font-family: courier new,courier;">when_any</span> can be taken by <span style="font-family: courier new,courier;">result</span> in line 11. <span style="font-family: Courier New,Courier,monospace;">result </span>provides the information which input future is ready. If you don't use<span style="font-family: Courier New,Courier,monospace;"> when_any_result</span>, you have to ask each future if it is ready. That is tedious.</p>
@@ -187,9 +188,10 @@
 </tbody>
 </table>
 </div>
-<p><span style="font-family: courier new,courier;">future_any</span> is the future that will be ready if one if input futures is ready.&nbsp; <span style="font-family: courier new,courier;">future_any.get()</span> in line 11 returns the future&nbsp; <span style="font-family: courier new,courier;">result</span>. By using <span style="font-family: courier new,courier;">result.futures[result.index]</span> (line 13) you have the ready future and thanks to <span style="font-family: Courier New,Courier,monospace;">ready_future.get</span>() you can ask for the result of the job.</p>
+<p>&nbsp;</p>
+<p><span style="font-family: courier new,courier;">future_any</span> is the future that will be ready if one the input futures is ready.&nbsp; <span style="font-family: courier new,courier;">future_any.get()</span> in line 11 returns the future&nbsp; <span style="font-family: courier new,courier;">result</span>. By using <span style="font-family: courier new,courier;">result.futures[result.index]</span> (line 13) you have the ready future and thanks to <span style="font-family: Courier New,Courier,monospace;">ready_future.get</span>() you can ask for the result of the job.</p>
 <h2>What's next?</h2>
-<p>Latches and barriers support it to synchronise some threads via a counter. I will present them in the <a href="index.php/latches-and-barriers">next post</a>.</p>
+<p>Latches and barriers support it to synchronise threads via a counter. I will present them in the <a href="index.php/latches-and-barriers">next post</a>.</p>
 <p>&nbsp;</p>
 <p>&nbsp;</p>
 <p>&nbsp;</p>
