@@ -1,0 +1,228 @@
+<p>They are nine rules to access objects in class hierarchies. Let's have a closer look.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p><img src="images/blog/ModernCpp/CppCoreGuidelinesAccessingClassHierarchies/doorSmall.png" alt="doorSmall" style="float: right;" /></p>
+<p>Here are the nine rules.</p>
+<h2>Accessing objects in a hierarchy rule summary:</h2>
+<ul>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rh-poly">C.145: Access polymorphic objects through pointers and references</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rh-dynamic_cast">C.146: Use <code class="highlighter-rouge no-highlight">dynamic_cast</code> where class hierarchy navigation is unavoidable</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rh-ref-cast">C.147: Use <code class="highlighter-rouge no-highlight">dynamic_cast</code> to a reference type when failure to find the required class is considered an error</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rh-ptr-cast">C.148: Use <code class="highlighter-rouge no-highlight">dynamic_cast</code> to a pointer type when failure to find the required class is considered a valid alternative</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rh-smart">C.149: Use <code class="highlighter-rouge no-highlight">unique_ptr</code> or <code class="highlighter-rouge no-highlight">shared_ptr</code> to avoid forgetting to <code class="highlighter-rouge no-highlight">delete</code> objects created using <code class="highlighter-rouge no-highlight">new</code></a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rh-make_unique">C.150: Use <code class="highlighter-rouge no-highlight">make_unique()</code> to construct objects owned by <code class="highlighter-rouge no-highlight">unique_ptr</code>s</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rh-make_shared">C.151: Use <code class="highlighter-rouge no-highlight">make_shared()</code> to construct objects owned by <code class="highlighter-rouge no-highlight">shared_ptr</code>s</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rh-array">C.152: Never assign a pointer to an array of derived class objects to a pointer to its base</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rh-use-virtual">C.153: Prefer virtual function to casting</a></li>
+</ul>
+<p>Believe me. Slicing is an issue in a lot of C++ code bases.</p>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rh-poly">C.145: Access polymorphic objects through pointers and references</a></h3>
+<p>If you access virtual function, you don't know which class provides the functionality; therefore, you should use a pointer or a reference. This means in the concrete example, that both <span style="font-family: courier new,courier;">d</span> are sliced.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">struct</span> B{ 
+  <span style="color: #007788; font-weight: bold;">int</span> a; 
+  <span style="color: #006699; font-weight: bold;">virtual</span> <span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">f</span>(); 
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> D <span style="color: #555555;">:</span> B{ 
+  <span style="color: #007788; font-weight: bold;">int</span> b; 
+  <span style="color: #007788; font-weight: bold;">int</span> f() override; 
+};
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">use</span>(B b)
+{
+    D d;
+    B b2 <span style="color: #555555;">=</span> d;   <span style="color: #0099ff; font-style: italic;">// slice</span>
+    B b3 <span style="color: #555555;">=</span> b;
+}
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">use2</span>()
+{
+    D d;
+    use(d);   <span style="color: #0099ff; font-style: italic;">// slice</span>
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The first and the second slice cause that only the <span style="font-family: courier new,courier;">B</span> part of <span style="font-family: courier new,courier;">D</span> is copied.</p>
+<p>Do you want to know more about slicing? <a href="index.php/c-core-guidelines-copy-and-move-rules">C.67: A base class should suppress copying, and provide a virtual clone instead if “copying” is desired</a> talks about this issue.</p>
+<p>The three next rules are about <span style="font-family: courier new,courier;">dynamic_cast</span>. Before I write about the<span style="font-family: courier new,courier;"> dynamic_cast</span> let me emphasis, casts including <span style="font-family: courier new,courier;">dynamic_cast</span> are used way too often. The job of the dynamic_cast is it to "Safely converts pointers and references to classes up, down, and sideways along the inheritance hierarchy." (<a href="http://en.cppreference.com/w/cpp/language/dynamic_cast">http://en.cppreference.com/w/cpp/language/dynamic_cast</a>)</p>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rh-dynamic_cast">C.146: Use <code class="highlighter-rouge no-highlight">dynamic_cast</code> where class hierarchy navigation is unavoidable</a></h3>
+<p>Here is the use-case from the C++ Core Guidelines. You want to navigate in the class hierarchy.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">struct</span> B {   <span style="color: #0099ff; font-style: italic;">// an interface</span>
+    <span style="color: #006699; font-weight: bold;">virtual</span> <span style="color: #007788; font-weight: bold;">void</span> f();
+    <span style="color: #006699; font-weight: bold;">virtual</span> <span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">g</span>();
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> D <span style="color: #555555;">:</span> B {   <span style="color: #0099ff; font-style: italic;">// a wider interface</span>
+    <span style="color: #007788; font-weight: bold;">void</span> f() override;
+    <span style="color: #006699; font-weight: bold;">virtual</span> <span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">h</span>();
+};
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">user</span>(B<span style="color: #555555;">*</span> pb)
+{
+    <span style="color: #006699; font-weight: bold;">if</span> (D<span style="color: #555555;">*</span> pd <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">dynamic_cast</span><span style="color: #555555;">&lt;</span>D<span style="color: #555555;">*&gt;</span>(pb)) {      // (1)
+        <span style="color: #0099ff; font-style: italic;">// ... use D's interface ...</span>
+    }
+    <span style="color: #006699; font-weight: bold;">else</span> {
+        <span style="color: #0099ff; font-style: italic;">// ... make do with B's interface ...</span>
+    }
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>To detect the right type for <span style="font-family: courier new,courier;">pb</span> <strong>(1)</strong> during run-time a <span style="font-family: courier new,courier;">dynamic_cast</span> is necessary. If the cast fails, you will get a null pointer.</p>
+<p>Because of performance reasons, you want to make the cast at compile-time; therefore, a <span style="font-family: courier new,courier;">static_cast</span> is your friend. Now, you can violate the type safety of the program.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">user2</span>(B<span style="color: #555555;">*</span> pb)   <span style="color: #0099ff; font-style: italic;">// bad</span>
+{
+    D<span style="color: #555555;">*</span> pd <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">static_cast</span><span style="color: #555555;">&lt;</span>D<span style="color: #555555;">*&gt;</span>(pb);    <span style="color: #0099ff; font-style: italic;">// I know that pb really points to a D; trust me</span>
+    <span style="color: #0099ff; font-style: italic;">// ... use D's interface ...</span>
+}
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">user3</span>(B<span style="color: #555555;">*</span> pb)    <span style="color: #0099ff; font-style: italic;">// unsafe</span>
+{
+    <span style="color: #006699; font-weight: bold;">if</span> (some_condition) {
+        D<span style="color: #555555;">*</span> pd <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">static_cast</span><span style="color: #555555;">&lt;</span>D<span style="color: #555555;">*&gt;</span>(pb);   <span style="color: #0099ff; font-style: italic;">// I know that pb really points to a D; trust me</span>
+        <span style="color: #0099ff; font-style: italic;">// ... use D's interface ...</span>
+    }
+    <span style="color: #006699; font-weight: bold;">else</span> {
+        <span style="color: #0099ff; font-style: italic;">// ... make do with B's interface ...</span>
+    }
+}
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">f</span>()
+{
+    B b;
+    user(<span style="color: #555555;">&amp;</span>b);   <span style="color: #0099ff; font-style: italic;">// OK</span>
+    user2(<span style="color: #555555;">&amp;</span>b);  <span style="color: #0099ff; font-style: italic;">// bad error   (1)</span>
+    user3(<span style="color: #555555;">&amp;</span>b);  <span style="color: #0099ff; font-style: italic;">// OK *if* the programmer got the some_condition check right (2)</span>
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Casting a pointer to <span style="font-family: courier new,courier;">B</span> to a pointer to<span style="font-family: courier new,courier;"> D</span> (1) is an error. This maybe holds for the last line (2).</p>
+<p>&nbsp;</p>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rh-ref-cast">C.147: Use <code class="highlighter-rouge no-highlight">dynamic_cast</code> to a reference type when failure to find the required class is considered an error</a></h3>
+<p>If you make a <span style="font-family: courier new,courier;">dynamic_cast</span> to a pointer, you will get in the case of a failure a null pointer; but if you make a <span style="font-family: courier new,courier;">dynamic_cas</span>t to a reference, you will get a failure. To be more specific, you will get a <span style="font-family: courier new,courier;">std::bad_cast</span> exception.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// badCast.cpp</span>
+
+<span style="color: #006699; font-weight: bold;">struct</span> A{
+    <span style="color: #006699; font-weight: bold;">virtual</span> <span style="color: #007788; font-weight: bold;">void</span> f() {}
+};
+<span style="color: #006699; font-weight: bold;">struct</span> B <span style="color: #555555;">:</span> A {};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+    
+    A a;
+    B b;
+<span style="color: #555555;"></span><span style="color: #555555;"></span><span style="color: #555555;"></span>
+    B<span style="color: #555555;">*</span> b1 <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">dynamic_cast</span><span style="color: #555555;">&lt;</span>B<span style="color: #555555;">*&gt;</span>(<span style="color: #555555;">&amp;</span>a);  <span style="color: #0099ff; font-style: italic;">// nullptr, because 'a' is not a 'B'</span>
+    B<span style="color: #555555;">&amp;</span> b2 <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">dynamic_cast</span><span style="color: #555555;">&lt;</span>B<span style="color: #555555;">&amp;&gt;</span>(a);   <span style="color: #0099ff; font-style: italic;">// std::bad_cast, because 'a' is not a 'B' </span>
+   
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The g++-6 compiler complains about both bad <span style="font-family: courier new,courier;">dynamic_cast'</span>s and the run-time throws the expected exception in case of the reference.</p>
+<p><img src="images/blog/ModernCpp/CppCoreGuidelinesAccessingClassHierarchies/badCast.png" alt="badCast" width="600" height="242" /></p>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rh-ptr-cast">C.148: Use <code class="highlighter-rouge no-highlight">dynamic_cast</code> to a pointer type when failure to find the required class is considered a valid alternative</a></h3>
+<p>Sometimes it may be valid option to choose an alternative code path, if the <span style="font-family: courier new,courier;">dynamic_cast</span> to a pointer type fails and, therefore, returns a null pointer.</p>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rh-smart">C.149: Use <code class="highlighter-rouge no-highlight">unique_ptr</code> or <code class="highlighter-rouge no-highlight">shared_ptr</code> to avoid forgetting to <code class="highlighter-rouge no-highlight">delete</code> objects created using <code class="highlighter-rouge no-highlight">new</code></a></h3>
+<p>Using <span style="font-family: courier new,courier;">std::unique_ptr</span> or <span style="font-family: courier new,courier;">std::shared_ptr</span> is a very important but also quite obvious rule to avoid resource leaks. In the case you build an application and not infrastructure such as a library, let me rephrase it: <strong>Never ever use new (and delete).</strong></p>
+<p>Applying this rule means that you should use <span style="font-family: courier new,courier;">std::make_unique</span> and <span style="font-family: courier new,courier;">std::make_shared</span> for creating smart pointers.</p>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rh-make_unique">C.150: Use <code class="highlighter-rouge no-highlight">make_unique()</code> to construct objects owned by <code class="highlighter-rouge no-highlight">unique_ptr</code>s, </a><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rh-make_shared">C.151: Use <code class="highlighter-rouge no-highlight">make_shared()</code> to construct objects owned by <code class="highlighter-rouge no-highlight">shared_ptr</code>s</a></h3>
+<p>Both rules are quite similar; therefore I can handle them together. <span style="font-family: courier new,courier;">std::make_unique</span> and <span style="font-family: courier new,courier;">std::make_shared</span> give you the guarantee that the operation is never interleaved. That means in the following example: no memory leak can happen.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">f(std<span style="color: #555555;">::</span>make_unique<span style="color: #555555;">&lt;</span>Foo<span style="color: #555555;">&gt;</span>(), bar());
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>This guarantee will not hold for the next call.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">f(std<span style="color: #555555;">::</span>unique_ptr<span style="color: #555555;">&lt;</span>Foo<span style="color: #555555;">&gt;</span>(<span style="color: #006699; font-weight: bold;">new</span> Foo()), bar());</pre>
+</div>
+<p>&nbsp;</p>
+<p>It may happen that<span style="font-family: courier new,courier;"> Foo</span> is at first allocated on the heap and then <span style="font-family: courier new,courier;">bar</span> is called. If <span style="font-family: courier new,courier;">bar</span> throws an exception, <span style="font-family: courier new,courier;">Foo</span> will not be destroyed and we will get a memory leak.</p>
+<p>The same observation holds for <span style="font-family: courier new,courier;">std::make_share</span> for creating a <span style="font-family: courier new,courier;">std::shared_ptr</span>.&nbsp; <span style="font-family: courier new,courier;">std::make_shared</span> has an additional performance benefit. Creating a <span style="font-family: courier new,courier;">std::shared_ptr</span> requires two memory allocations; one for the resource and one for the counter. By using <span style="font-family: courier new,courier;">std::make_shared</span>, both expensive allocations will happen in one step. The performance difference is dramatic. Have a look at my post: <a href="index.php/memory-and-performance-overhead-of-smart-pointer">Memory and Performance Overhead of Smart Pointers</a>.</p>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rh-array">C.152: Never assign a pointer to an array of derived class objects to a pointer to its base</a></h3>
+<p>This may not happen so often but if it happens the consequences may be very bad. The result may be an invalid object access or memory corruption. The former issue is shown in the example.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">struct</span> B { <span style="color: #007788; font-weight: bold;">int</span> x; };
+<span style="color: #006699; font-weight: bold;">struct</span> D <span style="color: #555555;">:</span> B { <span style="color: #007788; font-weight: bold;">int</span> y; };<span style="color: #007788; font-weight: bold;"></span><span style="color: #cc00ff;"></span><span style="color: #555555;"></span>
+
+D a[] <span style="color: #555555;">=</span> {{<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>}, {<span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>}, {<span style="color: #ff6600;">5</span>, <span style="color: #ff6600;">6</span>}};
+B<span style="color: #555555;">*</span> p <span style="color: #555555;">=</span> a;     <span style="color: #0099ff; font-style: italic;">// bad: a decays to &amp;a[0] which is converted to a B*</span>
+p[<span style="color: #ff6600;">1</span>].x <span style="color: #555555;">=</span> <span style="color: #ff6600;">7</span>;   <span style="color: #0099ff; font-style: italic;">// overwrite D[0].y</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The last assignment should update the <span style="font-family: courier new,courier;">x</span> attribute of an instance of <span style="font-family: courier new,courier;">B</span> but it overwrites the <span style="font-family: courier new,courier;">y</span> attribute of a <span style="font-family: courier new,courier;">D</span>. The reason is that <span style="font-family: courier new,courier;">B*</span> was assigned a pointer to an array of derived objects <span style="font-family: courier new,courier;">D</span>.</p>
+<p>Decay is the name of an implicit conversion, that applies lvalue-to-rvalue, array-to-pointer, and function-to-pointer conversions removing <span style="font-family: courier new,courier;">const</span> and <span style="font-family: courier new,courier;">volatile</span> qualifiers. That means in the concrete example you can call a function accepting a D<span style="font-family: courier new,courier;">*</span> with an array of <span style="font-family: courier new,courier;">D</span>'s. The argument <span style="font-family: courier new,courier;">d</span> of the following function will have a pointer to the first element of <span style="font-family: courier new,courier;">D</span>. Valuable information such as the length of the array of <span style="font-family: courier new,courier;">D</span>'s is lost.<code></code><code></code></p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">use</span>(D<span style="color: #555555;">*</span> d);
+D d[] <span style="color: #555555;">=</span> {{<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>}, {<span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>}, {<span style="color: #ff6600;">5</span>, <span style="color: #ff6600;">6</span>}};
+
+use(d);
+</pre>
+</div>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rh-use-virtual">C.153: Prefer virtual function to casting</a></h3>
+<p>You can use <span style="font-family: courier new,courier;">dynamic_cast</span> to simulate virtual behaviour also often called late binding. But that is ugly and error-prone. You may get a null pointer or a <span style="font-family: courier new,courier;">std::bad_cast</span> exception (see C.147). If you want to know more about virtual functions read the rule C67 in the post <a href="index.php/c-core-guidelines-copy-and-move-rules">C++ Core Guidelines: Rules for Copy and Move.</a> <code class="highlighter-rouge no-highlight"></code></p>
+<h2>What's next?</h2>
+<p>In C++ we can overload functions, function templates, and even operators. In particular, operator overloading is often very controversial discussed. For example, <a href="index.php/facts">MISRA C++</a>, a guideline for a safe subset of C++, forbids the overloading of operators. To be honest. I don't see why? The C++ Core Guidelines has ten rules to overloading that will be the topic of my next post.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Eric Pederson and Paul Baxter.<br /></strong></p>
+<p>&nbsp;</p>
+<table border="0" style="width: 800px; height: 250px;" cellpadding="8"><caption>
+<h2>Get your e-book at leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img src="images/books/cover.png" alt="cover" width="173" height="220" style="border: medium none #000000;" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="169" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11</strong> and <strong>C++14</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 500 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
