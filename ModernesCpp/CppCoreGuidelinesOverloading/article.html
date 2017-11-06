@@ -1,0 +1,188 @@
+There are ten rules for overloading and overload operators in the C++ core guidelines. Lots of them are quite obvious but if you don't follow them, your software may become very unintuitive.
+
+mistake
+
+I'm quite surprised having only ten rules for overloading in the guidelines. I'm in particular surprised because I had a lot of discussions in the past about overloading of operators in C++. Additionally, MISRA C++ which is heavily usind in the automotive and embedded area at least forbids operators overloading.
+
+In contrast to the discussion in C++, I have not a discussion in Python about operator overloading in mind, but Python is heavily based on operator overloading. To get an idea. Hava a look at all the following special functions starting and ending with two underscores; lovingly called dunder in Python. You have to implement them to get a type that behaves such as an int.
+
+python
+
+ But let me continue with C++. Here are the ten rules.
+
+    C.160: Define operators primarily to mimic conventional usage
+    C.161: Use nonmember functions for symmetric operators
+    C.162: Overload operations that are roughly equivalent
+    C.163: Overload only for operations that are roughly equivalent
+    C.164: Avoid conversion operators
+    C.165: Use using for customization points
+    C.166: Overload unary & only as part of a system of smart pointers and references
+    C.167: Use an operator for an operation with its conventional meaning
+    C.168: Define overloaded operators in the namespace of their operands
+    C.170: If you feel like overloading a lambda, use a generic lambda
+
+A lot of the rules are quite obvious; therefore, I often can make it short.
+Overloading and overloaded operators
+C.160: Define operators primarily to mimic conventional usage
+
+You should follow the principle of least astonishment. Or to say it in the words of the rule C: 61: A copy operation should copy. That means after the assignment x = y, x == y should hold.
+
+This was obvious. Right? The next rule sounds easy but the discussion of it is quite enlighting.
+C.161: Use nonmember functions for symmetric operators
+
+In general, the implementation of a symmetric operator such as + is inside the class not possible.
+
+Assume that you want to implement a type MyInt. MyInt should support addition with MyInt's and built-in int's. Let's give it a try.
+
+// MyInt.cpp
+
+struct MyInt{
+    MyInt(int v):val(v){};              // 1
+    MyInt operator+(const MyInt& oth) const { 
+        return MyInt(val + oth.val);
+    }
+    int val;
+};
+
+int main(){
+
+  MyInt myFive = MyInt(2) + MyInt(3);
+  MyInt myFive2 = MyInt(3) + MyInt(2);
+  
+  MyInt myTen = myFive + 5;            // 2
+  MyInt myTen2 = 5 + myFive;           // 3 ERROR
+  
+}
+  
+
+ 
+
+Because of the implicit conversion constructor (1), the expression (2) is valid. In contrast, the last expression (3) is not valid, because the 5 in the expression 5 + myFive will not implicitly convert to a MyInt; therefore, I got a compiler error.
+
+Trying to compile the program will fail because int does not have an overloaded + operator for MyInt. 
+
+MyIntError
+
+The small program has a lot of issues:
+
+    The + operator is not symmetric.
+    The val variable is public.
+    The conversion constructor is implicit.
+
+It's quite easy to overcome the first both issues with a non-member operator + that is in the class declared as friend.
+
+  
+
+// MyInt2.cpp
+
+class MyInt2{
+public:
+    MyInt2(int v):val(v){};
+    friend MyInt2 operator+(const MyInt2& fir, const MyInt2& sec){ 
+        return MyInt2(fir.val + sec.val);
+    }
+private:
+    int val;
+};
+
+int main(){
+
+  MyInt2 myFive = MyInt2(2) + MyInt2(3);
+  MyInt2 myFive2 = MyInt2(3) + MyInt2(2);
+  
+  MyInt2 myTen = myFive + 5;
+  MyInt2 myTen2 = 5 + myFive;           
+  
+}
+  
+
+ 
+
+Now, implicit conversion from int to MyInt kicks in and the variable val is private. According to rule C.164: Avoid conversion operators, you should not use an implicit conversion constructor. By making the conversion constructor in the following example explicit, the example will break.
+
+// MyInt3.cpp
+
+class MyInt3{
+public:
+    explicit MyInt3(int v):val(v){};           // 1
+    friend MyInt3 operator+(const MyInt3& fir, const MyInt3& sec){ 
+        return MyInt3(fir.val + sec.val);
+    }
+private:
+    int val;
+};
+
+int main(){
+
+  MyInt3 myFive = MyInt3(2) + MyInt3(3);
+  MyInt3 myFive2 = MyInt3(3) + MyInt3(2);
+  
+  MyInt3 myTen = myFive + 5;                   // 2
+  MyInt3 myTen2 = 5 + myFive;                  // 3
+  
+}
+
+ 
+
+Thanks to the explicit conversion operator, implicit conversion from int to MyInt will not happen and, therefore, the lines (2) and (3) fail.
+
+MyInt3Error
+
+At least I followed the rule and my operator is symmetric.
+
+One obvious way to solve the original challenge is, to implement two additional + operators for MyInt4. One should take an int as left and one should take an int as right argument.
+
+// MyInt4.cpp
+
+class MyInt4{
+public:
+    explicit MyInt4(int v):val(v){};           // 1
+    friend MyInt4 operator+(const MyInt4& fir, const MyInt4& sec){ 
+        return MyInt4(fir.val + sec.val);
+    }
+    friend MyInt4 operator+(const MyInt4& fir, int sec){
+        return MyInt4(fir.val + sec);
+    }
+     friend MyInt4 operator+(int fir, const MyInt4& sec){
+        return MyInt4(fir + sec.val);
+    }
+private:
+    int val;
+};
+
+int main(){
+
+  MyInt4 myFive = MyInt4(2) + MyInt4(3);
+  MyInt4 myFive2 = MyInt4(3) + MyInt4(2);
+  
+  MyInt4 myTen = myFive + 5;                   // 2
+  MyInt4 myTen2 = 5 + myFive;                  // 3
+  
+}
+
+C.162: Overload operations that are roughly equivalent and C.163: Overload only for operations that are roughly equivalent
+
+This time, I can make it short. Equivalent operations should have same name. Or the other way around. Non-equivalent operations should not have the same name.
+
+Here is a example from the guidelines:
+
+void print(int a);
+void print(int a, int base);
+void print(const string&);
+
+ 
+
+Invoking print(arg) with an argument feels like generic programming. You have not to care which version of print will be used.
+
+This will not hold for the three next functions, because they have different names:
+
+void print_int(int a);
+void print_based(int a, int base);
+void print_string(const string&);
+
+ 
+
+If non-equivalent operations have the same name the names are maybe to general or just wrong. This is confusing and error-prone.
+What's next?
+
+The next rule is quite important: C.164: Avoid conversion operators. I already mentioned it in rule C.161. You should not use an implicit conversion constructor and - this is new - an implicit conversion operator. Why? I will write about it in the next post.
