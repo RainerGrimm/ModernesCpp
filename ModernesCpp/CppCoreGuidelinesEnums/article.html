@@ -1,0 +1,242 @@
+<p>The section to enumerations has eight rules. Since C++11, we have scoped enumerations which overcome a lot of the drawbacks of classical enumerations.&nbsp;</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p><img src="images/blog/ModernCpp/CppCoreGuidelinesEnums/hand-162127_640.png" alt="hand 162127 640" /></p>
+<p>Enumerations are sets of integer values, which behave like a type. Here is the summary of the rules:</p>
+<ul>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Renum-macro">Enum.1: Prefer enumerations over macros</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Renum-set">Enum.2: Use enumerations to represent sets of related named constants</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Renum-class">Enum.3: Prefer <code class="highlighter-rouge no-highlight">enum class</code>es over “plain” <code class="highlighter-rouge no-highlight">enum</code>s</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Renum-oper">Enum.4: Define operations on enumerations for safe and simple use</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Renum-caps">Enum.5: Don’t use <code class="highlighter-rouge no-highlight">ALL_CAPS</code> for enumerators</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Renum-unnamed">Enum.6: Avoid unnamed enumerations</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Renum-underlying">Enum.7: Specify the underlying type of an enumeration only when necessary</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Renum-value">Enum.8: Specify enumerator values only when necessary</a></li>
+</ul>
+<p>As I mentioned it in the opening to this post: classical enumerations have a lot of drawbacks. Let me explicitly compare classical (unscoped) enumerations and scoped enumerations (sometimes called strongly typed enumerations), because this important comparison is not explicitly described in the rules.</p>
+<p>Here is a classical enumeration:</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">enum</span> Colour{
+  red,
+  blue,
+  green
+};
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Here are the drawbacks of the classical enumerations:</p>
+<ul>
+<li>The enumerators have no scope</li>
+<li>The enumerators implicitly convert to implicitly to <span style="font-family: courier new,courier;">int</span></li>
+<li>The enumerators pollute the global namespace</li>
+<li>The type of the enumerator is not defined. It just has to be big enough to hold the enumerator.</li>
+</ul>
+<p>By using the keyword <span style="font-family: courier new,courier;">class</span> or <span style="font-family: courier new,courier;">struct,</span> the classical enumeration becomes a scoped enumeration (enum class):</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">enum class</span> ColourScoped{
+  red,
+  blue,
+  green
+};
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Now, you have to use the scope operator for accessing the enumerators: <span style="font-family: courier new,courier;">ColourScoped::red. ColourScoped::red </span>will not implicitly convert to <span style="font-family: courier new,courier;">int</span> and will, therefore, not pollute the global namespace. Additionally, the underlying type is per default<span style="font-family: courier new,courier;"> int.&nbsp;</span></p>
+<p>After providing the background information we can directly jump into the rules.<span style="font-family: courier new,courier;"> </span></p>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Renum-macro">Enum.1: Prefer enumerations over macros</a></h3>
+<p>Macros don't respect a scope and have no type. This means you can override a previously set macro which specifies a colour.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// webcolors.h </span>
+<span style="color: #009999;">#define RED   0xFF0000</span>
+
+<span style="color: #0099ff; font-style: italic;">// productinfo.h</span>
+<span style="color: #009999;">#define RED    0</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> webcolor <span style="color: #555555;">=</span> RED;   <span style="color: #0099ff; font-style: italic;">// should be 0xFF0000</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>With <span style="font-family: courier new,courier;">ColourScoped</span> this will not happen because you have to use the scope operator: C<span style="font-family: courier new,courier;">olourScoped webcolour = ColourScoped::red;</span></p>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Renum-set">Enum.2: Use enumerations to represent sets of related named constants</a></h3>
+<p>This rule is quite obvious because the enumerators are a set of integers which create a kind of a type. &nbsp;</p>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Renum-class">Enum.3: Prefer <code class="highlighter-rouge no-highlight">enum class</code>es over “plain” <code class="highlighter-rouge no-highlight">enum</code>s</a></h3>
+<p>The enumerators of a scoped enum (enum class) will not automatically convert to <span style="font-family: courier new,courier;">int</span>. You have to access them with the scope operator.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// scopedEnum.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">enum</span> <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">ColourScoped</span>{
+  red,
+  blue,
+  green
+};
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">useMe</span>(ColourScoped color){
+
+  <span style="color: #006699; font-weight: bold;">switch</span>(color){
+  <span style="color: #006699; font-weight: bold;">case</span> ColourScoped:<span style="color: #555555;">:</span>red<span style="color: #555555;">:</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"ColourScoped::red"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    <span style="color: #006699; font-weight: bold;">break</span>;
+  <span style="color: #006699; font-weight: bold;">case</span> ColourScoped:<span style="color: #555555;">:</span>blue<span style="color: #555555;">:</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"ColourScoped::blue"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    <span style="color: #006699; font-weight: bold;">break</span>;
+  <span style="color: #006699; font-weight: bold;">case</span> ColourScoped:<span style="color: #555555;">:</span>green<span style="color: #555555;">:</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"ColourScoped::green"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    <span style="color: #006699; font-weight: bold;">break</span>;
+  }
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span>  <span style="color: #006699; font-weight: bold;">static_cast</span><span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span>(ColourScoped<span style="color: #555555;">::</span>red) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;   <span style="color: #0099ff; font-style: italic;">// 0</span>
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span>  <span style="color: #006699; font-weight: bold;">static_cast</span><span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span>(ColourScoped<span style="color: #555555;">::</span>red) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;   <span style="color: #0099ff; font-style: italic;">// 0</span>
+
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+  ColourScoped colour{ColourScoped<span style="color: #555555;">::</span>red};
+  useMe(colour);                                                     <span style="color: #0099ff; font-style: italic;">// ColourScoped::red</span>
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Renum-oper">Enum.4: Define operations on enumerations for safe and simple use</a></h3>
+<p>The rules define an enumeration <span style="font-family: courier new,courier;">Day</span> which supports the increment operation.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">enum</span> Day { mon, tue, wed, thu, fri, sat, sun };
+
+Day<span style="color: #555555;">&amp;</span> <span style="color: #006699; font-weight: bold;">operator</span><span style="color: #555555;">++</span>(Day<span style="color: #555555;">&amp;</span> d)
+{
+    <span style="color: #006699; font-weight: bold;">return</span> d <span style="color: #555555;">=</span> (d <span style="color: #555555;">==</span> Day<span style="color: #555555;">::</span>sun) <span style="color: #555555;">?</span> Day<span style="color: #555555;">::</span>mon <span style="color: #555555;">:</span> <span style="color: #006699; font-weight: bold;">static_cast</span><span style="color: #555555;">&lt;</span>Day<span style="color: #555555;">&gt;</span>(<span style="color: #006699; font-weight: bold;">static_cast</span><span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span>(d)<span style="color: #555555;">+</span><span style="color: #ff6600;">1</span>);
+}
+
+Day today <span style="color: #555555;">=</span> Day<span style="color: #555555;">::</span>sat;
+Day tomorrow <span style="color: #555555;">=</span> <span style="color: #555555;">++</span>today;
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The<span style="font-family: courier new,courier;"> static_cast</span> is necessary in this example because applying the increment operator inside the increment operator would cause an infinite recursion:</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">Day<span style="color: #555555;">&amp;</span> <span style="color: #006699; font-weight: bold;">operator</span><span style="color: #555555;">++</span>(Day<span style="color: #555555;">&amp;</span> d)
+{
+    <span style="color: #006699; font-weight: bold;">return</span> d <span style="color: #555555;">=</span> (d <span style="color: #555555;">==</span> Day<span style="color: #555555;">::</span>sun) <span style="color: #555555;">?</span> Day<span style="color: #555555;">::</span>mon <span style="color: #555555;">:</span> Day{<span style="color: #555555;">++</span>d};    <span style="color: #0099ff; font-style: italic;">// error</span>
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Renum-caps">Enum.5: Don’t use <code class="highlighter-rouge no-highlight">ALL_CAPS</code> for enumerators</a></h3>
+<p>If you use ALL_CAPS for enumerators, you may get a conflict with macros because they are typically written in ALL_CAPS.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #009999;">#define RED 0xFF0000</span>
+
+<span style="color: #006699; font-weight: bold;">enum</span> <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">ColourScoped</span>{ RED };  <span style="color: #0099ff; font-style: italic;">// error</span>
+</pre>
+</div>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Renum-unnamed">Enum.6: Avoid unnamed enumerations</a></h3>
+<p>If you can't find a name for the enumerations, the enumerations may be not related. In this case, you should use a constexpr value.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// bad</span>
+<span style="color: #006699; font-weight: bold;">enum</span> { red <span style="color: #555555;">=</span> <span style="color: #ff6600;">0xFF0000</span>, scale <span style="color: #555555;">=</span> <span style="color: #ff6600;">4</span>, is_signed <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span> };
+
+<span style="color: #0099ff; font-style: italic;">// good</span>
+constexpr <span style="color: #007788; font-weight: bold;">int</span> red <span style="color: #555555;">=</span> <span style="color: #ff6600;">0xFF0000</span>;
+constexpr <span style="color: #007788; font-weight: bold;">short</span> scale <span style="color: #555555;">=</span> <span style="color: #ff6600;">4</span>;
+constexpr <span style="color: #007788; font-weight: bold;">bool</span> is_signed <span style="color: #555555;">=</span> <span style="color: #336666;">true</span>;
+</pre>
+</div>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Renum-underlying">Enum.7: Specify the underlying type of an enumeration only when necessary</a></h3>
+<p>Since C++11, you can specify the underlying type of the enumeration and save memory. Per default the type of a scoped enum is <span style="font-family: courier new,courier;">int</span> and, therefore, you can forward declare an enum.<span style="font-family: courier new,courier;"> </span></p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// typeEnum.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">enum</span> <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Colour1</span>{
+  red,
+  blue,
+  green
+};
+ 
+<span style="color: #006699; font-weight: bold;">enum</span> <span style="color: #006699; font-weight: bold;">struct</span> Colour2<span style="color: #555555;">:</span> <span style="color: #007788; font-weight: bold;">char</span> {
+  red,
+  blue,
+  green
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #006699; font-weight: bold;">sizeof</span>(Colour1) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;  <span style="color: #0099ff; font-style: italic;">// 1</span>
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #006699; font-weight: bold;">sizeof</span>(Colour2) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;  <span style="color: #0099ff; font-style: italic;">// 4</span>
+
+}
+</pre>
+</div>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Renum-value">Enum.8: Specify enumerator values only when necessary</a></h3>
+<p>By specifying the enumerator values it may happen that you set a value twice. The following enumeration <span style="font-family: courier new,courier;">Col2</span> has this issue.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">enum</span> <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Col1</span> { red, yellow, blue };
+<span style="color: #006699; font-weight: bold;">enum</span> <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Col2</span> { red <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span>, yellow <span style="color: #555555;">=</span> <span style="color: #ff6600;">2</span>, blue <span style="color: #555555;">=</span> <span style="color: #ff6600;">2</span> };    <span style="color: #0099ff; font-style: italic;">// typo</span>
+<span style="color: #006699; font-weight: bold;">enum</span> <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Month</span> { jan <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span>, feb, mar, apr, may, jun,
+                   jul, august, sep, oct, nov, dec }; <span style="color: #0099ff; font-style: italic;">// starting with 1 is conventional</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<h2>What's next?</h2>
+<p>I made it relatively short in this post. The meta-rule that you should have to keep in mind is: <strong>use scoped enums</strong>.</p>
+<p>The next section of the C++ core guidelines deals with about 35 rules to resource management. This means we dive in the next post right into the heart of C++.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Eric Pederson, Paul Baxter, and Franco Amato.<br /></strong></p>
+<p>&nbsp;</p>
+<table border="0" style="width: 800px; height: 250px;" cellpadding="8"><caption>
+<h2>Get your e-book at leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img src="images/books/cover.png" alt="cover" width="173" height="220" style="border: medium none #000000;" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 550 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
