@@ -1,0 +1,129 @@
+<p>Ein Thread kann seine Daten per Copy oder per Referenz erhalten. Per Default sollte der Thread seine Daten per Copy annehmen, da per Referenz angenommene Daten leicht ihre Gültigkeit verlieren.</p>
+<hr id="system-readmore" />
+<h2>Datenübergabe</h2>
+<p>Ein Thread ist ein <a href="index.php?option=com_content&amp;view=article&amp;id=69:datenuebergabe-an-threads&amp;catid=35:c&amp;Itemid=101#VariadicTemplates">Variadic Template</a>. Das heißt insbesondere, dass er beliebig viele Daten annehmen kann. Der kleine Programmschnipsel stellt die zwei Variationen vor.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">std::string s{<span style="color: #a31515;">"C++11"</span>}
+
+std::<span style="color: #0000ff;">thread</span> t([=]{ std::cout &lt;&lt; s &lt;&lt; std::endl;});
+t.join();
+
+std::<span style="color: #0000ff;">thread</span> t2([&amp;]{ std::cout &lt;&lt; s &lt;&lt; std::endl;});
+t2.detach()
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Genau genommen nimmt in dem Beispiel nicht der Thread, sondern die Lambda-Funktion die Daten an. Das ändert aber nichts an meiner Argumentation. So nimmt der Thread<span style="font-family: courier new,courier;"> t</span> seine Daten per Copy&nbsp; ([=]), so nimmt der Thread <span style="font-family: courier new,courier;">t2</span> seine Daten per Referenz an ([&amp;]).</p>
+<p>Welche Gefahren verbergen sich in den paar Zeilen? Thread<span style="font-family: courier new,courier;"> t2</span> nimmt sein String <span style="font-family: courier new,courier;">s </span>per Referenz an uns löst sich von der Lebenszeit seines Erzeugers. Zum einen ist die <span style="font-family: arial,helvetica,sans-serif;">Lebenszeit des String </span><span style="font-family: courier new,courier;"><span style="font-family: arial,helvetica,sans-serif;"><span style="font-family: courier new,courier;">s</span> an die Lebenszeit seines Aufrufkontextes gebunden, zum anderen endet die Lebenszeit des globalen Objekts <span style="font-family: courier new,courier;">std::cout</span> mit der Lebenszeit des <span style="font-family: courier new,courier;">main</span>-Thread. Deren Lebenszeit kann aber deutlich kürzer sein als die des Threads <span style="font-family: courier new,courier;">t2</span>, da dieser sich durch den Aufruf <span style="font-family: courier new,courier;">t2.detach()</span> von der Lebenszeit des <span style="font-family: courier new,courier;">main</span>-Thread gelöst hat.</span> </span></p>
+<p>Immer noch nicht überzeugt? Das folgende Programm bringt die Problematik auf den Punkt.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">#include &lt;chrono&gt;</span>
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;thread&gt;</span>
+
+<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">Sleeper</span>{
+  public:
+    Sleeper(<span style="color: #2b91af;">int</span>&amp; i_):i{i_}{};
+    <span style="color: #2b91af;">void</span> operator() (<span style="color: #2b91af;">int</span> k){
+      <span style="color: #0000ff;">for</span> (<span style="color: #2b91af;">unsigned</span> <span style="color: #2b91af;">int</span> j= 0; j &lt;= 5; ++j){
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        i += k;
+      }
+      std::cout &lt;&lt; std::this_thread::get_id() &lt;&lt; std::endl;
+    }
+  private:
+    <span style="color: #2b91af;">int</span>&amp; i;
+};
+
+
+<span style="color: #2b91af;">int</span> main(){
+
+  std::cout &lt;&lt; std::endl;
+
+  <span style="color: #2b91af;">int</span> valSleeper= 1000;
+  std::<span style="color: #0000ff;">thread</span> t(Sleeper(valSleeper),5);
+  t.detach();
+  std::cout &lt;&lt; <span style="color: #a31515;">"valSleeper = "</span> &lt;&lt; valSleeper &lt;&lt; std::endl;
+
+  std::cout &lt;&lt; std::endl;
+
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Welchen Wert besitzt die Variable <span style="font-family: courier new,courier;">valSleeper, <span style="font-family: arial,helvetica,sans-serif;">wenn sie in der Zeile 27 ausgegeben wird</span></span><span style="font-family: arial,helvetica,sans-serif;">?</span> <span style="font-family: courier new,courier;">valSleeper</span> ist eine globale Variable. Der Thread<span style="font-family: courier new,courier;"> t</span> erhält als Arbeitspaket ein Funktionsobjekt vom Typ <span style="font-family: courier new,courier;">Sleeper</span> zusammen mit der Variable valSleeper und die Zahl 5 (Zeile 25). Die entscheidende Beobachtung ist es, dass der Thread <span style="font-family: courier new,courier;">valSleeper</span> per Referenz (Zeile 7) erhält und sich von der Lebenszeit seins Erzeugers löst (Zeile 26). Wird der Thread ausgeführt, prozessiert er den Klammer-Operator des Funktionsobjektes (Zeile 8 - 14). In diesem zählt er von 0 bis 5, schläft in jeder Iteration für 1/10 Sekunde&nbsp;und inkrementiert <span style="font-family: courier new,courier;">i</span> um<span style="font-family: courier new,courier;"> k.</span> Zum Abschluss gibt er&nbsp;seine ID aus. Nach Adam Riese ergibt das 1000 + 6 * 5= 1030.&nbsp;</p>
+<p>Da scheint sich wohl jemand verrechnet zu haben. Die Ausgabe des Programms ergibt nur 1000.</p>
+<p><img src="images/blog/Threads/DatenuebergabeAnThreads/Sleeper.png" alt="Sleeper" /></p>
+<p>Was läuft hier schief? Weder besitzt <span style="font-family: courier new,courier;">valSleeper</span> den Wert 1030, noch gibt der Thread seine ID aus. Das Programm besitzt&nbsp;undefiniertes Verhalten. Die Lebenszeit des <span style="font-family: courier new,courier;">main</span>-Threads endet, bevor der Kinderthread die Variable fertig inkrementiert hat und seine ID auf <span style="font-family: courier new,courier;">std::cout</span> schreibt. Wird&nbsp;die Lebenszeit des Kinderthreads durch <span style="font-family: courier new,courier;">t.join()</span> in Zeile 26 an die Lebenszeit seines Erzeugers gebunden, stellt sich das erwartete Ergebnis ein.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #2b91af;">int</span> main(){
+
+  std::cout &lt;&lt; std::endl;
+
+  <span style="color: #2b91af;">int</span> valSleeper= 1000;
+  std::<span style="color: #0000ff;">thread</span> t(Sleeper(valSleeper),5);
+  t.join();
+  std::cout &lt;&lt; <span style="color: #a31515;">"valSleeper = "</span> &lt;&lt; valSleeper &lt;&lt; std::endl;
+
+  std::cout &lt;&lt; std::endl;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p><img src="images/blog/Threads/DatenuebergabeAnThreads/Sleeper2.png" alt="Sleeper2" /></p>
+<p>Eine große Herausforderung besitzen Threads. Sowohl der Kinderthread als auch der <span style="font-family: courier new,courier;">main</span>-Thread teilen sich zwei Objekte. Das ist zum einen die Variable <span style="font-family: courier new,courier;">valSleeper,</span> das ist zum anderen das globale Objekt <span style="font-family: courier new,courier;">st</span>d::cout. Sobald&nbsp;mehrere Threads auf eine gemeinsame Variable gleichzeitig zugreifen und zu mindestens einer der Threads versucht, diese zu modifizieren, gilt es diese Variable zu schützen. Dazu aber mehr im nächsten Artikel, der sich mit dem <a href="index.php/blog/threads-teilen-daten">Teilen von Daten zwischen Threads</a>&nbsp; beschäftigt.</p>
+<h2>Hintergrundinformation</h2>
+<dl><dt><a id="VariadicTemplates">Variadic Templates</a></dt><dd><span style="font-family: arial,helvetica,sans-serif;">&nbsp;&nbsp;&nbsp; Die Details zu Variadic Templates lassen sich in dem Linux-Magazin Artikel <a href="index.php/modernes-c-in-der-praxis-linux-magazin-a">Punktlandung</a> (08/2015) nachlesen.</span></dd><dd></dd><dd></dd><dd></dd><dd></dd><dd></dd><dd></dd><dd></dd><dd></dd><dd>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="166" height="212" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Hole dir dein E-Book. Unterstütze meinen Blog.</span></strong></p>
+</dd><dd></dd><dd></dd><dd></dd><dd></dd><dd></dd><dd></dd><dd></dd></dl>

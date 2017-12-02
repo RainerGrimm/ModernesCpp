@@ -1,0 +1,321 @@
+<p><span style="font-family: courier new,courier;">std::promise</span> und<span style="font-family: courier new,courier;"> std::future</span> geben die volle Kontrolle über die Task.</p>
+<hr id="system-readmore" />
+<h2>Volle Kontrolle</h2>
+<p>Ein <span style="font-family: courier new,courier;">std::promise</span> erlaubt</p>
+<ul>
+<li>einen Wert, eine Benachrichtigung oder eine Ausnahme zu setzen. Diese kann auch erst zur Verfügung gestellt werden, wenn der aktuelle Thread beendet ist.</li>
+</ul>
+<p><span style="font-family: courier new,courier;"><span style="font-family: arial,helvetica,sans-serif;">Ein</span> std::future</span>&nbsp;erlaubt</p>
+<ul>
+<li>den Wert des Promise abzuholen.&nbsp;</li>
+<li>den Promise zu fragen,&nbsp;ob der Wert bereits vorliegt.</li>
+<li>zu warten, bis eine Benachrichtigung des Promise vorliegt: Dies ohne und mit absoluter oder relativer Zeitangabe&nbsp;möglich. =&gt; Ersatz für&nbsp;<a href="index.php?option=com_content&amp;view=article&amp;id=76:bedingungsvariablen&amp;catid=35:c&amp;Itemid=101">Bedingungsvariablen</a></li>
+<li>einen geteilten Future (<span style="font-family: courier new,courier;">std::shared_future</span>) zu erzeugen.</li>
+</ul>
+<p>&nbsp;</p>
+<p>Sowohl der Promise als auch der Future können explizit in einen anderen Thread<a href="index.php?option=com_content&amp;view=article&amp;id=68:lebenszeit-von-threads&amp;catid=35:c&amp;Itemid=101#MoveSemantik"> verschoben </a>werden. Damit findet die&nbsp;<a href="index.php?option=com_content&amp;view=article&amp;id=78:tasks&amp;catid=35:c&amp;Itemid=101">Kommunikation</a> über Threadgrenzen hinweg statt.&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">#include &lt;future&gt;</span>
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;thread&gt;</span>
+<span style="color: #0000ff;">#include &lt;utility&gt;</span>
+
+<span style="color: #2b91af;">void</span> product(std::promise&lt;<span style="color: #2b91af;">int</span>&gt;&amp;&amp; intPromise, <span style="color: #2b91af;">int</span> a, <span style="color: #2b91af;">int</span> b){
+  intPromise.set_value(a*b);
+}
+
+<span style="color: #0000ff;">struct</span> Div{
+
+  <span style="color: #2b91af;">void</span> <span style="color: #0000ff;">operator</span>() (std::promise&lt;<span style="color: #2b91af;">int</span>&gt;&amp;&amp; intPromise, <span style="color: #2b91af;">int</span> a, <span style="color: #2b91af;">int</span> b) <span style="color: #0000ff;">const</span> {
+    intPromise.set_value(a/b);
+  }
+
+};
+
+<span style="color: #2b91af;">int</span> main(){
+
+  <span style="color: #2b91af;">int</span> a= 20;
+  <span style="color: #2b91af;">int</span> b= 10;
+
+  std::cout &lt;&lt; std::endl;
+
+  <span style="color: #008000;">// define the promises</span>
+  std::promise&lt;<span style="color: #2b91af;">int</span>&gt; prodPromise;
+  std::promise&lt;<span style="color: #2b91af;">int</span>&gt; divPromise;
+
+  <span style="color: #008000;">// get the futures</span>
+  std::future&lt;<span style="color: #2b91af;">int</span>&gt; prodResult= prodPromise.get_future();
+  std::future&lt;<span style="color: #2b91af;">int</span>&gt; divResult= divPromise.get_future();
+
+  <span style="color: #008000;">// calculate the result in a separat thread</span>
+  std::<span style="color: #0000ff;">thread</span> prodThread(product,std::move(prodPromise),a,b);
+  Div div;
+  std::<span style="color: #0000ff;">thread</span> divThread(div,std::move(divPromise),a,b);
+
+  <span style="color: #008000;">// get the result</span>
+  std::cout &lt;&lt; <span style="color: #a31515;">"20*10= "</span> &lt;&lt; prodResult.get() &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"20/10= "</span> &lt;&lt; divResult.get() &lt;&lt; std::endl;
+
+  prodThread.join();
+  
+  divThread.join();
+
+  std::cout &lt;&lt; std::endl;
+
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Der Thread <span style="font-family: courier new,courier;">prodThread</span> (Zeile 34) verwendet die Funktion <span style="font-family: courier new,courier;">product</span> (Zeile 6 - 8), <span style="font-family: arial,helvetica,sans-serif;">den <span style="font-family: courier new,courier;">prodPromise</span></span> (Zeile 30) und die Zahlen<span style="font-family: courier new,courier;"> a</span> und<span style="font-family: courier new,courier;"> b</span>. Um die Argumente des Threads<span style="font-family: courier new,courier;"> prodThread</span> zu verstehen, ist es notwendig, die Signatur der Funktion genauer zu betrachten. <span style="font-family: courier new,courier;">prodThread</span> erwartet als erstes Argument eine <a href="index.php?option=com_content&amp;view=article&amp;id=67:threads&amp;catid=35:c&amp;Itemid=101#AufrufbareEinheit">aufrufbare Einheit</a>. Dies ist die bereits zitierte Funktion<span style="font-family: courier new,courier;"> product. product <span style="font-family: arial,helvetica,sans-serif;">erwartet eine<a href="index.php?option=com_content&amp;view=article&amp;id=68:lebenszeit-von-threads&amp;catid=35:c&amp;Itemid=101#MoveSemantik"> Rvalue Referenz</a></span> (std::promise&lt;int&gt;&amp;&amp; intPromise) </span>auf einen Promise, der eine ganze Zahl zurückgibt. Genau dies entspricht den drei letzen Argumenten des Threads <span style="font-family: courier new,courier;">prodThread</span>.&nbsp;Die von der Funktion <span style="font-family: courier new,courier;">product</span> benötigte Rvalue Referenz&nbsp;&nbsp;erzeugt der<span style="font-family: courier new,courier;"> std::move</span>-Aufruf in Zeile 34. Der Rest ist schnell erklärt. Der Thread <span style="font-family: courier new,courier;">divThread</span> (Zeile 36)&nbsp;teilt die beiden Zahlen a und b. Dazu verwendet er die Instanz der Klasse Div (Zeile 10 - 16) <span style="font-family: courier new,courier;">div</span>. <span style="font-family: courier new,courier;">div</span> ist ein Funktionsobjekt.&nbsp;</p>
+<p>Durch die Aufrufe <span style="font-family: courier new,courier;">prodResult.get()</span> und <span style="font-family: courier new,courier;">divResult.get()</span> sammeln die Future die Ergebnisse ein.</p>
+<p><img src="images/blog/Threads/PromiseFuture/promiseFuture.png" alt="promiseFuture" /></p>
+<p>Per Default besteht zwischen dem Promise und dem Future eine eins-zu-eins Beziehung. <span style="font-family: courier new,courier;">std::shared_future</span> erlauben eins-zu-viele Beziehung zwischen Promise und Future.</p>
+<h2>std::shared_future</h2>
+<p>Ein<span style="font-family: courier new,courier;"> std::shared_future</span></p>
+<ul>
+<li>kann unabhängig vom den anderen assoziierten Future seinen Promise abfragen.</li>
+<li>besitzt das gleiche Interface wie ein <span style="font-family: courier new,courier;">std::future</span>.</li>
+<li>kann durch einen <span style="font-family: courier new,courier;">std::future fut <span style="font-family: arial,helvetica,sans-serif;">mit dem Aufruf</span> fut.share() </span>erzeugt werden.</li>
+<li>kann durch einen <span style="font-family: courier new,courier;">std::promise&nbsp;divPromise <span style="font-family: arial,helvetica,sans-serif;">mit dem Aufruf</span> std::shared_future&lt;int&gt; divResult= divPromise.get_future() </span>erzeugt werden.</li>
+</ul>
+<p>Der Umgang mit <span style="font-family: courier new,courier;">std::shared_future</span> ist ein bisschen besonders.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+55
+56
+57
+58
+59
+60
+61
+62
+63
+64
+65
+66
+67
+68
+69
+70
+71
+72
+73
+74
+75</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">#include &lt;exception&gt;</span>
+<span style="color: #0000ff;">#include &lt;future&gt;</span>
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;thread&gt;</span>
+<span style="color: #0000ff;">#include &lt;utility&gt;</span>
+
+std::mutex coutMutex;
+
+<span style="color: #0000ff;">struct</span> Div{
+
+  <span style="color: #2b91af;">void</span> <span style="color: #0000ff;">operator</span>()(std::promise&lt;<span style="color: #2b91af;">int</span>&gt;&amp;&amp; intPromise, <span style="color: #2b91af;">int</span> a, <span style="color: #2b91af;">int</span> b){
+    try{
+      <span style="color: #0000ff;">if</span> ( b==0 ) <span style="color: #0000ff;">throw</span> std::runtime_error(<span style="color: #a31515;">"illegal division by zero"</span>);
+      intPromise.set_value(a/b);
+    }
+    <span style="color: #0000ff;">catch</span> (...){
+      intPromise.set_exception(std::current_exception());
+    }
+  }
+
+};
+
+<span style="color: #0000ff;">struct</span> Requestor{
+
+  <span style="color: #2b91af;">void</span> <span style="color: #0000ff;">operator</span> ()(std::shared_future&lt;<span style="color: #2b91af;">int</span>&gt; shaFut){
+
+    <span style="color: #008000;">// lock std::cout</span>
+    std::lock_guard&lt;std::mutex&gt; coutGuard(coutMutex);
+
+    <span style="color: #008000;">// get the thread id</span>
+    std::cout &lt;&lt; <span style="color: #a31515;">"threadId("</span> &lt;&lt; std::this_thread::get_id() &lt;&lt; <span style="color: #a31515;">"): "</span> ;
+
+    <span style="color: #008000;">// get the result</span>
+    try{
+      std::cout &lt;&lt; <span style="color: #a31515;">"20/10= "</span> &lt;&lt; shaFut.get() &lt;&lt; std::endl;
+    }
+    <span style="color: #0000ff;">catch</span> (std::runtime_error&amp; e){
+      std::cout &lt;&lt; e.what() &lt;&lt; std::endl;
+    }
+  }
+
+};
+
+<span style="color: #2b91af;">int</span> main(){
+
+  std::cout &lt;&lt; std::endl;
+
+  <span style="color: #008000;">// define the promises</span>
+  std::promise&lt;<span style="color: #2b91af;">int</span>&gt; divPromise;
+
+  <span style="color: #008000;">// get the futures</span>
+  std::shared_future&lt;<span style="color: #2b91af;">int</span>&gt; divResult= divPromise.get_future();
+
+  <span style="color: #008000;">// calculate the result in a separat thread</span>
+  Div div;
+  std::<span style="color: #0000ff;">thread</span> divThread(div,std::move(divPromise),20,10);
+
+  Requestor req;
+  std::<span style="color: #0000ff;">thread</span> sharedThread1(req,divResult);
+  std::<span style="color: #0000ff;">thread</span> sharedThread2(req,divResult);
+  std::<span style="color: #0000ff;">thread</span> sharedThread3(req,divResult);
+  std::<span style="color: #0000ff;">thread</span> sharedThread4(req,divResult);
+  std::<span style="color: #0000ff;">thread</span> sharedThread5(req,divResult);
+
+  divThread.join();
+
+  sharedThread1.join();
+  sharedThread2.join();
+  sharedThread3.join();
+  sharedThread4.join();
+  sharedThread5.join();
+
+  std::cout &lt;&lt; std::endl;
+
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Sowohl die Arbeitspakete des Promise als auch des Futures sind in diesem Beispiel Funktionsobjekte. Beider der Division zweier Zahlen besteht immer die Gefahr, dass der Nenner 0 ist. Dies führt natürlich zu einer Ausnahme. Mit dieser Gefahr geht der Promise um, indem er&nbsp;alle Ausnahme fängt (Zeile 16 -18) und an den Future weiter wirft. Der <span style="font-family: courier new,courier;">std::future</span> nimmt diese Ausnahmen an und gibt sie in Zeile 38 aus. In Zeile 56 wird der <span style="font-family: courier new,courier;">divPromise</span> in den <span style="font-family: courier new,courier;">divThread</span> geschoben und ausgeführt. Analog wird der <span style="font-family: courier new,courier;">std::shared_future</span> in die fünf Threads<strong> kopiert</strong>. Ich betone es gerne nochmals. Im&nbsp;Gegensatz zu <span style="font-family: courier new,courier;">std::future-<span style="font-family: arial,helvetica,sans-serif;">Objekten</span></span><span style="font-family: arial,helvetica,sans-serif;">, </span>der nur verschoben werden kann, können <span style="font-family: courier new,courier;">std::shared_future-<span style="font-family: arial,helvetica,sans-serif;">Objekte</span></span><span style="font-family: arial,helvetica,sans-serif;"> au</span>ch kopiert werden.</p>
+<p>In den Zeilen 65 bis 71 wartet der <span style="font-family: courier new,courier;">main</span>-Thread auf seine Kinderthreads und gibt die Ergebnisse aus.</p>
+<p><img src="images/blog/Threads/PromiseFuture/sharedFuture.png" alt="sharedFuture" /></p>
+<h2>Wie geht's weiter?</h2>
+<p><span style="font-family: courier new,courier;">std::async</span> erzeugt besondere Futures. Diese unterscheiden sich von den Futures, die ein <span style="font-family: courier new,courier;">std::promise</span> oder ein <span style="font-family: courier new,courier;">std::package_task</span> erzeugt dadurch, dass sie im Destruktor blockieren, bis ihr assoziierter Promise mit seinem Arbeitspaket fertig ist. Die Details zu diesen besonderen Futures folgen im <a href="index.php/blog/std-async-warten-im-destruktor">nächsten Artikel.</a></p>
+<h2>Hintergrundinformation</h2>
+<dl><dt>std::promise&nbsp;&nbsp;&nbsp;</dt><dd>&nbsp;&nbsp;&nbsp; Die Details lassen sich schön auf<a href="http://en.cppreference.com/w/cpp/thread/promise"> cppreference </a>nachlesen.</dd><dt>std::future&nbsp;&nbsp;&nbsp;</dt><dd>&nbsp;&nbsp;&nbsp; Die Details lassen sich schön auf <a href="http://en.cppreference.com/w/cpp/thread/future">cppreference</a> nachlesen.</dd><dt></dt><dt>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="166" height="212" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Hole dir dein E-Book. Unterstütze meinen Blog.</span></strong></p>
+</dt></dl>

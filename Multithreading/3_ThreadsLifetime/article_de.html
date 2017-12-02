@@ -1,0 +1,137 @@
+<p>Der Erzeuger muss sich um sein Kind kümmern. Diese einfache Aussage besitzt für Threads weitreichende Konsequenzen. Das kleine Programm startet einen Thread, der seine ID auf der Konsole ausgeben soll.&nbsp;</p>
+<hr id="system-readmore" /><!-- HTML generated using hilite.me -->
+<div style="background: #ffffff none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;thread&gt;</span>
+
+<span style="color: #2b91af;">int</span> main(){
+
+  std::<span style="color: #0000ff;">thread</span> t([]{std::cout &lt;&lt; std::this_thread::get_id() &lt;&lt; std::endl;});
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Wird das Programm ausgeführt,&nbsp; liefert es leider nicht das gewünschte Ergebnis.<br /><br /></p>
+<p>&nbsp;<img src="images/blog/Threads/LebenszeitVonThreads/threadForgetJoin.png" alt="threadForgetJoin" /></p>
+<p>Was ist der Grund?&nbsp;</p>
+<h2>join und detach</h2>
+<p>Die Ausführungseinheit des erzeugten Threads endet mit dem Ende der aufrufbaren Einheit. Entweder wartet der Erzeuger, bis sein Kind t fertig ist (<span style="font-family: courier new,courier;">t.join()</span>), oder er trennt sich explizit von diesem: <span style="font-family: courier new,courier;"> t.detach()</span>. Ein Thread<span style="font-family: courier new,courier;"> t</span> mit Ausführungseinheit (es lassen sich auch Threads ohne ausführbare Einheit erzeugen) ist <em>joinable</em>, wenn auf diesem noch nicht <span style="font-family: courier new,courier;">t.join()</span> oder <span style="font-family: courier new,courier;">t.detach()</span> aufgerufen wurde. Ein<em> joinable</em> Thread<span style="font-family: courier new,courier;"> t</span>&nbsp;ruft in seinem Destruktor die Ausnahme<span style="font-family: courier new,courier;"> std::terminate</span> auf, die zum Abbruch des Programms führt. Genau dies ist der Grund dafür, das die aktuelle Programmausführung zu einer Ausnahme führte.</p>
+<p>Die Lösung des Problems ist naheliegend. Durch einen <span style="font-family: courier new,courier;">t.join()</span> Aufruf verhält sich das Programm wohldefiniert.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;thread&gt;</span>
+
+<span style="color: #2b91af;">int</span> main(){
+
+  std::<span style="color: #0000ff;">thread</span> t([]{std::cout &lt;&lt; std::this_thread::get_id() &lt;&lt; std::endl;});
+
+  t.join(); 
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p><img src="images/blog/Threads/LebenszeitVonThreads/threadJoin.png" alt="threadJoin" /></p>
+<h3><span style="background-color: #ffffff; color: #3366ff;">Exkurs: Die Herausforderungen von detach<br /></span></h3>
+<p><span style="background-color: #ffffff; color: #3366ff;">Natürlich bietet es sich an, statt <span style="font-family: courier new,courier;">t.join() t.detach()</span> zu verwenden. Damit ist der Thread <span style="font-family: courier new,courier;">t</span> nicht mehr <em>joinable </em>und sein Destruktor wirft keine <span style="font-family: courier new,courier;">std::terminate</span> Ausnahme mehr. Leider handeln wir uns dadurch ein Lebenszeitproblem des Objekts <span style="font-family: courier new,courier;">std::cout</span> ein. Die Ausgabe des Programmlaufs ist nicht besonders vielsagend.&nbsp; </span></p>
+<p><span style="color: #3366ff; background-color: #ffffff;"><img src="images/blog/Threads/LebenszeitVonThreads/threadDetach.png" alt="threadDetach" width="450" height="172" /></span></p>
+<p><span style="color: #3366ff;"><span style="color: #000000;"><span style="background-color: #c0c0c0;"><span style="background-color: #ffffff;"><span style="color: #3366ff;">Dazu aber im nächsten Artikel mehr.</span></span> </span> </span> </span></p>
+<h2>Threads verschieben</h2>
+<p>Die Anwendung von join war bisher sehr leicht. Leider trifft dies nicht immer zu.</p>
+<p>Threads können nicht kopiert (Copy-Semantik), sondern nur verschoben (<a href="index.php?option=com_content&amp;view=article&amp;id=68:lebenszeit-von-threads&amp;catid=35:c&amp;Itemid=101#MoveSemantik">Move-Semantik</a>) werden. Wird ein Thread verschoben, ist es deutlich anspruchsvoller für den Erzeuger sich um die Lebenszeit seines Kindes zu kümmern.&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0000ff;">#include &lt;iostream&gt; </span>
+<span style="color: #0000ff;">#include &lt;thread&gt; </span>
+<span style="color: #0000ff;">#include &lt;utility&gt;</span>
+
+<span style="color: #2b91af;">int</span> main(){ 
+
+  std::<span style="color: #0000ff;">thread</span> t([]{std::cout &lt;&lt; std::this_thread::get_id();}); 
+  std::<span style="color: #0000ff;">thread</span> t2([]{std::cout &lt;&lt; std::this_thread::get_id();}); 
+  
+  t= std::move(t2); 
+  t.join(); 
+  t2.join(); 
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Die zwei Threads<span style="font-family: courier new,courier;"> t1</span> und <span style="font-family: courier new,courier;">t2</span> sollen in dem Programm ihre&nbsp; ID ausgeben. Darüber hinaus wird der Thread <span style="font-family: courier new,courier;">t2</span> nach <span style="font-family: courier new,courier;">t</span> verschoben:<span style="font-family: courier new,courier;"> t= std::move(t2)</span>. Zum Schluss kümmert sich der<span style="font-family: courier new,courier;"> main</span>-Thread um die Lebenszeit seiner Kinder, indem er sie<em> joined</em>. Leider deckt sich die Ausgabe des Programms nicht mit meinen Erwartungen.</p>
+<p>&nbsp;<img src="images/blog/Threads/LebenszeitVonThreads/threadMove.png" alt="threadMove" /></p>
+<p>Was läuft hier schief? Zwei Dinge:</p>
+<ol>
+<li>Durch das Verschieben des Threads <span style="font-family: courier new,courier;">t2</span> erhält der Thread <span style="font-family: courier new,courier;">t</span> eine neue Ausführungseinheit und sein Destruktor wird aufgerufen. Dies führt dazu, dass der Destruktor des Threads <span style="font-family: courier new,courier;">t std::terminate</span> ausführt, da dieser noch <em>joinable</em> ist.</li>
+<li>Der Thread t2 besitzt durch das Verschieben keine Ausführungseinheit mehr. Der Aufruf<em><span style="font-family: arial,helvetica,sans-serif;"> join </span></em>auf einem Thread ohne Ausführungseinheit verursacht eine Ausnahme <span style="font-family: courier new,courier;">std::system_error.</span></li>
+</ol>
+<p>Beide Fehler sind nun aber behoben.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0000ff;">#include &lt;iostream&gt; </span>
+<span style="color: #0000ff;">#include &lt;thread&gt; </span>
+<span style="color: #0000ff;">#include &lt;utility&gt;</span>
+
+<span style="color: #2b91af;">int</span> main(){ 
+
+  std::<span style="color: #0000ff;">thread</span> t([]{std::cout &lt;&lt; std::this_thread::get_id() &lt;&lt; std::endl;}); 
+  std::<span style="color: #0000ff;">thread</span> t2([]{std::cout &lt;&lt; std::this_thread::get_id() &lt;&lt; std::endl;}); 
+  
+  t.join();
+  t= std::move(t2); 
+  t.join(); 
+  
+  std::cout &lt;&lt; <span style="color: #a31515;">"\n"</span>;
+  std::cout &lt;&lt; std::boolalpha &lt;&lt; <span style="color: #a31515;">"t2.joinable(): "</span> &lt;&lt; t2.joinable() &lt;&lt; std::endl;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Konsequenterweise ist der Thread<span style="font-family: courier new,courier;"> t2</span> nicht mehr <em>joinable.</em></p>
+<p><img src="images/blog/Threads/LebenszeitVonThreads/threadMoveRight.png" alt="threadMoveRight" /></p>
+<h2>scoped_thread</h2>
+<p>Wem das explizite sich Kümmern um die Lebenszeit des Kinderthreads zu viel Aufwand ist, der kann ein <span style="font-family: courier new,courier;">std::thread</span> in einer eigenen Thread Klasse kapseln, die automatisch&nbsp;<em>join </em>im Destruktor aufruft. Ein automatischer Aufruf von detach im Desstruktor ist natürlich auch möglich. Diesen <em>detach</em>-Aufruf im Destruktor als Standardverhalten zu verwenden, bringt aber viele neue Herausforderungen mit sich.</p>
+<p>Die Klasse <span style="font-family: courier new,courier;">scoped_thread</span> geht auf <a href="index.php?option=com_content&amp;view=article&amp;id=68:lebenszeit-von-threads&amp;catid=35:c&amp;Itemid=101#AnthonyWilliams">Anthony Williams</a> zurück. Diese Klasse stellt im Konstruktor sicher, dass der Thread <em>joinable</em> ist und ruft <em>join</em> im Destruktor auf. Da der Copy-Konstruktor und Copy-Zuweisungsoperator als <span style="font-family: courier new,courier;">delete</span> deklariert sind, lassen sich Instanzen dieser Klasse weder kopieren noch zuweisen.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;thread&gt;</span>
+<span style="color: #0000ff;">#include &lt;utility&gt;</span>
+
+
+<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">scoped_thread</span>{
+  std::<span style="color: #0000ff;">thread</span> t;
+public:
+  <span style="color: #0000ff;">explicit</span> scoped_thread(std::<span style="color: #0000ff;">thread</span> t_): t(std::move(t_)){
+    <span style="color: #0000ff;">if</span> ( !t.joinable()) <span style="color: #0000ff;">throw</span> std::logic_error(<span style="color: #a31515;">"No thread"</span>);
+  }
+  ~scoped_thread(){
+    t.join();
+  }
+  scoped_thread(scoped_thread&amp;)= <span style="color: #0000ff;">delete</span>;
+  scoped_thread&amp; <span style="color: #0000ff;">operator</span>=(scoped_thread <span style="color: #0000ff;">const</span> &amp;)= <span style="color: #0000ff;">delete</span>;
+};
+
+<span style="color: #2b91af;">int</span> main(){
+
+  scoped_thread t(std::<span style="color: #0000ff;">thread</span>([]{std::cout &lt;&lt; std::this_thread::get_id() &lt;&lt; std::endl;}));
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>In nächsten Artikel geht ich auf die <a href="index.php/blog/datenuebergabe-an-threads">Datenübergabe an Threads</a> ein.</p>
+<h2>Hintergrundwissen</h2>
+<dl><dt><a id="MoveSemantik">Move-Semantik</a></dt><dd>&nbsp;&nbsp;&nbsp; Die Details zur Move-Semantik lassen sich in dem Linux-Magazin Artikel<a href="index.php/modernes-c-in-der-praxis-linux-magazin-a"> Rasch verschoben</a> (12/2012) nachlesen.</dd><dt><a id="AnthonyWilliams">Anthony Williams</a></dt><dd>&nbsp;&nbsp; Ist der Maintainer der Boost Thread Bibliothek und Autor des&nbsp;Standardwerkes zu Multithreading in modernem C++: C++ Concurrency in Action.</dd><dd></dd><dd></dd><dd></dd><dd></dd><dd></dd><dd></dd><dd></dd><dd></dd><dd>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="166" height="212" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Hole dir dein E-Book. Unterstütze meinen Blog.</span></strong></p>
+</dd></dl>
+<p>&nbsp;</p>

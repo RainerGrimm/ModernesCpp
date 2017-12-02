@@ -1,0 +1,263 @@
+<p>Die große Herausforderung mit Threads beginnt dann, wenn sich diese Daten teilen und diese nicht konstant sind.</p>
+<hr id="system-readmore" />
+<h2>Kritischer Wettlauf und kritischer Bereich</h2>
+<p>Im Zusammenhang mit von Threads gemeinsam verwendeten Daten wird gerne von einem kritischen Wettlauf&nbsp;oder auch kritischem Bereich gesprochen. Doch was ist das?</p>
+<dl><dt><a id="KritischerWettlauf">Kritischer Wettlauf </a>(Race Condition)</dt><dd>&nbsp;&nbsp;&nbsp; Ein kritischer Wettlauf entsteht genau dann, wenn mindestens zwei Threads gleichzeitig ein Datum verwenden, wobei zu mindestens ein Thread versucht, diese zu modifizieren.</dd><dt><a id="KritischerBereich">Kritischer Bereich</a> (Critial Section)</dt><dd>&nbsp;&nbsp;&nbsp; Ein kritischer Bereich ist ein zusammenhängender Datenbereich, in dem nur ein Thread Zugriff&nbsp;auf die Daten haben darf.</dd><dd></dd><dd>
+<p>&nbsp;</p>
+<p>Enthält ein Programm einen kritischen Wettlauf, dann ist das Programmverhalten undefiniert. Anders ausgedrückt, jedes erdenkliche und unerdenkliche Verhalten ist möglich.</p>
+</dd><dd></dd><dd>
+<p>Schön lässt sich dies verschränkte Ausführen von Threads visualisieren, wenn mehrere Threads versuchen, gleichzeitig auf <span style="font-family: courier new,courier;">std::cout</span> zu schreiben. <span style="font-family: courier new,courier;">std::cout</span> ist daher das gemeinsame Datum, dass es vor dem gleichzeitigen modifizierenden Zugriff mehrerer Threads zu schützen gilt. &nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0px; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47</pre>
+</td>
+<td>
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0000ff;">#include &lt;chrono&gt;</span>
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;thread&gt;</span>
+
+<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">Worker</span>{
+public:
+  Worker(std::string n):name(n){};
+  
+    <span style="color: #2b91af;">void</span> operator() (){
+      <span style="color: #0000ff;">for</span> (<span style="color: #2b91af;">int</span> i= 1; i &lt;= 3; ++i){
+	<span style="color: #008000;">// begin work</span>
+	std::this_thread::sleep_for(std::chrono::milliseconds(200));
+	<span style="color: #008000;">// end work</span>
+	std::cout &lt;&lt; name &lt;&lt; <span style="color: #a31515;">": "</span> &lt;&lt; <span style="color: #a31515;">"Work "</span> &lt;&lt; i &lt;&lt; <span style="color: #a31515;">" done !!!"</span> &lt;&lt; std::endl;
+      }
+      
+    }
+private:
+  std::string name;
+};
+
+
+<span style="color: #2b91af;">int</span> main(){
+
+  std::cout &lt;&lt; std::endl;
+  
+  std::cout &lt;&lt; <span style="color: #a31515;">"Boss: Let's start working.\n\n"</span>;
+ 
+  std::<span style="color: #0000ff;">thread</span> herb= std::<span style="color: #0000ff;">thread</span>(Worker(<span style="color: #a31515;">"Herb"</span>));
+  std::<span style="color: #0000ff;">thread</span> andrei= std::<span style="color: #0000ff;">thread</span>(Worker(<span style="color: #a31515;">"  Andrei"</span>));
+  std::<span style="color: #0000ff;">thread</span> scott= std::<span style="color: #0000ff;">thread</span>(Worker(<span style="color: #a31515;">"    Scott"</span>));
+  std::<span style="color: #0000ff;">thread</span> bjarne= std::<span style="color: #0000ff;">thread</span>(Worker(<span style="color: #a31515;">"      Bjarne"</span>));
+  std::<span style="color: #0000ff;">thread</span> andrew= std::<span style="color: #0000ff;">thread</span>(Worker(<span style="color: #a31515;">"        Andrew"</span>));
+  std::<span style="color: #0000ff;">thread</span> david= std::<span style="color: #0000ff;">thread</span>(Worker(<span style="color: #a31515;">"          David"</span>));
+  
+  herb.join();
+  andrei.join();
+  scott.join();
+  bjarne.join();
+  andrew.join();
+  david.join();
+  
+  std::cout &lt;&lt; <span style="color: #a31515;">"\n"</span> &lt;&lt; <span style="color: #a31515;">"Boss: Let's go home."</span> &lt;&lt; std::endl;
+  
+  std::cout &lt;&lt; std::endl;
+
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Der Boss gibt seinen sechs Arbeitern (Zeile 29 - 34)&nbsp; jeweils drei Arbeitspakete in den Zeilen 9 - 15. Hat ein Arbeiter sein Arbeitspaket erledigt, schreit er dies zum Boss (<span style="font-family: courier new,courier;">main</span>-Thread) zurück (Zeile 14). Hat der Boss alle Benachrichtigungen von seinen Arbeitern erhalten, schickt er sie in den wohlverdienten Feierabend (Zeile 43).&nbsp;</p>
+<p>&nbsp;<strong>Was für ein Durcheinander!</strong></p>
+<p>&nbsp;<img src="images/blog/Threads/ThreadsTeilenDaten/bossWorker.png" alt="bossWorker" /></p>
+<p>Am nächsten Tag wird es auch nicht besser. Die Arbeiter schreien wiederum vollkommen unkoordiniert durcheinander.</p>
+<p><img src="images/blog/Threads/ThreadsTeilenDaten/bossWorker1.png" alt="bossWorker1" /></p>
+</dd><dd></dd><dd></dd><dd></dd><dd></dd><dd></dd><dd></dd><dd>
+<p>Die naheliegendte Möglichkeit, den Zugriff der Threads auf die gemeinsame Variable <span style="font-family: courier new,courier;">std::cout</span> zu synchronisieren, ist ein Mutex.</p>
+<h3><span style="font-family: arial,helvetica,sans-serif; color: #3366ff;">Exkurs: <span style="font-family: courier new,courier;">std::cout</span> ist threadsicher</span></h3>
+</dd><dd><span style="color: #0000ff;"><span style="color: #3366ff;">Der C++11 Standard sicher zu, dass die einzelnen Zeichen auf den Ausgabestream <span style="font-family: courier new,courier;">std::cout</span> vor gleichzeitiger Modifikation mehrerer Threads nicht geschützt werden müssen. Jedes Zeichen wird atomar ausgegeben. Natürlich können mehrere Ausgabeanweisungen wie in dem Beispiel beliebig vermischt werden. Das ist aber nur ein <em>optisches</em> Problem. Das Programm ist wohldefiniert. Diese Aussage gilt neben den Ausgabestream <span style="font-family: courier new,courier;">std::cout</span> für alle weiteren Ein- und Ausgabebstreams in C++.</span> </span></dd><dd>
+<h2>Mutex</h2>
+<p>Ein Mutex steht für <strong>Mut</strong>ual<strong> Ex</strong>clusion. Dieser sichert zu, dass der kritische Bereich exklusiv von einem Thread verwendet wird.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0px; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51</pre>
+</td>
+<td>
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0000ff;">#include &lt;chrono&gt;</span>
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;mutex&gt;</span>
+<span style="color: #0000ff;">#include &lt;thread&gt;</span>
+
+std::mutex coutMutex;
+
+<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">Worker</span>{
+public:
+  Worker(std::string n):name(n){};
+ 
+    <span style="color: #2b91af;">void</span> operator() (){
+      <span style="color: #0000ff;">for</span> (<span style="color: #2b91af;">int</span> i= 1; i &lt;= 3; ++i){
+	<span style="color: #008000;">// begin work</span>
+	std::this_thread::sleep_for(std::chrono::milliseconds(200));
+	<span style="color: #008000;">// end work</span>
+	coutMutex.lock();
+	std::cout &lt;&lt; name &lt;&lt; <span style="color: #a31515;">": "</span> &lt;&lt; <span style="color: #a31515;">"Work "</span> &lt;&lt; i &lt;&lt; <span style="color: #a31515;">" done !!!"</span> &lt;&lt; std::endl;
+	coutMutex.unlock();
+      }
+    }
+private:
+  std::string name;
+};
+
+
+<span style="color: #2b91af;">int</span> main(){
+
+  std::cout &lt;&lt; std::endl;
+  
+  std::cout &lt;&lt; <span style="color: #a31515;">"Boss: Let's start working."</span> &lt;&lt; <span style="color: #a31515;">"\n\n"</span>;
+ 
+  std::<span style="color: #0000ff;">thread</span> herb= std::<span style="color: #0000ff;">thread</span>(Worker(<span style="color: #a31515;">"Herb"</span>));
+  std::<span style="color: #0000ff;">thread</span> andrei= std::<span style="color: #0000ff;">thread</span>(Worker(<span style="color: #a31515;">"  Andrei"</span>));
+  std::<span style="color: #0000ff;">thread</span> scott= std::<span style="color: #0000ff;">thread</span>(Worker(<span style="color: #a31515;">"    Scott"</span>));
+  std::<span style="color: #0000ff;">thread</span> bjarne= std::<span style="color: #0000ff;">thread</span>(Worker(<span style="color: #a31515;">"      Bjarne"</span>));
+  std::<span style="color: #0000ff;">thread</span> andrew= std::<span style="color: #0000ff;">thread</span>(Worker(<span style="color: #a31515;">"        Andrew"</span>));
+  std::<span style="color: #0000ff;">thread</span> david= std::<span style="color: #0000ff;">thread</span>(Worker(<span style="color: #a31515;">"          David"</span>));
+  
+  herb.join();
+  andrei.join();
+  scott.join();
+  bjarne.join();
+  andrew.join();
+  david.join();
+  
+  std::cout &lt;&lt; <span style="color: #a31515;">"\n"</span> &lt;&lt; <span style="color: #a31515;">"Boss: Let's go home."</span> &lt;&lt; std::endl;
+  
+  std::cout &lt;&lt; std::endl;
+
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Der entscheidende Unterschied zum ersten nicht synchronisierten Programm sind in diesem Programm die Zeilen 17 und 19. Durch die Methodenaufrufe <span style="font-family: courier new,courier;">coutMutex.lock()</span> und <span style="font-family: courier new,courier;">coutMutex.unlock()</span> wird der kritische Bereich erklärt, der nur von einem Thread zu einem Zeitpunkt verwendet werden darf. Dadurch ist der Zugriff auf den Ausgabestream <span style="font-family: courier new,courier;">std::cout</span> synchronisiert. Nun löst sich das Geschrei der Arbeiter in Wohlgefallen auf.</p>
+<p><img src="images/blog/Threads/ThreadsTeilenDaten/bossWorkerSynchonized.png" alt="bossWorkerSynchonized" /></p>
+<p>Mutexe bergen ihre eigenen Gefahren. Dazu aber mehr im <a href="index.php/blog/gefahren-von-mutexen">nächsten Artikel.</a></p>
+<h2><span style="color: #333333;">Hintergrundinformationen</span></h2>
+<p><span style="color: #333333;">C++11 kennt mehrere Variationen von Mutexen. So gibt es Mutexe, die rekursiv aufgerufen oder mit Zeitbedingungen verwendet werden können.</span></p>
+<p><span style="color: #0000ff;"><span style="color: #999999;"><span style="color: #3366ff;"><span style="color: #000000;"><span style="color: #333333;">C++14 führt einen weiteren Mutex ein, der von mehreren Threads gleichzeitig verwendet werden kann. Dieser Mutex bildet die Grundlage für Reader-Writer Locks. Die Details zu den Mutexvarianten lassen sich schön auf<a href="http://en.cppreference.com/w/cpp/thread" style="color: #333333;"><span style="color: #0000ff;"> en.cppreference.com</span> </a>nachlesen.</span> </span> </span> </span> </span> <a href="http://en.cppreference.com/w/cpp/thread"> </a></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="166" height="212" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Hole dir dein E-Book. Unterstütze meinen Blog.</span></strong></p>
+</dd><dd></dd></dl>
