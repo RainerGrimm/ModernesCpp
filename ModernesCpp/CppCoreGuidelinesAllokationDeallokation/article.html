@@ -1,0 +1,158 @@
+<p>The guidelines has six rules for explicit memory allocation and deallocation. Six! Maybe you are surprised because there is a simple rule in modern C++: don't use new and delete. Obviously, the story is not so simple.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p><img src="images/blog/ModernCpp/CppCoreGuidelinesAllocationDeallocation/German_Monopoly_board_in_the_middle_of_a_game.png" alt="German Monopoly board in the middle of a game" width="600" height="370" /></p>
+<p>Here are the six rules.</p>
+<ul>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rr-mallocfree">R.10: Avoid <code class="highlighter-rouge no-highlight">malloc()</code> and <code class="highlighter-rouge no-highlight">free()</code></a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rr-newdelete">R.11: Avoid calling <code class="highlighter-rouge no-highlight">new</code> and <code class="highlighter-rouge no-highlight">delete</code> explicitly</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rr-immediate-alloc">R.12: Immediately give the result of an explicit resource allocation to a manager object</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rr-single-alloc">R.13: Perform at most one explicit resource allocation in a single expression statement</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rr-ap">R.14: ??? array vs. pointer parameter</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rr-pair">R.15: Always overload matched allocation/deallocation pairs</a></li>
+</ul>
+<p>I will not write about the last two rules. First, the rule R.14 is not baked enough and second, the rule R.15 is quite special. If you want to learn more about overloading <span style="font-family: courier new,courier;">new</span> and <span style="font-family: courier new,courier;">delete,</span> you should read my posts to <a href="index.php/tag/new-delete">memory allocation and deallocation</a>.</p>
+<p>Before I dive into the rules, let me give you a little background which is necessary for understanding the rules. Creating an object in C++ with <span style="font-family: courier new,courier;">new</span> consists of two steps.</p>
+<ol>
+<li>Allocate the memory for the object</li>
+<li>Constructs the object into the allocated memory</li>
+</ol>
+<p><a href="http://en.cppreference.com/w/cpp/memory/new/operator_new"><span style="font-family: courier new,courier;">operator new</span> or <span style="font-family: courier new,courier;">operator new []</span></a> makes the first step; the constructor the second step.</p>
+<p>The same strategy applies to the destruction but the other way around. First, the destructor is called (if any) and then the memory is deallocated with <a href="http://en.cppreference.com/w/cpp/memory/new/operator_delete"><span style="font-family: courier new,courier;">operator delete</span> or <span style="font-family: courier new,courier;">operator delete []</span></a>. This two-step creation and destruction is the reason for the four rules. So, let's start.</p>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rr-mallocfree">R.10: Avoid <code class="highlighter-rouge no-highlight">malloc()</code> and <code class="highlighter-rouge no-highlight">free()</code></a></h3>
+<p>What is the difference between <span style="font-family: courier new,courier;">new</span> and <span style="font-family: courier new,courier;">malloc</span>, or<span style="font-family: courier new,courier;"> delete</span> and <span style="font-family: courier new,courier;">free</span>? The C-functions <span style="font-family: courier new,courier;">malloc</span> and <span style="font-family: courier new,courier;">free</span> do only half of the job. <span style="font-family: courier new,courier;">malloc</span> allocates the memory and <span style="font-family: courier new,courier;">free</span> only deallocates the memory. Either does <span style="font-family: courier new,courier;">malloc</span> invoke the constructor nor does free invoke the destructor.</p>
+<p>This means, if you use an object which was just <em>created</em> via <span style="font-family: courier new,courier;">malloc,</span> you will get undefined behaviour.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// mallocVersusNew.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;string&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">struct</span> Record{
+  Record(std<span style="color: #555555;">::</span>string na <span style="color: #555555;">=</span> <span style="color: #cc3300;">"Record"</span>)<span style="color: #555555;">:</span> name(na){}                 <span style="color: #0099ff; font-style: italic;">// (4)</span>
+  std<span style="color: #555555;">::</span>string name;
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    Record<span style="color: #555555;">*</span> p1 <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">static_cast</span><span style="color: #555555;">&lt;</span>Record<span style="color: #555555;">*&gt;</span>(malloc(<span style="color: #006699; font-weight: bold;">sizeof</span>(Record)));  <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> p1<span style="color: #555555;">-&gt;</span>name <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;                         <span style="color: #0099ff; font-style: italic;">// (3)</span>
+
+    <span style="color: #006699; font-weight: bold;">auto</span> p2 <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">new</span> Record;                                       <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> p2<span style="color: #555555;">-&gt;</span>name <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;                         <span style="color: #0099ff; font-style: italic;">  </span>
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+   
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>I only allocate in (1) memory for my <span style="font-family: courier new,courier;">Record</span> object. The result is that the output <span style="font-family: courier new,courier;">p1-&gt;name</span> in (3) is undefined behaviour. In contrast, the call (2) invokes the constructor in line (4). Undefined behaviour just means that you can not make any assumption about the output of the program.</p>
+<p>Depending on the used platform and the used GCC, the result of the program is entirely different.</p>
+<ul>
+<li>GCC 4.8.5 produces a core dump on my local PC</li>
+</ul>
+<p><img src="images/blog/ModernCpp/CppCoreGuidelinesAllocationDeallocation/mallocVersusNewGcc.png" alt="mallocVersusNewGcc" width="563" height="187" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<ul>
+<li>GCC 4.9 (on cppreference.com) produces no output</li>
+</ul>
+<p><img src="images/blog/ModernCpp/CppCoreGuidelinesAllocationDeallocation/mallocVersusNewOnline49.png" alt="mallocVersusNewOnline49" width="240" height="87" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<ul>
+<li>GCC 7.1 (cppreference.com) produces the <em>expected</em> output</li>
+</ul>
+<p><img src="images/blog/ModernCpp/CppCoreGuidelinesAllocationDeallocation/mallocVersusNewOnline71.png" alt="mallocVersusNewOnline71" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rr-newdelete">R.11: Avoid calling <code class="highlighter-rouge no-highlight">new</code> and <code class="highlighter-rouge no-highlight">delete</code> explicitly</a></h3>
+<p>You should keep this rule in mind. The emphasis in this rule lies on the word <strong>explicitly</strong> because using smart pointers or containers of the Standard Template Library give you object which use <strong>implicitly</strong> <span style="font-family: courier new,courier;">new</span> and <span style="font-family: courier new,courier;">delete.</span></p>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rr-immediate-alloc">R.12: Immediately give the result of an explicit resource allocation to a manager object</a></h3>
+<p>This is the key ideas of a smart pointer such as <span style="font-family: courier new,courier;">std::unique_ptr&lt;int&gt; upInt(new int()) and</span> will not hold in the counterexample from the guidelines. If the allocation of buffer fails the file handle will be lost.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">f</span>(<span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span>string<span style="color: #555555;">&amp;</span> name)
+{
+    <span style="color: #007788; font-weight: bold;">FILE</span><span style="color: #555555;">*</span> f <span style="color: #555555;">=</span> fopen(name, <span style="color: #cc3300;">"r"</span>);            <span style="color: #0099ff; font-style: italic;">// open the file</span>
+    std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">char</span><span style="color: #555555;">&gt;</span> buf(<span style="color: #ff6600;">1024</span>);
+    fclose(f);                             <span style="color: #0099ff; font-style: italic;">// close the file</span>
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rr-single-alloc">R.13: Perform at most one explicit resource allocation in a single expression statement</a></h3>
+<p>This rule is a little bit tricky. <span style="font-family: courier new,courier;"><br /></span></p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">func</span>(std<span style="color: #555555;">::</span>shared_ptr<span style="color: #555555;">&lt;</span>Widget<span style="color: #555555;">&gt;</span> sp1, std<span style="color: #555555;">::</span>shared_ptr<span style="color: #555555;">&lt;</span>Widget<span style="color: #555555;">&gt;</span> sp2){
+ ...
+}
+
+func(std<span style="color: #555555;">::</span>shared_ptr<span style="color: #555555;">&lt;</span>Widget<span style="color: #555555;">&gt;</span>(<span style="color: #006699; font-weight: bold;">new</span> Widget(1)), std<span style="color: #555555;">::</span>shared_ptr<span style="color: #555555;">&lt;</span>Widget<span style="color: #555555;">&gt;</span>(<span style="color: #006699; font-weight: bold;">new</span> Widget(2)));
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>This function call is not exception-safe and may, therefore, result in a memory leak. Why? The reason is that four operations must be performed to initialise the shared pointers.</p>
+<ol>
+<li>Allocate memory for <span style="font-family: courier new,courier;">Widget(1)</span></li>
+<li>Construct <span style="font-family: courier new,courier;">Widget(1)</span></li>
+<li>Allocate memory for <span style="font-family: courier new,courier;">Widget(2)</span></li>
+<li>Construct <span style="font-family: courier new,courier;">Widget(2)</span></li>
+</ol>
+<p>The compiler is free to first allocate the memory for <span style="font-family: courier new,courier;">Widget(1)</span> and <span style="font-family: courier new,courier;">Widget(2)</span> and then construct both.</p>
+<ol>
+<li>Allocate memory for <span style="font-family: courier new,courier;">Widget(1)</span></li>
+<li>Allocate memory for <span style="font-family: courier new,courier;">Widget(2)</span></li>
+<li>Construct <span style="font-family: courier new,courier;">Widget(1)</span></li>
+<li>Construct <span style="font-family: courier new,courier;">Widget(2)</span></li>
+</ol>
+<p>If one of the constructors throws an exception, the memory of the other object will not be automatically freed and we will get a memory leak.</p>
+<p>It's quite easy to overcome this issue by using the factory function <span style="font-family: courier new,courier;">std::make_shared </span>for creating an<span style="font-family: courier new,courier;"> std::shared_ptr. </span>&nbsp; <span style="font-family: courier new,courier;"><br /></span></p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">func(std<span style="color: #555555;">::</span>make_shared<span style="color: #555555;">&lt;</span>Widget<span style="color: #555555;">&gt;</span>(<span style="color: #ff6600;">1</span>), std<span style="color: #555555;">::</span>make_shared<span style="color: #555555;">&lt;</span>Widget<span style="color: #555555;">&gt;</span>(<span style="color: #ff6600;">2</span>));
+</pre>
+</div>
+<p>&nbsp;</p>
+<p><span style="font-family: courier new,courier;">std::make_shared</span> guarantees that the function will have no effect if an exception is thrown. The pendant function <span style="font-family: courier new,courier;">std::make_unique</span> for creating an <span style="font-family: courier new,courier;">std::unique_ptr</span> guarantees the same.&nbsp;</p>
+<h2>What's next?</h2>
+<p>The next rules to resource management will follow the Rule R.11: avoid calling <span style="font-family: courier new,courier;">new</span> and <span style="font-family: courier new,courier;">delete</span> explicitly; therefore, the next post will be about the smart pointers <span style="font-family: courier new,courier;">std::unique_ptr</span>, <span style="font-family: courier new,courier;">std::shared_ptr</span>, and <span style="font-family: courier new,courier;">std::weak_ptr</span>.</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Eric Pederson, Paul Baxter, and Franco Amato.<br /></strong></p>
+<p>&nbsp;</p>
+<table border="0" style="width: 800px; height: 250px;" cellpadding="8"><caption>
+<h2>Get your e-book at leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img src="images/books/cover.png" alt="cover" width="173" height="220" style="border: medium none #000000;" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 550 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
