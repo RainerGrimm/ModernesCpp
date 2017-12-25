@@ -1,0 +1,190 @@
+<p>Passing smart pointers is an important topic which is seldom addressed. This ends with the C++ core guidelines because they have six rules for passing <span style="font-family: courier new,courier;">std::shared_ptr</span> and <span style="font-family: courier new,courier;">std::unique_ptr</span>.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p><img src="images/blog/ModernCpp/CppCoreGuidelinesSmartPointersFunctionParameter/relay-race.png" alt="relay race" /></p>
+<p>The six rules violate the import dry (<a href="https://en.wikipedia.org/wiki/Don%27t_repeat_yourself">don't repeat yourself</a>) principle for software development. At the end, we have only four rules what makes our life as a software developer a lot easier. Here are the rules.</p>
+<ul>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rr-uniqueptrparam">R.32: Take a <code class="highlighter-rouge no-highlight">unique_ptr&lt;widget&gt;</code> parameter to express that a function assumes ownership of a <code class="highlighter-rouge no-highlight">widget</code></a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rr-reseat">R.33: Take a <code class="highlighter-rouge no-highlight">unique_ptr&lt;widget&gt;&amp;</code> parameter to express that a function reseats the <code class="highlighter-rouge no-highlight">widget</code></a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rr-sharedptrparam-owner">R.34: Take a <code class="highlighter-rouge no-highlight">shared_ptr&lt;widget&gt;</code> parameter to express that a function is part owner</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rr-sharedptrparam">R.35: Take a <code class="highlighter-rouge no-highlight">shared_ptr&lt;widget&gt;&amp;</code> parameter to express that a function might reseat the shared pointer</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rr-sharedptrparam-const">R.36: Take a <code class="highlighter-rouge no-highlight">const shared_ptr&lt;widget&gt;&amp;</code> parameter to express that it might retain a reference count to the object ???</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rr-smartptrget">R.37: Do not pass a pointer or reference obtained from an aliased smart pointer</a></li>
+</ul>
+<p>&nbsp;Let's start with the first two rules for <span style="font-family: courier new,courier;">std::unique_ptr</span>.</p>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rr-uniqueptrparam">R.32: Take a <code class="highlighter-rouge no-highlight">unique_ptr&lt;widget&gt;</code> parameter to express that a function assumes ownership of a <code class="highlighter-rouge no-highlight">widget</code></a></h3>
+<p>If a function should take ownership of a <span style="font-family: courier new,courier;">Widget,</span> you should take the <span style="font-family: courier new,courier;">std::unique_ptr&lt;Widget&gt;</span> by copy. The consequence is that the caller has to move the <span style="font-family: courier new,courier;">std::unique_ptr&lt;Widget&gt; </span>to make the code to run.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #009999;">#include &lt;memory&gt;</span>
+<span style="color: #009999;">#include &lt;utility&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">struct</span> Widget{
+    Widget(<span style="color: #007788; font-weight: bold;">int</span>){}
+};
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">sink</span>(std<span style="color: #555555;">::</span>unique_ptr<span style="color: #555555;">&lt;</span>Widget<span style="color: #555555;">&gt;</span> uniqPtr){
+    <span style="color: #0099ff; font-style: italic;">// do something with uniqPtr</span>
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+    <span style="color: #006699; font-weight: bold;">auto</span> uniqPtr <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>make_unique<span style="color: #555555;">&lt;</span>Widget<span style="color: #555555;">&gt;</span>(<span style="color: #ff6600;">1998</span>);
+    
+    sink(std<span style="color: #555555;">::</span>move(uniqPtr));      <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    sink(uniqPtr);                 <span style="color: #0099ff; font-style: italic;">// (2) ERROR</span>
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The call (1) is fine but the call (2) breaks because you can not copy an <span style="font-family: courier new,courier;">std::unique_ptr.</span> If your function only wants to use the <span style="font-family: courier new,courier;">Widget,</span> it should take its parameter by pointer of by reference. The difference between a pointer and a reference is that a pointer can be a null pointer.<span style="font-family: courier new,courier;"></span><span style="font-family: courier new,courier;"></span><span style="font-family: courier new,courier;"></span></p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">useWidget</span>(Widget<span style="color: #555555;">*</span> wid);
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">useWidget</span>(Widget<span style="color: #555555;">&amp;</span> wid);
+</pre>
+</div>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rr-reseat">R.33: Take a <code class="highlighter-rouge no-highlight">unique_ptr&lt;widget&gt;&amp;</code> parameter to express that a function reseats the <code class="highlighter-rouge no-highlight">widget</code></a></h3>
+<p>Sometimes a function want's to reseat a <span style="font-family: courier new,courier;">Widget.</span> In this use-case, you should pass the <span style="font-family: courier new,courier;">std::unique_ptr&lt;Widget&gt;</span> by a non-const reference.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #009999;">#include &lt;memory&gt;</span>
+<span style="color: #009999;">#include &lt;utility&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">struct</span> Widget{
+    Widget(<span style="color: #007788; font-weight: bold;">int</span>){}
+};
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">reseat</span>(std<span style="color: #555555;">::</span>unique_ptr<span style="color: #555555;">&lt;</span>Widget<span style="color: #555555;">&gt;&amp;</span> uniqPtr){
+    uniqPtr.reset(<span style="color: #006699; font-weight: bold;">new</span> Widget(<span style="color: #ff6600;">2003</span>));   <span style="color: #0099ff; font-style: italic;">// (0)</span>
+    <span style="color: #0099ff; font-style: italic;">// do something with uniqPtr</span>
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+    <span style="color: #006699; font-weight: bold;">auto</span> uniqPtr <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>make_unique<span style="color: #555555;">&lt;</span>Widget<span style="color: #555555;">&gt;</span>(<span style="color: #ff6600;">1998</span>);
+    
+    reseat(std<span style="color: #555555;">::</span>move(uniqPtr));       <span style="color: #0099ff; font-style: italic;">// (1) ERROR</span>
+    reseat(uniqPtr);                  <span style="color: #0099ff; font-style: italic;">// (2) </span>
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Now, the call (1) fails because you can not bind an rvalue to a non-const lvalue reference. This will not hold for the copy in (2). A lvalue can be bound to an lvalue reference. By the way. The call (0) will not only construct a new <span style="font-family: courier new,courier;">Widget(2003</span>), it will also destruct the old <span style="font-family: courier new,courier;">Widget(1998)</span>.</p>
+<p>The next three rules to <span style="font-family: courier new,courier;">std::shared_ptr</span> are literally repetitions; therefore, I will make one out of them.</p>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rr-sharedptrparam-owner">R.34: Take a <code class="highlighter-rouge no-highlight">shared_ptr&lt;widget&gt;</code> parameter to express that a function is part owner</a>, <a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rr-sharedptrparam">R.35: Take a <code class="highlighter-rouge no-highlight">shared_ptr&lt;widget&gt;&amp;</code> parameter to express that a function might reseat the shared pointer,&nbsp; </a>and <a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rr-sharedptrparam-const">R.36: Take a <code class="highlighter-rouge no-highlight">const shared_ptr&lt;widget&gt;&amp;</code> parameter to express that it might retain a reference count to the object ???</a></h3>
+<p>Here are the three function signatures, we have to deal with.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">share</span>(std<span style="color: #555555;">::</span>shared_ptr<span style="color: #555555;">&lt;</span>Widget<span style="color: #555555;">&gt;</span> shaWid);
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">reseat</span>(std<span style="color: #555555;">::</span>shard_ptr<span style="color: #555555;">&lt;</span>Widget<span style="color: #555555;">&gt;&amp;</span> shadWid);
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">mayShare</span>(<span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span>shared_ptr<span style="color: #555555;">&lt;</span>Widget<span style="color: #555555;">&gt;&amp;</span> shaWid);
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Let's look at each function signature in isolation. What does this mean from the function perspective?</p>
+<ul>
+<li><span style="font-family: courier new,courier;"><strong>void share(std::shared_ptr&lt;Widget&gt; shaWid)</strong>: </span>I'm for the lifetime of the function body a shared owner of the&nbsp;<span style="font-family: courier new,courier;">Widget.</span> At the begin of the function body, I will increase the reference counter; at the end of the function, I will decrease the reference counter; therefore, the&nbsp;<span style="font-family: courier new,courier;">Widget</span> will stay alive, as long as I use it.</li>
+<li><span style="font-family: courier new,courier;"><strong>void reseat(std::shared_ptr&lt;Widget&gt;&amp; shaWid)</strong>: </span>I'm not a shared owner of the Widget, because I will not change the reference counter. I have not guaranteed that the <span style="font-family: courier new,courier;">Widget</span> will stay alive during the execution of my function, but I can reseat the resource. A non-const lvalue reference is more like: I borrow the resource and can reseat it.&nbsp;</li>
+<li><span style="font-family: courier new,courier;"><strong>void mayShare(const std::shared_ptr&lt;Widget&gt;&amp; shaWid)</strong>: </span>I only borrow the resource. Either can I extend the lifetime of the resource nor can I reseat the resource. To be honest, you should use a pointer (<span style="font-family: courier new,courier;">Widget*)</span> or a reference (<span style="font-family: courier new,courier;">Widget&amp;)</span> as a parameter instead, because there is no added value in using a <span style="font-family: courier new,courier;">std::shared_ptr</span>. <span style="font-family: courier new,courier;"><br /></span></li>
+</ul>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rr-smartptrget">R.37: Do not pass a pointer or reference obtained from an aliased smart pointer</a></h3>
+<p>Let me present you a short code snippet to make the rule clear.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">oldFunc</span>(Widget<span style="color: #555555;">*</span> wid){
+  <span style="color: #0099ff; font-style: italic;">// do something with wid</span>
+}
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">shared</span>(std<span style="color: #555555;">::</span>shared_ptr<span style="color: #555555;">&lt;</span>Widget<span style="color: #555555;">&gt;&amp;</span> shaPtr){       <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    
+   oldFunc(<span style="color: #555555;">*</span>shaPtr);                                <span style="color: #0099ff; font-style: italic;">// (3)</span>
+   
+   <span style="color: #0099ff; font-style: italic;">// do something with shaPtr</span>
+     
+ }
+
+<span style="color: #006699; font-weight: bold;">auto</span> globShared <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>make_shared<span style="color: #555555;">&lt;</span>Widget<span style="color: #555555;">&gt;</span>(<span style="color: #ff6600;">2011</span>);   <span style="color: #0099ff; font-style: italic;">// (1)</span>
+
+
+...
+
+shared(globShared);                                 <span style="color: #0099ff; font-style: italic;"></span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>globShared (1) is a globally shared pointer. The function <span style="font-family: courier new,courier;">shared</span> takes it argument per reference (2). Therefore, the reference counter of <span style="font-family: courier new,courier;">shaPtr</span> will no be increased and the function share will no extend the lifetime of <span style="font-family: courier new,courier;">Widget(2011)</span>. The issue begins with (3). <span style="font-family: courier new,courier;">oldFunc</span> accepts a pointer to the <span style="font-family: courier new,courier;">Widget;</span> therefore, <span style="font-family: courier new,courier;">oldFunc</span> has no guarantee that the <span style="font-family: courier new,courier;">Widget</span> will stay alive during its execution. <span style="font-family: courier new,courier;">oldFunc</span> only borrows the <span style="font-family: courier new,courier;">Widget.</span></p>
+<p>The cure is quite simple. You have to ensure that the reference count of <span style="font-family: courier new,courier;">globShared</span> will be increased before the call to the function <span style="font-family: courier new,courier;">oldFunc.</span> This means you have to make a copy of the <span style="font-family: courier new,courier;">std::shared_ptr:</span></p>
+<ul>
+<li>Pass the <span style="font-family: courier new,courier;">std::shared_ptr</span> by copy to the function <span style="font-family: courier new,courier;">shared:</span><span style="font-family: courier new,courier;"><br /></span> <!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"> <span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">shared</span>(std<span style="color: #555555;">::</span>shared_ptr<span style="color: #555555;">&lt;</span>Widget<span style="color: #555555;">&gt;</span> shaPtr){
+   
+   oldFunc(<span style="color: #555555;">*</span>shaPtr);
+   
+   <span style="color: #0099ff; font-style: italic;">// do something with shaPtr</span>
+     
+ } 
+</pre>
+</div>
+</li>
+<li>Make a copy of the <span style="font-family: courier new,courier;">shaPtr</span> in the function <span style="font-family: courier new,courier;">shared:</span> <!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"> <span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">shared</span>(std<span style="color: #555555;">::</span>shared_ptr<span style="color: #555555;">&lt;</span>Widget<span style="color: #555555;">&gt;&amp;</span> shaPtr){
+   
+   <span style="color: #006699; font-weight: bold;">auto</span> keepAlive <span style="color: #555555;">=</span> shaPtr;   
+   oldFunc(<span style="color: #555555;">*</span>shaPtr);
+   
+   <span style="color: #0099ff; font-style: italic;">// do something with keepAlive or shaPtr</span>
+     
+ } 
+</pre>
+</div>
+</li>
+</ul>
+<p>The same reasoning also applies to <span style="font-family: courier new,courier;">std::unique_ptr</span> but I have no simple cure in mind because you can not copy an <span style="font-family: courier new,courier;">std::unique_ptr.</span> I suggest you should clone your <span style="font-family: courier new,courier;">std::unique_ptr</span> and, therefore, make a new <span style="font-family: courier new,courier;">std::unique_ptr. </span></p>
+<h2>What's next?</h2>
+<p>This was the last of my four posts about resource management in the C++ core guidelines. The C++ core guidelines has more than 50 rules for expressions and statements. I will have a closer look at my next post.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Eric Pederson, Paul Baxter, Franco Amato, and Carlos Gomes Martinho.<br /></strong></p>
+<p>&nbsp;</p>
+<table border="0" style="width: 800px; height: 250px;" cellpadding="8"><caption>
+<h2>Get your e-book at leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img src="images/books/cover.png" alt="cover" width="173" height="220" style="border: medium none #000000;" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 550 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
