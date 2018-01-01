@@ -1,0 +1,220 @@
+<p>There are quite a lot of rules in the C++ Core Guidelines dealing with expressions and statements. To be precise, there are more than 50 rules are about declarations, expressions, statements, and arithmetic expressions.</p>
+<hr id="system-readmore" />
+<p><img src="images/blog/ModernCpp/CppCoreGuidelinesDeclarations/naming-standards-clean-code-24-728.png" alt="naming standards clean code 24 728" width="600" height="450" />&nbsp;</p>
+<p>&nbsp;</p>
+<p>I forget to mention two rules that are just called general. Here we are.</p>
+<h3><a href="https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Res-lib">ES.1: Prefer the standard library to other libraries and to “handcrafted code”</a></h3>
+<p>There is no reason to write a raw loop, to sum up a vector of doubles:</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">int</span> max <span style="color: #555555;">=</span> v.size();             <span style="color: #0099ff; font-style: italic;">// bad: verbose, purpose unstated</span>
+<span style="color: #007788; font-weight: bold;">double</span> sum <span style="color: #555555;">=</span> <span style="color: #ff6600;">0.0</span>;
+<span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #007788; font-weight: bold;">int</span> i <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>; i <span style="color: #555555;">&lt;</span> max; <span style="color: #555555;">++</span>i)
+    sum <span style="color: #555555;">=</span> sum <span style="color: #555555;">+</span> v[i];
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>You should just use the<span style="font-family: courier new,courier;"> std::accumulate</span> algorithm from the STL.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">auto</span> sum <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>accumulate(begin(a), end(a), <span style="color: #ff6600;">0.0</span>);   <span style="color: #0099ff; font-style: italic;">// good</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>This rule reminds me to a sentence from Sean Parent at CppCon 2013: "If you want to improve the code quality in your organization, replace all your coding guidelines with one goal: No raw loops!"</p>
+<p>Or to say it more directly: If you write a raw loop, you probably don't know the algorithms of the STL.</p>
+<h3><a href="https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Res-abstr">ES.2: Prefer suitable abstractions to direct use of language features</a></h3>
+<p>The next déjà vu. In one of my last C++ seminars, I had a long discussion followed by an even longer analysis of a few quite sophisticated and handmade functions for reading and writing <a href="http://en.cppreference.com/w/cpp/io/strstream">strstream</a>s. The participants had to maintain this functions and had after one week no idea what was going on.</p>
+<p>The main obstacle to don't understand the functionality was that the functionality was not based on the right abstraction.</p>
+<p>For example, compare the handmake function for reading an <span style="font-family: courier new,courier;">std::istream. </span> <!-- HTML generated using hilite.me --></p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">char</span><span style="color: #555555;">**</span> <span style="color: #cc00ff;">read1</span>(istream<span style="color: #555555;">&amp;</span> is, <span style="color: #007788; font-weight: bold;">int</span> maxelem, <span style="color: #007788; font-weight: bold;">int</span> maxstring, <span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">*</span> nread)   <span style="color: #0099ff; font-style: italic;">// bad: verbose and incomplete</span>
+{
+    <span style="color: #006699; font-weight: bold;">auto</span> res <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">new</span> <span style="color: #007788; font-weight: bold;">char</span><span style="color: #555555;">*</span>[maxelem];
+    <span style="color: #007788; font-weight: bold;">int</span> elemcount <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>;
+    <span style="color: #006699; font-weight: bold;">while</span> (is <span style="color: #555555;">&amp;&amp;</span> elemcount <span style="color: #555555;">&lt;</span> maxelem) {
+        <span style="color: #006699; font-weight: bold;">auto</span> s <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">new</span> <span style="color: #007788; font-weight: bold;">char</span>[maxstring];
+        is.read(s, maxstring);
+        res[elemcount<span style="color: #555555;">++</span>] <span style="color: #555555;">=</span> s;
+    }
+    nread <span style="color: #555555;">=</span> <span style="color: #555555;">&amp;</span>elemcount;
+    <span style="color: #006699; font-weight: bold;">return</span> res;
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>In contrast, how easy is the following function to consume?</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">vector<span style="color: #555555;">&lt;</span>string<span style="color: #555555;">&gt;</span> read2(istream<span style="color: #555555;">&amp;</span> is)   <span style="color: #0099ff; font-style: italic;">// good</span>
+{
+    vector<span style="color: #555555;">&lt;</span>string<span style="color: #555555;">&gt;</span> res;
+    <span style="color: #006699; font-weight: bold;">for</span> (string s; is <span style="color: #555555;">&gt;&gt;</span> s;)
+        res.push_back(s);
+    <span style="color: #006699; font-weight: bold;">return</span> res;
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The right abstraction often means you have not to think about ownership such in the function <span style="font-family: courier new,courier;">read1</span>. This will not hold for the function read2. The caller of read<span style="font-family: courier new,courier;">1</span> is the owner of <span style="font-family: courier new,courier;">result</span> and has to delete it.</p>
+<p>A declaration introduces a name into a scope. To be honest, I'm biased. On one hand, the following rules are little bit borrowing for you, because they are quite obvious. On the other hand, I know a lot of codebases which permanently break this rules. For example, I had a discussion with a former Fortran programmer, who stated: Each variable should have exactly three characters.</p>
+<p>Anyway, I will continue presenting the rules, because good names a probably the key to make code readable, understandable, maintainable, extensible, ... .</p>
+<p>Here are the first six rules.</p>
+<h3><span style="font-family: courier new,courier;"><a href="https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Res-scope">ES.5: Keep scopes small</a></span></h3>
+<p>If a scope is small, you can put it on a screen and get an idea what is going on. If a scope becomes too big, you should structure your code into function or objects with methods. Identify logical entities and use self-explanatory names in your refactoring process. Afterward, it is a lot easier to think about your code.</p>
+<h3><span style="font-family: courier new,courier;"><a href="https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Res-cond">ES.6: Declare names in for-statement initializers and conditions to limit scope</a></span></h3>
+<p>Since the first C++ standard, we can declare a variable in a <span style="font-family: courier new,courier;">for</span> statement. Since C++17, we can declare variables in an <span style="font-family: courier new,courier;">if</span> or a <span style="font-family: courier new,courier;">switch</span> statement.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">std<span style="color: #555555;">::</span>map<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>,std<span style="color: #555555;">::</span>string<span style="color: #555555;">&gt;</span> myMap;
+
+<span style="color: #006699; font-weight: bold;">if</span> (<span style="color: #006699; font-weight: bold;">auto</span> result <span style="color: #555555;">=</span> myMap.insert(value); result.second){  <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    useResult(result.first);  
+    <span style="color: #0099ff; font-style: italic;">// ...</span>
+} 
+<span style="color: #006699; font-weight: bold;">else</span>{
+    <span style="color: #0099ff; font-style: italic;">// ...</span>
+} <span style="color: #0099ff; font-style: italic;">// result is automatically destroyed                 // (2)</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The variable <span style="font-family: courier new,courier;">result</span> (1) is only valid inside the<span style="font-family: courier new,courier;"> if</span> and <span style="font-family: courier new,courier;">else</span> branch of the <span style="font-family: courier new,courier;">if</span> statement. <span style="font-family: courier new,courier;">result</span> will not pollute the outer scope and will be automatically destroyed (2). This can not be done before C++17. You have to declare result in the outer scope (3).</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">std<span style="color: #555555;">::</span>map<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>,std<span style="color: #555555;">::</span>string<span style="color: #555555;">&gt;</span> myMap;
+<span style="color: #006699; font-weight: bold;">auto</span> result <span style="color: #555555;">=</span> myMap.insert(value)   <span style="color: #0099ff; font-style: italic;">// (3)</span>
+<span style="color: #006699; font-weight: bold;">if</span> (result.second){  <span style="color: #0099ff; font-style: italic;"></span>
+    useResult(result.first);  
+    <span style="color: #0099ff; font-style: italic;">// ...</span>
+} 
+<span style="color: #006699; font-weight: bold;">else</span>{
+    <span style="color: #0099ff; font-style: italic;">// ...</span>
+} 
+</pre>
+</div>
+<p>&nbsp;</p>
+<h3><span style="font-family: courier new,courier;"><a href="https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Res-name-length">ES.7: Keep common and local names short, and keep uncommon and nonlocal names longer</a></span></h3>
+<p>This rule sounds strange but we are already used to it. Giving a variable the name <span style="font-family: courier new,courier;">i or j, or </span>giving a variable the name<span style="font-family: courier new,courier;"> T</span> will make the intention of the code immediately clear: <span style="font-family: courier new,courier;">i</span> and <span style="font-family: courier new,courier;">j</span> are indices, and <span style="font-family: courier new,courier;">T</span> is a type parameter of a template.<span style="font-family: courier new,courier;"><br /></span></p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>    <span style="color: #0099ff; font-style: italic;">// good</span>
+<span style="color: #007788; font-weight: bold;">void</span> print(ostream<span style="color: #555555;">&amp;</span> os, <span style="color: #006699; font-weight: bold;">const</span> vector<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;&amp;</span> v)
+{
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #007788; font-weight: bold;">int</span> i <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>; i <span style="color: #555555;">&lt;</span> v.size(); <span style="color: #555555;">++</span>i)
+        os <span style="color: #555555;">&lt;&lt;</span> v[i] <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>There is a meta-rule behind this rule. A name should be self-explanatory. In a short context, you get with a glance what the variable means. This will not automatically hold for longer contexts; therefore, you should use longer names.&nbsp;</p>
+<h3><span style="font-family: courier new,courier;"><a href="https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Res-name-similar">ES.8: Avoid similar-looking names</a></span></h3>
+<p>Can you read this example without any hesitation?</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">if</span> (readable(i1 <span style="color: #555555;">+</span> l1 <span style="color: #555555;">+</span> ol <span style="color: #555555;">+</span> o1 <span style="color: #555555;">+</span> o0 <span style="color: #555555;">+</span> ol <span style="color: #555555;">+</span> o1 <span style="color: #555555;">+</span> I0 <span style="color: #555555;">+</span> l0)) surprise();
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>To be honest, I often have problems with the number <span style="font-family: courier new,courier;">0</span> and the big capital <span style="font-family: courier new,courier;">O</span>. Depending on the used font it looks quite similar. Two years ago it took me quite a time to log into a server. My automatically generated password had a character <span style="font-family: courier new,courier;"></span> <span style="font-family: courier new,courier;">O.</span></p>
+<h3><span style="font-family: courier new,courier;"><a href="https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Res-not-CAPS">ES.9: Avoid <code class="highlighter-rouge no-highlight">ALL_CAPS</code> names</a></span></h3>
+<p>If you use ALL_CAPS macro substitution may kick in because ALL_CAPS are commonly used for macros. The following program snippet may have a little surprise involved.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// somewhere in some header:</span>
+<span style="color: #009999;">#define NE !=</span>
+
+<span style="color: #0099ff; font-style: italic;">// somewhere else in some other header:</span>
+<span style="color: #006699; font-weight: bold;">enum</span> Coord { N, NE, NW, S, SE, SW, E, W };
+
+<span style="color: #0099ff; font-style: italic;">// somewhere third in some poor programmer's .cpp:</span>
+<span style="color: #006699; font-weight: bold;">switch</span> (direction) {
+<span style="color: #006699; font-weight: bold;">case</span> N:
+    <span style="color: #0099ff; font-style: italic;">// ...</span>
+<span style="color: #006699; font-weight: bold;">case</span> NE:
+    <span style="color: #0099ff; font-style: italic;">// ...</span>
+<span style="color: #0099ff; font-style: italic;">// ...</span>
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Res-name-one">ES.10: Declare one name (only) per declaration</a></h3>
+<p>Let me give you two examples. Did you spot the two issues?</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">char</span><span style="color: #555555;">*</span> p, p2;
+<span style="color: #007788; font-weight: bold;">char</span> a <span style="color: #555555;">=</span> <span style="color: #cc3300;">'a'</span>;
+p <span style="color: #555555;">=</span> <span style="color: #555555;">&amp;</span>a;
+p2 <span style="color: #555555;">=</span> a;                              <span style="color: #0099ff; font-style: italic;">// (1)</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> a <span style="color: #555555;">=</span> <span style="color: #ff6600;">7</span>, b <span style="color: #555555;">=</span> <span style="color: #ff6600;">9</span>, c, d <span style="color: #555555;">=</span> <span style="color: #ff6600;">10</span>, e <span style="color: #555555;">=</span> <span style="color: #ff6600;">3</span>;  <span style="color: #0099ff; font-style: italic;">// (2)</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p><span style="font-family: courier new,courier;">p2</span> is just a<span style="font-family: courier new,courier;"> char&nbsp;</span> (1) and <span style="font-family: courier new,courier;">c</span> is not initialised (2).</p>
+<p>With C++17, we got one exception to this rule: structured binding.</p>
+<p>Now, I can write the if statement with initialiser in rule ES.6 even cleaner and more readable.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">std<span style="color: #555555;">::</span>map<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>,std<span style="color: #555555;">::</span>string<span style="color: #555555;">&gt;</span> myMap;
+
+<span style="color: #006699; font-weight: bold;">if</span> (<span style="color: #006699; font-weight: bold;">auto</span> [iter, succeeded] <span style="color: #555555;">=</span> myMap.insert(value); succedded){  <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    useResult(iter);  
+    <span style="color: #0099ff; font-style: italic;">// ...</span>
+} 
+<span style="color: #006699; font-weight: bold;">else</span>{
+    <span style="color: #0099ff; font-style: italic;">// ...</span>
+} <span style="color: #0099ff; font-style: italic;">// iter and succeeded are automatically destroyed            // (2)</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<h2>What's next?</h2>
+<p>Of course, I will continue in my next post with the rules regarding declarations.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Eric Pederson, Paul Baxter, Franco Amato, and Carlos Gomes Martinho.<br /></strong></p>
+<p>&nbsp;</p>
+<table border="0" style="width: 800px; height: 250px;" cellpadding="8"><caption>
+<h2>Get your e-book at leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img src="images/books/cover.png" alt="cover" width="173" height="220" style="border: medium none #000000;" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 550 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
