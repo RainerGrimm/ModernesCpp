@@ -1,0 +1,202 @@
+<p dir="ltr" style="text-align: left;">In this post, I will finish the rules for declarations. The remaining rules for declarations are not especially sophisticated but important for high code quality.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p><img src="images/blog/ModernCpp/CppCoreGuidelinesMoreDeclarations/declarationSmall.png" alt="declarationSmall" width="300" height="363" style="float: right;" /></p>
+<p>Let's start. Here is the first overview before we dive into the details.</p>
+<ul>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Res-const">ES.25: Declare an object&nbsp;<code class="highlighter-rouge no-highlight">const</code>&nbsp;or&nbsp;<code class="highlighter-rouge no-highlight">constexpr</code>&nbsp;unless you want to modify its value later on</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Res-recycle">ES.26: Don’t use a variable for two unrelated purposes</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Res-stack">ES.27: Use&nbsp;<code class="highlighter-rouge no-highlight">std::array</code>&nbsp;or&nbsp;<code class="highlighter-rouge no-highlight">stack_array</code>&nbsp;for arrays on the stack</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Res-lambda-init">ES.28: Use lambdas for complex initialization, especially of&nbsp;<code class="highlighter-rouge no-highlight">const</code>&nbsp;variables</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Res-macros">ES.30: Don’t use macros for program text manipulation</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Res-macros2">ES.31: Don’t use macros for constants or “functions”</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Res-ALL_CAPS">ES.32: Use&nbsp;<code class="highlighter-rouge no-highlight">ALL_CAPS</code>&nbsp;for all macro names</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Res-MACROS">ES.33: If you must use macros, give them unique names</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Res-ellipses">ES.34: Don’t define a (C-style) variadic function</a></li>
+</ul>
+<p>In Python, there is the aphorism from the Zen of Python (Tim Peters): "Explicit is better than implicit". This is a kind of a meta-rule in Python for writing good code. This meta-rule holds, in particular, true for the next two rules in the C++ core guidelines.</p>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Res-const">ES.25: Declare an object&nbsp;<code class="highlighter-rouge no-highlight">const</code>&nbsp;or&nbsp;<code class="highlighter-rouge no-highlight">constexpr</code>&nbsp;unless you want to modify its value later on</a></h3>
+<p>Why should you use <span style="font-family: 'courier new', courier;">const</span> or <span style="font-family: 'courier new', courier;">constexpr</span> for your variable declaration if possible? I have a lot of good reasons:</p>
+<ul>
+<li>You express your intention.</li>
+<li>The variable cannot be changed by accident.</li>
+<li><span style="font-family: 'courier new', courier;">const</span> or <span style="font-family: 'courier new', courier;">constexpr</span> variables are by definition thread-safe.
+<ul>
+<li><span style="font-family: 'courier new', courier;">const</span>: You have to guarantee that the variable is initialised in a thread-safe way.</li>
+<li><span style="font-family: 'courier new', courier;">constexpr</span>: The C++ runtime guarantees, that the variable is initialised in a thread-safe way.</li>
+</ul>
+</li>
+</ul>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Res-recycle">ES.26: Don’t use a variable for two unrelated purposes</a></h3>
+<p>Do you like such kind of code?</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">use</span>()
+{
+    <span style="color: #007788; font-weight: bold;">int</span> i;
+    <span style="color: #006699; font-weight: bold;">for</span> (i <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>; i <span style="color: #555555;">&lt;</span> <span style="color: #ff6600;">20</span>; <span style="color: #555555;">++</span>i) { <span style="color: #0099ff; font-style: italic;">/* ... */</span> }
+    <span style="color: #006699; font-weight: bold;">for</span> (i <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>; i <span style="color: #555555;">&lt;</span> <span style="color: #ff6600;">200</span>; <span style="color: #555555;">++</span>i) { <span style="color: #0099ff; font-style: italic;">/* ... */</span> } <span style="color: #0099ff; font-style: italic;">// bad: i recycled</span>
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>I hope not. Put the declaration of <span style="font-family: 'courier new', courier;">i</span> into the for loop and you are fine. i will be bound to the lifetime of the for loop.&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">use</span>()
+{
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #007788; font-weight: bold;">int</span> i <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>; i <span style="color: #555555;">&lt;</span> <span style="color: #ff6600;">20</span>; <span style="color: #555555;">++</span>i) { <span style="color: #0099ff; font-style: italic;">/* ... */</span> }
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #007788; font-weight: bold;">int</span> i <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>; i <span style="color: #555555;">&lt;</span> <span style="color: #ff6600;">200</span>; <span style="color: #555555;">++</span>i) { <span style="color: #0099ff; font-style: italic;">/* ... */</span> } 
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>With C++17, you can declare your<span style="font-family: 'courier new', courier;"> i</span> just in an <span style="font-family: 'courier new', courier;">if</span> or <span style="font-family: 'courier new', courier;">switch</span> statement: <a href="index.php/cpp17-core">C++17 - What's new in the language?</a></p>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Res-stack">ES.27: Use&nbsp;<code class="highlighter-rouge no-highlight">std::array</code>&nbsp;or&nbsp;<code class="highlighter-rouge no-highlight">stack_array</code>&nbsp;for arrays on the stack</a></h3>
+<p>10 years ago, I thought that creating a variable length array on the stack is ISO C++.&nbsp;</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">int</span> n <span style="color: #555555;">=</span> <span style="color: #ff6600;">7</span>;
+<span style="color: #007788; font-weight: bold;">int</span> m <span style="color: #555555;">=</span> <span style="color: #ff6600;">9</span>;
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">f</span>()
+{
+    <span style="color: #007788; font-weight: bold;">int</span> a1[n];
+    <span style="color: #007788; font-weight: bold;">int</span> a2[m];   <span style="color: #0099ff; font-style: italic;">// error: not ISO C++</span>
+    <span style="color: #0099ff; font-style: italic;">// ...</span>
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Wrong!&nbsp;</p>
+<p>In the first case, you should use an <span style="font-family: 'courier new', courier;">std::array</span> and in the second case you can use a <span style="font-family: 'courier new', courier;">gsl::stack_array</span> from the <a href="https://github.com/Microsoft/GSL">Guideline support library (GSL)</a>.&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">int</span> n <span style="color: #555555;">=</span> <span style="color: #ff6600;">7</span>;
+<span style="color: #007788; font-weight: bold;">int</span> m <span style="color: #555555;">=</span> <span style="color: #ff6600;">9</span>;
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">f</span>()
+{
+    std<span style="color: #555555;">::</span>array<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>, n<span style="color: #555555;">&gt;</span> b1;
+    gsl<span style="color: #555555;">::</span>stack_array<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> b2(m);
+    <span style="color: #0099ff; font-style: italic;">// ...</span>
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Why should you use <span style="font-family: 'courier new', courier;">std::array</span>&nbsp;instead of C-array&nbsp;or <span style="font-family: 'courier new', courier;">gsl::array</span>&nbsp;instead of C-array?</p>
+<p><span style="font-family: 'courier new', courier;">std::array</span> knows it's length in contrast to the C-array&nbsp;and will not decay to a pointer as a function parameter.&nbsp;&nbsp;How easy is it to use the following function for copying arrays with the wrong length n:&nbsp;</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">copy_n</span>(<span style="color: #006699; font-weight: bold;">const</span> T<span style="color: #555555;">*</span> p, T<span style="color: #555555;">*</span> q, <span style="color: #007788; font-weight: bold;">int</span> n);   <span style="color: #0099ff; font-style: italic;">// copy from [p:p+n) to [q:q+n)</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>&nbsp;Variable length arrays such as <span style="font-family: 'courier new', courier;">int a2[m]</span> are a security risk, because you may execute arbitrary code or get stack exhaustion.&nbsp;</p>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Res-lambda-init">ES.28: Use lambdas for complex initialization, especially of&nbsp;<code class="highlighter-rouge no-highlight">const</code>&nbsp;variables</a></h3>
+<p>I sometimes hear the question in my seminars: Why should I invoke a lambda function just in place? This rule gives an answer. You can put complex initialisation in it. This in place invocation is very valuable, if you variable should become const.&nbsp;</p>
+<p>If you don't want to modify your variable after the initialisation, you should make it const according to the previous rule R.25. Fine. But sometimes the initialisation of the variable consist of more steps; therefore, you can make it not const.</p>
+<p>Have a look here. The widget <span style="font-family: 'courier new', courier;">x</span> in the following example should be <span style="font-family: 'courier new', courier;">const</span>&nbsp;after its initialisation.&nbsp; It cannot be <span style="font-family: 'courier new', courier;">const</span> because it will be changed a few times during its initialisation.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">widget x;   <span style="color: #0099ff; font-style: italic;">// should be const, but:</span>
+<span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> i <span style="color: #555555;">=</span> <span style="color: #ff6600;">2</span>; i <span style="color: #555555;">&lt;=</span> N; <span style="color: #555555;">++</span>i) {             <span style="color: #0099ff; font-style: italic;">// this could be some</span>
+    x <span style="color: #555555;">+=</span> some_obj.do_something_with(i);  <span style="color: #0099ff; font-style: italic;">// arbitrarily long code</span>
+}                                        <span style="color: #0099ff; font-style: italic;">// needed to initialize x</span>
+<span style="color: #0099ff; font-style: italic;">// from here, x should be const, but we can't say so in code in this style</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Now, a lambda function comes to our rescue. Put the initialisation stuff into a lambda function, capture the environment by reference, and initialise your const variable with the in-place invoked lambda function.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">const</span> widget x <span style="color: #555555;">=</span> [<span style="color: #555555;">&amp;</span>]{
+    widget val;                                <span style="color: #0099ff; font-style: italic;">// widget has a default constructor</span>
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> i <span style="color: #555555;">=</span> <span style="color: #ff6600;">2</span>; i <span style="color: #555555;">&lt;=</span> N; <span style="color: #555555;">++</span>i) {            <span style="color: #0099ff; font-style: italic;">// this could be some</span>
+        val <span style="color: #555555;">+=</span> some_obj.do_something_with(i);  <span style="color: #0099ff; font-style: italic;">// arbitrarily long code</span>
+    }                                          <span style="color: #0099ff; font-style: italic;">// needed to initialize x</span>
+    <span style="color: #006699; font-weight: bold;">return</span> val;
+}();
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Admittedly, it looks a little bit strange to invoke a lambda function just in place, but from the conceptional view, I like it. You put the whole initialisation stuff just in a function body.&nbsp;</p>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Res-macros">ES.30</a>,&nbsp;<a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Res-macros2">ES.31,&nbsp;&nbsp;</a><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Res-ALL_CAPS">ES.32</a>&nbsp;and&nbsp;<a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Res-MACROS">ES.33</a></h3>
+<p>I will only paraphrase the next four rule to macros. Don't use macros for program test manipulation or for constants and functions. If you have to use them use unique names with ALL_CAPS.</p>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Res-ellipses">ES.34: Don’t define a (C-style) variadic function</a></h3>
+<p>Right! Don't define a (C-style) variadic function. Since C++11 we have <span style="font-family: 'courier new', courier;">variadic templates </span>and since C++17 we have <a href="index.php/fold-expressions">fold expressions</a>. This all what we need.&nbsp;</p>
+<p>You probably quite often used the (C-style) variadic function: <span style="font-family: 'courier new', courier;">printf. printf</span>&nbsp;accepts a format string and arbitrary numbers of arguments and displays its arguments respectively. A call of printf has undefined behaviour if you don't use the correct format specifiers or the number of your arguments isn't correct.&nbsp;</p>
+<p>By using variadic templates you can implement a type-safe printf function. Here is the simplified version of <span style="font-family: 'courier new', courier;">printf</span> based on&nbsp;<a href="http://en.cppreference.com/w/cpp/language/parameter_pack">cppreference.com</a>.&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// myPrintf.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+ 
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">myPrintf</span>(<span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">char</span><span style="color: #555555;">*</span> format){                         <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> format;
+}
+ 
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T, <span style="color: #006699; font-weight: bold;">typename</span>... Targs<span style="color: #555555;">&gt;</span>                    <span style="color: #0099ff; font-style: italic;">// (2)</span>
+<span style="color: #007788; font-weight: bold;">void</span> myPrintf(<span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">char</span><span style="color: #555555;">*</span> format, T value, Targs... Fargs) 
+{
+    <span style="color: #006699; font-weight: bold;">for</span> ( ; <span style="color: #555555;">*</span>format <span style="color: #555555;">!=</span> <span style="color: #cc3300;">'\0'</span>; format<span style="color: #555555;">++</span> ) {
+        <span style="color: #006699; font-weight: bold;">if</span> ( <span style="color: #555555;">*</span>format <span style="color: #555555;">==</span> <span style="color: #cc3300;">'%'</span> ) {
+           std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> value;                             <span style="color: #0099ff; font-style: italic;">// (3)</span>
+           myPrintf(format<span style="color: #555555;">+</span><span style="color: #ff6600;">1</span>, Fargs...);                   <span style="color: #0099ff; font-style: italic;">// (4)</span>
+           <span style="color: #006699; font-weight: bold;">return</span>;
+        }
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #555555;">*</span>format;
+    }
+}
+ 
+<span style="color: #007788; font-weight: bold;">int</span> main(){
+    myPrintf(<span style="color: #cc3300;">"% world% %</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>,<span style="color: #cc3300;">"Hello"</span>,<span style="color: #cc3300;">'!'</span>,<span style="color: #ff6600;">123</span>);            <span style="color: #0099ff; font-style: italic;">// Hello world! 123</span>
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p><span style="font-family: 'courier new', courier;">myPrintf</span> can accept an arbitrary number of arguments. If arbitrary means 0, the first overload (1) is used. If arbitrary means more than 0, the second overload (2) is used. The function template (2) is quite interesting. It can accept an arbitrary number of arguments but the number must greater than 0. The first argument will be bound to <span style="font-family: 'courier new', courier;">value</span> and written to<span style="font-family: 'courier new', courier;"> std::cout</span> (3). The rest of the arguments will be used in (4) to make a recursive call. This recursive call will create another function template <span style="font-family: 'courier new', courier;">myPrintf</span> accepting one argument less. This recursion will go to zero. In this case, the function <span style="font-family: 'courier new', courier;">myPrintf</span> (1) as boundary condition kicks in.&nbsp;</p>
+<p><span style="font-family: 'courier new', courier;">myPrintf</span> is type-safe because all output will be handled by std::cout. This simplified implementation cannot deal with format strings such as&nbsp; <span style="font-family: 'courier new', courier;">%d, %f </span>or<span style="font-family: 'courier new', courier;"> 5.5f.</span><span class="c1"><br /></span></p>
+<h2>What's next?</h2>
+<p>There is a lot to write about expression. The C++ core guidelines has about 25 rules for them; therefore, my next post will deal with expression.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Eric Pederson, Paul Baxter, Carlos Gomes Martinho, and&nbsp;SAI RAGHAVENDRA PRASAD POOSA.</strong></p>
+<p><strong>&nbsp;</strong></p>
+<table border="0" style="width: 800px; height: 250px;" cellpadding="8"><caption>
+<h2>Get your e-book at leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img src="images/books/cover.png" alt="cover" width="173" height="220" style="border: medium none #000000;" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 550 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
