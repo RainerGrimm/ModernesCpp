@@ -1,0 +1,191 @@
+<p>Today's post is about expressions. You should avoid complicated expressions, you should know the precedence rules for arithmetic or logical expressions. and you should know the order of evaluation of expressions. Having the wrong precedence rules for expressions in mind or assuming an evaluation order for expressions which is just wrong or not guaranteed are the main reasons for undefined behaviour.&nbsp;I know that's a lot to digest. Let's start.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p><img src="images/blog/ModernCpp/CppCoreGuidelinesExpressions/Polynomial_expansion.png" alt="Polynomial expansion" width="400" height="225" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>Here are the four rules for today.</p>
+<ul style="margin-top: 0px; margin-bottom: 1rem; color: #515151; font-family: 'PT Sans', Helvetica, Arial, sans-serif; font-size: 20px; font-style: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing: 0px; background-color: #ffffff;">
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Res-complicated" style="color: #268bd2; text-decoration: none;">ES.40: Avoid complicated expressions</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Res-parens" style="color: #268bd2; text-decoration: none;">ES.41: If in doubt about operator precedence, parenthesize</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Res-order" style="color: #268bd2; text-decoration: none;">ES.43: Avoid expressions with undefined order of evaluation</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Res-order-fct" style="color: #268bd2; text-decoration: none;">ES.44: Don’t depend on order of evaluation of function arguments</a></li>
+</ul>
+<p>The rules for the precedence and the evaluation are not so easy as it sounds. They even change with C++17; therefore, we should start simple.</p>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Res-complicated" style="color: #268bd2; text-decoration: none;">ES.40: Avoid complicated expressions</a></h3>
+<p>What does complicated mean? Here is the original example of the guidelines:</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// bad: assignment hidden in subexpression                      (1)</span>
+<span style="color: #006699; font-weight: bold;">while</span> ((c <span style="color: #555555;">=</span> getc()) <span style="color: #555555;">!=</span> <span style="color: #555555;">-</span><span style="color: #ff6600;">1</span>)
+
+<span style="color: #0099ff; font-style: italic;">// bad: two non-local variables assigned in a sub-expressions   (1)</span>
+<span style="color: #006699; font-weight: bold;">while</span> ((cin <span style="color: #555555;">&gt;&gt;</span> c1, cin <span style="color: #555555;">&gt;&gt;</span> c2), c1 <span style="color: #555555;">==</span> c2)
+
+<span style="color: #0099ff; font-style: italic;">// better, but possibly still too complicated                   (1)</span>
+<span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #007788; font-weight: bold;">char</span> c1, c2; cin <span style="color: #555555;">&gt;&gt;</span> c1 <span style="color: #555555;">&gt;&gt;</span> c2 <span style="color: #555555;">&amp;&amp;</span> c1 <span style="color: #555555;">==</span> c2;)
+
+<span style="color: #0099ff; font-style: italic;">// OK: if i and j are not aliased                               (2)</span>
+<span style="color: #007788; font-weight: bold;">int</span> x <span style="color: #555555;">=</span> <span style="color: #555555;">++</span>i <span style="color: #555555;">+</span> <span style="color: #555555;">++</span>j;                 
+
+<span style="color: #0099ff; font-style: italic;">// OK: if i != j and i != k                                     (2)</span>
+v[i] <span style="color: #555555;">=</span> v[j] <span style="color: #555555;">+</span> v[k];
+
+<span style="color: #0099ff; font-style: italic;">// bad: multiple assignments "hidden" in subexpressions         (1)</span>
+x <span style="color: #555555;">=</span> a <span style="color: #555555;">+</span> (b <span style="color: #555555;">=</span> f()) <span style="color: #555555;">+</span> (c <span style="color: #555555;">=</span> g()) <span style="color: #555555;">*</span> <span style="color: #ff6600;">7</span>;
+
+<span style="color: #0099ff; font-style: italic;">// bad: relies on commonly misunderstood precedence rules       (1)</span>
+x <span style="color: #555555;">=</span> a <span style="color: #555555;">&amp;</span> b <span style="color: #555555;">+</span> c <span style="color: #555555;">*</span> d <span style="color: #555555;">&amp;&amp;</span> e <span style="color: #555555;">^</span> f <span style="color: #555555;">==</span> <span style="color: #ff6600;">7</span>;
+
+<span style="color: #0099ff; font-style: italic;">// bad: undefined behavior                                      (3)</span>
+x <span style="color: #555555;">=</span> x<span style="color: #555555;">++</span> <span style="color: #555555;">+</span> x<span style="color: #555555;">++</span> <span style="color: #555555;">+</span> <span style="color: #555555;">++</span>x;
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>I added a few (numbers) to it. First, all expressions having a (1) are bad style and should not pass a code review. For example, do you know what is happening here:&nbsp;<span style="font-family: 'courier new', courier;">x = a &amp; b + c * d &amp;&amp; e ^ f == 7;. </span>Of course, you have to look up the precedences of the operators. I will come to it in the next rule. The expressions (2) may be fine if the conditions hold. i and j must be disjunct and the indices i,j and i,k must be pairwise disjunct.</p>
+<p>(3) is undefined behaviour, because it is not defined which x will be evaluated first. Why? The argument is that the final semicolon ";" is a sequence point and now we have the guarantee that all side effects from the previous evaluations in the sequence are complete.</p>
+<p>With C++17, the rules for operator precedence changed: left-to-right for expressions except for right-to-left in assignments. I will write about it in ES.43.</p>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Res-parens" style="color: #268bd2; text-decoration: none;">ES.41: If in doubt about operator precedence, parenthesize</a></h3>
+<p>On one hand, the guidelines says: If you are in doubt about operator precedence, use parenthesis (1). On the other hand, they state: You should know enough not to need parentheses here (2):</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">unsigned</span> <span style="color: #007788; font-weight: bold;">int</span> flag <span style="color: #555555;">=</span> <span style="color: #ff6600;">2</span>;
+<span style="color: #007788; font-weight: bold;">unsigned</span> <span style="color: #007788; font-weight: bold;">int</span> a <span style="color: #555555;">=</span> flag;
+
+<span style="color: #006699; font-weight: bold;">if</span> (a <span style="color: #555555;">&amp;</span> flag <span style="color: #555555;">!=</span> <span style="color: #ff6600;">0</span>)  <span style="color: #0099ff; font-style: italic;">// bad: means a&amp;(flag != 0)         (1)</span>
+
+<span style="color: #006699; font-weight: bold;">if</span> (a <span style="color: #555555;">&lt;</span> <span style="color: #ff6600;">0</span> <span style="color: #555555;">||</span> a <span style="color: #555555;">&lt;=</span> max) {  <span style="color: #0099ff; font-style: italic;">// good: quite obvious        (2)</span>
+    <span style="color: #0099ff; font-style: italic;">// ...</span>
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Okay. For an expert expression (1) may be obvious but for a beginner expression (2) may be a challenge.&nbsp;</p>
+<p>I have only two tips in mind according to the guidelines:</p>
+<ol>
+<li>If in doubt about precedence, use parentheses. Do not forget the beginners!</li>
+<li>Keep this precedence table from <a href="http://en.cppreference.com/w/cpp/language/operator_precedence">cppreference.com</a> under your pillow.</li>
+</ol>
+<p><img src="images/blog/ModernCpp/CppCoreGuidelinesExpressions/OperatorPrecedence.png" alt="OperatorPrecedence" width="600" height="618" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>I will right jump to the rules ES.43 and ES.44 and will write about rule ES.42 in my next post. With C++17, the order of evaluation of expressions changed.</p>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Res-order" style="color: #268bd2; text-decoration: none;">ES.43: Avoid expressions with undefined order of evaluation</a></h3>
+<p>In C++14 the following expression has undefined behaviour.&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">v[i] <span style="color: #555555;">=</span> <span style="color: #555555;">++</span>i;   <span style="color: #0099ff; font-style: italic;">//  the result is undefined</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>This will not hold for C++17. With C++17 the order of evaluation of the last code snippet is right to left; therefore, the expression has well-defined behaviour.</p>
+<p>Here are the additional guarantees we have with C++17:</p>
+<ol>
+<li>Postfix expressions are evaluated from left to right. This includes functions calls and member selection expressions.</li>
+<li>Assignment expressions are evaluated from right to left. This includes compound assignments.</li>
+<li>Operands to shift operators are evaluated from left to right.&nbsp;</li>
+</ol>
+<p>This was the wording of the original <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2016/p0145r3.pdf">proposal</a>. They also provided a few examples. Here are they:</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">a.b
+a<span style="color: #555555;">-&gt;</span>b
+a<span style="color: #555555;">-&gt;*</span>b
+a(b1, b2, b3)        <span style="color: #0099ff; font-style: italic;">// (1)</span>
+b <span style="color: #aa0000; background-color: #ffaaaa;">@</span><span style="color: #555555;">=</span> a
+a[b]
+a <span style="color: #555555;">&lt;&lt;</span> b
+a <span style="color: #555555;">&gt;&gt;</span> b
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>How should you read these examples? Quite simple. First, <span style="font-family: 'courier new', courier;">a</span> will be evaluated, then <span style="font-family: 'courier new', courier;">b</span>, then c<span style="font-family: 'courier new', courier;">,</span> and then <span style="font-family: 'courier new', courier;">d</span>.</p>
+<p>Expression (1) is a bit tricky. With C++17 we have only the guarantee that the function is evaluated before its arguments but the order of the evaluation of the arguments is still unspecified.</p>
+<p>I know the last sentence was not easy. Let's elaborate a little bit more.</p>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Res-order-fct" style="color: #268bd2; text-decoration: none;">ES.44: Don’t depend on order of evaluation of function arguments</a></h3>
+<p>In the last years,&nbsp; I saw many errors because developers assumed that the order of the evaluation of function arguments is left to right. Wrong! You have no guarantees!</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">func</span>(<span style="color: #007788; font-weight: bold;">int</span> fir, <span style="color: #007788; font-weight: bold;">int</span> sec){
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"("</span> <span style="color: #555555;">&lt;&lt;</span> fir <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">","</span> <span style="color: #555555;">&lt;&lt;</span> sec <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">")"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+    <span style="color: #007788; font-weight: bold;">int</span> i <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>;
+    func(i<span style="color: #555555;">++</span>, i<span style="color: #555555;">++</span>);
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Here is my proof. The output from gcc and clang differs:</p>
+<ul>
+<li>gcc:</li>
+</ul>
+<p><img src="images/blog/ModernCpp/CppCoreGuidelinesExpressions/gcc.png" alt="gcc" style="margin-left: 50px; float: left;" /></p>
+<p>&nbsp;</p>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Res-magic" style="color: #268bd2; text-decoration: none;"></a></h3>
+<p>&nbsp;</p>
+<ul>
+<li>clang</li>
+</ul>
+<p><img src="images/blog/ModernCpp/CppCoreGuidelinesExpressions/clang.png" alt="clang" style="margin-left: 50px;" /></p>
+<p>With C++17, this behaviour didn't change. The order of evaluation is unspecified. But at least, the order of the evaluation of the following expressions is specified with C++17.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">f1()<span style="color: #555555;">-&gt;</span>m(f2());          <span style="color: #0099ff; font-style: italic;">// evaluation left to right  (1)</span>
+cout <span style="color: #555555;">&lt;&lt;</span> f1() <span style="color: #555555;">&lt;&lt;</span> f2();   <span style="color: #0099ff; font-style: italic;">// evaluation left to right  (2)</span>
+
+f1() <span style="color: #555555;">=</span> f(<span style="color: #ff6600;">2</span>);            <span style="color: #0099ff; font-style: italic;">// evaluation right to left  (3)</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Here is the reason, why:</p>
+<p>(1):&nbsp;Postfix expressions are evaluated from left to right. This includes functions calls and member selection expressions.</p>
+<p>(2):&nbsp;Operands to shift operators are evaluated from left to right.</p>
+<p>(3): Assignment expressions are evaluated from right to left.</p>
+<p><strong>Only to remind you. With C++14, the last three expressions have undefined behaviour.</strong></p>
+<h2>What's next?</h2>
+<p>Admitted, this was a quite a challenging post but a challenge you have to overcome to become a good programmer. The main topic of my next post will be about cast operations.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Eric Pederson, Paul Baxter, Carlos Gomes Martinho, and&nbsp;SAI RAGHAVENDRA PRASAD POOSA.</strong></p>
+<p></p>
+<p><br /><br /></p>
+<table border="0" style="width: 800px; height: 250px;" cellpadding="8"><caption><br />
+<h2>Get your e-book at leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td><br />
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td><br />
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td><br />
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img src="images/books/cover.png" alt="cover" width="173" height="220" style="border: medium none #000000;" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td><br />
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<br />
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td><br />
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0"><br />
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<br />
+<p>In sum, you get more than 550 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+<br />&nbsp;</td>
+</tr>
+</tbody>
+</table>
