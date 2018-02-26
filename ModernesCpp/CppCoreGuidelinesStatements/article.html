@@ -1,0 +1,188 @@
+<p>Before I continue with the roughly 15 rules for statements, let me finish the two rules for expressions. Both rules help you to protect your program from undefined behaviour.&nbsp;</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p><img src="images/blog/ModernCpp/CppCoreGuidelinesStatements/UnderConstruction.png" alt="UnderConstruction" width="500" height="449" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>Here are the two remaining rules for expressions.</p>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Res-construct" style="color: #268bd2; text-decoration: underline;">ES.64: Use the&nbsp;<code class="highlighter-rouge no-highlight" style="font-family: 'Roboto Mono', monospace; padding: 0.2em; font-size: 18px; background-color: #f9f9f9;">T{e}</code>notation for construction</a></h3>
+<p>The reason for using <span style="font-family: 'courier new', courier;">T{e}</span> for the construction of a value is quite obvious. In contrast to&nbsp;<span style="font-family: 'courier new', courier;">T(e) or (T)e, T{e}</span> does not allow narrowing conversion. Narrowing conversion is a conversion including the loss of data accuracy. I assume this is most of the times, not your intention. Have a look at the example from the guidelines.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">use</span>(<span style="color: #007788; font-weight: bold;">char</span> ch, <span style="color: #007788; font-weight: bold;">double</span> d, <span style="color: #007788; font-weight: bold;">char</span><span style="color: #555555;">*</span> p, <span style="color: #007788; font-weight: bold;">long</span> <span style="color: #007788; font-weight: bold;">long</span> lng){
+    <span style="color: #007788; font-weight: bold;">int</span> x1 <span style="color: #555555;">=</span> <span style="color: #007788; font-weight: bold;">int</span>{ch};     <span style="color: #0099ff; font-style: italic;">// OK, but redundant</span>
+    <span style="color: #007788; font-weight: bold;">int</span> x2 <span style="color: #555555;">=</span> <span style="color: #007788; font-weight: bold;">int</span>{d};      <span style="color: #0099ff; font-style: italic;">// error: double-&gt;int narrowing; use a cast if you need to</span>
+    <span style="color: #007788; font-weight: bold;">int</span> x3 <span style="color: #555555;">=</span> <span style="color: #007788; font-weight: bold;">int</span>{p};      <span style="color: #0099ff; font-style: italic;">// error: pointer to-&gt;int; use a reinterpret_cast if you really need to</span>
+    <span style="color: #007788; font-weight: bold;">int</span> x4 <span style="color: #555555;">=</span> <span style="color: #007788; font-weight: bold;">int</span>{lng};    <span style="color: #0099ff; font-style: italic;">// error: long long-&gt;int narrowing; use a cast if you need to          (1)</span>
+
+    <span style="color: #007788; font-weight: bold;">int</span> y1 <span style="color: #555555;">=</span> <span style="color: #007788; font-weight: bold;">int</span>(ch);     <span style="color: #0099ff; font-style: italic;">// OK, but redundant</span>
+    <span style="color: #007788; font-weight: bold;">int</span> y2 <span style="color: #555555;">=</span> <span style="color: #007788; font-weight: bold;">int</span>(d);      <span style="color: #0099ff; font-style: italic;">// bad: double-&gt;int narrowing; use a cast if you need to</span>
+    <span style="color: #007788; font-weight: bold;">int</span> y3 <span style="color: #555555;">=</span> <span style="color: #007788; font-weight: bold;">int</span>(p);      <span style="color: #0099ff; font-style: italic;">// bad: pointer to-&gt;int; use a reinterpret_cast if you really need to  (2)</span>
+    <span style="color: #007788; font-weight: bold;">int</span> y4 <span style="color: #555555;">=</span> <span style="color: #007788; font-weight: bold;">int</span>(lng);    <span style="color: #0099ff; font-style: italic;">// bad: long-&gt;int narrowing; use a cast if you need to</span>
+
+    <span style="color: #007788; font-weight: bold;">int</span> z1 <span style="color: #555555;">=</span> (<span style="color: #007788; font-weight: bold;">int</span>)ch;     <span style="color: #0099ff; font-style: italic;">// OK, but redundant</span>
+    <span style="color: #007788; font-weight: bold;">int</span> z2 <span style="color: #555555;">=</span> (<span style="color: #007788; font-weight: bold;">int</span>)d;      <span style="color: #0099ff; font-style: italic;">// bad: double-&gt;int narrowing; use a cast if you need to</span>
+    <span style="color: #007788; font-weight: bold;">int</span> z3 <span style="color: #555555;">=</span> (<span style="color: #007788; font-weight: bold;">int</span>)p;      <span style="color: #0099ff; font-style: italic;">// bad: pointer to-&gt;int; use a reinterpret_cast if you really need to  (3)</span>
+    <span style="color: #007788; font-weight: bold;">int</span> z4 <span style="color: #555555;">=</span> (<span style="color: #007788; font-weight: bold;">int</span>)lng;    <span style="color: #0099ff; font-style: italic;">// bad: long long-&gt;int narrowing; use a cast if you need to            </span>
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>&nbsp;Here is what gcc provides without any special flags.</p>
+<p>&nbsp;<img src="images/blog/ModernCpp/CppCoreGuidelinesStatements/Screenshot_20180223_192512.png" alt="Screenshot 20180223 192512" width="600" height="232" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>If you carefully read the output of the compiler run, you will observe a few interesting facts.</p>
+<ul>
+<li>Expression (1) will only give a warning in the first code block; the two previous expressions will produce an error.</li>
+<li>Only the expressions (2) and (3) result in an error. The other conversions in&nbsp;the second and third code block will not even give a warning.</li>
+</ul>
+<p>There is a special rule that you have to keep in mind if you construct a value with <span style="font-family: 'courier new', courier;">T(e1, e2)</span>&nbsp;or&nbsp;<span style="font-family: 'courier new', courier;">T{e1, e2}</span>. What will happen if you have a class has two competing constructors? One constructor accepting two ints (<span style="font-family: 'courier new', courier;">MyVector(int, int))</span> and the other accepting an <span style="font-family: 'courier new', courier;">std::initializer_list&lt;int&gt; (MyVector(std::initializer_list&lt;int&gt;))? T</span>he interesting question is: Does a call <span style="font-family: 'courier new', courier;">MyVector(1, 2)</span>&nbsp;or a call <span style="font-family: 'courier new', courier;">MyVector{int, int}</span> the constructor for two ints or the one with the <span style="font-family: 'courier new', courier;">std::initalizer_list&lt;int&gt;</span>?</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// constructionWihtBraces.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">MyVector</span>{
+<span style="color: #9999ff;">public:</span>
+    MyVector(<span style="color: #007788; font-weight: bold;">int</span>, <span style="color: #007788; font-weight: bold;">int</span>){
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"MyVector(int, int)"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    }
+    MyVector(std<span style="color: #555555;">::</span>initializer_list<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span>){
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"MyVector(std::initalizer_list&lt;int&gt;)"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    }
+};
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">MyVector1</span>{
+<span style="color: #9999ff;">public:</span>
+    MyVector1(<span style="color: #007788; font-weight: bold;">int</span>, <span style="color: #007788; font-weight: bold;">int</span>){
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"MyVector1(int, int)"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    }
+};
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">MyVector2</span>{
+<span style="color: #9999ff;">public:</span>
+    MyVector2(<span style="color: #007788; font-weight: bold;">int</span>, <span style="color: #007788; font-weight: bold;">int</span>){
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"MyVector(std::initalizer_list&lt;int&gt;)"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    }
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    MyVector(<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>);                       <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    MyVector{<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>};                       <span style="color: #0099ff; font-style: italic;">// (2) </span>
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    MyVector1{<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>};                      <span style="color: #0099ff; font-style: italic;">// (3)</span>
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    MyVector2(<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>);                      <span style="color: #0099ff; font-style: italic;">// (4)</span>
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>Here is the output of the program. The call (1) calls the constructor with two ints; the call (2) the constructor with the <span style="font-family: 'courier new', courier;">std::initializer_list&lt;int&gt;</span>. If you invoke <span style="font-family: 'courier new', courier;">MyVector1{1, 2}</span> (3), der constructor <span style="font-family: 'courier new', courier;">MyVector1(1, 2)</span> is a kind of fallback. The same holds for (4). The constructor with the <span style="font-family: 'courier new', courier;">std::initializer_list&lt;int&gt;</span> is, in this case, the fallback.&nbsp;</p>
+<p>&nbsp;&nbsp;</p>
+<p><img src="images/blog/ModernCpp/CppCoreGuidelinesStatements/constructionWithBraces.png" alt="constructionWithBraces" width="400" height="237" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>A constructor taking an <span style="font-family: 'courier new', courier;">std::initializer_list</span> as an argument is often called a sequence constructor.&nbsp;</p>
+<p>Do you know, why I called the class in the example <span style="font-family: 'courier new', courier;">MyVector</span>? The reason is that the two following expressions behave differently.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> vec(<span style="color: #ff6600;">10</span>, <span style="color: #ff6600;">1</span>);  <span style="color: #0099ff; font-style: italic;">// ten elements with 1</span>
+std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> vec2{<span style="color: #ff6600;">10</span>, <span style="color: #ff6600;">1</span>}; <span style="color: #0099ff; font-style: italic;">// two elements 10 and 1</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The first line creates a vector of 10 elements, having the value 1; the second line will create a vector, having the values 10 and 1.</p>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Res-deref" style="color: #268bd2; text-decoration: none;">ES.65: Don’t dereference an invalid pointer</a></h3>
+<p>Let me put it this way. If you dereference an invalid pointer, such as a <span style="font-family: 'courier new', courier;">nullptr</span>, your program has undefined behaviour. This is nasty. The only way to avoid this is to check your pointer before its usage.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">func</span>(<span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">*</span> p) {
+    <span style="color: #006699; font-weight: bold;">if</span> (p <span style="color: #555555;">==</span> nullptr) { <span style="color: #0099ff; font-style: italic;">// do something special</span>
+    }
+    <span style="color: #007788; font-weight: bold;">int</span> x <span style="color: #555555;">=</span> <span style="color: #555555;">*</span>p;
+    ...
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>How can you overcome this issue? Don't use a naked pointer. Use a smart pointer such as <span style="font-family: 'courier new', courier;">std::unique_ptr</span> or <span style="font-family: 'courier new', courier;">std::shared_ptr</span> or a reference.&nbsp; I have already written a post to the different kinds of ownership semantic in modern C++. Read the details here: <a href="index.php/c-core-guidelines-rules-to-resource-management">C++ Core Guidelines: Rules to Resource Management.</a></p>
+<p>Let's switch gears.&nbsp;</p>
+<h2>Rule for statements</h2>
+<p>The rules for statements are quite obvious; therefore, I can make it short.</p>
+<ul>
+<li>You should prefer a <span style="font-family: 'courier new', courier;">switch-</span>statement to an<span style="font-family: 'courier new', courier;"> if</span>-statement when there is a choice&nbsp;(<a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Res-switch-if" style="color: #268bd2; text-decoration: none;">ES.70)&nbsp;</a>because a <span style="font-family: 'courier new', courier;">switch-</span>statement may be more readable and can be better optimised.</li>
+<li>The same holds for a range-based for loop (<a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Res-for-range" style="color: #268bd2; text-decoration: none;">ES.71</a>) in contrast to a for-loop. First, a range-based for loop is easier to read and second, you can not make an index error or change the index while looping.</li>
+<li>When you have an obvious loop variable, you should use a for-loop instead of a <span style="font-family: 'courier new', courier;">while</span>-statement (<a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Res-for-while" style="color: #268bd2; text-decoration: none;">ES.72</a>); if not, you should use a <span style="font-family: 'courier new', courier;">while</span>-statement (<a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Res-while-for" style="color: #268bd2; text-decoration: none;">ES.73</a>).</li>
+</ul>
+<p>(1) shows an example when you should prefer a for loop and (2) when you should prefer a <span style="font-family: 'courier new', courier;">while</span>-statement.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">for</span> (gsl<span style="color: #555555;">::</span>index i <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>; i <span style="color: #555555;">&lt;</span> vec.size(); i<span style="color: #555555;">++</span>) {  <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    <span style="color: #0099ff; font-style: italic;">// do work</span>
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> events <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>;                                <span style="color: #0099ff; font-style: italic;">// (2)</span>
+<span style="color: #006699; font-weight: bold;">while</span> (wait_for_event()) {   
+    <span style="color: #555555;">++</span>events;
+    <span style="color: #0099ff; font-style: italic;">// ...</span>
+}</pre>
+</div>
+<p>&nbsp;</p>
+<ul>
+<li>You should declare a loop variable in a for-loop (<a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Res-for-init" style="color: #268bd2; text-decoration: none;">ES.74). </a>This will not only hold for a for-loop but also since C++17 for an <span style="font-family: 'courier new', courier;">if</span>- or <span style="font-family: 'courier new', courier;">switch</span>-statement. Read the details here: <a href="index.php/cpp17-core">C++17 - What's new in the core language?</a></li>
+<li>Avoid <span style="font-family: 'courier new', courier;">do</span>-statements (<a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Res-do" style="color: #268bd2; text-decoration: none;">ES.75</a>),<span style="font-family: 'courier new', courier;"> goto</span>-statements (<a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Res-goto" style="color: #268bd2; text-decoration: none;">ES.76</a>), and minimise the use of <span style="font-family: 'courier new', courier;">break</span> and <span style="font-family: 'courier new', courier;">continue</span> in loops (<a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Res-continue" style="color: #268bd2; text-decoration: none;">ES.77</a>) because they are difficult to read. If something is difficult to read, it's also error-prone.</li>
+</ul>
+<h2>What's next?</h2>
+<p>There are a few rules for statements left. My next post will start with them. Afterwards, the arithmetic rules become more thrilling.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Eric Pederson, Paul Baxter, Carlos Gomes Martinho, and&nbsp;SAI RAGHAVENDRA PRASAD POOSA.</strong></p>
+<p><strong>&nbsp;</strong></p>
+<p>&nbsp;</p>
+<table border="0" style="width: 800px; height: 250px;" cellpadding="8"><caption>
+<h2>Get your e-book at leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img src="images/books/cover.png" alt="cover" width="173" height="220" style="border: medium none #000000;" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 550 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
