@@ -1,0 +1,256 @@
+<p>At first, I have to apologize. Today, I wanted to continue my journey through the C++ Core Guidelines with the arithmetic expressions. In my seminar in this week, we had a long discussion about <span style="font-family: 'courier new', courier;">switch</span>&nbsp;statements in C/C++ and how they become totally unmaintainable. Honestly, I'm not a fan of the&nbsp;<span style="font-family: 'courier new', courier;">switch</span> statements and I have to say: there is life after the <span style="font-family: 'courier new', courier;">switch</span> statements.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p><img src="images/blog/ModernCpp/CppCoreGuidelinesStatementsSwitch/hamlet.png" alt="hamlet" width="400" height="583" style="display: block; margin-left: auto; margin-right: auto;" />&nbsp;</p>
+<p>Before I write about the discussion and in particular one way to overcome the switch statement, here is at first my the plan for today.</p>
+<ul>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Res-break" style="color: #268bd2; text-decoration: none;">ES.78: Always end a non-empty&nbsp;<code class="highlighter-rouge no-highlight" style="font-family: 'Roboto Mono', monospace; padding: 0.2em; font-size: 18px; background-color: #f9f9f9;">case</code>&nbsp;with a&nbsp;<code class="highlighter-rouge no-highlight" style="font-family: 'Roboto Mono', monospace; padding: 0.2em; font-size: 18px; background-color: #f9f9f9;">break</code></a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Res-default" style="color: #268bd2; text-decoration: none;">ES.79: Use&nbsp;<code class="highlighter-rouge no-highlight" style="font-family: 'Roboto Mono', monospace; padding: 0.2em; font-size: 18px; background-color: #f9f9f9;">default</code>&nbsp;to handle common cases (only)</a></li>
+</ul>
+<p>Let's dive directly into the <span style="font-family: 'courier new', courier;">switch</span> statements.</p>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Res-break" style="color: #268bd2; text-decoration: none;">ES.78: Always end a non-empty&nbsp;<code class="highlighter-rouge no-highlight" style="font-family: 'Roboto Mono', monospace; padding: 0.2em; font-size: 18px; background-color: #f9f9f9;">case</code>&nbsp;with a&nbsp;<code class="highlighter-rouge no-highlight" style="font-family: 'Roboto Mono', monospace; padding: 0.2em; font-size: 18px; background-color: #f9f9f9;">break</code></a></h3>
+<p>I saw <span style="font-family: 'courier new', courier;">switch</span> statements which more than hundred case labels. If you use non-empty cases without a break, the maintenance of this <span style="font-family: 'courier new', courier;">switch</span> statements becomes a maintenance nightmare. Here is a first example of the guidelines:</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">switch</span> (eventType) {
+<span style="color: #006699; font-weight: bold;">case</span> Information:
+    update_status_bar();
+    <span style="color: #006699; font-weight: bold;">break</span>;
+<span style="color: #006699; font-weight: bold;">case</span> Warning:
+    write_event_log();
+    <span style="color: #0099ff; font-style: italic;">// Bad - implicit fallthrough</span>
+<span style="color: #006699; font-weight: bold;">case</span> Error:
+    display_error_window();
+    <span style="color: #006699; font-weight: bold;">break</span>;
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Maybe, you overlooked it. The <span style="font-family: 'courier new', courier;">Warning</span> case has no break statement; therefore, the <span style="font-family: 'courier new', courier;">Error</span> case will automatically be executed.&nbsp;</p>
+<p>Since C++17, we have a cure with the attribute <span style="font-family: 'courier new', courier;">[[fallthrough]]</span>. Now, you can explicitly express your intent. <span style="font-family: 'courier new', courier;">[[fallthrough]]</span> has to be on its own line, immediately before a&nbsp;<span style="font-family: 'courier new', courier;">case</span>&nbsp;label and indicates that a fall through is intentional and should therefore not diagnose a compiler warning.</p>
+<p style="margin: 0px 0px 10px; color: #444444; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 14px; font-style: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing: 0px; background-color: #ffffff;">Here is a small example.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">f</span>(<span style="color: #007788; font-weight: bold;">int</span> n) {
+  <span style="color: #007788; font-weight: bold;">void</span> g(), h(), i();
+  <span style="color: #006699; font-weight: bold;">switch</span> (n) {
+    <span style="color: #006699; font-weight: bold;">case</span> <span style="color: #ff6600;">1</span>:
+    <span style="color: #006699; font-weight: bold;">case</span> <span style="color: #ff6600;">2</span>:
+      g();
+      [[fallthrough]];
+    <span style="color: #006699; font-weight: bold;">case</span> <span style="color: #ff6600;">3</span>: <span style="color: #0099ff; font-style: italic;">// no warning on fallthrough (1)</span>
+      h(); 
+    <span style="color: #006699; font-weight: bold;">case</span> <span style="color: #ff6600;">4</span>: <span style="color: #0099ff; font-style: italic;">// compiler may warn on fallthrough (2)</span>
+      i();
+      [[fallthrough]]; <span style="color: #0099ff; font-style: italic;">// ill&shy;formed, not before a case label (3)</span>
+  }
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p><span style="color: #444444; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 14px; font-style: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing: 0px; background-color: #ffffff; float: none;">The</span><span style="color: #444444; font-size: 14px; font-style: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing: 0px; background-color: #ffffff; font-family: 'courier new', courier;">&nbsp;[[fallthrough]]</span><span style="color: #444444; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 14px; font-style: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing: 0px; background-color: #ffffff; float: none;">&nbsp;attribute in line (1) suppresses a compiler warning. That will not hold for the line (2). The compiler may warn. Line (3) is ill-formed because no&nbsp;</span><span style="color: #444444; font-size: 14px; font-style: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing: 0px; background-color: #ffffff; font-family: 'courier new', courier;">case</span><span style="color: #444444; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 14px; font-style: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing: 0px; background-color: #ffffff; float: none;">&nbsp;label is following.</span></p>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Res-default" style="color: #268bd2; text-decoration: none;">ES.79: Use&nbsp;<code class="highlighter-rouge no-highlight" style="font-family: 'Roboto Mono', monospace; padding: 0.2em; font-size: 18px; background-color: #f9f9f9;">default</code>&nbsp;to handle common cases (only)</a></h3>
+<p>Here is my contrived example to make the rule clear.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// switch.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">enum</span> <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Message</span>{
+  information,
+  warning,
+  error,
+  fatal
+};
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">writeMessage</span>(){ std<span style="color: #555555;">::</span>cerr <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"message"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl; }
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">writeWarning</span>(){ std<span style="color: #555555;">::</span>cerr <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"warning"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl; }
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">writeUnexpected</span>(){ std<span style="color: #555555;">::</span>cerr <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"unexpected"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl; }
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">withDefault</span>(Message mess){
+
+  <span style="color: #006699; font-weight: bold;">switch</span>(mess){
+    <span style="color: #006699; font-weight: bold;">case</span> Message:<span style="color: #555555;">:</span>information<span style="color: #555555;">:</span>
+      writeMessage();
+      <span style="color: #006699; font-weight: bold;">break</span>;
+    <span style="color: #006699; font-weight: bold;">case</span> Message:<span style="color: #555555;">:</span>warning<span style="color: #555555;">:</span>
+      writeWarning();
+      <span style="color: #006699; font-weight: bold;">break</span>;
+    <span style="color: #9999ff;">default:</span>
+      writeUnexpected();
+      <span style="color: #006699; font-weight: bold;">break</span>;
+  }
+  
+}
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">withoutDefaultGood</span>(Message mess){
+
+  <span style="color: #006699; font-weight: bold;">switch</span>(mess){
+    <span style="color: #006699; font-weight: bold;">case</span> Message:<span style="color: #555555;">:</span>information<span style="color: #555555;">:</span>
+      writeMessage();
+      <span style="color: #006699; font-weight: bold;">break</span>;
+    <span style="color: #006699; font-weight: bold;">case</span> Message:<span style="color: #555555;">:</span>warning<span style="color: #555555;">:</span>
+      writeWarning();
+      <span style="color: #006699; font-weight: bold;">break</span>;
+    <span style="color: #9999ff;">default:</span>
+      <span style="color: #0099ff; font-style: italic;">// nothing can be done             // (1)</span>
+      <span style="color: #006699; font-weight: bold;">break</span>;
+  }
+  
+}
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">withoutDefaultBad</span>(Message mess){
+
+  <span style="color: #006699; font-weight: bold;">switch</span>(mess){
+    <span style="color: #006699; font-weight: bold;">case</span> Message:<span style="color: #555555;">:</span>information<span style="color: #555555;">:</span>
+      writeMessage();
+      <span style="color: #006699; font-weight: bold;">break</span>;
+    <span style="color: #006699; font-weight: bold;">case</span> Message:<span style="color: #555555;">:</span>warning<span style="color: #555555;">:</span>
+      writeWarning();
+      <span style="color: #006699; font-weight: bold;">break</span>;
+  }
+  
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  
+  withDefault(Message<span style="color: #555555;">::</span>fatal);
+  withoutDefaultGood(Message<span style="color: #555555;">::</span>information);
+  withoutDefaultBad(Message<span style="color: #555555;">::</span>warning);
+
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The implementation of the functions <span style="font-family: 'courier new', courier;">withDefault</span> and <span style="font-family: 'courier new', courier;">withoutDefaultGood</span> are expressive enough. A maintainer of the function knows because of the comment (1) that there is no default case for this switch statement. Compare the function <span style="font-family: 'courier new', courier;">withoutDefaultGood</span> and <span style="font-family: 'courier new', courier;">withoutDefaultBad</span> from an maintenance point of view. Do you know, if the implementer of the function <span style="font-family: 'courier new', courier;">withoutDefaultBad</span> forgot the default case or if the enumerator's <span style="font-family: 'courier new', courier;">Message::error</span> and <span style="font-family: 'courier new', courier;">Message::fatal</span> were later added? At least, you have to study the source code or ask the original authors, if possible.</p>
+<p><img src="images/blog/ModernCpp/CppCoreGuidelinesStatementsSwitch/switch.png" alt="switch" width="300" height="176" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>I mentioned already, that I had in my last seminar an intensive discussion about switch&nbsp;statements in C/C++. I forget to mention. It gave a Python seminar. Python has no switch statement. There is still a life after the switch statement in Python and maybe in C++. What is called in Python a dictionary, is typically coined hashtable, or unordered associative container in C++. We have it since C++11. The official name is <span style="font-family: 'courier new', courier;">std::unordered_map</span> and it guarantees constant amortised time. This means independent of the size of <span style="font-family: 'courier new', courier;">std::unordered_map</span> you get your answer at the same time.</p>
+<p>My key takeaway is that an&nbsp;<span style="font-family: 'courier new', courier;">std::unordered_map</span> is not only a data structure. An&nbsp;<span style="font-family: 'courier new', courier;">std::unordered_map</span> is also a control structure for simulating a switch statement. This technique is called <a href="https://en.wikipedia.org/wiki/Dispatch_table">dispatch table</a>. I already wrote a post about it: <a href="index.php/functional-in-c-dispatch-table">Functional in C++11 and C++14: Dispatch Table und Generic Lambdas</a>.<span style="color: #242729; font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; font-size: 15px; font-style: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: left; text-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing: 0px; background-color: #ffffff; float: none;"><br /></span></p>
+<p>To prove my point, I will implement the program <span style="font-family: 'courier new', courier;">switch.cpp</span> one more by using an <span style="font-family: 'courier new', courier;">std::unoredered_map</span>. For simplicity reason, I will use a global hash table.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// switchDict.cpp</span>
+
+<span style="color: #009999;">#include &lt;functional&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;unordered_map&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">enum</span> <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Message</span>{
+  information,
+  warning,
+  error,
+  fatal
+};
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">writeMessage</span>(){ std<span style="color: #555555;">::</span>cerr <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"message"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl; }
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">writeWarning</span>(){ std<span style="color: #555555;">::</span>cerr <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"warning"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl; }
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">writeUnexpected</span>(){ std<span style="color: #555555;">::</span>cerr <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"unexpected"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl; }
+
+std<span style="color: #555555;">::</span>unordered_map<span style="color: #555555;">&lt;</span>Message, std<span style="color: #555555;">::</span>function<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">void</span>()<span style="color: #555555;">&gt;&gt;</span> mess2Func{         // (1)
+    {Message<span style="color: #555555;">::</span>information, writeMessage},
+    {Message<span style="color: #555555;">::</span>warning, writeWarning}
+};
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">withDefault</span>(Message mess){
+    
+  <span style="color: #006699; font-weight: bold;">auto</span> pair <span style="color: #555555;">=</span> mess2Func.find(mess);
+  <span style="color: #006699; font-weight: bold;">if</span> (pair <span style="color: #555555;">!=</span> mess2Func.end()){
+      pair<span style="color: #555555;">-&gt;</span>second();
+  }
+  <span style="color: #006699; font-weight: bold;">else</span>{
+      writeUnexpected();
+  }
+  
+}
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">withoutDefaultGood</span>(Message mess){
+
+  <span style="color: #006699; font-weight: bold;">auto</span> pair <span style="color: #555555;">=</span> mess2Func.find(mess);
+  <span style="color: #006699; font-weight: bold;">if</span> (pair <span style="color: #555555;">!=</span> mess2Func.end()){
+      pair<span style="color: #555555;">-&gt;</span>second();
+  }
+  <span style="color: #006699; font-weight: bold;">else</span>{
+      <span style="color: #0099ff; font-style: italic;">// Nothing can be done</span>
+  }
+  
+}
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">withoutDefaultBad</span>(Message mess){
+  
+  <span style="color: #006699; font-weight: bold;">auto</span> pair <span style="color: #555555;">=</span> mess2Func.find(mess);
+  <span style="color: #006699; font-weight: bold;">if</span> (pair <span style="color: #555555;">!=</span> mess2Func.end()){
+      pair<span style="color: #555555;">-&gt;</span>second();
+  }
+  
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  
+  withDefault(Message<span style="color: #555555;">::</span>fatal);
+  withoutDefaultGood(Message<span style="color: #555555;">::</span>information);
+  withoutDefaultBad(Message<span style="color: #555555;">::</span>warning);
+
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}
+</pre>
+</div>
+<p></p>
+<p>In line (1) is the <span style="font-family: 'courier new', courier;">std::unordered_map</span>. I use it in the three functions <span style="font-family: 'courier new', courier;">withDefault, withoutDefaultGood</span>, and <span style="font-family: 'courier new', courier;">withoutDefaultBad</span>. The output of the program <span style="font-family: 'courier new', courier;">switchDict</span>&nbsp;is exactly the same as the output of the program <span style="font-family: 'courier new', courier;">switch.</span></p>
+<p><img src="images/blog/ModernCpp/CppCoreGuidelinesStatementsSwitch/switchDict.png" alt="switchDict" width="500" height="181" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>Of course, there are a few differences between the switch statement and the hash table. First, a hash table is a modifiable data structure; therefore, you can copy or modify it at runtime. Second, there is no fall through in the hash table. You have to simulate it by adding the function to the key: <span style="font-family: 'courier new', courier;">mess2Func[Message::error] = writeWarning;. </span>Now, the same action will happen for the key <span style="font-family: 'courier new', courier;">Message::warning</span> and the key&nbsp;<span style="font-family: 'courier new', courier;">Message::error.</span></p>
+<p>I will not argue about performance because depending on your use-case the dispatch table can be executed at compile time. For example, you can use <span style="font-family: 'courier new', courier;">constexpr</span> functions.&nbsp;</p>
+<h2>What's next</h2>
+<p>Sorry for the detour but the discussion in my seminar was too heavy. Next time, I will write finish the last rules to statements and start with the rules to arithmetic expressions.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Eric Pederson, Paul Baxter, Carlos Gomes Martinho, and&nbsp;SAI RAGHAVENDRA PRASAD POOSA.</strong></p>
+<p><strong>&nbsp;</strong></p>
+<p>&nbsp;</p>
+<table border="0" style="width: 800px; height: 250px;" cellpadding="8"><caption>
+<h2>Get your e-book at leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img src="images/books/cover.png" alt="cover" width="173" height="220" style="border: medium none #000000;" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 550 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
