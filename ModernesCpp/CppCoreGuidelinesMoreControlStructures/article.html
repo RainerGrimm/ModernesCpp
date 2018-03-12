@@ -1,0 +1,396 @@
+<p>My translation of my last post <a href="https://www.heise.de/-3985896">C++ Core Guidelines: To Switch or not to Switch, that is a Question</a>&nbsp;into German got a lot of attention. To use a hash table instead of a switch statement seems to be a highly emotional topic. So I change my original plan. Today, I will present a different kind of control structures. I will start with the if and switch statements, continue with the hash table, and end with dynamic and static polymorphism. Additionally, I will mark a few remarks about performance and maintainability.&nbsp;</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img src="images/blog/ModernCpp/CCoreGuidelinesMoreAboutControlStructures/640px-Schienennetz_Schweiz.svg.png" alt="640px Schienennetz Schweiz.svg" width="500" height="294" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>The classical control structure is the if statement; therefore, this is my starting point.</p>
+<h3>if statement</h3>
+<p>Here is the simple program that I will implement with different control structures.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// dispatchIf.cpp</span>
+
+<span style="color: #009999;">#include &lt;chrono&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">enum</span> <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">MessageSeverity</span>{                                 <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    information,
+    warning,
+    fatal,
+};
+
+<span style="color: #006699; font-weight: bold;">auto</span> start <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>steady_clock<span style="color: #555555;">::</span>now();              <span style="color: #0099ff; font-style: italic;">// (4)</span>
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">writeElapsedTime</span>(){                                   
+    <span style="color: #006699; font-weight: bold;">auto</span> now <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>steady_clock<span style="color: #555555;">::</span>now();            <span style="color: #0099ff; font-style: italic;">// (5)</span>
+    std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>duration<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">double</span><span style="color: #555555;">&gt;</span> diff <span style="color: #555555;">=</span> now <span style="color: #555555;">-</span> start;
+  
+    std<span style="color: #555555;">::</span>cerr <span style="color: #555555;">&lt;&lt;</span> diff.count() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" sec. elapsed: "</span>;
+}
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">writeInformation</span>(){ std<span style="color: #555555;">::</span>cerr <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"information"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl; }
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">writeWarning</span>(){ std<span style="color: #555555;">::</span>cerr <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"warning"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl; }
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">writeUnexpected</span>(){ std<span style="color: #555555;">::</span>cerr <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"unexpected"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl; }
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">writeMessage</span>(MessageSeverity messServer){               <span style="color: #0099ff; font-style: italic;">// (1)</span>
+	
+    writeElapsedTime();                                      <span style="color: #0099ff; font-style: italic;">// (3)</span>
+	
+    <span style="color: #006699; font-weight: bold;">if</span> (MessageSeverity<span style="color: #555555;">::</span>information <span style="color: #555555;">==</span> messServer){
+	    writeInformation();
+    }
+    <span style="color: #006699; font-weight: bold;">else</span> <span style="color: #006699; font-weight: bold;">if</span> (MessageSeverity<span style="color: #555555;">::</span>warning <span style="color: #555555;">==</span> messServer){
+	    writeWarning();
+    }
+    <span style="color: #006699; font-weight: bold;">else</span>{
+	    writeUnexpected();
+    }
+  
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  
+    writeMessage(MessageSeverity<span style="color: #555555;">::</span>information);
+    writeMessage(MessageSeverity<span style="color: #555555;">::</span>warning);
+    writeMessage(MessageSeverity<span style="color: #555555;">::</span>fatal);
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The function <span style="font-family: 'courier new', courier;">writeMessage</span> in line (1)&nbsp; displays the elapsed time in seconds (3) since the start of the program and a log message. It uses an enumeration (2) for the message severity. I use the start time (4) and the actual time (5) to calculate the elapsed time. As the name suggested, the<span style="font-family: 'courier new', courier;"> std::steady_clock&nbsp;</span>cannot be adjusted; therefore, it is the right choice for this measurement. The key part of the program is the part of the function <span style="font-family: 'courier new', courier;">writeMessage</span> (1), in which I make the decision which message should be displayed. In this case, I used if-else statements.&nbsp;</p>
+<p>To be honest, I had to look up the syntax for the if-else statement to make it right.&nbsp;</p>
+<p>Here is the output of the program:</p>
+<p>&nbsp;<img src="images/blog/ModernCpp/CCoreGuidelinesMoreAboutControlStructures/dispatchIf.png" alt="dispatchIf" width="400" height="171" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>&nbsp;I will skip the output for the remaining examples. Beside of the numbers, it is always the same.</p>
+<h3>switch statement</h3>
+<p>The following program is quite similar to the previous one. Only the implementation of the function <span style="font-family: 'courier new', courier;">writeMessage</span> changed.&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// dispatchSwitch.cpp</span>
+
+<span style="color: #009999;">#include &lt;chrono&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">enum</span> <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">MessageSeverity</span>{
+    information,
+    warning,
+    fatal,
+};
+
+<span style="color: #006699; font-weight: bold;">auto</span> start <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>steady_clock<span style="color: #555555;">::</span>now();
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">writeElapsedTime</span>(){
+    <span style="color: #006699; font-weight: bold;">auto</span> now <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>steady_clock<span style="color: #555555;">::</span>now();
+    std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>duration<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">double</span><span style="color: #555555;">&gt;</span> diff <span style="color: #555555;">=</span> now <span style="color: #555555;">-</span> start;
+  
+    std<span style="color: #555555;">::</span>cerr <span style="color: #555555;">&lt;&lt;</span> diff.count() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" sec. elapsed: "</span>;
+}
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">writeInformation</span>(){ std<span style="color: #555555;">::</span>cerr <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"information"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl; }
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">writeWarning</span>(){ std<span style="color: #555555;">::</span>cerr <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"warning"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl; }
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">writeUnexpected</span>(){ std<span style="color: #555555;">::</span>cerr <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"unexpected"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl; }
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">writeMessage</span>(MessageSeverity messSever){
+	
+    writeElapsedTime();
+
+    <span style="color: #006699; font-weight: bold;">switch</span>(messSever){
+        <span style="color: #006699; font-weight: bold;">case</span> MessageSeverity:<span style="color: #555555;">:</span>information<span style="color: #555555;">:</span>
+            writeInformation();
+            <span style="color: #006699; font-weight: bold;">break</span>;
+        <span style="color: #006699; font-weight: bold;">case</span> MessageSeverity:<span style="color: #555555;">:</span>warning<span style="color: #555555;">:</span>
+            writeWarning();
+            <span style="color: #006699; font-weight: bold;">break</span>;
+        <span style="color: #9999ff;">default:</span>
+            writeUnexpected();
+            <span style="color: #006699; font-weight: bold;">break</span>;
+  }
+  
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  
+    writeMessage(MessageSeverity<span style="color: #555555;">::</span>information);
+    writeMessage(MessageSeverity<span style="color: #555555;">::</span>warning);
+    writeMessage(MessageSeverity<span style="color: #555555;">::</span>fatal);
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}
+</pre>
+</div>
+<p></p>
+<p>I will make it short. Let's continue with the hash table.</p>
+<h3>Hashtable</h3>
+<p>For a more elaborate discussion of the switch statement and the hash table, read my last post: <a href="index.php/c-core-guidelines-to-switch-or-not-to-switch-that-is-the-question">C++ Core Guidelines: To Switch or not to Switch, that is the Question</a>.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// dispatchHashtable.cpp</span>
+
+<span style="color: #009999;">#include &lt;chrono&gt;</span>
+<span style="color: #009999;">#include &lt;functional&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;unordered_map&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">enum</span> <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">MessageSeverity</span>{
+  information,
+  warning,
+  fatal,
+};
+
+<span style="color: #006699; font-weight: bold;">auto</span> start <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>steady_clock<span style="color: #555555;">::</span>now();
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">writeElapsedTime</span>(){
+    <span style="color: #006699; font-weight: bold;">auto</span> now <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>steady_clock<span style="color: #555555;">::</span>now();
+    std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>duration<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">double</span><span style="color: #555555;">&gt;</span> diff <span style="color: #555555;">=</span> now <span style="color: #555555;">-</span> start;
+  
+    std<span style="color: #555555;">::</span>cerr <span style="color: #555555;">&lt;&lt;</span> diff.count() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" sec. elapsed: "</span>;
+}
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">writeInformation</span>(){ std<span style="color: #555555;">::</span>cerr <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"information"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl; }
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">writeWarning</span>(){ std<span style="color: #555555;">::</span>cerr <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"warning"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl; }
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">writeUnexpected</span>(){ std<span style="color: #555555;">::</span>cerr <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"unexpected"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl; }
+
+std<span style="color: #555555;">::</span>unordered_map<span style="color: #555555;">&lt;</span>MessageSeverity, std<span style="color: #555555;">::</span>function<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">void</span>()<span style="color: #555555;">&gt;&gt;</span> mess2Func{
+    {MessageSeverity<span style="color: #555555;">::</span>information, writeInformation},
+    {MessageSeverity<span style="color: #555555;">::</span>warning, writeWarning},
+    {MessageSeverity<span style="color: #555555;">::</span>fatal, writeUnexpected}
+};
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">writeMessage</span>(MessageSeverity messServer){
+	
+	writeElapsedTime();
+	
+	mess2Func[messServer]();
+	
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  
+  writeMessage(MessageSeverity<span style="color: #555555;">::</span>information);
+  writeMessage(MessageSeverity<span style="color: #555555;">::</span>warning);
+  writeMessage(MessageSeverity<span style="color: #555555;">::</span>fatal);
+
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}
+</pre>
+</div>
+<p></p>
+<p>Is this the end? No? In C++ we have dynamic and static polymorphism a few of my readers mentioned in their discussion. With the if-else or the switch statement, I used enumerator for dispatching to the right case. The key of my hash table behaves in a similar way.&nbsp;</p>
+<p>Dynamic or static polymorphism is totally different. Instead of an enumerator or a key for dispatching to the right action, I use objects which decide autonomously at runtime (dynamic polymorphism) or compile time (static polymorphism) what should be done.&nbsp;</p>
+<p>Let's continue with dynamic polymorphism.</p>
+<h3>Dynamic polymorphism</h3>
+<p>Not, the decision logic is encoded in the type hierarchy.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// dispatchDynamicPolymorphism.cpp</span>
+
+<span style="color: #009999;">#include &lt;chrono&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">auto</span> start <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>steady_clock<span style="color: #555555;">::</span>now();
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">writeElapsedTime</span>(){
+    <span style="color: #006699; font-weight: bold;">auto</span> now <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>steady_clock<span style="color: #555555;">::</span>now();
+    std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>duration<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">double</span><span style="color: #555555;">&gt;</span> diff <span style="color: #555555;">=</span> now <span style="color: #555555;">-</span> start;
+  
+    std<span style="color: #555555;">::</span>cerr <span style="color: #555555;">&lt;&lt;</span> diff.count() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" sec. elapsed: "</span>;
+}
+
+<span style="color: #006699; font-weight: bold;">struct</span> MessageSeverity{                         <span style="color: #0099ff; font-style: italic;">// (1)</span>
+	<span style="color: #006699; font-weight: bold;">virtual</span> <span style="color: #007788; font-weight: bold;">void</span> writeMessage() <span style="color: #006699; font-weight: bold;">const</span> {
+		std<span style="color: #555555;">::</span>cerr <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"unexpected"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+	}
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> MessageInformation<span style="color: #555555;">:</span> MessageSeverity{     <span style="color: #0099ff; font-style: italic;">// (2)</span>
+	<span style="color: #007788; font-weight: bold;">void</span> writeMessage() <span style="color: #006699; font-weight: bold;">const</span> override {
+		std<span style="color: #555555;">::</span>cerr <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"information"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+	}
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> MessageWarning<span style="color: #555555;">:</span> MessageSeverity{         <span style="color: #0099ff; font-style: italic;">// (3)</span>
+	<span style="color: #007788; font-weight: bold;">void</span> writeMessage() <span style="color: #006699; font-weight: bold;">const</span> override {
+		std<span style="color: #555555;">::</span>cerr <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"warning"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+	}
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> MessageFatal<span style="color: #555555;">:</span> MessageSeverity{};
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">writeMessageReference</span>(<span style="color: #006699; font-weight: bold;">const</span> MessageSeverity<span style="color: #555555;">&amp;</span> messServer){
+	
+	writeElapsedTime();
+	messServer.writeMessage();
+	
+}
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">writeMessagePointer</span>(<span style="color: #006699; font-weight: bold;">const</span> MessageSeverity<span style="color: #555555;">*</span> messServer){
+	
+	writeElapsedTime();
+	messServer<span style="color: #555555;">-&gt;</span>writeMessage();
+	
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  
+    MessageInformation messInfo;
+    MessageWarning messWarn;
+    MessageFatal messFatal;
+  
+    MessageSeverity<span style="color: #555555;">&amp;</span> messRef1 <span style="color: #555555;">=</span> messInfo;            
+    MessageSeverity<span style="color: #555555;">&amp;</span> messRef2 <span style="color: #555555;">=</span> messWarn;
+    MessageSeverity<span style="color: #555555;">&amp;</span> messRef3 <span style="color: #555555;">=</span> messFatal;
+  
+    writeMessageReference(messRef1);              <span style="color: #0099ff; font-style: italic;">// (4)</span>
+    writeMessageReference(messRef2);
+    writeMessageReference(messRef3);
+  
+    std<span style="color: #555555;">::</span>cerr <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  
+    MessageSeverity<span style="color: #555555;">*</span> messPoin1 <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">new</span> MessageInformation;
+    MessageSeverity<span style="color: #555555;">*</span> messPoin2 <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">new</span> MessageWarning;
+    MessageSeverity<span style="color: #555555;">*</span> messPoin3 <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">new</span> MessageFatal;
+  
+    writeMessagePointer(messPoin1);               <span style="color: #0099ff; font-style: italic;">// (5)</span>
+    writeMessagePointer(messPoin2);
+    writeMessagePointer(messPoin3);
+  
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The classes (1), (2), and (3) know, what the have to display if used. The key idea is that the static type <span style="font-family: 'courier new', courier;">MessageSeverity</span> differs from the dynamic type such as <span style="font-family: 'courier new', courier;">MessageInformation</span>(4); therefore, the late binding will kick in and the <span style="font-family: 'courier new', courier;">writeMessage</span> methods (5), (6), and (7) of the dynamic types are used. Dynamic polymorphism requires a kind of indirection. You can use references (8) or pointers (9).&nbsp;</p>
+<p>From a performance perspective, we can do better and make the dispatch at compile time.</p>
+<h3>Static polymorphism&nbsp;&nbsp;</h3>
+<p>Static polymorphism is often called CRTP. CRTP stands for c++ idiom <strong>C</strong>uriously <b>R</b>ecurring <b>T</b>emplate <b>P</b>attern. Curiously because a class derives in this technique from a class template instantiation using itself as template argument.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// dispatchStaticPolymorphism.cpp</span>
+
+<span style="color: #009999;">#include &lt;chrono&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">auto</span> start <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>steady_clock<span style="color: #555555;">::</span>now();
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">writeElapsedTime</span>(){
+    <span style="color: #006699; font-weight: bold;">auto</span> now <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>steady_clock<span style="color: #555555;">::</span>now();
+    std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>duration<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">double</span><span style="color: #555555;">&gt;</span> diff <span style="color: #555555;">=</span> now <span style="color: #555555;">-</span> start;
+  
+    std<span style="color: #555555;">::</span>cerr <span style="color: #555555;">&lt;&lt;</span> diff.count() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" sec. elapsed: "</span>;
+}
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> ConcreteMessage<span style="color: #555555;">&gt;</span>                        <span style="color: #0099ff; font-style: italic;">// (1)</span>
+<span style="color: #006699; font-weight: bold;">struct</span> MessageSeverity{
+  <span style="color: #007788; font-weight: bold;">void</span> writeMessage(){                                     <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    <span style="color: #006699; font-weight: bold;">static_cast</span><span style="color: #555555;">&lt;</span>ConcreteMessage<span style="color: #555555;">*&gt;</span>(<span style="color: #006699; font-weight: bold;">this</span>)<span style="color: #555555;">-&gt;</span>writeMessageImplementation();
+  }
+  <span style="color: #007788; font-weight: bold;">void</span> writeMessageImplementation() <span style="color: #006699; font-weight: bold;">const</span> {
+    std<span style="color: #555555;">::</span>cerr <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"unexpected"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  }
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> MessageInformation<span style="color: #555555;">:</span> MessageSeverity<span style="color: #555555;">&lt;</span>MessageInformation<span style="color: #555555;">&gt;</span>{
+  <span style="color: #007788; font-weight: bold;">void</span> writeMessageImplementation() <span style="color: #006699; font-weight: bold;">const</span> {               <span style="color: #0099ff; font-style: italic;">// (3)</span>
+    std<span style="color: #555555;">::</span>cerr <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"information"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  }
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> MessageWarning<span style="color: #555555;">:</span> MessageSeverity<span style="color: #555555;">&lt;</span>MessageWarning<span style="color: #555555;">&gt;</span>{
+  <span style="color: #007788; font-weight: bold;">void</span> writeMessageImplementation() <span style="color: #006699; font-weight: bold;">const</span> {               <span style="color: #0099ff; font-style: italic;">// (4)</span>
+    std<span style="color: #555555;">::</span>cerr <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"warning"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  }
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> MessageFatal<span style="color: #555555;">:</span> MessageSeverity<span style="color: #555555;">&lt;</span>MessageFatal<span style="color: #555555;">&gt;</span>{};     <span style="color: #0099ff; font-style: italic;">// (5)</span>
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">void</span> writeMessage(T<span style="color: #555555;">&amp;</span> messServer){                       
+	
+    writeElapsedTime();                                   
+    messServer.writeMessage();                            <span style="color: #0099ff; font-style: italic;">// (6)</span>
+	
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main(){
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  
+    MessageInformation messInfo;
+    writeMessage(messInfo);
+    
+    MessageWarning messWarn;
+    writeMessage(messWarn);
+	
+    MessageFatal messFatal;
+    writeMessage(messFatal);
+  
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}
+</pre>
+</div>
+<p></p>
+<p>In this case, all concrete classes (3), (4), and (5) derive from the base class <span style="font-family: 'courier new', courier;">MessageSeverity</span>. The method <span style="font-family: 'courier new', courier;">writeMessage</span> is a kind of an interface that dispatches to the concrete implementations <span style="font-family: 'courier new', courier;">writeMessageImplementation</span>.&nbsp; To make that happen, the object will be upcasted to the <span style="font-family: 'courier new', courier;">ConcreteMessage</span>:&nbsp;<span style="font-family: 'courier new', courier;">&nbsp;static_cast&lt;ConcreteMessage*&gt;(this)-&gt;writeMessageImplementation();. </span>This is the static dispatch at compile time; therefore, this technique is called static polymorphism.</p>
+<p>To be honest, I took me a time to get used to it, but the applying of the static polymorphism in line (6) is quite easy. If the&nbsp;curiously recurring template pattern is still curious to you, I wrote an article about it: <a href="http://www.grimm-jaud.de/index.php/blog/c-ist-doch-lazy">C++ is doch lazy!</a></p>
+<p>To end my comparison, let me compare this variious techniques.</p>
+<h2>My simple comparison</h2>
+<p>Let's first look at your prefered way to implement and maintain a control structure. Depending on your experience as a C programmer, the if or switch statements seem quite natural to you. If you have an interpreter background, you may prefer the hash table. With an object orientation background, the dynamic polymorphism is your prefered way to implement the control structure. The static polymorphism, also called CRTP, is quite special; therefore, it will take some time to get comfortable with it. Afterwards it quite a pattern you have to use.&nbsp;</p>
+<p>From the security perspective, I have to mention the new context-sensitive identifiers <span style="font-family: 'courier new', courier;">override</span>.&nbsp; It&nbsp;helps to express your intent to override a virtual method in your type hierarchy. If you will make it wrong, the compiler will complain.&nbsp;</p>
+<p>Now to the more interesting question. What are the performance differences? I will only provide a rough idea without numbers. If you have a long series of if statements, this will become quite expensive because a lot of comparisons are involved. The dynamic polymorphism and the hash table will be faster and in the same ballpark, because in both cases a pointer indirection is involved. The switch statement and the static polymorphism make their decision at compile time; therefore, they are the two fastest control structures.</p>
+<h2>What's next?</h2>
+<p><span style="color: #444444; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 14px; font-style: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing: 0px; background-color: #ffffff; float: none;">I hope, I'm done with the discussion of the different control structures; therefore, I will in my next post the last rules to statements and start with the rules to arithmetic expressions.</span></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Eric Pederson, Paul Baxter, Carlos Gomes Martinho, and&nbsp;SAI RAGHAVENDRA PRASAD POOSA.</strong></p>
+<p></p>
+<table border="0" style="width: 800px; height: 250px;" cellpadding="8"><caption><br />
+<h2>Get your e-book at leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td><br />
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td><br />
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td><br />
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img src="images/books/cover.png" alt="cover" width="173" height="220" style="border: medium none #000000;" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td><br />
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<br />
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td><br />
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0"><br />
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<br />
+<p>In sum, you get more than 550 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+<br />&nbsp;</td>
+</tr>
+</tbody>
+</table>
