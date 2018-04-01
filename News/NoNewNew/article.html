@@ -1,0 +1,114 @@
+<p>Two weeks ago, the ISO C++ standard meeting took place in Jacksonville.&nbsp; Today I want to make a short detour and write about the revolutionary decision that was made in the Jacksonville meeting. Additionally, I refer to the post&nbsp;<a href="https://www.fluentcpp.com/2018/04/01/cpp-will-no-longer-have-pointers/">C++ Will no Longer Have Pointers</a> by Fluent C++. The standard committee decided that pointers will be deprecated in C++20 and will with very high probability removed in C++23.</p>
+<hr id="system-readmore" />
+<p>To be honest, what seems like a revolution is only the last step in a long evolution. First, let me explain the big picture.</p>
+<p>&nbsp;<img src="images/blog/news/NoNewNew/memory.png" alt="memory" width="600" height="237" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<h3>The evolution of pointers in C++</h3>
+<p>Pointers are part of C++ since the first beginning. We got them from C. From the first beginning there was always the tendency in C++ to make the handling with pointers more type-safe without paying the extra cost.</p>
+<p>With C++98 we got <span style="font-family: courier\ new, courier;">std::auto_ptr </span>to express&nbsp;exclusive ownership. But <span style="font-family: courier\ new, courier;">std::auto_ptr </span>had a&nbsp;big issue.<span style="font-family: courier\ new, courier;">&nbsp;When</span>&nbsp;you copy an <span style="font-family: courier\ new, courier;">std::auto_ptr&nbsp;</span><span style="font-family: courier\ new, courier;"><span>t</span></span>he resource will be moved. What looks like a copy operation was actually a move operation. The graphic shows the surprising behaviour of an <span style="font-family: courier\ new, courier;">std::auto_ptr</span>.<span style="font-family: courier\ new, courier;"><span><br /></span></span></p>
+<p><img src="images/blog/news/NoNewNew/autoPtrCopy.jpg" alt="autoPtrCopy" width="400" height="174" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>This was extremely bad and the reason for a lot of serious bugs; therefore, we got <span style="font-family: courier\ new, courier;">std::unique_ptr</span> with C++11 and <span style="font-family: courier\ new, courier;">std::auto_ptr</span> was deprecated in C++11 and finally removed in C++17. Additionally, we got <span style="font-family: courier\ new, courier;">std::shared_ptr</span> and <span style="font-family: courier\ new, courier;">std::weak_ptr</span> in C++11 for handling shared ownership. You can not copy but move an <span style="font-family: courier\ new, courier;">std::unique_ptr</span> and if you copy or assign an <span style="font-family: courier\ new, courier;">std::shared_ptr</span>, the internal reference counter will be increased. Have a look here:</p>
+<p><img src="images/blog/news/NoNewNew/uniquePtrCopy.jpg" alt="uniquePtrCopy" width="400" height="159" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p><img src="images/blog/news/NoNewNew/sharedPtr.jpg" alt="sharedPtr" width="500" height="284" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>Since C++11 C++ has a multithreading library. This makes the handling with <span style="font-family: 'courier new', courier;">std::shared_ptr</span> quite challenging because an <span style="font-family: 'courier new', courier;">std::shared_ptr</span> is per definition shared but not thread-safe. Only the control-block is thread-safe but not the access to its resource. That means, modifying the reference counter is an atomic operation and you have the guarantee that the resource will be deleted exactly once. This is the reason we will get with C++20 atomic smart pointers: <span style="font-family: courier\ new, courier;">std::atomic_shared_ptr</span> and <span style="font-family: courier\ new, courier;">std::atmic_weak_ptr</span>. Read the details in the proposal: <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2014/n4058.pdf">Atomic Smart Pointers</a>.</p>
+<p>Now to the more interesting part of C++20 and C++23. Pointers will be deprecated in C++20 and removed in C++23. Or to say it with three words: <strong>N</strong>o <strong>N</strong>ew <strong>N</strong>ew (NNN).</p>
+<h3>std::unique_ptr to our rescue</h3>
+<p>But hold, we have a dogma in C++: Don't pay for anything, you don't need. How can we program without a pointer? Just use an <span style="font-family: courier\ new, courier;">std::unique_ptr.</span> An <span style="font-family: courier\ new, courier;">std::unique_ptr</span> is by design as fast and as slim as a raw pointer but has a great benefit: it automatically manages its resource.</p>
+<p>Only to remind you. Here is a simple performance test.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// all.cpp</span>
+
+<span style="color: #009999;">#include &lt;chrono&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">static</span> <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">long</span> <span style="color: #007788; font-weight: bold;">long</span> numInt<span style="color: #555555;">=</span> <span style="color: #ff6600;">100000000</span>;
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+
+  <span style="color: #006699; font-weight: bold;">auto</span> start <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>system_clock<span style="color: #555555;">::</span>now();
+
+  <span style="color: #006699; font-weight: bold;">for</span> ( <span style="color: #007788; font-weight: bold;">long</span> <span style="color: #007788; font-weight: bold;">long</span> i<span style="color: #555555;">=</span><span style="color: #ff6600;">0</span> ; i <span style="color: #555555;">&lt;</span> numInt; <span style="color: #555555;">++</span>i){
+    <span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">*</span> tmp(<span style="color: #006699; font-weight: bold;">new</span> <span style="color: #007788; font-weight: bold;">int</span>(i));
+    <span style="color: #006699; font-weight: bold;">delete</span> tmp;
+    <span style="color: #0099ff; font-style: italic;">// std::shared_ptr&lt;int&gt; tmp(new int(i));</span>
+    <span style="color: #0099ff; font-style: italic;">// std::shared_ptr&lt;int&gt; tmp(std::make_shared&lt;int&gt;(i));</span>
+    <span style="color: #0099ff; font-style: italic;">// std::unique_ptr&lt;int&gt; tmp(new int(i));</span>
+    <span style="color: #0099ff; font-style: italic;">// std::unique_ptr&lt;int&gt; tmp(std::make_unique&lt;int&gt;(i));</span>
+  }
+
+  std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>duration<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">double</span><span style="color: #555555;">&gt;</span> dur<span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>system_clock<span style="color: #555555;">::</span>now() <span style="color: #555555;">-</span> start;
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"time native: "</span> <span style="color: #555555;">&lt;&lt;</span> dur.count() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" seconds"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The program allocates and deletes 100.000.000 ints.&nbsp; I use a raw pointer, and <span style="font-family: courier\ new, courier;">std::shared_ptr</span> and <span style="font-family: courier\ new, courier;">std::unique_ptr</span> in two variations. I executed the program with and without maximum optimisation on Linux and Windows. Here are the numbers.</p>
+<p>&nbsp;<img src="images/blog/news/NoNewNew/comparisonEng.png" alt="comparisonEng" width="600" height="142" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>The numbers show it black on blue. The two variations of <span style="font-family: courier\ new, courier;">std::unique_ptr</span> are on Linux and Windows as fast as the raw pointers. For the details of the numbers, read my previous post: <a href="index.php/memory-and-performance-overhead-of-smart-pointer">Memory and Performance Overhead of Smart Pointers</a>.</p>
+<h3>Ownership semantic</h3>
+<p>Honestly, we use pointers and in particular raw pointers far too often. The question if you should use a pointer, boils down to one question: Who is the owner? Luckily, we can directly express our intention about ownership in code.</p>
+<ul>
+<li><strong>Local objects</strong>. The C++ runtime as the owner automatically manages the lifetime of these resources. The same holds for global objects or members of a class. The guidelines calls them scoped objects.</li>
+<li><strong>References</strong>: I'm not the owner. I only borrowed the resource that cannot be empty.</li>
+<li><strong>Raw pointers</strong>: I'm not the owner. I only borrowed the resource that can be can be empty. I must not delete the resource.</li>
+<li><strong><span style="font-family: courier\ new, courier;">std::unique_ptr</span></strong>: I'm the exclusive owner of the resource. I may explicitly release the resource.</li>
+<li><strong><span style="font-family: courier\ new, courier;">std::shared_ptr</span></strong>: I share the resource with other shared ptr. I may explicitly release my shared ownership.</li>
+<li><strong><span style="font-family: courier\ new, courier;">std::weak_ptr</span></strong>: I'm not the owner of the resource but I may become temporary the shared owner of the resource by using the method <a href="http://en.cppreference.com/w/cpp/memory/weak_ptr/lock"><span style="font-family: courier\ new, courier;">std::weak_ptr::lock</span></a>.</li>
+</ul>
+<p>We have only to change our practice in one out of six use-cases and we are fine with the next evolution step in C++.</p>
+<h2>What's next?</h2>
+<p>Sorry for the detour but the Jacksonville decision was worth a detour. The next post will be about the rules to performance in the C++ Core Guidelines.</p>
+<h2>Further Information</h2>
+<p>The decision to the next pdf bundle is made. It will take me about a week to prepare the pdf-bundles. First, I have to look for typos. People already subscribed to my newsletter will get them automatically.</p>
+<ul>
+<li>English: <a href="index.php/which-pdf-bundle-should-i-provide-make-your-choice-2">Functional Features in C++</a></li>
+<li>German: <a href="https://www.grimm-jaud.de/index.php/blog/welches-pdf-paeckchen-soll-ich-zusammenstellen-mache-dein-kreuz-3">Charakteristiken der funktionalen Programmierung</a></li>
+</ul>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Eric Pederson, Paul Baxter, &nbsp;Sai Raghavendra Prasad Poosa, and Meeting C++.&nbsp;</strong></p>
+<p><strong>&nbsp;</strong></p>
+<p>&nbsp;</p>
+<table border="0" style="width: 800px; height: 250px;" cellpadding="8"><caption>
+<h2>Get your e-book at leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img src="images/books/cover.png" alt="cover" width="173" height="220" style="border: medium none #000000;" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 550 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
