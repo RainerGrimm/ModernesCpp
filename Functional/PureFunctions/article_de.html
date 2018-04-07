@@ -1,0 +1,131 @@
+<p>Reine Funktionen sind mathematischen Funktionen sehr ähnlich. Sie sind der Grund dafür, das Haskell als rein funktionale Programmiersprache bezeichnet wird.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<h2>Reine Funktionen</h2>
+<p><img src="images/blog/FunktionaleProgrammierung/PureFunctions/PureFunctions.png" alt="PureFunctions" style="margin: 15px;" /></p>
+<p>Die Tabelle stellte ich reine den unreinen Funktionen gegenüber.</p>
+<p><img src="images/blog/FunktionaleProgrammierung/PureFunctions/pureVersusImpure.png" alt="pureVersusImpure" width="500" height="162" style="margin: 15px;" /></p>
+<p>&nbsp;</p>
+<p>Reine Funktionen besitzen einen entscheidenden Nachteil. Sie können nicht mit der Welt interagieren. Den Funktionen zur Ein- und Ausgabe, Funktionen, die Zustand aufbauen oder auch Funktionen, die Zufallszahlen ermitteln, können nicht rein sein. Den einzigen Effekt, den reine Funktionen laut <a href="https://en.wikipedia.org/wiki/Simon_Peyton_Jones">Simon Peyton Jones </a>besitzen können, ist, den Raum zu wärmen. Haskell löst sich aus dieser Sackgasse, in dem sie unreine, imperative Subsysteme in die rein funktionale Programmiersprache einbettet. Die imperativen Subsysteme werden in Haskell Monaden genannt. Dazu gleich mehr.</p>
+<p>Wie steht es nun um die Reinheit von C++? Diese basiert ähnlich wie der Umgang mit <a href="index.php/blog/unveraenderliche-daten">unveränderlichen Daten </a>auf der Disziplin des Programmierers. Das folgende Programm stelle ich eine Funktion, eine Meta-Funktion und eine <span style="font-family: courier new,courier;">constexpr</span>-Funktion als&nbsp;reine Funktion vor.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// pureFunctions.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+
+<span style="color: #2b91af;">int</span> powFunc(<span style="color: #2b91af;">int</span> m, <span style="color: #2b91af;">int</span> n){ 
+  <span style="color: #0000ff;">if</span> (n == 0) <span style="color: #0000ff;">return</span> 1; 
+  <span style="color: #0000ff;">return</span> m * powFunc(m, n-1); 
+}
+
+<span style="color: #0000ff;">template</span>&lt;<span style="color: #2b91af;">int</span> m, <span style="color: #2b91af;">int</span> n&gt;
+<span style="color: #0000ff;">struct</span> PowMeta{
+  <span style="color: #0000ff;">static</span> <span style="color: #2b91af;">int</span> <span style="color: #0000ff;">const</span> value = m * PowMeta&lt;m,n-1&gt;::value;
+};
+
+<span style="color: #0000ff;">template</span>&lt;<span style="color: #2b91af;">int</span> m&gt;
+<span style="color: #0000ff;">struct</span> PowMeta&lt;m,0&gt;{
+  <span style="color: #0000ff;">static</span> <span style="color: #2b91af;">int</span> <span style="color: #0000ff;">const</span> value = 1;
+};
+
+constexpr <span style="color: #2b91af;">int</span> powConst(<span style="color: #2b91af;">int</span> m, <span style="color: #2b91af;">int</span> n){ 
+  <span style="color: #2b91af;">int</span> r = 1;
+  <span style="color: #0000ff;">for</span>(<span style="color: #2b91af;">int</span> k=1; k&lt;=n; ++k) r*= m;
+  <span style="color: #0000ff;">return</span> r;
+}
+
+<span style="color: #2b91af;">int</span> main(){
+  std::cout &lt;&lt; powFunc(2,10) &lt;&lt; std::endl;               <span style="color: #008000;">// 1024</span>
+  std::cout &lt;&lt; PowMeta&lt;2,10&gt;::value &lt;&lt; std::endl;        <span style="color: #008000;">// 1024</span>
+  std::cout &lt;&lt; powConst(2,10) &lt;&lt; std::endl;              <span style="color: #008000;">// 1024</span>
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Auch wenn die drei Funktionen das gleiche Ergebnis liefern, sind sie doch sehr verschieden. <span style="font-family: courier new,courier;">powFunc</span> (Zeile 5 - 8) ist eine klassische Funktion. Sie wird zur Laufzeit des Programms ausgeführt und kann auch mit nicht-konstanten Ausdrücken umgehen. Im Gegensatz dazu ist <span style="font-family: courier new,courier;">PowMeta</span> (Zeile 10 - 18) eine Meta-Funktion, die zur Übersetzungszeit des Programms ausgeführt wird. Daher benötigt sie konstante Ausdrücke als Argumente. Die <span style="font-family: courier new,courier;">constexpr-</span>Funktion <span style="font-family: courier new,courier;">powConst</span> (Zeile 20 - 24) kann zur Übersetzungszeit und zur Laufzeit des Programms ausgeführt werden. Wird sie zur Übersetzungszeit des Programms ausgeführt, benötigt sie wie die Meta-Funktion <span style="font-family: courier new,courier;">PowMeta</span> konstante Ausdrücke als Argumente.</p>
+<p>An now to something complitly different. Im nächsten Abschnitt stelle ich in einer ersten Annäherung Monaden in Haskell vor. Diese Annäherung werde ich im Laufe der weiteren Artikel zu funktionalen Programmierung in C++ sukzessive verfeinern. Jetzt rede ich aber über die Zukunft, den mit <span style="font-family: courier new,courier;">std::optional</span> in C++17, der Ranges-Library von Eric Niebler und den Erweiterungen von<span style="font-family: courier new,courier;"> std::future</span> stehen uns in C++ eine monadische Zukunft bevor. Oder, wie es Bartosz Milewski in seinem absolut sehenswerten Vortrag so treffend formuliert hat: <a href="http://bartoszmilewski.com/2014/02/26/c17-i-see-a-monad-in-your-future/">I See a Monad in Your Future</a>. <a href="http://bartoszmilewski.com/2014/02/26/c17-i-see-a-monad-in-your-future/"></a></p>
+<h3>Monaden</h3>
+<p>Haskell als rein funktionale Sprache verwendet ausschließlich reine Funktionen. Diese reinen Funktionen zeichnen sich insbesondere dadurch aus, dass sie immer das gleiche Ergebnis zurückgeben, wenn sie mit den gleichen Argumenten aufgerufen werden. Dank dieser Eigenschaft, referenzielle Transparenz genannt, ist es für Funktionen in Haskell nicht möglich, Seiteneffekte zu besitzen. Damit besitzt Haskell ein konzeptionelles Problem. Die Welt ist voll von Berechnungen, die Seiteneffekte besitzen. Dies sind Berechnungen, die fehl schlagen, eine nicht deterministische Anzahl von Ergebnissen erzeugen oder auch von der Umgebung abhängen. Um dieses konzeptionelle Problem zu lösen, führte Haskell Monaden ein und bettete diese in die rein funktionale Programmiersprache ein.</p>
+<p>Die klassischen Monaden kapseln genau einen Seiteneffekt:</p>
+<ul>
+<li><strong>I/O&nbsp; Monade:</strong> Berechnungen, die mit der Ein- und Ausgabe interagieren.</li>
+<li><strong>Maybe Monade</strong>: Berechnungen, die eventuell einen Wert zurückgeben.</li>
+<li><strong>Error Monade</strong>: Berechnungen, die fehlschlagen können.</li>
+<li><strong>List Monade:</strong> Berechnungen, die beliebige viele Ergebnisse besitzen können .</li>
+<li><strong>State Monade:</strong> Berechnungen, die einen Zustand aufbauen.</li>
+<li><strong>Reader Monade</strong>: Berechnungen, die Werte aus der Umgebung lesen.</li>
+<li><strong>Writer Monade</strong>: Berechnungen, die einen Strom von Daten ergeben.</li>
+</ul>
+<p>Das Konzept der Monaden stammt aus der Kategorientheorie, einem Zweig der Mathematik, der Objekte und die Abbildungen auf diesen Objekten beschreibt. Monaden sind abstrakte Datentypen (<a href="https://en.wikibooks.org/wiki/Haskell/Classes_and_types">Typklassen</a>), die einfache Datentypen in höhere Datentypen transformieren. Werte dieser höheren Datentypen werden monadische Werte genannt. Einmal in der Monade gefangen, kann der monadische Wert durch Funktionskomposition nur in einen anderen monadischen Wert transformiert werden.<br />Diese Transformation berücksichtigt die besondere Struktur der Monade. So bricht die Error Monade bei einem Fehler die Berechnung vorzeitig ab, so baut die State Monade auf ihrem bestehenden Zustand auf oder akkumuliert die Writer Monade ihre Logdatei. &nbsp;</p>
+<p>Damit dies möglich ist, bestehen Monaden formal gesprochen aus drei Komponenten:</p>
+<ol>
+<li><strong>Typkonstruktor</strong>: Dieser erklärt für den zugrunde liegenden einfachen Typ, wie der entsprechende monadische Typ zu erhalten ist.</li>
+<li><strong>Funktionen:</strong>
+<ul>
+<li><strong>Einheitsfunktion:</strong> Führt die einfachen Werte in die Monade ein.</li>
+<li><strong>bind Operator:</strong> Definiert, wie eine Funktion auf einem monadischen Wert angewandt wird um einen neuen monadischen Wert zu erhalten.</li>
+</ul>
+</li>
+<li><strong>Regeln für die Funktionen:</strong>
+<ul>
+<li>Die Einheitsfunktion muss das links- und rechts neutrale Element sein.</li>
+<li>Die Komposition von Funktionen muss assoziativ sein.</li>
+</ul>
+</li>
+</ol>
+<p>Wird ein Typ wie die Error Monade Instanz der Monade Typklasse, muss sie die Einheitsfunktion und den bind Operator implementieren. Diese zwei Funktionen definieren explizit, wie die Error Monade mit Fehler in Berechnungen umgeht. Beim Einsatz der Error Monade tritt die Fehlerbehandlung in den Hintergrund.</p>
+<p>Eine Monade besteht aus zwei Kontrollflüssen. Dem regulären, expliziten Kontrollfluss, der den Wert berechnet und dem impliziten Kontrollfluss, der sich um ihren speziellen Seiteneffekt kümmert.&nbsp;</p>
+<h2>Wie geht's weiter?</h2>
+<p>Rein funktionale Sprachen kennen keine veränderlichen Daten. Daher verwenden sie Anstelle von Schleifen Rekursion. Wie, das genau zeigt der <a href="index.php/blog/rekursion-verarbeitung-von-listen-und-bedarfsauswertung">nächste Artikel.</a><span id="transmark"></span></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="166" height="212" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Hole dir dein E-Book. Unterstütze meinen Blog.</span></strong></p>
+<p>&nbsp;</p>

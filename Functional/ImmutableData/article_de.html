@@ -1,0 +1,314 @@
+<p>Rein funktionale Programmiersprachen wie Haskell zeichnen sich vor allem dadurch aus, dass ihre Daten unveränderlich sind. Damit sind Zuweisungen der Form x=x+1 oder entsprechend ++x nicht möglich. Die Konsequenz ist, das Haskell keine Schleifen, sei es for, while oder until, kennt. Diese basieren auf dem Modifizieren einer Schleifenvariable. Haskell modifiziert keine bestehenden Daten, sondern erzeugt bei Bedarf neue. Dabei verwendet der Haskell Compiler die alten, unveränderliche Daten wieder.</p>
+<hr id="system-readmore" />
+<h2>Unveränderliche Daten</h2>
+<p><img src="images/blog/FunktionaleProgrammierung/ImmutableData/ImmutableData.png" alt="ImmutableData" style="margin: 15px;" /></p>
+<p>Unveränderliche Daten besitzen eine schöne Eigenschaft. Sie sind implizit thread-safe, denn es fehlt ihnen eine notwendige Bedingung für einen<a href="index.php/blog/threads-teilen-daten"> kritischen Bereich</a>. Ein kritischer Bereich zeichnet sich dadurch aus, das zwei oder mehrere Threads gleichzeitig auf ein Datum zugreifen. Zu mindestens ein Thread versucht dabei, dies Datum zu verändern.</p>
+<h3>Quicksort in Haskell</h3>
+<p>Schön ist die Unveränderlichkeit der Daten in Haskells Quicksort Algorithmus&nbsp;zu sehen.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">qsort <span style="color: #2b91af;">[]</span> <span style="color: #0000ff;">=</span> <span style="color: #2b91af;">[]</span>
+qsort (x<span style="color: #2b91af;">:</span>xs) <span style="color: #0000ff;">=</span> qsort [y | y <span style="color: #0000ff;">&lt;-</span> xs, y &lt; x] ++ [x] ++ qsort [y | y <span style="color: #0000ff;">&lt;-</span> xs, y &gt;= x]
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Der Quicksort Algorithmus <span style="font-family: courier new,courier;">qsort</span> besteht aus zwei Funktionsdefinitionen. In der ersten Zeile wird der Quicksort, auf der leere Liste angewandt, definiert. Dies ist die leere Liste. Die zweite Zeile stellt den allgemeinen Fall dar, in dem die Liste aus mindestens einem Element besteht: <span style="font-family: courier new,courier;">x:xs.</span> Dabei bezeichnet<span style="font-family: courier new,courier;"> x</span> den Anfang und <span style="font-family: courier new,courier;">xs</span> den Rest der Liste per Konvention.</p>
+<p>Die Strategie des Quicksort-Algorithmus lässt sich fast direkt in Haskell ausdrücken. Verwende das erste Element der Liste <span style="font-family: courier new,courier;">x</span>, das sogenannte Pivot-Element, füge (<span style="font-family: courier new,courier;">++</span>) vor die einelementige Liste <span style="font-family: courier new,courier;">[x]</span> alle die Elemente aus <span style="font-family: courier new,courier;">xs,</span> die kleiner als <span style="font-family: courier new,courier;">x</span> sind (<span style="font-family: courier new,courier;">qsort [y | y &lt;- xs, y &lt; x]</span>) und hänge an die Liste <span style="font-family: courier new,courier;">[x]</span> all die Elemente aus<span style="font-family: courier new,courier;"> xs</span>, die mindestens so groß wie x sind (<span style="font-family: courier new,courier;">qsort [y | y &lt;- xs, y &gt;= x]</span>). Die Rekursion endet dann, wenn Quicksort auf die leere Liste angewandt wird. Zugegeben, die Kompaktheit von Haskell ist ungewohnt.</p>
+<p>Der entscheidende Punkt des Algorithmus ist aber, dass bei jeder Rekursion eine neue Liste erzeugt wird. Wie schaut hingegen eine klassische Implementierung in C++ aus?</p>
+<h3>Quicksort in C++</h3>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #2b91af;">void</span> quickSort(<span style="color: #2b91af;">int</span> arr[], <span style="color: #2b91af;">int</span> left, <span style="color: #2b91af;">int</span> right) { 
+  <span style="color: #2b91af;">int</span> i = left, j = right; 
+  <span style="color: #2b91af;">int</span> tmp; 
+  <span style="color: #2b91af;">int</span> pivot = arr[abs((left + right) / 2)]; 
+  <span style="color: #0000ff;">while</span> (i &lt;= j) { 
+    <span style="color: #0000ff;">while</span> (arr[i] &lt; pivot) i++; 
+    <span style="color: #0000ff;">while</span> (arr[j] &gt; pivot) j--; 
+    <span style="color: #0000ff;">if</span> (i &lt;= j) { 
+      tmp = arr[i]; 
+      arr[i] = arr[j]; 
+      arr[j] = tmp; 
+      i++; j--; 
+    }
+  }
+  <span style="color: #0000ff;">if</span> (left &lt; j) quickSort(arr, left, j);
+  <span style="color: #0000ff;">if</span> (i &lt; right) quickSort(arr, i, right);
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Keine Angst. Ich werde die Funktion nicht erklären. Mir reicht eine simple Beobachtung. In den Zeilen 9 - 11 werden die bestehenden Elemente überschreibe. Der Algorithmus arbeitet daher <em>in-place</em> und setzt veränderliche Daten voraus. Für das Überschreiben der alten mit den neuen Werten hat sich ein schöner Ausdruck in der funktionalen Programmierung etabliert: <em><strong>destructive assignment.</strong></em></p>
+<p>Zu Ehrenrettung von C++ muss ich aber sagen, dass es deutlich elegantere Implementierungen der Quicksort Algorithmus in C++ gibt, die auf dem <a href="http://en.cppreference.com/w/cpp/algorithm/partition"><span style="font-family: courier new,courier;">std::partition</span></a> Algorithmus basieren.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">template</span> &lt;<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">ForwardIt</span>&gt;
+ <span style="color: #2b91af;">void</span> quicksort(ForwardIt first, ForwardIt last)
+ {
+    <span style="color: #0000ff;">if</span>(first == last) <span style="color: #0000ff;">return</span>;
+    <span style="color: #0000ff;">auto</span> pivot = *std::next(first, std::distance(first,last)/2);
+    ForwardIt middle1 = std::partition(first, last, 
+                         [pivot](<span style="color: #0000ff;">const</span> <span style="color: #0000ff;">auto</span>&amp; em){ <span style="color: #0000ff;">return</span> em &lt; pivot; });
+    ForwardIt middle2 = std::partition(middle1, last, 
+                         [pivot](<span style="color: #0000ff;">const</span> <span style="color: #0000ff;">auto</span>&amp; em){ <span style="color: #0000ff;">return</span> !(pivot &lt; em); });
+    quicksort(first, middle1);
+    quicksort(middle2, last);
+ }
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Der entscheidendee Punkt ist aber, dass <span style="font-family: courier new,courier;">std::partition</span> <em>destructive assignment</em> anwendet.</p>
+<p>Wie steht es nun um die Unveränderlichkeit der Daten in C++?</p>
+<h3>Unveränderliche Daten in C++</h3>
+<p>Die Verwendung von unveränderlichen Daten basiert in C++ auf der Disziplin des Programmierers. Mit konstanten Daten, Template Metaprogrammierung und konstanten Ausdrücken bietet C++ dazu drei Möglichkeiten an. Die Optionen eins und zwei sind schnell vorgestellt, konstante Ausdrücke verdienen dagegen deutlich mehr Aufmerksamkeit.</p>
+<h4>Konstante Daten</h4>
+<p>Durch die Anweisung<span style="font-family: courier new,courier;"> const int value= 1;</span> wird value zum konstanten Wert.</p>
+<h4>Template Metaprogrammierung</h4>
+<p>Template Metaprogrammierung findet zur Übersetzungszeit statt. Zur Übersetzungszeit gibt es keine Veränderung. Daher sind alle Werte, die zur Übersetzungszeit ermittelt werden, konstant. Dies trifft natürlich auf die Berechnung von Factorial&lt;5&gt;::value zu.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">template</span> &lt;<span style="color: #2b91af;">int</span> N&gt;
+<span style="color: #0000ff;">struct</span> Factorial{
+  <span style="color: #0000ff;">static</span> <span style="color: #2b91af;">int</span> <span style="color: #0000ff;">const</span> value= N * Factorial&lt;N-1&gt;::value;
+};
+
+<span style="color: #0000ff;">template</span> &lt;&gt;
+<span style="color: #0000ff;">struct</span> Factorial&lt;1&gt;{
+  <span style="color: #0000ff;">static</span> <span style="color: #2b91af;">int</span> <span style="color: #0000ff;">const</span> value = 1;
+};
+
+std::cout &lt;&lt; Factorial&lt;5&gt;::value &lt;&lt; std::endl;
+std::cout &lt;&lt; 120 &lt;&lt; std::endl;
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Wem die kurze Erwähnung von Template Metaprogrammierung zu oberflächlich war, den verweise ich gerne auf meinen Artikel <a href="index.php/blog/funktional-in-c98">Funktional&nbsp;in C++98.&nbsp;</a></p>
+<p>Nun aber zu konstanten Ausdrücken und einem großen Sprung in die C++ Zukunft.</p>
+<h4>Konstante Ausdrücke</h4>
+<p>&nbsp;C++11 kennt konstante Ausdrücke. Mit C++14 lassen sich als konstante Ausdrücke deklarierte Funktionen fast wie normale Funktionen verwenden.</p>
+<p>C++ unterstützt konstante Ausdrücke in drei Formen: Als Variablen, benutzerdefinierte Typen und Funktionen. Das besondere an konstanten Ausdrücken ist, das sie zur Übersetzungszeit ausgewertet werden können.</p>
+<ol>
+<li>Durch den Ausdruck <span style="font-family: courier new,courier;">constexpr double pi= 3.14</span> wird <span style="font-family: courier new,courier;">pi</span> zum konstanten Ausdruck. pi ist damit implizit <span style="font-family: courier new,courier;">const</span> und muss durch einen konstanten Ausdruck <span style="font-family: courier new,courier;">3.14</span> initialisiert werden.</li>
+<li>Damit die Objekte eines benutzerdefinierte Typen zu konstanten Ausdrücken werden, gelten für den Typ einige Einschränkungen. So muss sein Konstruktor leer und selbst ein konstanter Ausdruck sein. So kann das Objekt nur Methoden verwenden, die selbst konstante Ausdrücke sind. Zur Übersetzungszeit sind natürlich auch keine Aufrufe von virtuellen Methoden möglich. Erfüllt der benutzerdefinierte Typ alle Einschränkungen, können seine Objekte zur Übersetzungszeit erzeugt und verwendet werden.</li>
+<li>Für Funktionen als konstante Ausdrücke gelten ein paar wenige Einschränkungen, damit sie zur Übersetzungszeit ausgeführt werden können. Zum einen müssen alle Argumente konstante Ausdrücke sein. Zum anderen können sie keine statische und thread-lokale Daten enthalten.</li>
+</ol>
+<p>Welche Mächtigkeit konstante Ausdrücke besitzen, zeigt das folgende Beispiel. In diesem werden benutzerdefinierte Literale verwendet um Entfernungen zur Übersetzungszeit zu berechnen.</p>
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+55
+56
+57
+58
+59
+60
+61
+62
+63
+64
+65
+66
+67
+68
+69
+70
+71
+72
+73
+74
+75
+76
+77
+78
+79
+80
+81</pre>
+</td>
+<td>
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #008000;">// userdefinedLiteralsConstexpr.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+
+<span style="color: #0000ff;">namespace</span> Distance{
+
+  <span style="color: #0000ff;">class</span> <span style="color: #2b91af;">MyDistance</span>{
+    public:
+      constexpr MyDistance(<span style="color: #2b91af;">double</span> i):m(i){}
+
+      <span style="color: #0000ff;">friend</span> constexpr MyDistance <span style="color: #0000ff;">operator</span>+(<span style="color: #0000ff;">const</span> MyDistance&amp; a, <span style="color: #0000ff;">const</span> MyDistance&amp; b){
+        <span style="color: #0000ff;">return</span> MyDistance(a.m + b.m);
+      }
+      <span style="color: #0000ff;">friend</span> constexpr MyDistance <span style="color: #0000ff;">operator</span>-(<span style="color: #0000ff;">const</span> MyDistance&amp; a,<span style="color: #0000ff;">const</span> MyDistance&amp; b){
+        <span style="color: #0000ff;">return</span> MyDistance(a.m - b.m);
+      }
+	  
+      <span style="color: #0000ff;">friend</span> constexpr MyDistance <span style="color: #0000ff;">operator</span>*(<span style="color: #2b91af;">double</span> m, <span style="color: #0000ff;">const</span> MyDistance&amp; a){
+        <span style="color: #0000ff;">return</span> MyDistance(m*a.m);
+      }
+	  
+      <span style="color: #0000ff;">friend</span> constexpr MyDistance <span style="color: #0000ff;">operator</span>/(<span style="color: #0000ff;">const</span> MyDistance&amp; a, <span style="color: #2b91af;">int</span> n){
+        <span style="color: #0000ff;">return</span> MyDistance(a.m/n);
+      }
+	  
+      <span style="color: #0000ff;">friend</span> std::ostream&amp; <span style="color: #0000ff;">operator</span>&lt;&lt; (std::ostream &amp;out, <span style="color: #0000ff;">const</span> MyDistance&amp; myDist){
+        out &lt;&lt; myDist.m &lt;&lt; <span style="color: #a31515;">" m"</span>;
+        <span style="color: #0000ff;">return</span> out;
+      }
+    private:<br />      <span style="color: #2b91af;">double</span> m;	  
+  };
+
+  <span style="color: #0000ff;">namespace</span> Unit{
+    constexpr MyDistance <span style="color: #0000ff;">operator</span> <span style="color: #a31515;">""</span> _km(<span style="color: #2b91af;">long</span> <span style="color: #2b91af;">double</span> d){
+      <span style="color: #0000ff;">return</span> MyDistance(1000*d);
+    }
+    constexpr MyDistance <span style="color: #0000ff;">operator</span> <span style="color: #a31515;">""</span> _m(<span style="color: #2b91af;">long</span> <span style="color: #2b91af;">double</span> m){
+      <span style="color: #0000ff;">return</span> MyDistance(m);
+    }
+    constexpr MyDistance <span style="color: #0000ff;">operator</span> <span style="color: #a31515;">""</span> _dm(<span style="color: #2b91af;">long</span> <span style="color: #2b91af;">double</span> d){
+      <span style="color: #0000ff;">return</span> MyDistance(d/10);
+    }
+    constexpr MyDistance <span style="color: #0000ff;">operator</span> <span style="color: #a31515;">""</span> _cm(<span style="color: #2b91af;">long</span> <span style="color: #2b91af;">double</span> c){
+      <span style="color: #0000ff;">return</span> MyDistance(c/100);
+    }
+  }
+  
+}
+  
+constexpr Distance::MyDistance getAverageDistance(std::initializer_list&lt;Distance::MyDistance&gt; inList){
+  <span style="color: #0000ff;">auto</span> sum= Distance::MyDistance{0.0};
+  <span style="color: #0000ff;">for</span> (<span style="color: #0000ff;">auto</span> i: inList) sum = sum + i ;
+  <span style="color: #0000ff;">return</span> sum/inList.size(); 
+}
+
+
+<span style="color: #0000ff;">using</span> <span style="color: #0000ff;">namespace</span> Distance::Unit;
+
+<span style="color: #2b91af;">int</span> main(){
+
+  std:: cout &lt;&lt; std::endl;
+  
+  constexpr <span style="color: #0000ff;">auto</span> work= 63.0_km;
+  constexpr <span style="color: #0000ff;">auto</span> workPerDay= 2 * work;
+  constexpr <span style="color: #0000ff;">auto</span> abbrevationToWork= 5400.0_m;
+  constexpr <span style="color: #0000ff;">auto</span> workout= 2 * 1600.0_m;
+  constexpr <span style="color: #0000ff;">auto</span> shopping= 2 * 1200.0_m;
+  
+  constexpr <span style="color: #0000ff;">auto</span> distPerWeek1= 4*workPerDay-3*abbrevationToWork+ workout+ shopping;
+  constexpr <span style="color: #0000ff;">auto</span> distPerWeek2= 4*workPerDay-3*abbrevationToWork+ 2*workout;
+  constexpr <span style="color: #0000ff;">auto</span> distPerWeek3= 4*workout + 2*shopping;
+  constexpr <span style="color: #0000ff;">auto</span> distPerWeek4= 5*workout + shopping;
+  
+  constexpr <span style="color: #0000ff;">auto</span> averageDistance= getAverageDistance({distPerWeek1,distPerWeek2,distPerWeek3,distPerWeek4});
+  
+  std::cout &lt;&lt; <span style="color: #a31515;">"averageDistance: "</span> &lt;&lt; averageDistance &lt;&lt; std::endl;        <strong><span style="color: #339966;">// 255900 m</span></strong>
+  
+  std::cout &lt;&lt; std::endl;
+
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Ich will hier nicht die Theorie zu konstanten Ausdrücken und benutzerdefinierten Literalen erschöpfenden erklären. Das habe ich bereits in den Artikeln zu <a href="index.php/blog/tag/constexpr">constexpr</a> und <a href="index.php/blog/tag/benutzerdefinierte-literale">benutzerdefinierten Literalen</a> getan. Zwei Beobachtungen sind aber wichtig.</p>
+<ol>
+<li>Durch die Deklaration <span style="font-family: courier new,courier;">constexpr</span> werden alle Variablen, Instanzen der Klasse <span style="font-family: courier new,courier;">MyDistance</span> und Funktionen zu konstanten Ausdrücken. Der Compiler führt sie daher zu Compilezeit aus.</li>
+<li>Bis auf die Ausgabefunktion <span style="font-family: courier new,courier;">std::cout</span> sind alle Variablen, Instanzen und Funktionen als konstante Ausdrücke definiert. Das heißt, das ganze Programm wird bereits zur Übersetzungszeit ausgewertet.&nbsp;Damit sind natürlich auch alle verwendeten Variablen und Instanzen unveränderlich. Lediglich das Ergebnis des Programms <span style="font-family: courier new,courier;">255900 m</span> wird zur Laufzeit ausgegeben.</li>
+</ol>
+<h2>Wie geht's weiter?</h2>
+<p>Reine Funktionen sind <a href="index.php/blog/funktionale-programmierung-die-definition">mathematischen Funktionen</a> sehr ähnlich. Sie sind der Grund dafür, das sowohl Haskell als auch Template Metaprogrammierung als rein funktionale Programmiersprache bezeichnet wird. Was genau reine Funktionen sind und mit welchen Einschränkungen sie zu kämpfen haben, das zeigt der <a href="index.php/blog/reine-funktionen">nächste Artikel.</a><span id="transmark"></span></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="166" height="212" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Hole dir dein E-Book. Unterstütze meinen Blog.</span></strong></p>
+<p>&nbsp;</p>
