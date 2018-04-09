@@ -1,0 +1,199 @@
+<p>In this post, I continue my journey through the rules to performance in the C++ Core Guidelines.&nbsp; I will mainly write about design for optimisation.</p>
+<hr id="system-readmore" />
+<p><img src="images/blog/ModernCpp/CppCoreGuidelinesMorePerformance/athlete-bicycle-bike-12838.jpg" alt="athlete bicycle bike 12838" width="600" height="374" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>Here are the two rules for today.&nbsp;</p>
+<ul>
+<li><a href="https://github.com/isocpp/CppCoreGuidelines/blob/master/CppCoreGuidelines.md#Rper-efficiency">Per.7: Design to enable optimization</a></li>
+<li><a href="https://github.com/isocpp/CppCoreGuidelines/blob/master/CppCoreGuidelines.md#Rper-type">Per.10: Rely on the static type system</a></li>
+</ul>
+<h3><a href="https://github.com/isocpp/CppCoreGuidelines/blob/master/CppCoreGuidelines.md#Rper-efficiency">Per.7: Design to enable optimization</a></h3>
+<p>When I read this title, I immediately have to think about move semantic. Why? Because you should write your algorithms with move semantic and not with copy semantic. You will automatically get a few benefits.&nbsp;</p>
+<ol>
+<li>Of course, instead of an expensive copy, your algorithms use a cheap move.&nbsp;</li>
+<li>Your algorithm is way more stable because it requires no memory and you will, therefore, get no <a href="http://en.cppreference.com/w/cpp/memory/new/bad_alloc">std::bad_alloc</a>&nbsp;exception.</li>
+<li>You can use your algorithm with move-only types such as<a href="http://en.cppreference.com/w/cpp/memory/unique_ptr"> std::unique_ptr</a>.&nbsp;</li>
+</ol>
+<p>Understood! Let me implement a generic <span style="font-family: 'courier new', courier;">swap</span> algorithm which uses move semantic.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// swap.cpp</span>
+
+<span style="color: #009999;">#include &lt;algorithm&gt;</span>
+<span style="color: #009999;">#include &lt;cstddef&gt; </span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>                                                <span style="color: #0099ff; font-style: italic;">// (3)</span>
+<span style="color: #007788; font-weight: bold;">void</span> swap(T<span style="color: #555555;">&amp;</span> a, T<span style="color: #555555;">&amp;</span> b) noexcept {
+    T tmp(std<span style="color: #555555;">::</span>move(a));
+    a <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>move(b);
+    b <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>move(tmp);
+}
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">BigArray</span>{
+
+<span style="color: #9999ff;">public:</span>
+    BigArray(std<span style="color: #555555;">::</span><span style="color: #007788; font-weight: bold;">size_t</span> sz)<span style="color: #555555;">:</span> size(sz), data(<span style="color: #006699; font-weight: bold;">new</span> <span style="color: #007788; font-weight: bold;">int</span>[size]){}
+
+    BigArray(<span style="color: #006699; font-weight: bold;">const</span> BigArray<span style="color: #555555;">&amp;</span> other)<span style="color: #555555;">:</span> size(other.size), data(<span style="color: #006699; font-weight: bold;">new</span> <span style="color: #007788; font-weight: bold;">int</span>[other.size]){
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Copy constructor"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+        std<span style="color: #555555;">::</span>copy(other.data, other.data <span style="color: #555555;">+</span> size, data);
+    }
+    
+    BigArray<span style="color: #555555;">&amp;</span> <span style="color: #006699; font-weight: bold;">operator</span><span style="color: #555555;">=</span>(<span style="color: #006699; font-weight: bold;">const</span> BigArray<span style="color: #555555;">&amp;</span> other){                      <span style="color: #0099ff; font-style: italic;">// (1)</span>
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Copy assignment"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+        <span style="color: #006699; font-weight: bold;">if</span> (<span style="color: #006699; font-weight: bold;">this</span> <span style="color: #555555;">!=</span> <span style="color: #555555;">&amp;</span>other){
+            <span style="color: #006699; font-weight: bold;">delete</span> [] data;
+            data <span style="color: #555555;">=</span> nullptr;
+			
+            size <span style="color: #555555;">=</span> other.size;
+            data <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">new</span> <span style="color: #007788; font-weight: bold;">int</span>[size];
+            std<span style="color: #555555;">::</span>copy(other.data, other.data <span style="color: #555555;">+</span> size, data);
+        }
+        <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">this</span>;
+    }
+    
+    <span style="color: #555555;">~</span>BigArray(){
+        <span style="color: #006699; font-weight: bold;">delete</span>[] data;
+    }
+<span style="color: #9999ff;">private:</span>
+    std<span style="color: #555555;">::</span><span style="color: #007788; font-weight: bold;">size_t</span> size;
+    <span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">*</span> data;
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+  BigArray bigArr1(<span style="color: #ff6600;">2011</span>);
+  BigArray bigArr2(<span style="color: #ff6600;">2017</span>);
+  swap(bigArr1, bigArr2);                                           <span style="color: #0099ff; font-style: italic;">// (2)</span>
+
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+};
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Fine. That was it. No! My coworker gave me his type <span style="font-family: 'courier new', courier;">BigArray</span>. <span style="font-family: 'courier new', courier;">BigArray</span> has a few flaws. I will write about the copy assignment operator (1) later. First of all, I have a more serious concern. <span style="font-family: 'courier new', courier;">BigArray</span> does not support move semantic but only copy semantic. What will happen if I swap the <span style="font-family: 'courier new', courier;">BigArrays</span> in line (2)?&nbsp; My <span style="font-family: 'courier new', courier;">swap</span> algorithm uses move semantic (3) under the hood. Let's try it out.</p>
+<p><img src="images/blog/ModernCpp/CppCoreGuidelinesMorePerformance/swap.png" alt="swap" width="300" height="222" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>&nbsp;</p>
+<p>Nothing bad will happen. Traditional copy semantic will kick in and you will get the classical behaviour. Copy semantic is a kind of fallback to move semantics. You can see it the other way around. A move is an optimised copy.&nbsp;</p>
+<p>How is that possible? I asked for a move operation in my <span style="font-family: 'courier new', courier;">swap</span> algorithm. The reason is that <span style="font-family: 'courier new', courier;">std::move</span> returns a rvalue. A const lvalue reference can bind to an rvalue and the copy constructor or a copy assignment operator takes a const lvalue reference. If <span style="font-family: 'courier new', courier;">BigArray</span> would have a move constructor or a move assignment operator taking rvalue references both would have higher priority than the copy pendants.&nbsp;&nbsp;</p>
+<p>Implementing your algorithms with move semantic means that move semantic will automatically kick in if you data types support it. If not copy semantic will be used as a fallback. In the worst case, you will have the classical behaviour.</p>
+<p>I said the copy assignment operator has a few flaws. Here are they:</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">BigArray<span style="color: #555555;">&amp;</span> <span style="color: #006699; font-weight: bold;">operator</span><span style="color: #555555;">=</span>(<span style="color: #006699; font-weight: bold;">const</span> BigArray<span style="color: #555555;">&amp;</span> other){                      
+    <span style="color: #006699; font-weight: bold;">if</span> (<span style="color: #006699; font-weight: bold;">this</span> <span style="color: #555555;">!=</span> <span style="color: #555555;">&amp;</span>other){                                 <span style="color: #0099ff; font-style: italic;">// (1)</span>
+        <span style="color: #006699; font-weight: bold;">delete</span> [] data;                                        
+        data <span style="color: #555555;">=</span> nullptr;
+			
+        size <span style="color: #555555;">=</span> other.size;
+        data <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">new</span> <span style="color: #007788; font-weight: bold;">int</span>[size];                            <span style="color: #0099ff; font-style: italic;">// (2)</span>
+        std<span style="color: #555555;">::</span>copy(other.data, other.data <span style="color: #555555;">+</span> size, data);  <span style="color: #0099ff; font-style: italic;">// (3)</span>
+    }
+    <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">this</span>;
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<ol>
+<li>I have to check for self-assignment. Most of the times self-assignment will not happen, but I check always for the special case.</li>
+<li>If the allocation will fail, this was already modified. The size is <span style="font-family: 'courier new', courier;">wrong</span> and <span style="font-family: 'courier new', courier;">data</span> is already deleted. This means the copy constructor only guarantees the basic exception guarantee but not the strong one. The basic exception guarantee states that there is no leak after an exception. The strong exception guarantees in case of an exception that the program can be rolled back to the state before. For more details to exception safety, read the Wikipedia article about <a href="https://en.wikipedia.org/wiki/Exception_safety">exception safety</a>.</li>
+<li>The line is identical to the line in the copy constructor.</li>
+</ol>
+<p>&nbsp;You can overcome this flaws by implementing your own swap function. This is already suggested by the C++ Core Guidelines:&nbsp;<a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rc-swap" style="color: #268bd2; text-decoration: underline;">C.83: For value-like types, consider providing a&nbsp;<code class="highlighter-rouge no-highlight" style="font-family: 'Roboto Mono', monospace; padding: 0.2em; font-size: 18px; background-color: #f9f9f9;">noexcept</code>&nbsp;swap function</a>. Here is the new <span style="font-family: 'courier new', courier;">BigArray</span> having a non-member <span style="font-family: 'courier new', courier;">swap</span> function and a copy assignment operator using the <span style="font-family: 'courier new', courier;">swap</span> function.&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">BigArray</span>{
+
+<span style="color: #9999ff;">public:</span>
+    BigArray(std<span style="color: #555555;">::</span><span style="color: #007788; font-weight: bold;">size_t</span> sz)<span style="color: #555555;">:</span> size(sz), data(<span style="color: #006699; font-weight: bold;">new</span> <span style="color: #007788; font-weight: bold;">int</span>[size]){}
+
+    BigArray(<span style="color: #006699; font-weight: bold;">const</span> BigArray<span style="color: #555555;">&amp;</span> other)<span style="color: #555555;">:</span> size(other.size), data(<span style="color: #006699; font-weight: bold;">new</span> <span style="color: #007788; font-weight: bold;">int</span>[other.size]){
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Copy constructor"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+        std<span style="color: #555555;">::</span>copy(other.data, other.data <span style="color: #555555;">+</span> size, data);
+    }
+	
+    BigArray<span style="color: #555555;">&amp;</span> <span style="color: #006699; font-weight: bold;">operator</span> <span style="color: #555555;">=</span> (BigArray other){                  <span style="color: #0099ff; font-style: italic;">// (2)</span>
+        swap(<span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">this</span>, other);                                 
+        <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">this</span>;
+    }
+    
+    <span style="color: #555555;">~</span>BigArray(){
+        <span style="color: #006699; font-weight: bold;">delete</span>[] data;
+    }
+	
+    <span style="color: #006699; font-weight: bold;">friend</span> <span style="color: #007788; font-weight: bold;">void</span> swap(BigArray<span style="color: #555555;">&amp;</span> first, BigArray<span style="color: #555555;">&amp;</span> second){    <span style="color: #0099ff; font-style: italic;">// (1)</span>
+        std<span style="color: #555555;">::</span>swap(first.size, second.size);
+        std<span style="color: #555555;">::</span>swap(first.data, second.data);
+    }
+	
+<span style="color: #9999ff;">private:</span>
+    std<span style="color: #555555;">::</span><span style="color: #007788; font-weight: bold;">size_t</span> size;
+    <span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">*</span> data;
+};
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The swap function in line (1) is not a member; therefore a call<span style="font-family: 'courier new', courier;"> swap(bigArray1, bigArray2)</span>&nbsp;uses it.&nbsp; The signature of the copy assignment operator in line (2) may surprise you. Because of the copy, no self-assignment test is necessary. Additionally, the strong exception guarantee holds, and there is no code duplication. This technique is called the <a href="https://en.wikibooks.org/wiki/More_C++_Idioms/Copy-and-swap">copy-and-swap idiom</a>.</p>
+<p>They are a lot of overloaded versions of <span style="font-family: 'courier new', courier;">std::swap</span> available. The C++ standard provides about 50 overloads.&nbsp;</p>
+<h3><a href="https://github.com/isocpp/CppCoreGuidelines/blob/master/CppCoreGuidelines.md#Rper-type">Per.10: Rely on the static type system</a></h3>
+<p>This is a kind of meta-rule in C++. Catch errors at compile-time. I can make my explanation of this rule quite short because I already have written a few articles on this important topic:</p>
+<ul>
+<li>Use automatic type deduction with auto (<a href="index.php/automatically-inititialized">auto-matically initialized</a>) in combination with <a href="index.php/initialization">{}-initialisation</a> and you will get a lot of benefits.<ol>
+<li>The compiler knows always the right type: <span style="font-family: 'courier new', courier;">auto f = 5.0f.</span></li>
+<li>You can never forget to initialise a type: <span style="font-family: 'courier new', courier;">auto a</span>; will not work.</li>
+<li>You can verify with {}-initialisation that no narrowing conversion will kick in; therefore you can guarantee that the automatically deduced type is the type you expected: <span style="font-family: 'courier new', courier;">int i = {f}</span>; The compiler will check in this expression that f is, in this case, an <span style="font-family: 'courier new', courier;">int</span>. If not, you will get a warning. This will not happen without braces:<span style="font-family: 'courier new', courier;"> int i = f</span>;.</li>
+</ol></li>
+<li>Check with <a href="index.php/statically-checked">static_assert</a>&nbsp;and the <a href="index.php/tag/type-traits">type-traits library</a> type properties at compile time. If the check fails you will get a compile-time error: <span style="font-family: 'courier new', courier;">static_assert&lt;std::is_integral&lt;T&gt;::value, "T should be an integral type!").</span></li>
+<li>Make type-safe arithmetic with the user-defined literals and the new built-in literals(<a href="index.php/tag/benutzerdefinierte-literale">user-defined literals</a>): <span style="font-family: 'courier new', courier;">auto distancePerWeek=&nbsp; (5 * 120_km + 2 * 1500m - 5 * 400m) / 5;.&nbsp;&nbsp;</span></li>
+<li><a href="index.php/component/content/article/41-blog/embedded/222-override-and-final?Itemid=239"><span style="font-family: 'courier new', courier;">overrride</span> and <span style="font-family: 'courier new', courier;">final</span></a>&nbsp;provide guarantees to virtual methods. The compiler checks with <span style="font-family: 'courier new', courier;">override</span> that you actually overrode a virtual method. The compiler guarantees further with <span style="font-family: 'courier new', courier;">final</span> that you can not override a virtual method which is declared <span style="font-family: 'courier new', courier;">final</span>.&nbsp;</li>
+<li><span style="color: #444444; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 14px; font-style: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing: 0px; background-color: #ffffff; float: none;"><a href="index.php/tag/nullptr">The New Null Pointer Constant nullptr</a>&nbsp;cleans in C++11 up with the ambiguity of the number 0 and the macro NULL.</span></li>
+</ul>
+<h2>What's next?</h2>
+<p>My journey through the rules to performance will go on. In the next post, I will in particular write about how to move computation from runtime to compile-time and how you should access memory.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Eric Pederson, Paul Baxter, &nbsp;Sai Raghavendra Prasad Poosa, Meeting C++, Matt Braun, and Avi Lachmish. </strong></strong></p>
+<p><strong>&nbsp;</strong></p>
+<p>&nbsp;</p>
+<table border="0" style="width: 800px; height: 250px;" cellpadding="8"><caption>
+<h2>Get your e-book at leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img src="images/books/cover.png" alt="cover" width="173" height="220" style="border: medium none #000000;" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 550 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
