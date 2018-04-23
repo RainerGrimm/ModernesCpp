@@ -1,0 +1,165 @@
+<p><span style="color: #000000; font-family: 'Noto Serif', serif; font-size: 16px; font-style: normal; font-weight: 400; letter-spacing: normal; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; word-spacing: 0px; background-color: #ffffff; float: none;">C++11 is the first C++ standard that deals with concurrency. The basic building block for concurrency is a thread; therefore, most of the rules are explicitly about threads. This changed dramatically with C++17.<br /></span></p>
+<p>&nbsp;</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img src="images/blog/ModernCpp/CppCoreGuidelinesConcurrenyAndParallelism/timeline11_14.png" alt="timeline11 14" width="700" height="350" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>&nbsp;</p>
+<p><span>With <strong>C++17</strong> we got the parallel algorithms of the Standard Template Library (STL). That means, most of the algorithms of the STL can be executed sequential, parallel, or vectorized. For the curious reader: I have already written two posts to the parallel STL. The post <a href="index.php/parallel-algorithm-of-the-standard-template-library">Parallel Algorithms of the Standard Template Librar</a>y explains the execution policy which you can use the run an existing algorithm sequential, parallel, or parallel and vectorised. C++17 also gave new algorithms which are meant to run in parallel or vectorised. Here are the details: <a href="index.php/c-17-new-algorithm-of-the-standard-template-library">C++17: New Parallel Algorithms of the Standard Template Library.</a><br /></span></p>
+<p><span>The concurrency story in C++ goes on. With C++20 we can hope for extended futures, coroutines, transactions, and more. From the bird's eye view, the concurrency facilities of C++11 and C++14 are only the implementations details on which the higher abstraction of C++17 and C++20 are based on. Here is a series of posts about out concurrent future in<a href="index.php/category/multithreading-c-17-and-c-20"> C++20</a>.<br /></span></p>
+<p>Said that the rules are mainly about threads because neither GCC nor Clang or MSVC&nbsp; has fully implemented the parallel algorithms of the STL. There can not be best practices written to features that are not available (parallel STL) or even not standardised. &nbsp;</p>
+<p>This is the first rule to keep in mind when you read the rules. These rules are about available multithreading in C++11 and C++14. The second rule to keep in mind is that multithreading is very challenging. This means the rules want to give guidance to the novice and not to the experts in this domain. The rules to the memory model will follow in the future.</p>
+<p>Now, let's start and dive into the first rule.</p>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rconc-multi">CP.1: Assume that your code will run as part of a multi-threaded program</a></h3>
+<p>I was astonished I read this rule the first time. Why should I optimise for the special case? To make it clear this rule is mainly about code that is used in libraries, not about the application. And the experience shows that library code is often reused. This means you maybe optimise for the general case, which is fine.</p>
+<p>To make the point of the rule clear, here is the small example.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">double</span> <span style="color: #cc00ff;">cached_computation</span>(<span style="color: #007788; font-weight: bold;">double</span> x)
+{
+    <span style="color: #006699; font-weight: bold;">static</span> <span style="color: #007788; font-weight: bold;">double</span> cached_x <span style="color: #555555;">=</span> <span style="color: #ff6600;">0.0</span>;                       <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    <span style="color: #006699; font-weight: bold;">static</span> <span style="color: #007788; font-weight: bold;">double</span> cached_result <span style="color: #555555;">=</span> COMPUTATION_OF_ZERO;  <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    <span style="color: #007788; font-weight: bold;">double</span> result;
+
+    <span style="color: #006699; font-weight: bold;">if</span> (cached_x <span style="color: #555555;">==</span> x)                                  <span style="color: #0099ff; font-style: italic;">// (1)</span>
+        <span style="color: #006699; font-weight: bold;">return</span> cached_result;                           <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    result <span style="color: #555555;">=</span> computation(x);
+    cached_x <span style="color: #555555;">=</span> x;                                       <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    cached_result <span style="color: #555555;">=</span> result;                             <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    <span style="color: #006699; font-weight: bold;">return</span> result;
+}
+</pre>
+</div>
+<p></p>
+<p>The function <span style="font-family: courier\ new, courier;">cached_computation</span> is totally fine if it will run in a single-threaded environment. This will not hold for a multithreading environment because the static variables <span style="font-family: courier\ new, courier;">cached_x</span> (1) and <span style="font-family: courier\ new, courier;">cached_result</span> (2) can be used simultaneously be many threads and they are modified during their usage. The C++11 standard adds multithreading semantic to static variables with block scope such as cached_x and cached_result. <strong>Static variables with block scope are initialised in C++11 in a thread-safe way.</strong></p>
+<p>This is fine but will not help in our case. We will get a data race if we invoke <span style="font-family: courier\ new, courier;">cached_computation</span> simultaneously from many threads. The notion of a data race is quite important in multithreading in C++; therefore, let me write about it.&nbsp;</p>
+<p>A <strong>data race</strong> is a situation, in which at least two threads access a shared variable at the same time. At least one thread tries to modify the variable.</p>
+<p>The rest is quite simple. If you have a data race in your program, your program has undefined behaviour. Undefined behaviour means, you can not reason anymore about your program because all can happen. I mean all. In my seminars, I often say: If your program has undefined behaviour, it has cache-fire semantic. Even your computer can cache fire.</p>
+<p>If you read the definition of data race quite carefully, you will notice that shared mutable state is necessary for having a data race. Here is a picture to make this observation quite obvious.</p>
+<p>&nbsp;<img src="images/blog/ModernCpp/CppCoreGuidelinesConcurrenyAndParallelism/SharedMutable.png" alt="SharedMutable" width="300" height="211" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>So, what can you do to get rid of the data race? Making the static variables <span style="font-family: courier\ new, courier;">cached_x</span> (1) and <span style="font-family: courier\ new, courier;">cached_result</span> (2) immutable (<span style="font-family: courier\ new, courier;">const</span>) makes no sense. This means both static should not be shared. Here are a few ways to achieve this.</p>
+<ol>
+<li>Protect both static by their own lock.</li>
+<li>Use one lock to protect the entire critical region.</li>
+<li>Protect the call to the function<span style="font-family: courier\ new, courier;"> cached_computation </span>by a lock. <span style="font-family: courier\ new, courier;"></span><span style="font-family: courier\ new, courier;"></span></li>
+<li><span>Make both static<span style="font-family: courier\ new, courier;"> thread_local</span></span><span style="font-family: courier\ new, courier;">. tread_local</span> guarantees that each thread gets its variable <span style="font-family: courier\ new, courier;">cached_x</span> and<span style="font-family: courier\ new, courier;"> cached_result</span>. Such as a static variable is bound to the lifetime of the main-thread, a <span style="font-family: courier\ new, courier;">thread_loca</span>l variable is bound to the lifetime of its thread.</li>
+</ol>
+<p>Here are the variations 1, 2, 3, and 4.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">std<span style="color: #555555;">::</span>mutex m_x;
+std<span style="color: #555555;">::</span>mutex m_result;
+<span style="color: #007788; font-weight: bold;">double</span> <span style="color: #cc00ff;">cached_computation</span>(<span style="color: #007788; font-weight: bold;">double</span> x){                <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    <span style="color: #006699; font-weight: bold;">static</span> <span style="color: #007788; font-weight: bold;">double</span> cached_x <span style="color: #555555;">=</span> <span style="color: #ff6600;">0.0</span>;
+    <span style="color: #006699; font-weight: bold;">static</span> <span style="color: #007788; font-weight: bold;">double</span> cached_result <span style="color: #555555;">=</span> COMPUTATION_OF_ZERO;
+	
+    <span style="color: #007788; font-weight: bold;">double</span> result;
+    {
+	std<span style="color: #555555;">::</span>scoped_lock(m_x, m_result);
+        <span style="color: #006699; font-weight: bold;">if</span> (cached_x <span style="color: #555555;">==</span> x) <span style="color: #006699; font-weight: bold;">return</span> cached_result;
+    }
+    result <span style="color: #555555;">=</span> computation(x);
+    {
+	std<span style="color: #555555;">::</span>lock_guard<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span> lck(m_x);
+        cached_x <span style="color: #555555;">=</span> x;
+    }
+    { 
+	std<span style="color: #555555;">::</span>lock_guard<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span> lck(m_result);  
+        cached_result <span style="color: #555555;">=</span> result;
+    }
+    <span style="color: #006699; font-weight: bold;">return</span> result;
+}
+
+std<span style="color: #555555;">::</span>mutex m;
+<span style="color: #007788; font-weight: bold;">double</span> <span style="color: #cc00ff;">cached_computation</span>(<span style="color: #007788; font-weight: bold;">double</span> x){                <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    <span style="color: #006699; font-weight: bold;">static</span> <span style="color: #007788; font-weight: bold;">double</span> cached_x <span style="color: #555555;">=</span> <span style="color: #ff6600;">0.0</span>;
+    <span style="color: #006699; font-weight: bold;">static</span> <span style="color: #007788; font-weight: bold;">double</span> cached_result <span style="color: #555555;">=</span> COMPUTATION_OF_ZERO;
+    <span style="color: #007788; font-weight: bold;">double</span> result;
+    {
+        std<span style="color: #555555;">::</span>lock_guard<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span> lck(m);
+	<span style="color: #006699; font-weight: bold;">if</span> (cached_x <span style="color: #555555;">==</span> x) <span style="color: #006699; font-weight: bold;">return</span> cached_result;
+	result <span style="color: #555555;">=</span> computation(x);
+	cached_x <span style="color: #555555;">=</span> x;
+	cached_result <span style="color: #555555;">=</span> result;
+    }
+    <span style="color: #006699; font-weight: bold;">return</span> result;
+}
+
+std<span style="color: #555555;">::</span>mutex cachedComputationMutex;                  <span style="color: #0099ff; font-style: italic;">// (3)</span>
+{
+    std<span style="color: #555555;">::</span>lock_guard<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span> lck(cachedComputationMutex);
+    <span style="color: #006699; font-weight: bold;">auto</span> cached <span style="color: #555555;">=</span> cached_computation(<span style="color: #ff6600;">3.33</span>);
+}
+
+
+<span style="color: #007788; font-weight: bold;">double</span> cached_computation(<span style="color: #007788; font-weight: bold;">double</span> x){                <span style="color: #0099ff; font-style: italic;">// (4)</span>
+    thread_local <span style="color: #007788; font-weight: bold;">double</span> cached_x <span style="color: #555555;">=</span> <span style="color: #ff6600;">0.0</span>;
+    thread_local <span style="color: #007788; font-weight: bold;">double</span> cached_result <span style="color: #555555;">=</span> COMPUTATION_OF_ZERO;
+    <span style="color: #007788; font-weight: bold;">double</span> result;
+
+    <span style="color: #006699; font-weight: bold;">if</span> (cached_x <span style="color: #555555;">==</span> x) <span style="color: #006699; font-weight: bold;">return</span> cached_result;
+    result <span style="color: #555555;">=</span> computation(x);
+    cached_x <span style="color: #555555;">=</span> x;
+    cached_result <span style="color: #555555;">=</span> result;
+    <span style="color: #006699; font-weight: bold;">return</span> result;
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>First, the C++11 standard guarantees that static variables are initialised in a thread-safe way; therefore, I have not to protect their initialisation in all programs.</p>
+<ol>
+<li>This version is a little bit tricky because I have to acquire both locks in an atomic step. C++17 supports <span style="font-family: courier\ new, courier;">std::scoped_lock</span> which can lock an arbitrary number of mutexes in an atomic step. In C++11 you have to use instead of an <span style="font-family: courier\ new, courier;">std::unqiue_lock</span> in combination with the function<span style="font-family: courier\ new, courier;"> std::lock</span>.&nbsp; My previous post <a href="index.php/prefer-locks-to-mutexes">Prefer Locks to Mutexes </a>provides you more details.</li>
+<li>Version 2 uses a more coarse-grained locking. Usually, you should not use coarse-grained lock such in version but instead use fine-grained locking but in this use-casem it may be fine.</li>
+<li>This is the most coarse-grained solution because the entire function is locked. Of course, the downside is that the user of the function is responsible for the synchronisation. In general, that is a bad idea.</li>
+<li>Just make the static variables <span style="font-family: courier\ new, courier;">thread_loca</span>l and you are done<span style="font-family: courier\ new, courier;"></span><span style="font-family: courier\ new, courier;"></span><span style="font-family: courier\ new, courier;"></span><span style="font-family: courier\ new, courier;"> </span></li>
+</ol>
+<p>In he end, its a question of performance and your users. Therefore try each variation, measure, and think about the people who should use and maintain your code.</p>
+<h3>What's next?</h3>
+<p>This post was just the starting point through a long journey of rules to concurrency in C++. In the next post, I will take about threads and shared state.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Eric Pederson, Paul Baxter, &nbsp;Sai Raghavendra Prasad Poosa, Meeting C++, Matt Braun, Avi Lachmish, and Adrian Muntea.&nbsp;<span class="sc-bxivhb huvVuj" style="color: #052d49; font-family: America, sans-serif; letter-spacing: inherit; margin: 0px; position: relative; text-align: inherit; text-transform: inherit; text-shadow: none; font-weight: 400; font-size: 1rem; line-height: 1.5;"><span class="sc-bxivhb fjhgUr" style="color: #052d49; font-family: America, sans-serif; letter-spacing: inherit; margin: 0px; position: relative; text-align: inherit; text-transform: inherit; text-shadow: none; font-weight: bold; font-size: 1rem; line-height: 1.5;"></span></span><br /></strong></p>
+<p><strong>&nbsp;</strong></p>
+<p>&nbsp;</p>
+<table border="0" style="width: 800px; height: 250px;" cellpadding="8"><caption>
+<h2>Get your e-book at leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img src="images/books/cover.png" alt="cover" width="173" height="220" style="border: medium none #000000;" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 550 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
+<div id="s3gt_translate_tooltip_mini" class="s3gt_translate_tooltip_mini_box" style="background: initial !important; border: initial !important; border-radius: initial !important; border-spacing: initial !important; border-collapse: initial !important; direction: ltr !important; flex-direction: initial !important; font-weight: initial !important; height: initial !important; letter-spacing: initial !important; min-width: initial !important; max-width: initial !important; min-height: initial !important; max-height: initial !important; margin: auto !important; outline: initial !important; padding: initial !important; position: absolute; table-layout: initial !important; text-align: initial !important; text-shadow: initial !important; width: initial !important; word-break: initial !important; word-spacing: initial !important; overflow-wrap: initial !important; box-sizing: initial !important; display: initial !important; color: inherit !important; font-size: 13px !important; font-family: X-LocaleSpecific, sans-serif, Tahoma, Helvetica !important; line-height: 13px !important; vertical-align: top !important; white-space: inherit !important; left: 206px; top: 1744px; opacity: 0.6;">&nbsp;</div>
+<div id="s3gt_translate_tooltip_mini" class="s3gt_translate_tooltip_mini_box" style="background: initial !important; border: initial !important; border-radius: initial !important; border-spacing: initial !important; border-collapse: initial !important; direction: ltr !important; flex-direction: initial !important; font-weight: initial !important; height: initial !important; letter-spacing: initial !important; min-width: initial !important; max-width: initial !important; min-height: initial !important; max-height: initial !important; margin: auto !important; outline: initial !important; padding: initial !important; position: absolute; table-layout: initial !important; text-align: initial !important; text-shadow: initial !important; width: initial !important; word-break: initial !important; word-spacing: initial !important; overflow-wrap: initial !important; box-sizing: initial !important; display: initial !important; color: inherit !important; font-size: 13px !important; font-family: X-LocaleSpecific, sans-serif, Tahoma, Helvetica !important; line-height: 13px !important; vertical-align: top !important; white-space: inherit !important; left: 654px; top: 1899px; opacity: 0.3;">&nbsp;</div>
