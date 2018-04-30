@@ -1,0 +1,167 @@
+<p>Writing multithreading programs is hard, even harder if the program should be correct. The rules of the C++ Core Guidelines guide you to write correct programs. The rules of this post will deal with data races, sharing of data, tasks, and the infamous keyword volatile.</p>
+<hr id="system-readmore" />
+<p><img src="images/blog/ModernCpp/CppCoreGuidelinesMoreRulesConcurrenyParallelism/thread-841607_640.jpg" alt="thread 841607 640" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>&nbsp;Here are the five rules for more details.</p>
+<ul>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rconc-races">CP.2: Avoid data races</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rconc-data">CP.3: Minimize explicit sharing of writable data</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rconc-task">CP.4: Think in terms of tasks, rather than threads</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rconc-volatile">CP.8: Don’t try to use <code class="highlighter-rouge no-highlight">volatile</code> for synchronization</a></li>
+</ul>
+<p>Let me directly jump into the first rule.</p>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rconc-races">CP.2: Avoid data races</a></h3>
+<p>I already defined the term data race in the<a href="index.php/c-core-guidelines-rules-for-concurrency-and-parallelism"> last post</a>; therefore, I can make it short. A data race is a concurrently writing and reading of data. The effect is undefined behaviour. The C++&nbsp; Core Guidelines provides a typical example of data race: a static variable.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">get_id</span>() {
+  <span style="color: #006699; font-weight: bold;">static</span> <span style="color: #007788; font-weight: bold;">int</span> id <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span>;
+  <span style="color: #006699; font-weight: bold;">return</span> id<span style="color: #555555;">++</span>;
+}
+</pre>
+</div>
+<p></p>
+<p>What can go wrong? For example, thread A and thread B reads the same value k for id. Afterwards, thread A and thread B writes the value k + 1 back. In the end, the id k + 1 exists twice.</p>
+<p>The next example is quite surprising. Here is a small switch block:</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">unsigned</span> val;
+
+<span style="color: #006699; font-weight: bold;">if</span> (val <span style="color: #555555;">&lt;</span> <span style="color: #ff6600;">5</span>) {
+    <span style="color: #006699; font-weight: bold;">switch</span> (val) {
+    <span style="color: #006699; font-weight: bold;">case</span> <span style="color: #ff6600;">0</span>: <span style="color: #0099ff; font-style: italic;">// ...</span>
+    <span style="color: #006699; font-weight: bold;">case</span> <span style="color: #ff6600;">1</span>: <span style="color: #0099ff; font-style: italic;">// ...</span>
+    <span style="color: #006699; font-weight: bold;">case</span> <span style="color: #ff6600;">2</span>: <span style="color: #0099ff; font-style: italic;">// ...</span>
+    <span style="color: #006699; font-weight: bold;">case</span> <span style="color: #ff6600;">3</span>: <span style="color: #0099ff; font-style: italic;">// ...</span>
+    <span style="color: #006699; font-weight: bold;">case</span> <span style="color: #ff6600;">4</span>: <span style="color: #0099ff; font-style: italic;">// ...</span>
+    }
+}
+</pre>
+</div>
+<p></p>
+<p>The compiler will often implement the switch block as a jump table. Conceptually, it may look like this.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">if</span> (val <span style="color: #555555;">&lt;</span> <span style="color: #ff6600;">5</span>){
+    <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    functions[val]();
+}
+</pre>
+</div>
+<p></p>
+<p>In this case, <span style="font-family: courier\ new, courier;">functions[3]()</span> stands for the functionality of the switch block if&nbsp;<span style="font-family: courier\ new, courier;">val</span>&nbsp;is equal to 3. Now it could happen, that another thread kicks in and changes the value at (1) so that it is outside the valid range. Of course, this is undefined behaviour.</p>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rconc-data">CP.3: Minimize explicit sharing of writable data</a></h3>
+<p>This is a straightforward to follow but very important rule. If your shared data, it should be constant.&nbsp;</p>
+<p>Now, you have only to solve the challenge that the shared data is initialised in a thread-safe way. C++11 support a few ways to achieve this.</p>
+<ol>
+<li>Initialise your data before you start a thread. This is not due to C++11 but often quite easy to apply.<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">int</span> val <span style="color: #555555;">=</span> <span style="color: #ff6600;">2011</span>;
+<span style="color: #006699; font-weight: bold;">thread</span> t1([<span style="color: #555555;">&amp;</span>val]{ .... };
+<span style="color: #006699; font-weight: bold;">thread</span> t2([<span style="color: #555555;">&amp;</span>val]{ .... };
+</pre>
+</div>
+</li>
+<li>Use constant expression because they are initialised at compile time. <!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">constexpr <span style="color: #006699; font-weight: bold;">auto</span> doub <span style="color: #555555;">=</span> <span style="color: #ff6600;">5.1</span>;
+</pre>
+</div>
+</li>
+<li>Use the function <span style="font-family: courier\ new, courier;">std::call_once</span> in combination with the <span style="font-family: courier\ new, courier;"><span style="font-family: courier\ new, courier;">std::once_flag.</span></span>You can put the important initialisation stuff into the function <span style="font-family: courier\ new, courier;">onlyOnceFunc</span>. The C++ runtime guarantees that this function runs exactly once successfully.<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">std<span style="color: #555555;">::</span>once_flag onceFlag;
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">do_once</span>(){
+  std<span style="color: #555555;">::</span>call_once(onceFlag, [](){ std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Important initialisation"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl; });
+}
+std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t1(do_once);
+std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t2(do_once);
+std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t3(do_once);
+std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t4(do_once);
+</pre>
+</div>
+</li>
+<li>Use static variables with block scope because the C++11 runtime guarantees that they are initialised in a thread-safe way. <!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">func</span>(){
+  .... <br /><span style="color: #006699; font-weight: bold;">  static</span> <span style="color: #007788; font-weight: bold;">int</span> val <span style="color: #ff6600;">2011</span>; <br />  ....
+}
+<span style="color: #006699; font-weight: bold;">thread</span> t5{ func() };
+<span style="color: #006699; font-weight: bold;">thread</span> t6{ func() };
+</pre>
+</div>
+</li>
+</ol>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rconc-task">CP.4: Think in terms of tasks, rather than threads</a></h3>
+<p>First of all. What is a task? A task is a term in C++11 which stands for two components: a promise and a future. Promise exists in three variations in C++: <span style="font-family: courier\ new, courier;">std::async, std::packaged_task,</span> and <span style="font-family: courier\ new, courier;">std::promise. </span>I have already written a few posts on <a href="index.php/tag/tasks">tasks</a>.</p>
+<p>A thread, an&nbsp;<span style="font-family: courier\ new, courier;">std::packaged_task,</span> or an <span style="font-family: courier\ new, courier;">std::promise</span>&nbsp;have in common that they are quite low-level; therefore, I will write about an <span style="font-family: courier\ new, courier;">std::async</span>.&nbsp;</p>
+<p>Here are a thread and a future and promise pair to calculate the sum of 3 + 4.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// thread</span>
+<span style="color: #007788; font-weight: bold;">int</span> res;
+<span style="color: #006699; font-weight: bold;">thread</span> t([<span style="color: #555555;">&amp;</span>]{ res <span style="color: #555555;">=</span> <span style="color: #ff6600;">3</span> <span style="color: #555555;">+</span> <span style="color: #ff6600;">4</span>; });
+t.join();
+cout <span style="color: #555555;">&lt;&lt;</span> res <span style="color: #555555;">&lt;&lt;</span> endl;
+
+<span style="color: #0099ff; font-style: italic;">// task</span>
+<span style="color: #006699; font-weight: bold;">auto</span> fut <span style="color: #555555;">=</span> async([]{ <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #ff6600;">3</span> <span style="color: #555555;">+</span> <span style="color: #ff6600;">4</span>; });
+cout <span style="color: #555555;">&lt;&lt;</span> fut.get() <span style="color: #555555;">&lt;&lt;</span> endl;
+</pre>
+</div>
+<p></p>
+<p>What is the fundamental difference between a thread an a future and promise pair? <strong>A thread is about how something should be calculated; a task&nbsp;is about what should be calculated.</strong></p>
+<p>Let me be more specific.</p>
+<ul>
+<li>The thread uses the shared variable <span style="font-family: courier\ new, courier;">res</span> to provide its results. In contrast, the promise <span style="font-family: courier\ new, courier;">std::async</span> uses a secure data channel to communicate its result to the future <span style="font-family: courier\ new, courier;">fut.T</span>his means for the thread in particular that you have to protect<span style="font-family: courier\ new, courier;"> res.</span></li>
+<li>In case of a thread, you explicitly create a thread. This will not hold for the promise because you just specify what should be calculated.</li>
+</ul>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rconc-volatile">CP.8: Don’t try to use <code class="highlighter-rouge no-highlight">volatile</code> for synchronization</a></h3>
+<p>If you want to have an atomic in Java or C# you declare it as <span style="font-family: courier\ new, courier;">volatile</span>. Quite easy in C++, or? If you want to have an atomic in C++, use <span style="font-family: courier\ new, courier;">volatile</span>. Totally wrong. <span style="font-family: courier\ new, courier;">volatile</span> has no multithreading-semantic in C++. Atomics are called <span style="font-family: courier\ new, courier;">std::atomic</span> in C++11.</p>
+<p>Now, I'm curious: What is the meaning of volatile in C++? <span style="font-family: courier\ new, courier;">volatile</span> is for special objects, on which optimized read or write operations are not allowed.</p>
+<p><span style="font-family: courier\ new, courier;">volatile</span> is typically used in the embedded programming to denote objects, which can change independently of the regular program flow. These are for example objects, which represent an external device (memory-mapped I/O). Because these objects can change independently of the regular program their value will directly be written to main memory. So there is no optimised storing in caches.</p>
+<h2>What's next?</h2>
+<p>Correct multithreading is hard. This is the reason you should use each possible tool to validate your code. With the dynamic code analyser <a href="https://clang.llvm.org/docs/ThreadSanitizer.html">ThreadSanitizer</a> and the static code analyser <a href="http://svr-pes20-cppmem.cl.cam.ac.uk/cppmem/">CppMem</a> there are two tools which should be in the toolbox of each serious multithreading programmer. In the next post, you will see why.&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Eric Pederson, Paul Baxter, &nbsp;Sai Raghavendra Prasad Poosa, Meeting C++, Matt Braun, Avi Lachmish, and Adrian Muntea.&nbsp;<span class="sc-bxivhb huvVuj" style="color: #052d49; font-family: America, sans-serif; letter-spacing: inherit; margin: 0px; position: relative; text-align: inherit; text-transform: inherit; text-shadow: none; font-weight: 400; font-size: 1rem; line-height: 1.5;"><span class="sc-bxivhb fjhgUr" style="color: #052d49; font-family: America, sans-serif; letter-spacing: inherit; margin: 0px; position: relative; text-align: inherit; text-transform: inherit; text-shadow: none; font-weight: bold; font-size: 1rem; line-height: 1.5;"></span></span><br /></strong></p>
+<p><strong>&nbsp;</strong></p>
+<p>&nbsp;</p>
+<table border="0" style="width: 800px; height: 250px;" cellpadding="8"><caption>
+<h2>Get your e-book at leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img src="images/books/cover.png" alt="cover" width="173" height="220" style="border: medium none #000000;" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 550 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
