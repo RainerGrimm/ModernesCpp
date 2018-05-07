@@ -1,0 +1,268 @@
+<p>Today, I'm happy to write about the probably most import rule of the C++ Core Guidelines for concurrency: Whenever feasible use tools to validate your concurrent code. Not all, but a lot of bugs&nbsp;can be detected with tools and each fixed bug is a good bug. Here are two tools which provided me precious help in the last years: <a href="https://github.com/google/sanitizers/wiki/ThreadSanitizerCppManual">ThreadSanitizer</a> and <a href="http://svr-pes20-cppmem.cl.cam.ac.uk/cppmem/">CppMem</a>.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesToolsToValidateConcurrentCode/wrench-24261_640.png" alt="wrench 24261 640" width="500" height="474" /></p>
+<p>Here is the rule for today:</p>
+<h2><a style="color: #268bd2; text-decoration: underline;" href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rconc-tools">CP.9: Whenever feasible use tools to validate your concurrent code</a></h2>
+<p>Believe me, this post is based on personal experience. On one hand, a lot of my students in my multithreading classes wrote programs with data race, on the other hand, I implemented a lot of multithreading programs with bugs. How can I be sure? Because of the dynamic code analysis tool&nbsp;<a href="https://github.com/google/sanitizers/wiki/ThreadSanitizerCppManual">ThreadSanitizer</a>&nbsp;and the static code analysis tool <a href="http://svr-pes20-cppmem.cl.cam.ac.uk/cppmem/">CppMem</a>. The use-cases for ThreadSanitizer und CppMem are different.</p>
+<p>ThreadSanitizer gives you the big picture and detects if the execution of your program has a data race. CppMem gives you a detailed insight into small pieces of code, most of the times including atomics. You will get the answer to the question: Which interleavings are possible according to the memory model?&nbsp;</p>
+<p>Let's start with ThreadSanitizer.</p>
+<h3>ThreadSanitizer</h3>
+<p>Here is the official introduction to <a href="https://github.com/google/sanitizers/wiki/ThreadSanitizerCppManual">ThreadSanitizer</a>: "ThreadSanitizer (aka TSan) is a data race detector for C/C++. Data races are one of the most common and hardest to debug types of bugs in concurrent systems. A data race occurs when two threads access the same variable concurrently and at least one of the accesses is write.&nbsp;<a href="http://en.wikipedia.org/wiki/C%2B%2B11" rel="nofollow">C++11</a>&nbsp;standard officially bans data races as&nbsp;undefined behavior."</p>
+<p>ThreadSanitizer is part of clang 3.2 and gcc&nbsp;4.8, it supports&nbsp;Linux x86_64, and is tested on Ubuntu 12.04. To use it you&nbsp;just have to compile and link against&nbsp;<span style="font-family: 'courier new', courier;">-fsanitize=thread</span>, use at least&nbsp;optimisation level <span style="font-family: 'courier new', courier;">-O2</span> and the flag <span style="font-family: 'courier new', courier;">-g</span>&nbsp;for producing debugging information: <span style="font-family: 'courier new', courier;">-fsanitize=thread -O2 -g</span>.&nbsp;</p>
+<p>The runtime overhead is significant:&nbsp;&nbsp;the memory usage may increase by 5-10x and execution time by 2-20x. But of course, you&nbsp;know the principal law of software development: <strong>First, your program should be correct than fast.</strong>&nbsp;</p>
+<h4>The ping-pong game</h4>
+<p>Now, let's see ThreadSanitizer in action. Here is a typical exercise I often have given in my multithreading classes&nbsp;to condition variables:</p>
+<p>Write a small ping pong game.</p>
+<ul>
+<li>Two threads should alternatively set a bool value to <span style="font-family: 'courier new', courier;">true</span> or fa<span style="font-family: 'courier new', courier;">l</span>se. One thread sets the value to <span style="font-family: 'courier new', courier;">true</span> and notifies the other thread.&nbsp;The other&nbsp;thread sets the value to <span style="font-family: 'courier new', courier;">false</span> and notifies the original thread. That play should end after a fixed&nbsp;amount of iterations.&nbsp;</li>
+</ul>
+<p>And this is the typical&nbsp;implementation my students came up with.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// conditionVariablePingPong.cpp</span>
+
+<span style="color: #009999;">#include &lt;condition_variable&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;thread&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">bool</span> dataReady<span style="color: #555555;">=</span> <span style="color: #336666;">false</span>;                                   <span style="color: #0099ff; font-style: italic;">// (3)</span>
+
+std<span style="color: #555555;">::</span>mutex mutex_;
+std<span style="color: #555555;">::</span>condition_variable condVar1;
+std<span style="color: #555555;">::</span>condition_variable condVar2;
+
+<span style="color: #007788; font-weight: bold;">int</span> counter<span style="color: #555555;">=</span><span style="color: #ff6600;">0</span>;
+<span style="color: #007788; font-weight: bold;">int</span> COUNTLIMIT<span style="color: #555555;">=</span><span style="color: #ff6600;">50</span>;
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">setTrue</span>(){                                           <span style="color: #0099ff; font-style: italic;">// (1)</span>
+
+  <span style="color: #006699; font-weight: bold;">while</span>(counter <span style="color: #555555;">&lt;=</span> COUNTLIMIT){                           <span style="color: #0099ff; font-style: italic;">// (7)</span>
+
+    std<span style="color: #555555;">::</span>unique_lock<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span> lck(mutex_);
+    condVar1.wait(lck, []{<span style="color: #006699; font-weight: bold;">return</span> dataReady <span style="color: #555555;">==</span> <span style="color: #336666;">false</span>;});   <span style="color: #0099ff; font-style: italic;">// (4)</span>
+    dataReady<span style="color: #555555;">=</span> <span style="color: #336666;">true</span>;
+    <span style="color: #555555;">++</span>counter;                                            <span style="color: #0099ff; font-style: italic;">// (5)</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> dataReady <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    condVar2.notify_one();                                <span style="color: #0099ff; font-style: italic;">// (6)</span>
+
+  }
+}
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">setFalse</span>(){                                           <span style="color: #0099ff; font-style: italic;">// (2)</span>
+
+  <span style="color: #006699; font-weight: bold;">while</span>(counter <span style="color: #555555;">&lt;</span> COUNTLIMIT){                             <span style="color: #0099ff; font-style: italic;">// (8)</span>
+
+    std<span style="color: #555555;">::</span>unique_lock<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span> lck(mutex_);
+    condVar2.wait(lck, []{<span style="color: #006699; font-weight: bold;">return</span> dataReady <span style="color: #555555;">==</span> <span style="color: #336666;">true</span>;});
+    dataReady<span style="color: #555555;">=</span> <span style="color: #336666;">false</span>;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> dataReady <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    condVar1.notify_one();
+
+  }
+
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>boolalpha <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Begin: "</span> <span style="color: #555555;">&lt;&lt;</span> dataReady <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t1(setTrue);
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t2(setFalse);
+
+  t1.join();
+  t2.join();
+  
+  dataReady<span style="color: #555555;">=</span> <span style="color: #336666;">false</span>;
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"End: "</span> <span style="color: #555555;">&lt;&lt;</span> dataReady <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Function <span style="font-family: courier\ new, courier;">setTrue</span> (1) sets the boolean value <span style="font-family: courier\ new, courier;">dataReady</span> (3) to <span style="font-family: courier\ new, courier;">true</span> and function <span style="font-family: courier\ new, courier;">setFalse</span> (2) sets it to <span style="font-family: courier\ new, courier;">false</span>.&nbsp; The play starts with <span style="font-family: courier\ new, courier;">setTrue</span>. The condition variable in the function waits for the notification and therefore checks first the boolean <span style="font-family: courier\ new, courier;">dataReady</span> (4). Afterwards, the function increments the <span style="font-family: courier\ new, courier;">counter</span> (5) and notifies the other thread with the help of the condition variable <span style="font-family: courier\ new, courier;">condVar2</span> (6). The function <span style="font-family: courier\ new, courier;">setFalse</span> follows the same workflow. If <span style="font-family: 'courier new', courier;">counter</span> becomes equal to <span style="font-family: courier\ new, courier;">COUNTLIMIT</span> (7), the game ends. Fine? NO!</p>
+<p>There is a data race on the counter. It is read (8) and written (5) and the same time. Thanks to ThreadSanitizer. Here is the proof.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesToolsToValidateConcurrentCode/pingPongDataRace.png" alt="pingPongDataRace" width="700" height="500" /></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;ThreadSanitzer detects data races during runtime, CppMem lets you analyse small code snippets.</p>
+<h3>CppMem&nbsp;</h3>
+<p>I will only provide a short overview to CppMem.</p>
+<p>The online tool which you can also install on your CPP provides very precious services.</p>
+<ol>
+<li>CppMem validates small code snippets typically including atomics.</li>
+<li>The very accurate analysis of CppMem gives you a deep insight into the C++ memory model.</li>
+</ol>
+<p>For deeper insight, I have already written a few posts to <a href="index.php/tag/cppmem">CppMem</a>. For now, I will only refer to the first point and provide your a 10000 feet view overview.</p>
+<h3>A Short Overview</h3>
+<p>My simplified overview uses the default configuration of the tool. This overview should give you the base for further experiments.</p>
+<p>For simplicity reasons, I will refer to the red numbers in the following screenshot.&nbsp;</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesToolsToValidateConcurrentCode/CppMemNumbers.PNG" alt="CppMemNumbers" width="700" height="461" /></p>
+<ol>
+<li><strong>Model</strong>
+<ul>
+<li>Specifies the C++ memory model. <em>preferred</em> is the C++ memory model.</li>
+</ul>
+</li>
+<li><strong>Program</strong>
+<ul>
+<li>Is the executable program in C or C++&nbsp; like syntax.</li>
+<li>CppMem offers a bunch of typical atomic workflow. To get the details to these programs, read the very well written article <a href="http://www.cl.cam.ac.uk/~pes20/cpp/popl085ap-sewell.pdf">Mathematizing C++ Concurrency</a>. Of course, you can also use your own code.</li>
+<li>CppMem is about multithreading, so there are a few simplifications<br />
+<ul>
+<li>You can easily define two thread by the symbols <span style="font-family: courier new,courier;">{{{&nbsp; ... ||| ... }}}</span>.&nbsp;The three dots (...) stand for the work package of the thread.</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><strong>Display Relations</strong>
+<ul>
+<li>Describes the relations between the read, write and read-write modifications on atomic operations, fences and locks.&nbsp;</li>
+<li>If the relation is enabled they will be displayed in the annotated graph (see point 6).<br />
+<ul>
+<li>Here are a few relations:<br />
+<ul>
+<li><strong>sb</strong>: sequenced-before</li>
+<li><strong>rf:</strong> read from</li>
+<li><strong>mo</strong>: modification order</li>
+<li><strong>sc</strong>: sequentially consistent</li>
+<li><strong>lo</strong>: lock order</li>
+<li><strong>sw:</strong> synchronizes-with</li>
+<li><strong>dob</strong>: dependency-ordered-before</li>
+<li><strong>data_races</strong></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><strong>Display Layout</strong>
+<ul>
+<li>You can choose with this switch, which <a href="https://sourceforge.net/projects/doxygraph/">Doxygraph</a> graph is used.</li>
+</ul>
+</li>
+<li><strong>Choose the Executions</strong>
+<ul>
+<li>Switch between the various consistent executions.</li>
+</ul>
+</li>
+<li><strong>Annotated Graph</strong>
+<ul>
+<li>Displays the annotated graph.</li>
+</ul>
+</li>
+</ol>
+<p>Now, let's try it out.</p>
+<h3>A Data Race</h3>
+<p>First, my program with a data race on <span style="font-family: courier\ new, courier;">x (1)</span>. The atomic <span style="font-family: courier\ new, courier;">y i</span>s fine. Independent of the applied <a href="https://en.cppreference.com/w/cpp/atomic/memory_order">memory-order</a>, the operations on<span style="font-family: courier\ new, courier;"> y</span> are at least atomic.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// dataRaceOnX.cpp</span>
+
+<span style="color: #009999;">#include &lt;atomic&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;thread&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> x <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>;
+std<span style="color: #555555;">::</span>atomic<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> y{<span style="color: #ff6600;">0</span>};
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">writing</span>(){  
+  x <span style="color: #555555;">=</span> <span style="color: #ff6600;">2000</span>;                                              <span style="color: #0099ff; font-style: italic;">// (1)</span>
+  y.store(<span style="color: #ff6600;">11</span>, std<span style="color: #555555;">::</span>memory_order_release);                <span style="color: #0099ff; font-style: italic;">// (2)</span>
+}
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">reading</span>(){  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> y.load(std<span style="color: #555555;">::</span>memory_order_acquire) <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span>; <span style="color: #0099ff; font-style: italic;">// (2)</span>
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> x <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;                           <span style="color: #0099ff; font-style: italic;">// (1)</span>
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+
+    std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> thread1(writing);
+    std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> thread2(reading);
+
+    thread1.join();
+    thread2.join();
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Here is the equivalent program in the simplified CppMem syntax.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// dataRaceOnXCppMem.txt</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+  <span style="color: #007788; font-weight: bold;">int</span> x <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>;
+  atomic_int y <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>;
+  
+  {{{ 
+    {
+      x <span style="color: #555555;">=</span> <span style="color: #ff6600;">2000</span>;
+      y.store(<span style="color: #ff6600;">11</span>, memory_order_release);
+    }
+  <span style="color: #555555;">|||</span> 
+    {
+      y.load(memory_order_acquire);
+      x;
+    }
+  }}}
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>CppMem shows it immediately. The first consistent execution has a data race on x.</p>
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesToolsToValidateConcurrentCode/DataRaceOnX.png" alt="DataRaceOnX" width="400" height="232" /></p>
+<p>You can observe the data race in the graph. It is the yellow edge (dr) between the write (<span style="font-family: courier\ new, courier;">x=2000</span>) and the read operation (<span style="font-family: courier\ new, courier;">x=0</span>).</p>
+<h2>What's next?</h2>
+<p>Of course, there are a lot more rules to concurrency in the C++ Core Guidelines. The next post will write about locks and mutexes.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Eric Pederson, Paul Baxter, &nbsp;Sai Raghavendra Prasad Poosa, Meeting C++, Matt Braun, Avi Lachmish, Adrian Muntea, and Roman Postanciuc. <span class="sc-bxivhb huvVuj" style="color: #052d49; font-family: America, sans-serif; letter-spacing: inherit; margin: 0px; position: relative; text-align: inherit; text-transform: inherit; text-shadow: none; font-weight: 400; font-size: 1rem; line-height: 1.5;"><span class="sc-bxivhb fjhgUr" style="color: #052d49; font-family: America, sans-serif; letter-spacing: inherit; margin: 0px; position: relative; text-align: inherit; text-transform: inherit; text-shadow: none; font-weight: bold; font-size: 1rem; line-height: 1.5;"></span></span><span class="sc-bxivhb huvVuj" style="color: #052d49; font-family: America, sans-serif; letter-spacing: inherit; margin: 0px; position: relative; text-align: inherit; text-transform: inherit; text-shadow: none; font-weight: 400; font-size: 1rem; line-height: 1.5;"><span class="sc-bxivhb fjhgUr" style="color: #052d49; font-family: America, sans-serif; letter-spacing: inherit; margin: 0px; position: relative; text-align: inherit; text-transform: inherit; text-shadow: none; font-weight: bold; font-size: 1rem; line-height: 1.5;"></span></span><br /></strong></p>
+<p><strong>&nbsp;</strong></p>
+<p>&nbsp;</p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 550 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
