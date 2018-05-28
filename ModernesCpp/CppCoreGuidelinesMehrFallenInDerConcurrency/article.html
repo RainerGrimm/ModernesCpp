@@ -1,0 +1,197 @@
+<p>Concurrency provides many ways to shoot yourself in the foot. The rules for today help you to know these dangers and to overcome them.</p>
+<hr id="system-readmore" />
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesRemainingRulesToConcurrency/trap.png" alt="trap" width="700" height="447" /></p>
+<p>First, here are three rules for this post.</p>
+<ul>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rconc-data-by-value">CP.31: Pass small amounts of data between threads by value, rather than by reference or pointer</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rconc-shared">CP.32: To share ownership between unrelated <code class="highlighter-rouge no-highlight">thread</code>s use <code class="highlighter-rouge no-highlight">shared_ptr</code></a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rconc-create">CP.41: Minimize thread creation and destruction</a></li>
+</ul>
+<p>They are more rules which I ignore because they have no content.</p>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rconc-data-by-value">CP.31: Pass small amounts of data between threads by value, rather than by reference or pointer</a></h3>
+<p>This rule is quite apparent; therefore, I can make it short. Passing data to a thread by value gives you immediately two benefits:</p>
+<ol>
+<li>There is no sharing and, therefore, no data race is possible. The requirements for a data race are mutable, shared state. Read the details here: <a href="index.php/c-core-guidelines-rules-for-concurrency-and-parallelism">C++ Core Guidelines: Rules for Concurrency and Parallelism</a>.</li>
+<li>You have not to care about the lifetime of the data. The data stays alive for the lifetime of the created thread. This is in particular important when you detach a thread: <a href="index.php/c-core-guidelines-taking-care-of-your-child-thread">C++ Core Guidelines: Taking Care of your Child.</a></li>
+</ol>
+<p>Of course, the crucial question is: What does a small amount of data mean? The C++ core guidelines is not clear about this point. In the rule <a href="https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rf-in">F.16 For “in” parameters, pass cheaply-copied types by value and others by reference to </a><code class="highlighter-rouge no-highlight"><a href="F.16:%20For%20“in”%20parameters,%20pass%20cheaply-copied%20types%20by%20value%20and%20others%20by%20reference%20to%20const">const to functions</a>, </code>the C++ core guidelines states that <span style="font-family: courier new, courier;">4 * sizeof(int)</span> is a rule of thumb for functions. Meaning, smaller than <span style="font-family: courier new, courier;">4 * sizeof(int)</span> should be passed by value; bigger than <span style="font-family: courier new, courier;">4 * sizeof(int)</span> by reference or pointer.</p>
+<p>In the end, you have to measure the performance if necessary.</p>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rconc-shared">CP.32: To share ownership between unrelated <code class="highlighter-rouge no-highlight">thread</code>s use <code class="highlighter-rouge no-highlight">shared_ptr</code></a></h3>
+<p>Imagine, you have an object which you want to share between unrelated threads. The key question is, who is the owner of the object and, therefore, responsible for releasing the memory? Now you can choose between a memory leak if you don't deallocate the memory or undefined behaviour because you invoked delete more than once. Most of the times, the undefined behaviour ends in a runtime crash.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// threadSharesOwnership.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;thread&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">using</span> <span style="color: #006699; font-weight: bold;">namespace</span> std<span style="color: #555555;">::</span>literals<span style="color: #555555;">::</span>chrono_literals;
+
+<span style="color: #006699; font-weight: bold;">struct</span> MyInt{
+  <span style="color: #007788; font-weight: bold;">int</span> val{<span style="color: #ff6600;">2017</span>};
+  <span style="color: #555555;">~</span>MyInt(){                                 <span style="color: #0099ff; font-style: italic;">// (4)</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Good Bye"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;   <span style="color: #0099ff; font-style: italic;"></span>
+  }
+};
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">showNumber</span>(MyInt<span style="color: #555555;">*</span> myInt){
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> myInt<span style="color: #555555;">-&gt;</span>val <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+}
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">threadCreator</span>(){
+    MyInt<span style="color: #555555;">*</span> tmpInt<span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">new</span> MyInt;             <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    
+    std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t1(showNumber, tmpInt);   <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t2(showNumber, tmpInt);   <span style="color: #0099ff; font-style: italic;">// (3)</span>
+    
+    t1.detach();
+    t2.detach();
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){<br /><br />    std::cout &lt;&lt; std::endl;<br />
+    threadCreator();
+    std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>sleep_for(<span style="color: #ff6600;">1</span>s);<br /><br />    std::cout &lt;&lt; std::endl; <br />
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Bear with me. The example is intentionally so easy. I let the main thread sleep for one second to be sure that it outlives the lifetime of the child thread <span style="font-family: courier new, courier;">t1</span> and <span style="font-family: courier new, courier;">t2.</span> This is, of course, no appropriate synchronisation, but it helps me to make my point. The vital issue of the program is: Who is responsible for the deletion of <span style="font-family: courier new, courier;">tmpInt</span> (1)? Thread <span style="font-family: courier new, courier;">t1</span> (2), thread<span style="font-family: courier new, courier;"> t2</span> (3), or the function (main thread) itself. Because I can not forecast how long each thread runs I decided to go with a memory leak. Consequentially, the destructor of <span style="font-family: courier new, courier;">MyInt</span> (4) is never called:</p>
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesRemainingRulesToConcurrency/threadSharesOwnership.png" alt="threadSharesOwnership" width="400" height="183" /></p>
+<p>The lifetime issues are quite easy to handle if I use a <span style="font-family: courier new, courier;">std::shared_ptr</span>.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesRemainingRulesToConcurrency/threadSharesOwnershipSharedPtr.png" alt="threadSharesOwnershipSharedPtr" width="400" height="177" /></p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// threadSharesOwnershipSharedPtr.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;memory&gt;</span>
+<span style="color: #009999;">#include &lt;thread&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">using</span> <span style="color: #006699; font-weight: bold;">namespace</span> std<span style="color: #555555;">::</span>literals<span style="color: #555555;">::</span>chrono_literals;
+
+<span style="color: #006699; font-weight: bold;">struct</span> MyInt{
+  <span style="color: #007788; font-weight: bold;">int</span> val{<span style="color: #ff6600;">2017</span>};
+  <span style="color: #555555;">~</span>MyInt(){
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Good Bye"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  }
+};
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">showNumber</span>(std<span style="color: #555555;">::</span>shared_ptr<span style="color: #555555;">&lt;</span>MyInt<span style="color: #555555;">&gt;</span> myInt){    <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> myInt<span style="color: #555555;">-&gt;</span>val <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+}
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">threadCreator</span>(){
+    <span style="color: #006699; font-weight: bold;">auto</span> sharedPtr <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>make_shared<span style="color: #555555;">&lt;</span>MyInt<span style="color: #555555;">&gt;</span>();    <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    
+    std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t1(showNumber, sharedPtr);
+    std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t2(showNumber, sharedPtr);
+    
+    t1.detach();
+    t2.detach();
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    threadCreator();
+    std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>sleep_for(<span style="color: #ff6600;">1</span>s);
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+}
+</pre>
+</div>
+<p></p>
+<p>Two small changes to the source code were necessary. First, the pointer in (1) became a <span style="font-family: courier new, courier;">std::shared_ptr</span> and second, the function <span style="font-family: courier new, courier;">showNumber </span>takes a smart pointer instead of a plain pointer<span style="font-family: courier new, courier;">. <br /></span></p>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rconc-create">CP.41: Minimize thread creation and destruction</a></h3>
+<p>How expensive is a thread? Quite expensive! This is the issue behind this rule. Let me first talk about the usual size of a thread and then about the costs of its creation.</p>
+<h4>Size</h4>
+<p>A <span style="font-family: courier new, courier;">std::thread i</span>s a thin wrapper around the native thread. This means I'm interested in the size of a Windows thread and a <a href="https://en.wikipedia.org/wiki/POSIX_Threads">POSIX thread</a>.</p>
+<ul>
+<li>Windows systems: the post <a href="https://msdn.microsoft.com/en-us/library/windows/desktop/ms686774(v=vs.85).aspx">Thread Stack Size</a> gave me the answer: 1 MB.</li>
+<li>POSIX systems: the<span style="font-family: courier new, courier;"></span> <a href="http://man7.org/linux/man-pages/man3/pthread_create.3.html"><span style="font-family: courier new, courier;">pthread_create</span></a> man-page provides me with the answer: 2MB. This is the sizes for the i386 and x86_64 architectures. If you want to know the sizes for further architectures that support POSIX, here are they:</li>
+</ul>
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesRemainingRulesToConcurrency/threadStackSize.png" alt="threadStackSize" width="250" height="274" /></p>
+<h4>Creation</h4>
+<p>I didn't find numbers who much time it takes to create a thread. To get a gut feeling, I made a simple performance test on Linux and Windows.</p>
+<p>I used GCC 6.2.1 on a desktop and cl.exe on a laptop for my performance tests. The cl.exe is part of the Microsoft Visual Studio 2017. I compiled the programs with maximum optimisation. This means on Linux the flag <span style="font-family: courier new, courier;">O3</span> and on Windows <span style="font-family: courier new, courier;">Ox</span>.</p>
+<p>Here is my small test program.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// threadCreationPerformance.cpp</span>
+
+<span style="color: #009999;">#include &lt;chrono&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;thread&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">static</span> <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">long</span> <span style="color: #007788; font-weight: bold;">long</span> numThreads<span style="color: #555555;">=</span> <span style="color: #ff6600;">1000000</span>;
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+
+    <span style="color: #006699; font-weight: bold;">auto</span> start <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>system_clock<span style="color: #555555;">::</span>now();
+
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">volatile</span> <span style="color: #007788; font-weight: bold;">int</span> i <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>; i <span style="color: #555555;">&lt;</span> numThreads; <span style="color: #555555;">++</span>i) std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span>([]{}).detach();  <span style="color: #0099ff; font-style: italic;">// (1)</span>
+
+    std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>duration<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">double</span><span style="color: #555555;">&gt;</span> dur<span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>system_clock<span style="color: #555555;">::</span>now() <span style="color: #555555;">-</span> start;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"time: "</span> <span style="color: #555555;">&lt;&lt;</span> dur.count() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" seconds"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}
+</pre>
+</div>
+<p></p>
+<p>The program creates 1 million threads which execute an empty lambda function (1). These are the numbers for Linux and Windows:</p>
+<h5><strong>Linux:</strong></h5>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesRemainingRulesToConcurrency/threadCreationLinux.png" alt="threadCreationLinux" width="400" height="247" /></p>
+<p>This means that the creation of a thread took about 14.5 sec / 1000000 = <strong>14.5 microseconds on Linux</strong>.</p>
+<h5><strong>Windows:</strong></h5>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesRemainingRulesToConcurrency/threadCreationWindows.png" alt="threadCreationWindows" width="400" height="295" /></p>
+<p>It took about 44 sec / 1000000 = <strong>44 microseconds on Windows.</strong></p>
+<p>To put it the other way around. You can create about<strong> 69 thousand threads on Linux and 23 thousand threads on Windows in one second.</strong></p>
+<h2>What's next?</h2>
+<p>What is the easiest way to shot yourself in the foot? Use a condition variable! You don't believe? Wait for the next week!</p>
+<p>&nbsp;</p>
+<p></p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Eric Pederson, Paul Baxter, &nbsp;Sai Raghavendra Prasad Poosa, Meeting C++, Matt Braun, Avi Lachmish, Adrian Muntea, and Roman Postanciuc. <span class="sc-bxivhb huvVuj" style="color: #052d49; font-family: America, sans-serif; letter-spacing: inherit; margin: 0px; position: relative; text-align: inherit; text-transform: inherit; text-shadow: none; font-weight: 400; font-size: 1rem; line-height: 1.5;"><span class="sc-bxivhb fjhgUr" style="color: #052d49; font-family: America, sans-serif; letter-spacing: inherit; margin: 0px; position: relative; text-align: inherit; text-transform: inherit; text-shadow: none; font-weight: bold; font-size: 1rem; line-height: 1.5;"></span></span><span class="sc-bxivhb huvVuj" style="color: #052d49; font-family: America, sans-serif; letter-spacing: inherit; margin: 0px; position: relative; text-align: inherit; text-transform: inherit; text-shadow: none; font-weight: 400; font-size: 1rem; line-height: 1.5;"><span class="sc-bxivhb fjhgUr" style="color: #052d49; font-family: America, sans-serif; letter-spacing: inherit; margin: 0px; position: relative; text-align: inherit; text-transform: inherit; text-shadow: none; font-weight: bold; font-size: 1rem; line-height: 1.5;"></span></span><br /></strong></p>
+<p><strong>&nbsp;</strong></p>
+<p>&nbsp;</p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 550 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
