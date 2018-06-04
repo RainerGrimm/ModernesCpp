@@ -1,0 +1,246 @@
+<p>Today, I write a scary post about condition variables. You should be aware of this issues of condition variables. The C++ core guideline CP 42 just states: "Don't wait without a condition".</p>
+<hr id="system-readmore" />
+<p><a class="anchorjs-link " style="color: #268bd2; text-decoration: none; font-style: normal; font-variant: normal; font-weight: normal; font-size: 1em; line-height: 1; font-family: anchorjs-icons; padding-left: 0.375em;" href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#cp42-dont-wait-without-a-condition" aria-label="Anchor link for: cp42 dont wait without a condition" data-anchorjs-icon=""></a></p>
+<h5 id="reason-285" style="margin-bottom: 0.5rem; font-weight: bold; line-height: 1.25; color: #313131; margin-top: 1rem; font-size: 1rem; display: inline; font-family: 'PT Sans', Helvetica, Arial, sans-serif; font-style: normal; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing: 0px; background-color: #ffffff;">&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelines/trapMice.jpg" alt="trapMice" width="700" height="497" /></h5>
+<p>&nbsp;</p>
+<p>Wait! Condition variables support a quite simple concept. One thread prepares something and sends a notification another thread is waiting for. Why can't this be so dangers? Okay, let's start with the only rule for today.</p>
+<h2><a style="color: #268bd2; text-decoration: none;" href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rconc-wait">CP.42: Don’t <code class="highlighter-rouge no-highlight" style="font-family: 'Roboto Mono', monospace; padding: 0.2em; font-size: 18px; background-color: #f9f9f9;"></code>wait without a condition</a></h2>
+<p>Here is the rationale for the rule: "A&nbsp;wait&nbsp;without a condition can miss a wakeup or wake up simply to find that there is no work to do." What does that mean? Condition variables can be victims of two very serious issues: lost wakeup and spurious wakeup. The key concern about condition variables is that they have no memory.</p>
+<p>Before I present you this issue, let me at first do it right. Here is the pattern, how to use condition variables.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// conditionVariables.cpp</span>
+
+<span style="color: #009999;">#include &lt;condition_variable&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;thread&gt;</span>
+
+std<span style="color: #555555;">::</span>mutex mutex_;
+std<span style="color: #555555;">::</span>condition_variable condVar; 
+
+<span style="color: #007788; font-weight: bold;">bool</span> dataReady{<span style="color: #336666;">false</span>};
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">waitingForWork</span>(){
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Waiting "</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>unique_lock<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span> lck(mutex_);
+    condVar.wait(lck, []{ <span style="color: #006699; font-weight: bold;">return</span> dataReady; });   <span style="color: #0099ff; font-style: italic;">// (4)</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Running "</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+}
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">setDataReady</span>(){
+    {
+        std<span style="color: #555555;">::</span>lock_guard<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span> lck(mutex_);
+        dataReady <span style="color: #555555;">=</span> <span style="color: #336666;">true</span>;
+    }
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Data prepared"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    condVar.notify_one();                        <span style="color: #0099ff; font-style: italic;">// (3)</span>
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+    
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t1(waitingForWork);               <span style="color: #0099ff; font-style: italic;">// (1)</span>
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t2(setDataReady);                 <span style="color: #0099ff; font-style: italic;">// (2)</span>
+
+  t1.join();
+  t2.join();
+  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  
+}
+</pre>
+</div>
+<p></p>
+<p>How does the synchronisation work? The program has two child threads:<span style="font-family: 'courier new', courier;"> t1</span> and <span style="font-family: 'courier new', courier;">t2</span>. They get their work package<span style="font-family: 'courier new', courier;">&nbsp;waitingForWork</span>&nbsp;and <span style="font-family: 'courier new', courier;">setDataRead</span>&nbsp;in lines (1 and 2). <span style="font-family: 'courier new', courier;">setDataReady</span>&nbsp;notifies - using the condition variable <span style="font-family: 'courier new', courier;">condVar</span>&nbsp;- that it is done with the preparation of the work: <span style="font-family: 'courier new', courier;">condVar.notify_one()</span>(line 3). While holding the lock, thread <span style="font-family: 'courier new', courier;">t1</span>&nbsp;waits for its notification: <span style="font-family: 'courier new', courier;">condVar.wait(lck, []{ return dataReady; })</span>( line 4). The sender and receiver need a lock. In the case of the sender a <span style="font-family: 'courier new', courier;">std::lock_guard</span>&nbsp;is sufficient, because it calls lock and unlock only once. In the case of the receiver, a <span style="font-family: 'courier new', courier;">std::unique_lock</span>&nbsp;is necessary because it usually frequently locks and unlocks its mutex.</p>
+<p>Here is the output of the program.</p>
+<p>&nbsp;<img style="float: left;" src="images/blog/ModernCpp/CppCoreGuidelines/conditionVariable.png" alt="conditionVariable" width="400" height="197" /></p>
+<p></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>Maybe you are wondering: Why you need a predicate for the <span style="font-family: 'courier new', courier;">wait</span> call because you can invoke <span style="font-family: 'courier new', courier;">wait</span>&nbsp;without a predicate? This workflow seems quite too complicated for such a simple synchronisation of threads.&nbsp;</p>
+<p>Now we are back to the missing memory and the two phenomena called lost wakeup and spurious wakeup.</p>
+<h3>Lost Wakeup and Spurious Wakeup</h3>
+<ul>
+<li><strong>Lost wakeup</strong>:&nbsp;The phenomenon of the lost wakeup is that the sender sends its notification before the receiver gets to its wait state. The consequence is that the notification is lost. The C++ standard describes condition variables as a simultaneous synchronisation mechanism: "The condition_variable class is a synchronisation primitive that can be used to block a thread, or multiple threads <strong>at the same time</strong>, ...". So the notification gets lost, and the receiver is waiting and waiting and ... .</li>
+<li><strong>Spurious wakeup</strong>:&nbsp;It may happen that the receiver wakes up, although no notification happened. At a minimum <a href="https://en.wikipedia.org/wiki/POSIX_Threads">POSIX Threads</a>&nbsp;and the <a href="https://en.wikipedia.org/wiki/Windows_API">Windows AP</a>I can be victims of these phenomena.</li>
+</ul>
+<p>To become not the victim of this two issues, you have to use an additional predicate as memory; or as the rule state it an additional condition. If you don't believe it, here is the wait workflow.</p>
+<h3>The wait workflow&nbsp;</h3>
+<p>In the initial processing of <span style="font-family: 'courier new', courier;">wait</span>, the thread locks the mutex and then checks the predicate <span style="font-family: 'courier new', courier;">[]{ return dataReady; }</span>.</p>
+<ul>
+<li>If the call of the predicated evaluates to
+<ul>
+<li><span style="font-family: 'courier new', courier;">true</span>: the thread continues its work.</li>
+<li><span style="font-family: 'courier new', courier;">false</span>: <span style="font-family: 'courier new', courier;">condVar.wait()</span>&nbsp;unlocks the mutex and puts the thread in a waiting (blocking) state</li>
+</ul>
+</li>
+</ul>
+<p>If the condition_variable <span style="font-family: 'courier new', courier;">condVar</span> is in the waiting state and gets a notification or a spurious wakeup the following steps happen.</p>
+<ul>
+<li>The thread is unblocked and will reacquire the lock on the mutex.&nbsp;</li>
+<li>The thread checks the predicate.</li>
+<li>If the call of the predicated evaluates to
+<ul>
+<li><span style="font-family: 'courier new', courier;">true</span>: the thread continues its work.</li>
+<li><span style="font-family: 'courier new', courier;">false</span>: <span style="font-family: 'courier new', courier;">condVar.wait</span>() unlocks the mutex and puts the thread in a waiting (blocking) state.</li>
+</ul>
+</li>
+</ul>
+<p>Complicated! Right? Don't you believe me?</p>
+<h3>Without a predicate</h3>
+<p>What will happen if I remove the predicate from the last example?&nbsp;&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// conditionVariableWithoutPredicate.cpp</span>
+
+<span style="color: #009999;">#include &lt;condition_variable&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;thread&gt;</span>
+
+std<span style="color: #555555;">::</span>mutex mutex_;
+std<span style="color: #555555;">::</span>condition_variable condVar;
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">waitingForWork</span>(){
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Waiting "</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>unique_lock<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span> lck(mutex_);
+    condVar.wait(lck);                       <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Running "</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+}
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">setDataReady</span>(){
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Data prepared"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    condVar.notify_one();                   <span style="color: #0099ff; font-style: italic;">// (2)</span>
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+    
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t1(waitingForWork);
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t2(setDataReady);
+
+  t1.join();
+  t2.join();
+  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Now, the wait call in line (1) does not use a predicate and the synchronisation looks quite easy. Sad to say, but the program has now a race condition which you can see in the very first execution. The screenshot shows the deadlock.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelines/conditionVariableWithoutPredicate.png" alt="conditionVariableWithoutPredicate" width="500" height="178" /></p>
+<p></p>
+<p>&nbsp;</p>
+<p>The sender sends in line (1)&nbsp;&nbsp;(<span style="font-family: 'courier new', courier;">condVar.notify_one()</span>) its notification before the receiver is capable to receive it; therefore, the receiver will sleep forever.&nbsp;</p>
+<p>Okay, lesson learned the hard way. The predicate is necessary but there must be a way to simplify the program <span style="font-family: courier new, courier;">conditionVariables.cpp</span>?</p>
+<h3>An atomic predicate&nbsp;</h3>
+<p>Maybe, you already saw it. The variable <span style="font-family: Courier New, Courier, monospace;">dataReady</span> is just a boolean. We should make it an atomic boolean and, therefore, get rid of the mutex on the sender.</p>
+<p>Here we are:</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// conditionVariableAtomic.cpp</span>
+
+<span style="color: #009999;">#include &lt;atomic&gt;</span>
+<span style="color: #009999;">#include &lt;condition_variable&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;thread&gt;</span>
+
+std<span style="color: #555555;">::</span>mutex mutex_;
+std<span style="color: #555555;">::</span>condition_variable condVar;
+
+std<span style="color: #555555;">::</span>atomic<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">bool</span><span style="color: #555555;">&gt;</span> dataReady{<span style="color: #336666;">false</span>};
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">waitingForWork</span>(){
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Waiting "</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>unique_lock<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span> lck(mutex_);
+    condVar.wait(lck, []{ <span style="color: #006699; font-weight: bold;">return</span> dataReady.load(); });   <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Running "</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+}
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">setDataReady</span>(){
+    dataReady <span style="color: #555555;">=</span> <span style="color: #336666;">true</span>;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Data prepared"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    condVar.notify_one();
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+    
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t1(waitingForWork);
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t2(setDataReady);
+
+  t1.join();
+  t2.join();
+  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The program is quite straightforward compared to the first version because <span style="font-family: Courier New, Courier, monospace;">dataReady </span>has not to&nbsp;be&nbsp;protected by a mutex. Once more, the program has a race condition which can cause a deadlock. Why? <span style="font-family: Courier New, Courier, monospace;">dataReady </span>is atomic! Right, but the wait expression (<span style="font-family: Courier New, Courier, monospace;">condVar.wait(lck, []{ return dataReady.load(); });</span>) in line (1) is way more complicated then it seems.</p>
+<p>The wait expression is equivalent to the following four lines:</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">std<span style="color: #555555;">::</span>unique_lock<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span> lck(mutex_);<br /><span style="color: #006699; font-weight: bold;">while</span> ( <span style="color: #555555;">!</span>[]{ <span style="color: #006699; font-weight: bold;">return</span> dataReady.load(); }() {
+    <span style="color: #0099ff; font-style: italic;">// time window (1)</span>
+    condVar.wait(lck);
+}
+</pre>
+</div>
+<p>Even if you make<span style="font-family: Courier New, Courier, monospace;"> dataReady</span> an atomic, it must be modified under the mutex; if not the modification to the waiting thread may be published, but not correctly synchronised. This race condition may cause a deadlock. What does that mean: published, but not correctly synchronised. Let's have a closer look at the previous code snippet and assume that data is atomic and is not protected by the mutex <span style="font-family: Courier New, Courier, monospace;">mutex_</span>.</p>
+<p>Let me assume the notification is sent while the condition variable <span style="font-family: Courier New, Courier, monospace;">condVar</span> is not in the waiting state. This means the execution of the thread is in the source snippet in the line with the comment time window ( line 1). The result is that the notification is lost. Afterwards, the thread goes back in the waiting state and presumably sleeps forever.&nbsp;</p>
+<p>This wouldn't have happened if <span style="font-family: Courier New, Courier, monospace;">dataReady </span>had been protected by a mutex. Because of the synchronisation with the mutex, the notification would only be sent if the condition variable and, therefore, the receiver thread is in the waiting state.&nbsp;</p>
+<p>What a scary story?&nbsp;Is there no possibility to make the initial program <span style="font-family: 'courier new', courier;">conditionVariables.cpp</span> easier? No, not with a condition variable, but you can use a promise and future pair the make the job done. For the details, read the post <a href="index.php/thread-synchronization-with-condition-variables-or-tasks">Thread Synchronisation with Condition Variables or Tasks</a>.</p>
+<h2>What's next?</h2>
+<p>Now, I'm nearly done with the rules to concurrency. The rules to parallelism, message passing, and vectorisation have no content, therefore, I skip them and write in my nest post mainly about lock-free programming.</p>
+<p></p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Eric Pederson, Paul Baxter, &nbsp;Sai Raghavendra Prasad Poosa, Meeting C++, Matt Braun, Avi Lachmish, Adrian Muntea, and Roman Postanciuc. <span class="sc-bxivhb huvVuj" style="color: #052d49; font-family: America, sans-serif; letter-spacing: inherit; margin: 0px; position: relative; text-align: inherit; text-transform: inherit; text-shadow: none; font-weight: 400; font-size: 1rem; line-height: 1.5;"><span class="sc-bxivhb fjhgUr" style="color: #052d49; font-family: America, sans-serif; letter-spacing: inherit; margin: 0px; position: relative; text-align: inherit; text-transform: inherit; text-shadow: none; font-weight: bold; font-size: 1rem; line-height: 1.5;"></span></span><span class="sc-bxivhb huvVuj" style="color: #052d49; font-family: America, sans-serif; letter-spacing: inherit; margin: 0px; position: relative; text-align: inherit; text-transform: inherit; text-shadow: none; font-weight: 400; font-size: 1rem; line-height: 1.5;"><span class="sc-bxivhb fjhgUr" style="color: #052d49; font-family: America, sans-serif; letter-spacing: inherit; margin: 0px; position: relative; text-align: inherit; text-transform: inherit; text-shadow: none; font-weight: bold; font-size: 1rem; line-height: 1.5;"></span></span><br /></strong></p>
+<p><strong>&nbsp;</strong></p>
+<p>&nbsp;</p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 550 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
