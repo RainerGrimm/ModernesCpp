@@ -1,0 +1,197 @@
+<p>A few weeks ago, the member of the C++ standardisation committee Felix Petriconi wrote me an E-Mail. He said my article about <a href="index.php/std-future-extensions">std::future Extensions</a> is quite dated. Honestly, he is right. The future of the futures changed mainly because of executors.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/MultithreadingCpp17Cpp20/Executors/timeline20_23.png" alt="timeline20 23" width="600" height="301" /></p>
+<p>Before is write about the future of the futures, I have to introduce the concepts of executors.&nbsp; Executors have quite a history in C++. The discussion began at least 8 years ago. For the details, Detlef Vollmanns gives in his presentation "<a href="http://www.vollmann.ch/en/presentations/executors2018.pdf">Finally Executors for C++</a>" a great overview.</p>
+<p>This post is mainly based on the proposals to the design of executors <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p0761r2.pdf">P0761</a>, and to their formal description <a href="http://open-std.org/JTC1/SC22/WG21/docs/papers/2018/p0443r7.html">P0443</a>. This post also refers to the relatively new "Modest Executor Proposal" <a href="http://open-std.org/JTC1/SC22/WG21/docs/papers/2018/p1055r0.pdf">P1055</a>.</p>
+<p>First of all. What are Executors?</p>
+<h2>Executors</h2>
+<p>Executors are the basic building block for execution in C++ and fulfil a similar role for execution such as allocators for the containers in C++. At June 2018 many proposals were written for executors, and many design decisions are still open. The expectation is that they are part of C++23 but can be used much earlier as an extension of the C++ standard.</p>
+<p>An executor consists of a set of rules about <strong>where</strong>, <strong>when</strong>, and <strong>how</strong> to run a callable. A callable can be a function, a function object, or a lambda function.</p>
+<ul>
+<li><strong>Where</strong>: The callable may run on an internal or external processor and that the result is read back from the internal or external processor.</li>
+<li><strong>When</strong>: The callable may run immediately or just be scheduled.</li>
+<li><strong>How</strong>: The callable may run on a CPU or GPU or even be executed in a vectorised way.</li>
+</ul>
+<p>Because the executors are the building blocks for execution, the concurrency and parallelism features of C++ heavily depend on them. This holds for the new concurrency features in <a href="index.php/category/multithreading-c-17-and-c-20">C++20/23</a> such as extended futures, latches and barriers, coroutines, transactional memory, and task blocks. This holds for the extensions for networking, but also for the&nbsp;<a href="index.php/parallel-algorithm-of-the-standard-template-library">parallel algorithms of the STL</a>.</p>
+<h2>First Examples</h2>
+<h3>Using an Executor</h3>
+<p>Here are a few code snippets showing the usage of the executor <span style="font-family: 'courier new', courier;">my_excutor</span>:</p>
+<ul>
+<li>The promise <span style="font-family: courier new, courier;">std::async</span></li>
+</ul>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// get an executor through some means</span>
+my_executor_type my_executor <span style="color: #555555;">=</span> ...
+
+<span style="color: #0099ff; font-style: italic;">// launch an async using my executor</span>
+<span style="color: #006699; font-weight: bold;">auto</span> future <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>async(my_executor, [] {
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Hello world, from a new execution agent!"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+});
+</pre>
+</div>
+<p></p>
+<ul>
+<li>The STL algorithm <span style="font-family: courier new, courier;">std::for_each</span></li>
+</ul>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// get an executor through some means</span>
+my_executor_type my_executor <span style="color: #555555;">=</span> ...
+
+<span style="color: #0099ff; font-style: italic;">// execute a parallel for_each "on" my executor</span>
+std<span style="color: #555555;">::</span>for_each(std<span style="color: #555555;">::</span>execution<span style="color: #555555;">::</span>par.on(my_executor),
+              data.begin(), data.end(), func);
+</pre>
+</div>
+<p>&nbsp;</p>
+<h3>Obtaining an Executor</h3>
+<p>There are various ways to obtain an executor.</p>
+<ul>
+<li>From the execution context<span style="font-family: courier new, courier;"> static_thread_pool</span></li>
+</ul>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// create a thread pool with 4 threads</span>
+static_thread_pool <span style="color: #cc00ff;">pool</span>(<span style="color: #ff6600;">4</span>);
+
+<span style="color: #0099ff; font-style: italic;">// get an executor from the thread pool</span>
+<span style="color: #006699; font-weight: bold;">auto</span> exec <span style="color: #555555;">=</span> pool.executor();
+
+<span style="color: #0099ff; font-style: italic;">// use the executor on some long-running task</span>
+<span style="color: #006699; font-weight: bold;">auto</span> task1 <span style="color: #555555;">=</span> long_running_task(exec);
+</pre>
+</div>
+<p>&nbsp;</p>
+<ul>
+<li>From the system executor</li>
+</ul>
+<p style="padding-left: 60px;">This is the default executor that usually uses a thread for the execution. It is used if not another one is specified.</p>
+<ul>
+<li>From an executor adapter</li>
+</ul>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// get an executor from a thread pool</span>
+<span style="color: #006699; font-weight: bold;">auto</span> exec <span style="color: #555555;">=</span> pool.executor();
+
+<span style="color: #0099ff; font-style: italic;">// wrap the thread pool's executor in a logging_executor</span>
+logging_executor<span style="color: #555555;">&lt;</span>decltype(exec)<span style="color: #555555;">&gt;</span> logging_exec(exec);
+
+<span style="color: #0099ff; font-style: italic;">// use the logging executor in a parallel sort</span>
+std<span style="color: #555555;">::</span>sort(std<span style="color: #555555;">::</span>execution<span style="color: #555555;">::</span>par.on(logging_exec), my_data.begin(), my_data.end());
+</pre>
+</div>
+<p>&nbsp;</p>
+<p><span style="font-family: courier new, courier;">logging_executor</span> is in the code snippet a wrapper for the pool executor.</p>
+<h2>Goals of an Executor Concept</h2>
+<p>What are the goals of an executor concept according to the proposal&nbsp;<a href="http://open-std.org/JTC1/SC22/WG21/docs/papers/2018/p1055r0.pdf">P1055</a>?</p>
+<ol>
+<li><strong>Batchable</strong>: control the trade-off between the cost of the transition of the callable and the size of it.</li>
+<li><strong>Heterogenous</strong>: allow the callable to run on heterogeneous contexts and get the result back.</li>
+<li><strong>Orderable</strong>: specify the order in which the callables are invoked. The goal includes ordering guarantees such as <a href="https://en.wikipedia.org/wiki/Stack_(abstract_data_type)">LIFO </a>(<strong>L</strong>ast <strong>I</strong>n, <strong>F</strong>irst <strong>O</strong>ut),&nbsp;<a href="https://en.wikipedia.org/wiki/FIFO_(computing_and_electronics">FIFO</a>&nbsp; (<strong>F</strong>irst&nbsp;<strong>I</strong>n,&nbsp;<strong>F</strong>irst&nbsp;<strong>O</strong>ut) execution, priority or time constraints, or even sequential execution.</li>
+<li><strong>Controllable</strong>: the callable has to be targetable to a specific compute resource, deferred, or even cancelled.</li>
+<li><strong>Continuable</strong>: to control an asynchronous callable signals are needed. These signals have to indicate, whether the result is available, whether an error occurred, when the callable is done or if the callee wants to cancel the callable. The explicit starting of the callable or the stopping of the staring should also be possible.</li>
+<li><strong>Layerable</strong>: hierarchies allow capabilities to be added without increasing the complexity of the simpler use-cases.</li>
+<li><strong>Usable</strong>: ease of use for the implementer and the user should be the main goal.</li>
+<li><strong>Composable</strong>: allows a user to extend the executors for features that are not part of the standard.</li>
+<li><strong>Minimal</strong>: nothing should exist on the executor concepts that could be added externally in a library on top of the concept.</li>
+</ol>
+<h2>Execution Functions</h2>
+<p>An executor provides one or more execution function for creating execution agents from a callable. An executor has to support at least one of the six following functions.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/MultithreadingCpp17Cpp20/Executors/ExecutionFunction.png" alt="ExecutionFunction" width="500" height="203" /></p>
+<p>Each execution function has two properties: cardinality and direction.</p>
+<ul>
+<li><strong>Cardinality</strong>:
+<ul>
+<li><span style="font-family: courier new, courier;">single</span>: creates one execution agent</li>
+<li><span style="font-family: courier new, courier;">bulk</span>: creates a group of execution agents</li>
+</ul>
+</li>
+<li><strong>Direction</strong>:<br />
+<ul>
+<li><span style="font-family: courier new, courier;">oneway</span>: creates an execution agent and does not return a result</li>
+<li><span style="font-family: courier new, courier;">twoway</span>: creates an execution agent and does return a future that can be used to wait for execution to complete</li>
+<li><span style="font-family: courier new, courier;">then</span>: creates an execution agent and does return a future that can be used to wait for execution to complete. The execution agent begins execution after a given future becomes ready.</li>
+</ul>
+</li>
+</ul>
+<p><br />Let me explain the execution functions more informally.</p>
+<p>First, I refer to the single cardinality case.</p>
+<ul>
+<li>A <span style="font-family: courier new, courier;">oneway</span> execution function is a fire and forget job. It's quite similar to a <a href="index.php/the-special-futures">fire and forget future</a>, but it does not automatically block in the destructor of the future.</li>
+<li>A <span style="font-family: courier new, courier;">twoway</span> execution function returns you a future which you can use to pick up the result. This behaves similarly to a <a href="index.php/promise-and-future"><span style="font-family: courier new, courier;">std::promise</span></a> that gives you back the handle to the associated&nbsp;<span style="font-family: courier new, courier;">std::future</span>.</li>
+<li>A <span style="font-family: courier new, courier;">then</span> execution it is a kind of continuation. It gives you back a future, but the execution agent runs only if the provided future is&nbsp;<span style="font-family: courier new, courier;">ready</span>.</li>
+</ul>
+<p>Second, the bulk cardinality case is more complicated. These functions create a group of execution agents, and each of these execution agents calls the given callable. They return the result of a factory and not the result of a single callable <span style="font-family: courier new, courier;">f</span> invoked by the execution agents. The user is responsible for disambiguating the right result via this factory.</p>
+<h3><span style="font-family: courier new, courier;">execution::require</span></h3>
+<p>How can you be sure that your executor supports the specific execution function?</p>
+<p>In the special case, you know it.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">concrete_context</span>(<span style="color: #006699; font-weight: bold;">const</span> my_oneway_single_executor<span style="color: #555555;">&amp;</span> ex)
+{
+    <span style="color: #006699; font-weight: bold;">auto</span> task <span style="color: #555555;">=</span> ...;
+    ex.execute(task);
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>In the general case, you can use the function&nbsp;<span style="font-family: courier new, courier;">execution::require</span> to ask for it.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template &lt;typename Executor&gt;</span>
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">generic_context</span>(<span style="color: #006699; font-weight: bold;">const</span> Executor<span style="color: #555555;">&amp;</span> ex)
+{
+    <span style="color: #006699; font-weight: bold;">auto</span> task <span style="color: #555555;">=</span> ...;
+
+    <span style="color: #0099ff; font-style: italic;">// ensure .twoway_execute() is available with execution::require()</span>
+    execution<span style="color: #555555;">::</span>require(ex, execution<span style="color: #555555;">::</span>single, execution<span style="color: #555555;">::</span>twoway).twoway_execute(task);
+}
+</pre>
+</div>
+<p></p>
+<p>In this case, the executor <span style="font-family: courier new, courier;">ex</span> has to be a single cardinality and twoway direction executor.</p>
+<h2>What's next?</h2>
+<p>In the next post, I will continue my detour from the C++ core guidelines. The future of the futures changed mainly because of the executors; therefore I will write about the futures.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Eric Pederson, Paul Baxter, &nbsp;Sai Raghavendra Prasad Poosa, Meeting C++, Matt Braun, Avi Lachmish, Adrian Muntea, and Roman Postanciuc. <span class="sc-bxivhb huvVuj" style="color: #052d49; font-family: America, sans-serif; letter-spacing: inherit; margin: 0px; position: relative; text-align: inherit; text-transform: inherit; text-shadow: none; font-weight: 400; font-size: 1rem; line-height: 1.5;"><span class="sc-bxivhb fjhgUr" style="color: #052d49; font-family: America, sans-serif; letter-spacing: inherit; margin: 0px; position: relative; text-align: inherit; text-transform: inherit; text-shadow: none; font-weight: bold; font-size: 1rem; line-height: 1.5;"></span></span><span class="sc-bxivhb huvVuj" style="color: #052d49; font-family: America, sans-serif; letter-spacing: inherit; margin: 0px; position: relative; text-align: inherit; text-transform: inherit; text-shadow: none; font-weight: 400; font-size: 1rem; line-height: 1.5;"><span class="sc-bxivhb fjhgUr" style="color: #052d49; font-family: America, sans-serif; letter-spacing: inherit; margin: 0px; position: relative; text-align: inherit; text-transform: inherit; text-shadow: none; font-weight: bold; font-size: 1rem; line-height: 1.5;"></span></span><br /></strong></p>
+<p><strong>&nbsp;</strong></p>
+<p>&nbsp;</p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 550 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
