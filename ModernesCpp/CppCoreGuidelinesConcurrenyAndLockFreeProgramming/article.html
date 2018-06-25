@@ -1,0 +1,213 @@
+<p>Today, I finish my rules to concurrency and continue directly with lock-free programming. Yes, you have read it correctly: lock-free programming.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesLockFree/fear-cat.jpg" alt="fear cat" width="600" height="400" /></p>
+<p>Before I write about lock-free programming in particular, here are three last rules to concurrency.</p>
+<ul>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rconc-time">CP.43: Minimize time spent in a critical section</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rconc-name">CP.44: Remember to name your <code class="highlighter-rouge no-highlight">lock_guard</code>s and <code class="highlighter-rouge no-highlight">unique_lock</code>s</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rconc-mutex">CP.50: Define a <code class="highlighter-rouge no-highlight">mutex</code> together with the data it guards. Use <code class="highlighter-rouge no-highlight">synchronized_value&lt;T&gt;</code> where possible</a></li>
+</ul>
+<p>I make it short because these rules are quite obvious.</p>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rconc-time">CP.43: Minimize time spent in a critical section</a></h3>
+<p>The less time your lock a mutex, the more time other threads can run. Have a look at the notification of a condition variable. If you want to see the entire program, read my previous post <a href="index.php/c-core-guidelines-be-aware-of-the-traps-of-condition-variables">C++ Core Guidelines: Be Aware of the Traps of Condition Variables</a>.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">setDataReady</span>(){
+    std<span style="color: #555555;">::</span>lock_guard<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span> lck(mutex_);
+    dataReady <span style="color: #555555;">=</span> <span style="color: #336666;">true</span>;                                <span style="color: #0099ff; font-style: italic;">// (1) </span></pre>
+<pre style="margin: 0; line-height: 125%;">    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Data prepared"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl; <br />    condVar.notify_one(); <br />}</pre>
+</div>
+<p>&nbsp;</p>
+<p>The Mutex <span style="font-family: courier new, courier;">mutex_</span> is locked at the begin of the function and unlocked at the end of the function. This is not necessary. Only the expression<span style="font-family: courier new, courier;"> dataReady = true</span> (1) has to be protected.</p>
+<p>First,<span style="font-family: courier new, courier;"> std::cout</span> is thread-safe. The C++11 standard guarantees that each character is written in an atomic step and in the right sequence. Second, the notification<span style="font-family: courier new, courier;"> condVar.notify_one()</span> is thread-safe.</p>
+<p>Here is the improved version of the function <span style="font-family: courier new, courier;">setDataReady:</span></p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">setDataReady</span>(){
+    {  <span style="color: #0099ff; font-style: italic;">// Don't remove because of the lifetime of the mutex (1)</span>
+        std<span style="color: #555555;">::</span>lock_guard<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span> lck(mutex_);
+        dataReady <span style="color: #555555;">=</span> <span style="color: #336666;">true</span>;
+    }                  <span style="color: #0099ff; font-style: italic;">                                     (2)</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Data prepared"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    condVar.notify_one();    <span style="color: #0099ff; font-style: italic;">           </span>
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>When I teach this rule in my classes to concurrency, often a question arises:&nbsp; Should you document this artificial scope for limiting the lifetime of the <span style="font-family: courier new, courier;">std::lock_guard</span> and, therefore, the lifetime of the <span style="font-family: courier new, courier;">std::mutex </span>(line (1) and (2))? Most of my students including me add a comment to this artificial scope. If not, the maintainer of your code may not be aware that the curly braces in line (1) and line (2) are necessary for control the lifetime of the mutex. In the end, your maintainer will remove the artificial scope because they seem to be superfluous and your code uses the first variant.</p>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rconc-name">CP.44: Remember to name your <code class="highlighter-rouge no-highlight">lock_guard</code>s and <code class="highlighter-rouge no-highlight">unique_lock</code>s</a></h3>
+<p>I was a little astonished to read this rule. Here is the example from the guidelines:</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">unique_lock<span style="color: #555555;">&lt;</span>mutex<span style="color: #555555;">&gt;</span>(m1);
+lock_guard<span style="color: #555555;">&lt;</span>mutex<span style="color: #555555;">&gt;</span> {m2};
+lock(m1, m2);
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The <span style="font-family: courier new, courier;">unique_lock</span> and <span style="font-family: courier new, courier;">lock_guard</span> are just temporaries which are created and immediately destroyed. The<span style="font-family: courier new, courier;"> std::lock_guard</span> or <span style="font-family: courier new, courier;">std::unique_lock</span> locks its mutex and its constructor and unlocks it in its destructor. This pattern is called RAII. Read the details here:<a href="index.php/garbage-collectio-no-thanks"> Garbage Collection: No Thanks</a>.</p>
+<p>My small example shows only the conceptional behaviour a <span style="font-family: courier new, courier;">std::lock_guard. </span>Its big brother<span style="font-family: courier new, courier;"></span><span style="font-family: courier new, courier;">std::unique_lock</span> supports more operations<span style="font-family: courier new, courier;">.</span></p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// myGuard.cpp</span>
+
+<span style="color: #009999;">#include &lt;mutex&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">MyGuard</span>{
+  T<span style="color: #555555;">&amp;</span> myMutex;
+  <span style="color: #9999ff;">public:</span>
+    MyGuard(T<span style="color: #555555;">&amp;</span> m)<span style="color: #555555;">:</span>myMutex(m){
+      myMutex.lock();
+	  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"lock"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    }
+    <span style="color: #555555;">~</span>MyGuard(){
+	  myMutex.unlock();
+      std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"unlock"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    }
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+	
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+	
+  std<span style="color: #555555;">::</span>mutex m;
+  MyGuard<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span> {m};                        <span style="color: #0099ff; font-style: italic;">// (1)</span>
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"CRITICAL SECTION"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;   <span style="color: #0099ff; font-style: italic;">// (2)</span>
+  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}                                                 <span style="color: #0099ff; font-style: italic;">// (3)</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p><span style="font-family: courier new, courier;">MyGuard</span> calls lock and unlock in its constructor and in its destructor. Because of the temporary, the call to the constructor and destructor happens in line (1). In particular, this means that the call of the destructor happens at line (1) and not, as usual, in line (3). As consequence, the critical section in line (2) is executed without synchronisation.</p>
+<p>This execution of the program shows that the output of "<span style="font-family: courier new, courier;">unlock</span>" happens before the output of "<span style="font-family: courier new, courier;">CRITICAL SECTION</span>".</p>
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesLockFree/myGuard.png" alt="myGuard" width="300" height="193" /></p>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rconc-mutex">CP.50: Define a <code class="highlighter-rouge no-highlight">mutex</code> together with the data it guards. Use <code class="highlighter-rouge no-highlight">synchronized_value&lt;T&gt;</code> where possible</a></h3>
+<p>The central idea is that you put your mutex into the data you want to protect. With already standardised C++ it looks like this:</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">struct</span> Record {
+    std<span style="color: #555555;">::</span>mutex m;   <span style="color: #0099ff; font-style: italic;">// take this mutex before accessing other members</span>
+    <span style="color: #0099ff; font-style: italic;">// ...</span>
+};
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>With an upcoming standard, it may look like this because <span style="font-family: courier new, courier;">synchronized_value&lt;T&gt;</span> is not part of the current C++ standard but it may become part of an upcoming standard.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">MyClass</span> {
+    <span style="color: #006699; font-weight: bold;">struct</span> DataRecord {
+       <span style="color: #0099ff; font-style: italic;">// ...</span>
+    };
+    synchronized_value<span style="color: #555555;">&lt;</span>DataRecord<span style="color: #555555;">&gt;</span> data; <span style="color: #0099ff; font-style: italic;">// Protect the data with a mutex</span>
+};
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>According to the proposal <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2014/n4033.html">N4033</a> from Anthony Williams: "<em>The basic idea is that <code>synchronized_value&lt;T&gt;</code> stores a value of type <code>T</code> and a mutex. It then exposes a pointer interface, such that derefencing the pointer yields a special wrapper type that holds a lock on the mutex, and that can be implicitly converted to <code>T</code> for reading, and which forwards any values assigned to the assignment operator of the underlying <code>T</code> for writing</em>."</p>
+<p>This means that the operation on s in the following code snippet is thread-safe.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">synchronized_value<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>string<span style="color: #555555;">&gt;</span> s;
+
+std<span style="color: #555555;">::</span>string readValue()
+{
+    <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #555555;">*</span>s;
+}
+
+<span style="color: #007788; font-weight: bold;">void</span> setValue(std<span style="color: #555555;">::</span>string <span style="color: #006699; font-weight: bold;">const</span><span style="color: #555555;">&amp;</span> newVal)
+{
+    <span style="color: #555555;">*</span>s<span style="color: #555555;">=</span>newVal;
+}
+ 
+<span style="color: #007788; font-weight: bold;">void</span> appendToValue(std<span style="color: #555555;">::</span>string <span style="color: #006699; font-weight: bold;">const</span><span style="color: #555555;">&amp;</span> extra)
+{
+    s<span style="color: #555555;">-&gt;</span>append(extra);
+}
+</pre>
+</div>
+<p><span style="font-family: courier new, courier;"></span></p>
+<p>Now as announced, to something completely different: lock-free programming.</p>
+<h2>Lock-free programming</h2>
+<p>First, let me state the most important meta-rule to lock-free programming.</p>
+<h3>Don't program lock-free</h3>
+<p>Sure, you don't believe me but based on my experience giving many concurrency classes and workshops this is<strong> my</strong> first rule. Honestly, I agree with many of the most appreciated C++ experts worldwide. Here are the key statements and cites from their talks:</p>
+<ul>
+<li><strong>Herb Sutter</strong>: Lock-free programming is like playing with knives.</li>
+<li><strong>Anthony Williams</strong>: "<em>Lock-free programming is about how to shoot yourself in the foot.</em>"</li>
+<li><strong>Tony Van Eerd</strong>: "<em>Lock-free coding is the last thing you want to do</em>."</li>
+<li><strong>Fedor Pikus</strong>: "<em>Writing correct lock-free programs is even harder.</em>"</li>
+<li><strong>Harald Böhm</strong>: "<em>The rules are not obvious.</em>"</li>
+</ul>
+<p>Here is a picture to the statements and cites:</p>
+<p><img src="images/blog/ModernCpp/CppCoreGuidelinesLockFree/lockFree.png" alt="lockFree" width="600" height="390" /></p>
+<p>You still don't believe me? With C++11 the memory order <span style="font-family: 'courier new', courier;">std::memory_order_consume</span> was defined. Seven years later the official wording is: "<em>The specification of release-consume ordering is being revised, and the use of <code>memory_order_consume</code> is temporarily discouraged.</em>" (<a href="https://en.cppreference.com/w/cpp/atomic/memory_order">memory_order</a>)</p>
+<p>In case you know what you do, think about the <a href="index.php/aba-a-is-not-the-same-as-a">ABA</a>&nbsp;problem in the guidelines CP.100.</p>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rconc-lockfree">CP.100: Don’t use lock-free programming unless you absolutely have to</a></h3>
+<p>The following code snippet from the C++ core guidelines has a bug.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">extern</span> atomic<span style="color: #555555;">&lt;</span>Link<span style="color: #555555;">*&gt;</span> head;        <span style="color: #0099ff; font-style: italic;">// the shared head of a linked list</span>
+
+Link<span style="color: #555555;">*</span> nh <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">new</span> Link(data, nullptr);    <span style="color: #0099ff; font-style: italic;">// make a link ready for insertion</span>
+Link<span style="color: #555555;">*</span> h <span style="color: #555555;">=</span> head.load();                 <span style="color: #0099ff; font-style: italic;">// read the shared head of the list</span>
+
+<span style="color: #006699; font-weight: bold;">do</span> {
+    <span style="color: #006699; font-weight: bold;">if</span> (h<span style="color: #555555;">-&gt;</span>data <span style="color: #555555;">&lt;=</span> data) <span style="color: #006699; font-weight: bold;">break</span>;        <span style="color: #0099ff; font-style: italic;">// if so, insert elsewhere</span>
+    nh<span style="color: #555555;">-&gt;</span>next <span style="color: #555555;">=</span> h;                      <span style="color: #0099ff; font-style: italic;">// next element is the previous head</span>
+} <span style="color: #006699; font-weight: bold;">while</span> (<span style="color: #555555;">!</span>head.compare_exchange_weak(h, nh));    <span style="color: #0099ff; font-style: italic;">// write nh to head or to h</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Find the bug and write me an e-mail. I will mention the best problem analysis in my next post and if you like your name.</p>
+<h3>What's next?</h3>
+<p>Of course, I solve the riddle of the ABA problem in the next post. Afterwards, my story with lock-free programming continues.&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Eric Pederson, Paul Baxter, &nbsp;Sai Raghavendra Prasad Poosa, Meeting C++, Matt Braun, Avi Lachmish, Adrian Muntea, and Roman Postanciuc. <span class="sc-bxivhb huvVuj" style="color: #052d49; font-family: America, sans-serif; letter-spacing: inherit; margin: 0px; position: relative; text-align: inherit; text-transform: inherit; text-shadow: none; font-weight: 400; font-size: 1rem; line-height: 1.5;"><span class="sc-bxivhb fjhgUr" style="color: #052d49; font-family: America, sans-serif; letter-spacing: inherit; margin: 0px; position: relative; text-align: inherit; text-transform: inherit; text-shadow: none; font-weight: bold; font-size: 1rem; line-height: 1.5;"></span></span><span class="sc-bxivhb huvVuj" style="color: #052d49; font-family: America, sans-serif; letter-spacing: inherit; margin: 0px; position: relative; text-align: inherit; text-transform: inherit; text-shadow: none; font-weight: 400; font-size: 1rem; line-height: 1.5;"><span class="sc-bxivhb fjhgUr" style="color: #052d49; font-family: America, sans-serif; letter-spacing: inherit; margin: 0px; position: relative; text-align: inherit; text-transform: inherit; text-shadow: none; font-weight: bold; font-size: 1rem; line-height: 1.5;"></span></span><br /></strong></p>
+<p></p>
+<p><strong>&nbsp;</strong></p>
+<p></p>
+<p>&nbsp;</p>
+<p><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /></p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption><br />
+<h2>Get your e-book at leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td><br />
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td><br />
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td><br />
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td><br />
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<br />
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td><br />
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0"><br />
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<br />
+<p>In sum, you get more than 600 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+<br />&nbsp;</td>
+</tr>
+</tbody>
+</table>
