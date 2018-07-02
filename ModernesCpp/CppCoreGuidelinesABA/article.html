@@ -1,0 +1,138 @@
+<p>Today, I solve the riddle from my <a href="index.php/c-core-guidelines-concurrency-and-lock-free-programming">last post</a>. Thanks to my readers, the analysis of the ABA problem is quite accurate.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesABA/park-748339_1280.jpg" alt="park 748339 1280" width="600" height="266" /></p>
+<p>Only to remind you. The rule CP.100 from the C++ core guidelines is the starting point of the riddle.</p>
+<h2><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rconc-lockfree">CP.100: Don’t use lock-free programming unless you absolutely have to. </a></h2>
+<p>The challenge in the rule states that the following code snippet has a bug. The bug should be due to the ABA problem. The post <a href="index.php/aba-a-is-not-the-same-as-a">ABA - A is not the same as A</a> gives a concise introduction into the ABA problem.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">extern</span> atomic<span style="color: #555555;">&lt;</span>Link<span style="color: #555555;">*&gt;</span> head;        <span style="color: #0099ff; font-style: italic;">// the shared head of a linked list</span>
+
+Link<span style="color: #555555;">*</span> nh <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">new</span> Link(data, nullptr);    <span style="color: #0099ff; font-style: italic;">// make a link ready for insertion</span>
+Link<span style="color: #555555;">*</span> h <span style="color: #555555;">=</span> head.load();                 <span style="color: #0099ff; font-style: italic;">// read the shared head of the list   </span>
+
+<span style="color: #006699; font-weight: bold;">do</span> {
+    <span style="color: #006699; font-weight: bold;">if</span> (h<span style="color: #555555;">-&gt;</span>data <span style="color: #555555;">&lt;=</span> data) <span style="color: #006699; font-weight: bold;">break</span>;        <span style="color: #0099ff; font-style: italic;">// if so, insert elsewhere           </span>
+    nh<span style="color: #555555;">-&gt;</span>next <span style="color: #555555;">=</span> h;                      <span style="color: #0099ff; font-style: italic;">// next element is the previous head  </span>
+} <span style="color: #006699; font-weight: bold;">while</span> (<span style="color: #555555;">!</span>head.compare_exchange_weak(h, nh));    <span style="color: #0099ff; font-style: italic;">// write nh to head or to h </span>
+</pre>
+</div>
+<p></p>
+<p>Thanks a lot in particular to anonymous readers of my German blog, here is a runnable piece of code and a deep analysis of the issue.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #009999;">#include &lt;atomic&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Link</span> {
+<span style="color: #9999ff;">public:</span>
+    Link(<span style="color: #007788; font-weight: bold;">int</span> d, Link<span style="color: #555555;">*</span> p) <span style="color: #555555;">:</span> data(d), next(p) {}
+    <span style="color: #007788; font-weight: bold;">int</span>     data;
+    Link<span style="color: #555555;">*</span>   next;
+};
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">foo</span> (<span style="color: #007788; font-weight: bold;">int</span> data) {
+    <span style="color: #006699; font-weight: bold;">extern</span> std<span style="color: #555555;">::</span>atomic<span style="color: #555555;">&lt;</span>Link<span style="color: #555555;">*&gt;</span> head;
+
+    Link<span style="color: #555555;">*</span> nh <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">new</span> Link(data, nullptr);            <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    Link<span style="color: #555555;">*</span> h  <span style="color: #555555;">=</span> head.load();                        <span style="color: #0099ff; font-style: italic;">// (2)</span>
+
+    <span style="color: #006699; font-weight: bold;">do</span> {
+        <span style="color: #006699; font-weight: bold;">if</span> (h<span style="color: #555555;">-&gt;</span>data <span style="color: #555555;">&lt;=</span> data) <span style="color: #006699; font-weight: bold;">break</span>;                <span style="color: #0099ff; font-style: italic;">// (3)</span>
+        nh<span style="color: #555555;">-&gt;</span>next <span style="color: #555555;">=</span> h;                              <span style="color: #0099ff; font-style: italic;">// (4)</span>
+    } <span style="color: #006699; font-weight: bold;">while</span> (<span style="color: #555555;">!</span>head.compare_exchange_weak(h, nh));  <span style="color: #0099ff; font-style: italic;">// (5)</span>
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>First of all, what should this piece of code do? It creates a singly linked list of nodes (<span style="font-family: courier new, courier;">Link</span>). Each <span style="font-family: courier new, courier;">node</span> has a pointer and a data field. The pointer points to the next element (<span style="font-family: courier new, courier;">node</span>-&gt;next), and the data field stores the value:<span style="font-family: courier new, courier;"> node-&gt;data. </span>Each new node is inserted into the singly linked list in such a way that data is ordered in ascending order.<span style="font-family: courier new, courier;"><br /></span></p>
+<p>To insert a new node into the correct position in the singly linked list, the following steps are performed.</p>
+<ul>
+<li><strong>Line 1</strong>: A new node is created. This is fine because the node is locally created in each thread.</li>
+<li><strong>Line 2</strong>: The pointer to the head is read. The read operation is atomic; therefore,&nbsp; considered in isolation the operation is also fine. What does in isolation mean? Line 2 creates with line 5 a kind of transaction. Line 2 stores the initial state of the transaction and line 5 publish the transaction if nothing had changed in between.</li>
+<li><strong>Line 3</strong>: Correspondingly to the previous lines, this line 3 has no issue. Only a value comparison takes place which may end the function if the data of head is smaller than the new data.</li>
+<li><strong>Line 4</strong>: <span style="font-family: courier new, courier;">nh</span> is local data; therefore, the assignment of<span style="font-family: courier new, courier;"> nh-&gt;next</span> is fine. It may happen head<span style="font-family: courier new, courier;"> h</span> was changed in the meantime and, consequently, <span style="font-family: courier new, courier;">nh-&gt;next</span> does not refer to the head afterwards. This is only an issue if the change is committed in the next line 5.</li>
+<li><strong>Line 5</strong>: The instruction <span style="font-family: courier new, courier;">head.compare_exchange_weak(h, nh)</span> compares <span style="font-family: courier new, courier;">head</span> with the stored <span style="font-family: courier new, courier;">h</span> in line 2 and exchanges <span style="font-family: courier new, courier;">h</span> and <span style="font-family: courier new, courier;">nh</span> in an atomic step as soon as they are the same. If <span style="font-family: courier new, courier;">head </span>is not equal to<span style="font-family: courier new, courier;"> h</span>, <span style="font-family: courier new, courier;">h</span> is set to <span style="font-family: courier new, courier;">head.</span> Line 5 is the end of the atomic transaction and publishes the updated singly linked list.</li>
+</ul>
+<p>What is the issue with this few lines of code? The entire transaction is based on the pointer comparison in line 5. If the pointer comparison can be fooled, the singly linked list can be broken.</p>
+<p>There is a time window between the loading of the head (line 2) and the check if the current head is the old head (line 5). The means another thread may kick in and change in the meantime <span style="font-family: courier new, courier;">head</span> but the first thread is not aware of it.</p>
+<p>Let me present a buggy sequence of events.</p>
+<h3>Breaking of the Invariant</h3>
+<p>The invariant of the following singly linked list is that data is ordered in an ascending order. The blue node is the head of the list.</p>
+<p>This is the initial structure of the list. The head has the address <strong><span style="font-family: courier new, courier;">0x0815</span></strong>.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesABA/ABAThread1.png" alt="ABAThread1" width="450" height="94" /></p>
+<p>&nbsp;</p>
+<h4>Thread 1</h4>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesABA/Head42.png" alt="Head42" width="150" height="93" /></p>
+<ul>
+<li>Wants to add the new node with data 42.</li>
+<li>42 &lt; 47, therefore the new node should become the new head.</li>
+<li>Right before the line (5), Thread 2 kicks in.</li>
+</ul>
+<h4>Thread 2</h4>
+<ul>
+<li>Removes the current head 47.</li>
+<li>Makes the node with data 60 to the new head.</li>
+</ul>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesABA/ABAThread2_60head.png" alt="ABAThread2 60head" width="300" height="92" /></p>
+<ul>
+<li>Wants to add the new node with data 30.</li>
+</ul>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesABA/Head30.png" alt="Head30" width="150" height="98" /></p>
+<ul>
+<li>Makes 30 the new head with address <span style="font-family: courier new, courier;"><strong>0x0815</strong></span>; this was the former address of 47 and will often happen because of memory reuse.</li>
+</ul>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesABA/ABAThread2_30.png" alt="ABAThread2 30" width="500" height="99" /></p>
+<p>&nbsp;</p>
+<h4>&nbsp;Thread 1</h4>
+<ul>
+<li>Makes the node with the data 42 to the new head; this is fine because the comparison in line 5 just compares the old with the new node and they have the same address: <span style="font-family: courier new, courier;"><strong>0x0815.</strong></span></li>
+</ul>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesABA/ABAThread1_42.png" alt="ABAThread1 42" width="600" height="108" /></p>
+<p>&nbsp;Now, the singly linked list is broken because the values of the nodes are not ordered in an ascending order.</p>
+<h2>What's next?</h2>
+<p>I'm nearly done with the rules to concurrency and lock-free programming in particular. The remaining rules are about wrong assumptions to hardware/compiler combinations and the infamous double-checked locking pattern.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Eric Pederson, Paul Baxter, &nbsp;Sai Raghavendra Prasad Poosa, Meeting C++, Matt Braun, Avi Lachmish, Adrian Muntea, and Roman Postanciuc. <span class="sc-bxivhb huvVuj" style="color: #052d49; font-family: America, sans-serif; letter-spacing: inherit; margin: 0px; position: relative; text-align: inherit; text-transform: inherit; text-shadow: none; font-weight: 400; font-size: 1rem; line-height: 1.5;"><span class="sc-bxivhb fjhgUr" style="color: #052d49; font-family: America, sans-serif; letter-spacing: inherit; margin: 0px; position: relative; text-align: inherit; text-transform: inherit; text-shadow: none; font-weight: bold; font-size: 1rem; line-height: 1.5;"></span></span><span class="sc-bxivhb huvVuj" style="color: #052d49; font-family: America, sans-serif; letter-spacing: inherit; margin: 0px; position: relative; text-align: inherit; text-transform: inherit; text-shadow: none; font-weight: 400; font-size: 1rem; line-height: 1.5;"><span class="sc-bxivhb fjhgUr" style="color: #052d49; font-family: America, sans-serif; letter-spacing: inherit; margin: 0px; position: relative; text-align: inherit; text-transform: inherit; text-shadow: none; font-weight: bold; font-size: 1rem; line-height: 1.5;"></span></span><br /></strong></p>
+<p><strong>&nbsp;</strong></p>
+<p>&nbsp;</p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 600 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
