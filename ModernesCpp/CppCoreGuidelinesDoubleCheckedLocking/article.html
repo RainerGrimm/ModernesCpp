@@ -1,0 +1,198 @@
+<p>Today, I will finish my story to concurrency and lock-free programming in particular. There are four rules to lock-free programming in the C++ core guidelines left.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesDoubleChecked/padlock.png" alt="padlock" width="300" height="257" /></p>
+<p>First of all, here are the rules for the current post.</p>
+<ul>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rconc-distrust">CP.101: Distrust your hardware/compiler combination</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rconc-literature">CP.102: Carefully study the literature</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rconc-double">CP.110: Do not write your own double-checked locking for initialization</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rconc-double-pattern">CP.111: Use a conventional pattern if you really need double-checked locking</a></li>
+</ul>
+<p>I have to admit, I annoyed a few German readers with my two last posts about lock-free programming. My readers got the impression, that I don't like lock-free programming. Wrong!. I'm totally curious about lock-free programming but before you use it you have to answer two questions.</p>
+<ol>
+<li>Does lock-free programming solve my performance bottleneck?</li>
+<li>Do I understand lock-free programming good enough to use it?</li>
+</ol>
+<p>Before you can not answer this two questions with a big yes, you should continue with the rule CP.102</p>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rconc-distrust">CP.101: Distrust your hardware/compiler combination</a></h3>
+<p>What does that mean: distrust your hardware/compiler combination. Let me put in in another way: When you break the sequential consistency, you will also break with high probability your intuition. Here is my example:</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #009999;">#include &lt;atomic&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;thread&gt;</span>
+
+std<span style="color: #555555;">::</span>atomic<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> x{<span style="color: #ff6600;">0</span>};
+std<span style="color: #555555;">::</span>atomic<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> y{<span style="color: #ff6600;">0</span>};
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">writing</span>(){  
+  x.store(<span style="color: #ff6600;">2000</span>);                        <span style="color: #0099ff; font-style: italic;">// (1)</span>
+  y.store(<span style="color: #ff6600;">11</span>);                          <span style="color: #0099ff; font-style: italic;">// (2)</span>
+}
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">reading</span>(){  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> y.load() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span>;         <span style="color: #0099ff; font-style: italic;">// (3)</span>
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> x.load() <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;   <span style="color: #0099ff; font-style: italic;">// (4)</span>
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> thread1(writing);
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> thread2(reading);
+  thread1.join();
+  thread2.join();
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>I have a question for the short example? Which values für <span style="font-family: courier new, courier;">y</span> and <span style="font-family: courier new, courier;">x</span> are possible in the lines (3) and (4).<span style="font-family: courier new, courier;"> x</span> and <span style="font-family: courier new, courier;">y</span> are atomic, therefore no data race is possible. I further don't specify the memory ordering, therefore, sequential consistency applies. Sequential consistency means:</p>
+<ul>
+<ul>
+<li>Each thread performs its operation in the specified sequence: line (1) happens before the line (2) and line (3) happens before the line(4).</li>
+<li>There is a global order of all operations on all threads.</li>
+</ul>
+</ul>
+<p>If you combine this two properties of the sequential consistency, there is only one combination of x and y not possible: <span style="font-family: courier new, courier;">y == 11</span> and <span style="font-family: courier new, courier;">x == 0</span>.</p>
+<p>Now, let me break the sequential consistency and maybe your intuition. Here is the weakest of all memory orderings: the relaxed semantics.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #009999;">#include &lt;atomic&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;thread&gt;</span>
+
+std<span style="color: #555555;">::</span>atomic<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> x{<span style="color: #ff6600;">0</span>};
+std<span style="color: #555555;">::</span>atomic<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> y{<span style="color: #ff6600;">0</span>};
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">writing</span>(){  
+  x.store(<span style="color: #ff6600;">2000</span>, std<span style="color: #555555;">::</span>memory_order_relaxed);   <span style="color: #0099ff; font-style: italic;">// (1)</span>
+  y.store(<span style="color: #ff6600;">11</span>, std<span style="color: #555555;">::</span>memory_order_relaxed);     <span style="color: #0099ff; font-style: italic;">// (2)</span>
+}
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">reading</span>(){  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> y.load(std<span style="color: #555555;">::</span>memory_order_relaxed) <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span>;        <span style="color: #0099ff; font-style: italic;">// (3)</span>
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> x.load(std<span style="color: #555555;">::</span>memory_order_relaxed) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;  <span style="color: #0099ff; font-style: italic;">// (4) </span>
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> thread1(writing);
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> thread2(reading);
+  thread1.join();
+  thread2.join();
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Two unintuitive phenomena can happen. First, <span style="font-family: 'courier new', courier;">thread2</span> can see the operations of <span style="font-family: 'courier new', courier;">thread1</span> in a different sequence. Second, <span style="font-family: 'courier new', courier;">thread1</span> can reorder its instruction because they are not performed on the same atomic.&nbsp; What does that mean for the possible values of x and y: <span style="font-family: courier new, courier;">y == 11</span> and <span style="font-family: courier new, courier;">x == 0 </span>is a valid result. I want to be a little bit more specific. Which result is possible depends on your hardware.</p>
+<p>For example, operation recording is quite conservative on x86 or AMD64, stores can be reordered after loads but on Alpha, IA64, or RISC (ARM) architectures, all four possible reordering of stores and loads operations are allowed.</p>
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesDoubleChecked/LoadStore.png" alt="LoadStore" width="500" height="88" /></p>
+<p></p>
+<p>If you don't believe me, I suggest you&nbsp;read the following rule CP.102.</p>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rconc-literature">CP.102: Carefully study the literature</a></h3>
+<p>There is not much to add to this rule. At least, I can provide links to the literature.</p>
+<ul>
+<li><a href="https://www.manning.com/books/c-plus-plus-concurrency-in-action-second-edition">Anthony Williams: C++ concurrency in action. Manning Publications.</a></li>
+<li><a href="https://queue.acm.org/detail.cfm?searchterm=T&amp;id=2088916">Boehm, Adve, You Don’t Know Jack About Shared Variables or Memory Models, Communications of the ACM, Feb 2012.</a></li>
+<li><a href="http://www.hpl.hp.com/techreports/2009/HPL-2009-259html.html">Boehm, “Threads Basics”, HPL TR 2009-259.</a></li>
+<li><a href="https://cacm.acm.org/magazines/2010/8/96610-memory-models-a-case-for-rethinking-parallel-languages-and-hardware/fulltext">Adve, Boehm, “Memory Models: A Case for Rethinking Parallel Languages and Hardware”, Communications of the ACM, August 2010.</a></li>
+<li><a href="http://www.hpl.hp.com/techreports/2008/HPL-2008-56.pdf">Boehm, Adve, “Foundations of the C++ Concurrency Memory Model”, PLDI 08.</a></li>
+<li><a href="https://www.cl.cam.ac.uk/~pes20/cpp/popl085ap-sewell.pdf">Mark Batty, Scott Owens, Susmit Sarkar, Peter Sewell, and Tjark Weber, “Mathematizing C++ Concurrency”, POPL 2011.</a></li>
+<li><a href="http://www.stroustrup.com/isorc2010.pdf">Damian Dechev, Peter Pirkelbauer, and Bjarne Stroustrup: Understanding and Effectively Preventing the ABA Problem in Descriptor-based Lock-free Designs. 13th IEEE Computer Society ISORC 2010 Symposium. May 2010</a>.</li>
+<li><a href="http://www.stroustrup.com/oopsla09-nonblocking.pdf">Damian Dechev and Bjarne Stroustrup: Scalable Non-blocking Concurrent Objects for Mission Critical Code. ACM OOPSLA’09. October 2009</a></li>
+<li><a href="http://www.stroustrup.com/sec09.pdf">Damian Dechev, Peter Pirkelbauer, Nicolas Rouquette, and Bjarne Stroustrup: Semantically Enhanced Containers for Concurrent Real-Time Systems. Proc. 16th Annual IEEE International Conference and Workshop on the Engineering of Computer Based Systems (IEEE ECBS). April 2009</a></li>
+</ul>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rconc-double">CP.110: Do not write your own double-checked locking for initialization </a>and<a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rconc-double"> </a><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rconc-double-pattern">CP.111: Use a conventional pattern if you really need double-checked locking</a></h3>
+<p>I know, I should not write about the singleton pattern but the double-checked locking pattern is infamous for initialising a singleton in a thread-safe way. Here we are:</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">std::mutex myMutex;
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">MySingleton</span>{
+<span style="color: #9999ff;">public:</span>  
+  <span style="color: #006699; font-weight: bold;">static</span> MySingleton<span style="color: #555555;">&amp;</span> getInstance(){    
+    std::lock_guard<span style="color: #555555;">&lt;std::</span>mutex<span style="color: #555555;">&gt;</span> myLock(myMutex);       <span style="color: #0099ff; font-style: italic;">// (1)  </span>
+    <span style="color: #006699; font-weight: bold;">if</span>( <span style="color: #555555;">!</span>instance ) instance<span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">new</span> MySingleton();    
+    <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #555555;">*</span>instance;  
+  }
+<span style="color: #9999ff;">private:</span>  
+  MySingleton();  
+  <span style="color: #555555;">~</span>MySingleton();  
+  MySingleton(<span style="color: #006699; font-weight: bold;">const</span> MySingleton<span style="color: #555555;">&amp;</span>)<span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">delete</span>;  
+  MySingleton<span style="color: #555555;">&amp;</span> <span style="color: #006699; font-weight: bold;">operator</span><span style="color: #555555;">=</span>(<span style="color: #006699; font-weight: bold;">const</span> MySingleton<span style="color: #555555;">&amp;</span>)<span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">delete</span>;
+  <span style="color: #006699; font-weight: bold;">static</span> MySingleton<span style="color: #555555;">*</span> instance;
+};
+MySingleton<span style="color: #555555;">::</span>MySingleton()<span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">default</span>;
+MySingleton<span style="color: #555555;">::~</span>MySingleton()<span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">default</span>;
+MySingleton<span style="color: #555555;">*</span> MySingleton<span style="color: #555555;">::</span>instance<span style="color: #555555;">=</span> nullptr;
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>This implementation of the singleton pattern is thread-safe because each access to the instance is protected by a std<span style="font-family: courier new, courier;">::lock_guard </span>(line (1)). The implementation is correct but way to expensive because each reading access of the singleton is guarded by a heavy-weight lock. Beside the initialisation of the singleton, no synchronisation is necessary. Here comes the double-checked locking pattern to our rescue.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">static</span> MySingleton<span style="color: #555555;">&amp;</span> getInstance(){    
+  <span style="color: #006699; font-weight: bold;">if</span> ( <span style="color: #555555;">!</span>instance ){                              <span style="color: #0099ff; font-style: italic;">// (1)               </span>
+    lock_guard<span style="color: #555555;">&lt;</span>mutex<span style="color: #555555;">&gt;</span> myLock(myMutex);           <span style="color: #0099ff; font-style: italic;">// (2)   </span>
+    <span style="color: #006699; font-weight: bold;">if</span>( <span style="color: #555555;">!</span>instance ) instance<span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">new</span> MySingleton(); <span style="color: #0099ff; font-style: italic;">// (3)</span>
+  }  
+  <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #555555;">*</span>instance; 
+}
+</pre>
+</div>
+<p></p>
+<p>The <span style="font-family: courier new, courier;">getInstance</span> method uses now an inexpensive pointer comparison in line (1) instead of an expensive lock. Only if the pointer is a <span style="font-family: courier new, courier;">nullptr,</span> an expensive lock is used (line (2)). Because there is the possibility that another thread will initialise the singleton between the pointer comparison (line (1)) and the lock (line (2)), an additional pointer comparison in line (3) is necessary. So the name is obvious. Two times a check and one time a lock.</p>
+<p>Smart? Yes! Thread safe? No!</p>
+<p>What is the problem? The call <span style="font-family: courier new, courier;">instance= new MySingleton()</span> in line (3) consists of at least three steps.</p>
+<ol>
+<li>Allocate memory for <span style="font-family: 'courier new', courier;">MySingleton</span></li>
+<li>Create the <span style="font-family: 'courier new', courier;">MySingleton</span> object in the memory</li>
+<li>Let <span style="font-family: courier new, courier;">instance</span> refer to the <span style="font-family: courier new, courier;">MySingleton</span> object</li>
+</ol>
+<p>The problem is that there is no guarantee about the sequence of these three steps. For example, the processor can reorder the steps to the sequence 1,3 and 2. So, in the first step the memory will be allocated and in the second step, the<span style="font-family: courier new, courier;">&nbsp;instance</span> refers to the singleton. If at that time another thread tries to access the singleton, it compares the pointer and assumes that the singleton is fully initialised. <span style="font-family: courier new, courier;"></span></p>
+<p>The consequence is simple: the program has undefined behaviour.</p>
+<p>I have already written a quite emotionally discussed post to the thread-safe singleton pattern. This included different implementations with <span style="font-family: courier new, courier;">std::lock_guard</span>, <span style="font-family: courier new, courier;">std::call_once</span> and <span style="font-family: courier new, courier;">std::once_flag,</span> the Meyers singleton, and atomic versions that are based on the double-checked locking-pattern. You can read the details to these implementations and their different performance characteristics on Linux and Windows here:&nbsp; <a href="index.php/thread-safe-initialization-of-a-singleton">Thread-Safe Initialization of a Singleton</a>.</p>
+<h2>What's next?</h2>
+<p>As I promised I'm done with the rules to concurrency. The next post is about the rules for error handling in the C++ core guidelines.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Eric Pederson, Paul Baxter, &nbsp;Sai Raghavendra Prasad Poosa, Meeting C++, Matt Braun, Avi Lachmish, Adrian Muntea, and Roman Postanciuc. <span class="sc-bxivhb huvVuj" style="color: #052d49; font-family: America, sans-serif; letter-spacing: inherit; margin: 0px; position: relative; text-align: inherit; text-transform: inherit; text-shadow: none; font-weight: 400; font-size: 1rem; line-height: 1.5;"><span class="sc-bxivhb fjhgUr" style="color: #052d49; font-family: America, sans-serif; letter-spacing: inherit; margin: 0px; position: relative; text-align: inherit; text-transform: inherit; text-shadow: none; font-weight: bold; font-size: 1rem; line-height: 1.5;"></span></span><span class="sc-bxivhb huvVuj" style="color: #052d49; font-family: America, sans-serif; letter-spacing: inherit; margin: 0px; position: relative; text-align: inherit; text-transform: inherit; text-shadow: none; font-weight: 400; font-size: 1rem; line-height: 1.5;"><span class="sc-bxivhb fjhgUr" style="color: #052d49; font-family: America, sans-serif; letter-spacing: inherit; margin: 0px; position: relative; text-align: inherit; text-transform: inherit; text-shadow: none; font-weight: bold; font-size: 1rem; line-height: 1.5;"></span></span><br /></strong></p>
+<p><strong>&nbsp;</strong></p>
+<p>&nbsp;</p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 600 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>

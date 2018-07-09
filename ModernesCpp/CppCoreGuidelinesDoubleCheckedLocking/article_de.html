@@ -1,0 +1,128 @@
+Heute schließe ich die Regeln zur Concurrency und insbesondere zur lock-freien Programmierung ab. Genau vier Regeln zur lock-freien Programmierung gibt es noch in den C++ Core Guidelines.
+Zuerst einmal, hier sind die vier Regeln:
+
+    CP.101: Distrust your hardware/compiler combination
+    CP.102: Carefully study the literature
+    CP.110: Do not write your own double-checked locking for initialization
+    CP.111: Use a conventional pattern if you really need double-checked locking
+
+Insbesondere ein paar Leser meines deutschen Blogs habe ich ein wenig verärgert, indem ich über lock-freies Programmieren schrieb. Einige Leser bekamen wohl den Eindruck, dass ich lock-freies Programmieren nicht mag. Falsch! Ich bin vom lock-freien Programmieren total fasziniert. Wer es aber einsetzt, sollte zuerst zwei Fragen beantworten:
+
+    Löst lock-freie Programmierung die Performanzproblem?
+    Verstehst du lock-freie Programmierung gut genug, um sie einsetzen zu können?
+
+Wenn du nicht beide Fragen mit einem eindeutigen Ja beantworten kannst, solltest du mit der Regel CP.102 fortfahren:
+CP.101: Distrust your hardware/compiler combination
+Was soll das heißen? Misstraue deiner Hardware-Compiler-Kombination. Lasse es mich anders formulieren: Wenn du die sequenzielle Konsistenz brichst, brichst du auch mit hoher Wahrscheinlichkeit deine Intuition. Hier ist mein Beispiel:
+#include <atomic>
+#include <iostream>
+#include <thread>
+
+std::atomic<int> x{0};
+std::atomic<int> y{0};
+
+void writing(){ 
+  x.store(2000);                        // (1)
+  y.store(11);                          // (2)
+}
+
+void reading(){ 
+  std::cout << y.load() << " ";         // (3)
+  std::cout << x.load() << std::endl;   // (4)
+}
+
+int main(){
+  std::thread thread1(writing);
+  std::thread thread2(reading);
+  thread1.join();
+  thread2.join();
+}
+Für das kurze Codebeispiel habe ich bereits eine Frage: Welche Ergebnisse für x und y sind in den Zeilen (3) und (4) möglich. x und y sind atomare Variablen, daher ist ein Data Race nicht möglich. Darüber hinaus habe ich das Speichermodell nicht explizit angegeben, damit kommt sequenzielle Konsistenz zum Einsatz. Sie bedeutet:
+
+    Jeder Thread führt seine Operationen in der angegebenen Reihenfolge aus: Zeile (1) wird damit vor Zeile (2) und Zeile (3) vor Zeile (4) ausgeführt.
+    Es gibt eine globale Ordnung aller Operationen auf allen Threads.
+
+Wenn du beide Zusicherungen der sequenziellen Konsistenz kombinierst, gibt es nur eine Kombination für x und y, die nicht möglich ist: y == 1 und x == 0.
+Jetzt werde ich die sequenzielle Konsistenz und vielleicht deine Intuition brechen. Hier ist das schwächste aller Speichermodelle: die Relaxed-Semantik.
+#include <atomic>
+#include <iostream>
+#include <thread>
+
+std::atomic<int> x{0};
+std::atomic<int> y{0};
+
+void writing(){ 
+  x.store(2000, std::memory_order_relaxed);   // (1)
+  y.store(11, std::memory_order_relaxed);     // (2)
+}
+
+void reading(){ 
+  std::cout << y.load(std::memory_order_relaxed) << " ";        // (3)
+  std::cout << x.load(std::memory_order_relaxed) << std::endl;  // (4)
+}
+
+int main(){
+  std::thread thread1(writing);
+  std::thread thread2(reading);
+  thread1.join();
+  thread2.join();
+}
+Zwei überraschende Phänomene können nun auftreten. Zuerst einmal kann thread2 die Operationen von thread1 in einer anderen Reihenfolge wahrnehmen. Darüber hinaus ist es möglich, dass thread1 seine Operationen umsortiert, da die Operationen auf verschieden atomaren Variablen stattfinden. Was bedeutet dies für die möglichen Werte von x und y: y == 1 und x == 0 sind zulässige Ergebnisse. Ich möchte ein wenig genauer sein. Welches Ergebnis möglich ist, hängt von der Hardware ab.
+Zum Beispiel ist das Umsortieren von Operationen nur sehr eingeschränkt auf x86- und AMD64-Architekturen möglich: "Schreibe Operationen" (store) können nur hinter "Lade Operationen" (load) umsortiert werden. Dies gilt nicht für die Alpha-, IA64- oder RISC-(ARM-)Architekturen, denn jede Umsortierung von Schreibe- und Lese-Operationen ist möglich.
+[<ir_inline itemname=bilder_mvp_bild_var2:1 type=2>]
+Falls du mir nicht glaubst, schlage ich vor, dass du die folgenden Regel CP.102 genauer liest.
+CP.102: Carefully study the literature
+Zu der Regel habe nicht allzu viel zu ergänzen. Zumindest, kann ich die Verweise mit Links hinterlegen.
+
+    Anthony Williams: C++ concurrency in action. Manning Publications.
+    Boehm, Adve, You Don’t Know Jack About Shared Variables or Memory Models, Communications of the ACM, Feb 2012.
+    Boehm, “Threads Basics”, HPL TR 2009-259.
+    Adve, Boehm, “Memory Models: A Case for Rethinking Parallel Languages and Hardware”, Communications of the ACM, August 2010.
+    Boehm, Adve, “Foundations of the C++ Concurrency Memory Model”, PLDI 08.
+    Mark Batty, Scott Owens, Susmit Sarkar, Peter Sewell, and Tjark Weber, “Mathematizing C++ Concurrency”, POPL 2011.
+    Damian Dechev, Peter Pirkelbauer, and Bjarne Stroustrup: Understanding and Effectively Preventing the ABA Problem in Descriptor-based Lock-free Designs. 13th IEEE Computer Society ISORC 2010 Symposium. May 2010.
+    Damian Dechev and Bjarne Stroustrup: Scalable Non-blocking Concurrent Objects for Mission Critical Code. ACM OOPSLA’09. October 2009.
+    Damian Dechev, Peter Pirkelbauer, Nicolas Rouquette, and Bjarne Stroustrup: Semantically Enhanced Containers for Concurrent Real-Time Systems. Proc. 16th Annual IEEE International Conference and Workshop on the Engineering of Computer Based Systems (IEEE ECBS). April 2009. 
+
+CP.110: Do not write your own double-checked locking for initialization and CP.111: Use a conventional pattern if you really need double-checked locking
+Ich sollte nicht über das Singleton Pattern schreiben, aber das Double-Checked Locking-Pattern ist berühmt-berüchtigt für die Initialisierung eines Singleton in thread-sicherer Art und Weise. Hier ist das thread-sichere Singleton Pattern:
+std::mutex myMutex;
+
+class MySingleton{
+public:  
+  static MySingleton& getInstance(){    
+    std::lock_guard<std::mutex> myLock(myMutex);       // (1)  
+    if( !instance ) instance= new MySingleton();    
+    return *instance;  
+  }
+private:  
+  MySingleton();  
+  ~MySingleton();  
+  MySingleton(const MySingleton&)= delete;  
+  MySingleton& operator=(const MySingleton&)= delete;
+  static MySingleton* instance;
+};
+MySingleton::MySingleton()= default;
+MySingleton::~MySingleton()= default;
+MySingleton* MySingleton::instance= nullptr;
+Die Implementierung ist thread-sicher, da jeder Zugriff auf die Instanz durch einen std::lock_guard (line (1)) geschützt ist. Die Implementierung ist korrekt, aber deutlich zu aufwendig. Jeder lesende Zugriff auf das Singleton wird durch einen schwergewichtigen Lock geschützt. Abgesehen von der Initialisierung des Singleton ist aber keine weitere Synchronisation notwendig. Jetzt kommt das Double-Checked Locking-Pattern als vermeintliche Rettung ins Spiel:
+static MySingleton& getInstance(){   
+  if ( !instance ){                              // (1)              
+    lock_guard<mutex> myLock(myMutex);           // (2)  
+    if( !instance ) instance= new MySingleton(); // (3)
+  } 
+  return *instance;
+}
+Die getInstance-Methode verwendet nun einen billigen Zeigervergleich in Zeile (1) anstelle eines teuren Locks. Lediglich wenn der Zeiger ein nullptr ist, kommt in Zeile (2) der teure Lock zum Einsatz. Da es die Möglichkeit gibt, dass ein anderer Thread das Singleton zwischen dem Zeigervergleich und dem Lockaufruf initialisiert, muss ein weiterer Zeigervergleich in Zeile 3 verwendet werden. Damit ist der Name geklärt. Zweimal wird gecheckt und einmal gelockt.
+Clever? Ja! Thread-sicher? Nein!
+Was ist das Problem. Der Aufruf instance = new MySingleton() in Zeile 3 besteht aus mindestens drei Schritten.
+
+    Fordere Speicher für MySingleton an.
+    Erzeuge das MySingleton-Objekt in dem Speicher.
+    Verweise instance auf das neue MySingleton-Objekt.
+
+Die falsche Annahme ist nun, dass die drei Schritte in der vorgestellten Reihenfolge ausgeführt werden. Das gilt aber nicht. Zum Beispiel kann der Prozessor die drei Schritte in der Reihenfolge 1, 3 und 2 ausführen. Daher wird im ersten Schritt der Speicher angefordert und im zweiten Schritt verweist instance auf das MySingelton-Objekt. Falls genau zu diesem Zeitpunkt ein anderer Thread den initialen Zeigervergleich ausführt, ist der Vergleich erfolgreich und der anderer Thread verwendet das nicht richtig initialisierte Singleton-Objekt.
+Die Konsequenz ist einfach: Das Programm besitzt jetzt undefiniertes Verhalten.
+Ich habe bereits einen sehr emotional diskutierten Blogartikel zum thread-sicheren Singleton Pattern geschrieben. Dieser Artikel umfasst verschiedene Implementierungen des thread-sicheren Singleton Pattern mit std::lock_guard, std::call_once und std::once_flag, dem Meyers-Singleton und atomaren Varianten, die auf dem Doubled-Checked Locking-Pattern basieren. Du kannst die Details zu den verschiedenen Implementierungen und ihren Performanzcharakteristiken auf Linux und Windows hier nachlesen: "Threadsicheres Initialisieren eines Singleton".
+Wie geht's weiter?
+Wie versprochen bin ich heute mit den Regeln zur Concurrency fertig geworden. Im nächsten Artikel geht es in den C++ Core Guidelines um die Regeln zur Fehlerbehandlung.
