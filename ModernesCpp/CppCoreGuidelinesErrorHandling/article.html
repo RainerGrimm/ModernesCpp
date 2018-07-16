@@ -1,0 +1,127 @@
+<p>Error handling is an important part of writing good software; therefore, the C++ core guidelines has about 20 rules for error handling.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesErrorHandling/bobby-car.jpg" alt="bobby car" width="600" height="400" /></p>
+<p>&nbsp;First of all. Which aspects are involved in error handling according to the guidelines:</p>
+<ul>
+<li>Detecting an error</li>
+<li>Transmitting information about an error to some handler code</li>
+<li>Preserve the state of a program in a valid state</li>
+<li>Avoid resource leaks</li>
+</ul>
+<p>You should use exceptions for error handling. <a href="https://en.wikipedia.org/wiki/David_Abrahams_(computer_programmer)">David Abrahams</a>, one of the founders of the Boost C++ Library and former member of the ISO C++ standardisation committee, formalised in the document "<a href="https://www.boost.org/community/exception_safety.html">Exception-Safety in Generic Components</a>" what exception-safety means. His <a href="https://en.wikipedia.org/wiki/Exception_safety">Abrahams Guarantees</a> describe a contract that is fundamental if you think about exception-safety; therefore, I will mention them here in short and will refer to them in the upcoming post. Here are the four levels of the contract from the already mentioned wiki page in decreasing order:</p>
+<ol>
+<li><b>No-throw guarantee</b>, also known as <b>failure transparency</b>: Operations are guaranteed to succeed and satisfy all requirements even in exceptional situations. If an exception occurs, it will be handled internally and not observed by clients.</li>
+<li><b>Strong exception safety</b>, also known as <b>commit or rollback semantics</b>: Operations can fail, but failed operations are guaranteed to have no side effects, so all data retains their original values.<sup id="cite_ref-4" class="reference"><a href="https://en.wikipedia.org/wiki/Exception_safety#cite_note-4"><br /></a></sup></li>
+<li><b>Basic exception safety</b>, also known as a <b>no-leak guarantee</b>: Partial execution of failed operations can cause side effects, but all invariants are preserved and there are no resource leaks (including memory leaks). Any stored data will contain valid values, even if they differ from what they were before the exception.</li>
+<li><b>No exception safety</b>: No guarantees are made.</li>
+</ol>
+<p>Often, you can not fully recover from an error. Now, you have two options.</p>
+<p>First, let the program run in a simpler error state. This means, the software is not fully functional anymore but provides at least a reduced functionality. For example, it may not be possible for a defibrillator to apply the power but you can at least guide the operator.</p>
+<p>Or, second, restart the program. Often, this is the fastest and the easiest way to get into a safe state, recover, and get fully functional.&nbsp;</p>
+<p>The rules from the guidelines should help you to avoid the following kinds of errors:</p>
+<ul>
+<li>Type violations<code class="highlighter-rouge no-highlight"></code></li>
+<li>Resource leaks</li>
+<li>Bounds errors</li>
+<li>Lifetime errors<code class="highlighter-rouge no-highlight"></code></li>
+<li>Logical errors</li>
+<li>Interface errors</li>
+</ul>
+<p>After my more general remarks, let me start with the first three rules:</p>
+<ul>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Re-design">E.1: Develop an error-handling strategy early in a design</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Re-throw">E.2: Throw an exception to signal that a function can’t perform its assigned task</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Re-errors">E.3: Use exceptions for error handling only</a></li>
+</ul>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Re-design">E.1: Develop an error-handling strategy early in a design</a></h3>
+<p>The entire rule consists only of this reason. "A consistent and complete strategy for handling errors and resource leaks is hard to retrofit into a system." To be honest, that is too less for an explanation. Error handling is a so-called cross-cutting concern such as logging or security. This means these concerns are difficult to address because they can not be easily modularised. They affect the entire software.</p>
+<p>Exception-safety is an important part of the interface design and has to be, therefore, addressed from the first beginning. Now the question is: What is an interface? My definition of an interface is quite broad.</p>
+<p><strong>An interface is a protocol between two components</strong>. One component may be a function, an object, a sub-system, or the entire system. This component may also be an external dependency such as hardware or an operating system.</p>
+<p>At the boundary level, you have two way to communicate: regularly and irregularly. The regular communication is the functional aspect of the interface. Or to say it differently: What the system should do. The irregular communication stands for the non-functional aspects. The non-functional aspect specifies how a system should perform. A big part of the non-functional aspects is exception-handling or what can go wrong. Often the non-functional aspects are just called quality attributes.</p>
+<p>From a general point of view, an interface consists of two components. Each component has to fulfil a special kind of contract.</p>
+<ol>
+<li>A <strong>Precondition</strong> that must always hold before a component is called.</li>
+<li>An <strong>Invariant</strong> that must always be true during the execution of the component.</li>
+<li>A <strong>Postcondition</strong> that must always be true after the execution of the component.</li>
+</ol>
+<p>This terms go back <a title="" href="https://en.wikipedia.org/wiki/Bertrand_Meyer">Bertrand Meyer</a> and are known as <a href="https://en.wikipedia.org/wiki/Design_by_contract">design by contract</a>.</p>
+<p>&nbsp;</p>
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesErrorHandling/Design_by_contract.png" alt="Design by contract" width="350" height="343" /></p>
+<p>&nbsp;</p>
+<p style="text-align: center;">By <a class="extiw" title="it:Fabuio" href="https://it.wikipedia.org/wiki/Fabuio">Fabuio</a> - <span class="int-own-work" lang="en">Own work</span>, <a title="Creative Commons Zero, Public Domain Dedication" href="http://creativecommons.org/publicdomain/zero/1.0/deed.en">CC0</a>, <a href="https://commons.wikimedia.org/w/index.php?curid=38020523">Link</a></p>
+<p>Before I continue, I should mention that we may get <a href="https://herbsutter.com/category/c/">contracts</a> with C++20.</p>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Re-throw">E.2: Throw an exception to signal that a function can’t perform its assigned task</a></h3>
+<p>The consequence of this rule is that the caller of the function should handle the exception with a <span style="font-family: 'courier new', courier;">try/catch</span> statement. The key question&nbsp;is: When should you throw an exception? Here are typical use-cases:</p>
+<ul>
+<li>A precondition that cannot be met</li>
+<li>A constructor that cannot construct an object</li>
+<li>An out-of-range error<code class="highlighter-rouge no-highlight"><br /></code></li>
+<li>The inability to acquire a resource&nbsp;</li>
+</ul>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Re-errors">E.3: Use exceptions for error handling only</a></h3>
+<p>This is, in my opinion, one of the worst misuses of exceptions. Exceptions are a kind of <span style="font-family: courier new, courier;">goto</span> statements. Maybe your code guidelines forbid you to use <span style="font-family: courier new, courier;">goto</span> statements. Therefore, you came up with a totally clever idea: use exceptions for control flow. In the following example, the exception is used in the success case.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// don't: exception not used for error handling</span>
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">find_index</span>(vector<span style="color: #555555;">&lt;</span>string<span style="color: #555555;">&gt;&amp;</span> vec, <span style="color: #006699; font-weight: bold;">const</span> string<span style="color: #555555;">&amp;</span> x)
+{
+    try {
+        <span style="color: #006699; font-weight: bold;">for</span> (gsl<span style="color: #555555;">::</span>index i <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>; i <span style="color: #555555;">&lt;</span> vec.size(); <span style="color: #555555;">++</span>i)
+            <span style="color: #006699; font-weight: bold;">if</span> (vec[i] <span style="color: #555555;">==</span> x) <span style="color: #006699; font-weight: bold;">throw</span> i;  <span style="color: #0099ff; font-style: italic;">// found x</span>
+    } <span style="color: #006699; font-weight: bold;">catch</span> (<span style="color: #007788; font-weight: bold;">int</span> i) {
+        <span style="color: #006699; font-weight: bold;">return</span> i;
+    }
+    <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #555555;">-</span><span style="color: #ff6600;">1</span>;   <span style="color: #0099ff; font-style: italic;">// not found</span>
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The code snippet uses <span style="font-family: courier new, courier;">gsl::index</span> from the <a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#S-gsl">guideline support library</a>. In this case, the regular control flow is not separated from the exceptional control flow. In the success case, the code uses a <span style="font-family: 'courier new', courier;">throw</span> statement; in the failure case, the code uses a <span style="font-family: 'courier new', courier;">return</span> statement. If that is not confusing?</p>
+<h2>What's next?</h2>
+<p>Of course, I continue in the next post with the rules to error handling. In particular, I write about precondition, postcondition, and invariants.</p>
+<p>&nbsp;</p>
+<p></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Eric Pederson, Paul Baxter,&nbsp; Meeting C++, Matt Braun, Avi Lachmish, Adrian Muntea, and Roman Postanciuc. <span class="sc-bxivhb huvVuj" style="color: #052d49; font-family: America, sans-serif; letter-spacing: inherit; margin: 0px; position: relative; text-align: inherit; text-transform: inherit; text-shadow: none; font-weight: 400; font-size: 1rem; line-height: 1.5;"><span class="sc-bxivhb fjhgUr" style="color: #052d49; font-family: America, sans-serif; letter-spacing: inherit; margin: 0px; position: relative; text-align: inherit; text-transform: inherit; text-shadow: none; font-weight: bold; font-size: 1rem; line-height: 1.5;"></span></span><span class="sc-bxivhb huvVuj" style="color: #052d49; font-family: America, sans-serif; letter-spacing: inherit; margin: 0px; position: relative; text-align: inherit; text-transform: inherit; text-shadow: none; font-weight: 400; font-size: 1rem; line-height: 1.5;"><span class="sc-bxivhb fjhgUr" style="color: #052d49; font-family: America, sans-serif; letter-spacing: inherit; margin: 0px; position: relative; text-align: inherit; text-transform: inherit; text-shadow: none; font-weight: bold; font-size: 1rem; line-height: 1.5;"></span></span><br /></strong></p>
+<p><strong>&nbsp;</strong></p>
+<p>&nbsp;</p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 600 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
