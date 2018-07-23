@@ -1,0 +1,226 @@
+<p>My original plan was it to write in this post about the next rules to error handling. But I changed my plan to write about the future: contracts in C++20.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesContracts/Design_by_contract.png" alt="Design by contract" /></p>
+<p style="text-align: center;">By <a class="extiw" title="it:Fabuio" href="https://it.wikipedia.org/wiki/Fabuio">Fabuio</a> - <span class="int-own-work" lang="en">Own work</span>, <a title="Creative Commons Zero, Public Domain Dedication" href="http://creativecommons.org/publicdomain/zero/1.0/deed.en">CC0</a>, <a href="https://commons.wikimedia.org/w/index.php?curid=38020523">Link</a></p>
+<p>Here are the rules I will skip.</p>
+<ul>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Re-design-invariants">E.4: Design your error-handling strategy around invariants</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Re-invariant">E.5: Let a constructor establish an invariant, and throw if it cannot</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Re-raii">E.6: Use RAII to prevent leaks</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Re-precondition">E.7: State your preconditions</a></li>
+<li>
+<p><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Re-postcondition">E.8: State your postconditions</a></p>
+</li>
+</ul>
+<p>Why did I change my plan? I did it for a few reasons.</p>
+<ul>
+<li>The cited rules for error handling in the C++ core guidelines have not enough meat.</li>
+<li>I already wrote about the rule E.6 an entire post: <a href="index.php/garbage-collectio-no-thanks">Garbage Collection - No Thanks</a>. Of course, I don't want to repeat myself.</li>
+<li>Four of the five rules are about <a href="https://en.wikipedia.org/wiki/Design_by_contract">design by contract. </a></li>
+</ul>
+<p>The consequence of this points is quite simple. Contracts seem to be important for error handling, C++20 will presumably have contracts, therefore, I write in this post about contracts in C++20.</p>
+<p>In case you want to have more details to contracts. This post is based on the proposals <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2016/p0380r1.pdf">P0380R1 </a>and <a href="http://open-std.org/JTC1/SC22/WG21/docs/papers/2018/p0542r5.html">P0542R5</a>.</p>
+<p>First of all.</p>
+<h3>What is a contract?</h3>
+<p>A contract specifies in a precise and checkable way interfaces for software components. This software components are typically functions and methods, that have to fulfil preconditions, postconditions, and invariants. Here are the shortened definitions from the proposals.</p>
+<ul>
+<li>A <strong>precondition</strong>: a predicate that is supposed to hold upon entry in a function. It is placed outside the function definition.</li>
+<li>A <strong>postcondition</strong>: a predicate that is supposed to hold upon exit from the function. It is placed outside the function definition.</li>
+<li>An <strong>assertion</strong>: a predicate that is supposed to hold at its point in the computation. It is placed inside the function definition.</li>
+</ul>
+<p>The precondition and the postconditon is in C++20 placed outside the function defintion but the invariant is placed inside the function definition. A predicate is a function which returns a boolean.</p>
+<div>
+<div>&nbsp;</div>
+<div>Here is a first example:</div>
+</div>
+<div>&nbsp;</div>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">int</span> push(queue<span style="color: #555555;">&amp;</span> q, int val) 
+  [[ expects<span style="color: #555555;">:</span> !q<span style="color: #555555;"></span>.full() ]]
+  [[ ensures <span style="color: #555555;">!</span>q.empty() ]]{
+  ...
+  [[assert<span style="color: #555555;">:</span> q.is_ok() ]]<br />  ...
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The attribute <span style="font-family: courier new, courier;">expects</span>&nbsp;is a precondition, the attribute <span style="font-family: courier new, courier;">ensures</span>&nbsp;is a postcondition, and the attribute assert&nbsp;is an assertion.</p>
+<p>The contracts for the function <span style="font-family: courier new, courier;">push</span>&nbsp;are that the queue is not full before adding an element, that is not empty after adding and the assertion <span style="font-family: courier new, courier;">q.is_ok(</span>) holds.</p>
+<p>Preconditions and postconditions are part of the function interface. This means they can't access local members of a function or private or protected members of a class. In contrast, assertions are part of the implementation and can, therefore, access local members of a function of private or protected members of a class.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">X</span> {
+<span style="color: #9999ff;">public:</span>
+    <span style="color: #007788; font-weight: bold;">void</span> f(<span style="color: #007788; font-weight: bold;">int</span> n)
+        [[ expects<span style="color: #555555;">:</span> n<span style="color: #555555;">&lt;</span>m ]]  <span style="color: #0099ff; font-style: italic;">// error; m is private</span>
+    {
+        [[ assert<span style="color: #555555;">:</span> n<span style="color: #555555;">&lt;</span>m ]];  <span style="color: #0099ff; font-style: italic;">// OK</span>
+        <span style="color: #0099ff; font-style: italic;">// ...</span>
+    }
+<span style="color: #9999ff;">private:</span>
+    <span style="color: #007788; font-weight: bold;">int</span> m;
+};     
+</pre>
+</div>
+<p>&nbsp;</p>
+<p><span style="font-family: courier new, courier;">m</span> is private and can, therefore, not be part of a precondition.</p>
+<p>By default, a violation of a contract terminates the program. This is not the full story, let me give you more details.</p>
+<h3>More Details</h3>
+<p>Here is the full syntax of the contract attributes:<span style="font-family: courier new, courier;"><strong> [[contract-attribute modifier: conditional-expression ]]</strong></span></p>
+<ul>
+<li><strong><span style="font-family: courier new, courier;">contract-attribute</span></strong>: <span style="font-family: courier new, courier;">expects,</span> <span style="font-family: courier new, courier;">ensures,</span> and <span style="font-family: courier new, courier;">assert</span></li>
+<li><strong><span style="font-family: courier new, courier;">modifier:</span></strong> specifies the contract level or the enforcement of the contract; possible values are <span style="font-family: courier new, courier;">default, audit, </span><span style="font-family: courier new, courier;"></span>and <span style="font-family: courier new, courier;">axiom</span>
+<ul>
+<li><span style="font-family: courier new, courier;">default: </span>the cost of run-time checking should be small; it is the default modifier</li>
+<li><span style="font-family: courier new, courier;">audit:</span> the cost of run-time checking is assumed to be large</li>
+<li><span style="font-family: courier new, courier;">axiom:</span> the predicate is not checked at run-time</li>
+</ul>
+</li>
+<li><strong><span style="font-family: courier new, courier;">conditional-expression</span></strong>: the predicate of the contract</li>
+</ul>
+<p>For the <span style="font-family: 'courier new', courier;">ensures</span> attribute, there is an additional identifier available. <strong>[[ensures modifier identifier: conditional-expression ]]</strong><span style="font-family: courier new, courier;"></span></p>
+<p>The <span style="font-family: 'courier new', courier;"><strong>identifier</strong></span> let you refer to the return value of the function.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">int</span> mul(<span style="color: #007788; font-weight: bold;">int</span> x, <span style="color: #007788; font-weight: bold;">int</span> y)
+  [[expects<span style="color: #555555;">:</span> x <span style="color: #555555;">&gt;</span> <span style="color: #ff6600;">0</span>]]         // implicit default
+  [[expects <span style="color: #006699; font-weight: bold;">default</span><span style="color: #555555;">:</span> y <span style="color: #555555;">&gt;</span> <span style="color: #ff6600;">0</span>]]
+  [[ensures audit res<span style="color: #555555;">:</span> res <span style="color: #555555;">&gt;</span> <span style="color: #ff6600;">0</span>]]{
+  <span style="color: #006699; font-weight: bold;">return</span> x <span style="color: #555555;">*</span> y;
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p><span style="font-family: courier new, courier;">res</span>&nbsp;as the identifier is, in this case, an arbitrary name. As shown in the example, you can use more contracts of the same kind.</p>
+<p>Let me dive deeper into the modifiers and the handling of the contract violations.</p>
+<h3>Handling contract violations</h3>
+<p>A compilation has three assertion build levels:</p>
+<ul>
+<li><strong>off:</strong> no contracts are checked</li>
+<li><strong>default:</strong> default contracts are checked; this is the default</li>
+<li><strong>audit:</strong> default and audit contract are checked</li>
+</ul>
+<p>If a contract violation occurs - that means the predicate evaluates to false -, the violation handler is invoked. The violation handler is a function of type <span style="font-family: courier new, courier;">noexcept</span> which takes a <span style="font-family: courier new, courier;">const std::contract_violation</span> and returns a <span style="font-family: courier new, courier;">void. </span>Because the function is noexcept,<span style="font-family: courier new, courier;">&nbsp;t</span>his means that <span style="font-family: courier new, courier;">std::terminate</span> is called in case of a violation of the contract. A user can set a violation handler.</p>
+<p>The class <span style="font-family: courier new, courier;">std::contract_violation</span> gives information about the violation of the contract.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">namespace</span> std{ 
+  <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">contract_violation</span>{
+  <span style="color: #9999ff;">public:</span>
+    <span style="color: #007788; font-weight: bold;">uint_least32_t</span> line_number() <span style="color: #006699; font-weight: bold;">const</span> noexcept;
+    string_view file_name() <span style="color: #006699; font-weight: bold;">const</span> noexcept;
+    string_view function_name() <span style="color: #006699; font-weight: bold;">const</span> noexcept;
+    string_view comment() <span style="color: #006699; font-weight: bold;">const</span> noexcept;
+    string_view assertion_level() <span style="color: #006699; font-weight: bold;">const</span> noexcept;
+  };
+}
+</pre>
+</div>
+<p></p>
+<ul>
+<li><span style="font-family: courier new, courier;">line_number: </span>line number of the contract violation<span style="font-family: courier new, courier;"><br /></span></li>
+<li><span style="font-family: courier new, courier;">file_name: </span>file name of the contract violation<span style="font-family: courier new, courier;"><br /></span></li>
+<li><span style="font-family: courier new, courier;">function_name: </span>function name of the contract violation<span style="font-family: courier new, courier;"><br /></span></li>
+<li><span style="font-family: courier new, courier;">comment: </span>the predicate to the contract<span style="font-family: courier new, courier;"><br /></span></li>
+<li><span style="font-family: courier new, courier;">assertion_level: </span>assertion level to the contract<span style="font-family: courier new, courier;"><br /></span></li>
+</ul>
+<p>&nbsp;There are a few rules to keep in mind if you declare a contract.</p>
+<h3>Declaration of contracts</h3>
+<p>A contract can be placed on the declaration of a function. This includes declarations of virtual functions or function templates.</p>
+<ul>
+<li>The contracts declaration of a function must be identical. Any declaration different from the first one can omit the contract.</li>
+</ul>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">int</span> f(<span style="color: #007788; font-weight: bold;">int</span> x) 
+  [[expects<span style="color: #555555;">:</span> x<span style="color: #555555;">&gt;</span><span style="color: #ff6600;">0</span>]]
+  [[ensures r<span style="color: #555555;">:</span> r<span style="color: #555555;">&gt;</span><span style="color: #ff6600;">0</span>]];
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">f</span>(<span style="color: #007788; font-weight: bold;">int</span> x); <span style="color: #0099ff; font-style: italic;">// OK. No contract.</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> f(<span style="color: #007788; font-weight: bold;">int</span> x)
+  [[expects<span style="color: #555555;">:</span> x<span style="color: #555555;">&gt;=</span><span style="color: #ff6600;">0</span>]]; <span style="color: #0099ff; font-style: italic;">// Error missing ensures and different expects condition</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<ul>
+<li>A contract can not be modified in an overriding function.</li>
+</ul>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">struct</span> B{
+  <span style="color: #006699; font-weight: bold;">virtual</span> <span style="color: #007788; font-weight: bold;">void</span> f(<span style="color: #007788; font-weight: bold;">int</span> x)[[expects<span style="color: #555555;">:</span> x <span style="color: #555555;">&gt;</span> <span style="color: #ff6600;">0</span>]];
+  <span style="color: #006699; font-weight: bold;">virtual</span> <span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">g</span>(<span style="color: #007788; font-weight: bold;">int</span> x);
+}
+
+<span style="color: #006699; font-weight: bold;">struct</span> D<span style="color: #555555;">:</span> B{
+  <span style="color: #007788; font-weight: bold;">void</span> f(<span style="color: #007788; font-weight: bold;">int</span> x)[[expects<span style="color: #555555;">:</span> x <span style="color: #555555;">&gt;=</span> <span style="color: #ff6600;">0</span>]];   <span style="color: #0099ff; font-style: italic;">// error</span>
+  <span style="color: #007788; font-weight: bold;">void</span> g(<span style="color: #007788; font-weight: bold;">int</span> x)[[expects<span style="color: #555555;">:</span> x <span style="color: #555555;">!=</span> <span style="color: #ff6600;">0</span>]];   <span style="color: #0099ff; font-style: italic;">// error</span>
+};
+</pre>
+</div>
+<p></p>
+<p>Both contract definitions of class <span style="font-family: courier new, courier;">D</span> are erroneous. The contract of the method <span style="font-family: courier new, courier;">f</span> differs from the one from <span style="font-family: courier new, courier;">B::f</span>. The method <span style="font-family: courier new, courier;">D::g</span> adds a contract to <span style="font-family: courier new, courier;">B::g</span>.</p>
+<h3>Closing Thoughts</h3>
+<p>Impressed? Me too! I still can not imagine how fundamentally contracts will change the way we write functions and think about interfaces and exception handling. Maybe Herb Sutter's thoughts on <a href="https://herbsutter.com/2018/07/02/trip-report-summer-iso-c-standards-meeting-rapperswil/">Sutter's Mill</a> give you an idea because for him "<em>contracts is the most impactful feature of C++20 so far, and arguably the most impactful feature we have added to C++ since C++11</em>."</p>
+<h2>What's next?</h2>
+<p>With my next post, I will continue with a step back to the present time and write about the rules to exception handling.</p>
+<h2>Further Information</h2>
+<p>&nbsp;Wow! Almost 200 readers participated in the vote to the next pdf bundle. Here are the winners.</p>
+<div class="text">
+<ul>
+<li>German pdf bundle: Embedded: Performanz zählt</li>
+<li>English pdf bundle: C++ Core Guidelines: Concurrency and Parallelism</li>
+</ul>
+</div>
+<div class="text">Here are the details to the vote:</div>
+<div class="text">
+<ul>
+<li>German blog: <a href="https://www.grimm-jaud.de/index.php/blog/welches-pdf-paeckchen-soll-ich-zusammenstellen-mache-dein-kreuz-4">Welches PDF-Päckchen soll ich zusammenstellen? Mache dein Kreuz!</a></li>
+<li>English Blog: <a href="index.php/which-pdf-bundle-should-i-provide-make-your-choice-3">Which PDF bundle should I provide? Make your choice!</a></li>
+</ul>
+<p>I need at least a week to proofread and prepare the pdf bundles</p>
+</div>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Eric Pederson, Paul Baxter,&nbsp; Meeting C++, Matt Braun, Avi Lachmish, Adrian Muntea, and Roman Postanciuc. <span class="sc-bxivhb huvVuj" style="color: #052d49; font-family: America, sans-serif; letter-spacing: inherit; margin: 0px; position: relative; text-align: inherit; text-transform: inherit; text-shadow: none; font-weight: 400; font-size: 1rem; line-height: 1.5;"><span class="sc-bxivhb fjhgUr" style="color: #052d49; font-family: America, sans-serif; letter-spacing: inherit; margin: 0px; position: relative; text-align: inherit; text-transform: inherit; text-shadow: none; font-weight: bold; font-size: 1rem; line-height: 1.5;"></span></span><span class="sc-bxivhb huvVuj" style="color: #052d49; font-family: America, sans-serif; letter-spacing: inherit; margin: 0px; position: relative; text-align: inherit; text-transform: inherit; text-shadow: none; font-weight: 400; font-size: 1rem; line-height: 1.5;"><span class="sc-bxivhb fjhgUr" style="color: #052d49; font-family: America, sans-serif; letter-spacing: inherit; margin: 0px; position: relative; text-align: inherit; text-transform: inherit; text-shadow: none; font-weight: bold; font-size: 1rem; line-height: 1.5;"></span></span><br /></strong></p>
+<p><strong>&nbsp;</strong></p>
+<p>&nbsp;</p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 600 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
