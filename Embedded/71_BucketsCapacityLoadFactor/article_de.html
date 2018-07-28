@@ -1,0 +1,233 @@
+<p>Der entscheidende Grund für die konstante Zugriffszeit der ungeordneten assoziativen Container sind deren <a href="index.php/blog/hashtabellen">Hashfunktionen.</a> In bekannter Manier bietet C++ viele Stellschrauben für Hashfunktionen an. Einerseits bringt C++ einen reichen Satz an Hashfunktionen mit, andererseits lassen sich auch eigene Hashfunktionen verwenden. Selbst die Verteilung der Hashwerte auf die Buckets kann angepasst werden.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p>Bevor ich aber konkret auf die Hashfunktionen eingehe, muss ich erst die Deklaration der ungeordneten assoziativen Container genauer betrachten, um nicht das große Bild zu verlieren. Exemplarisch betrachte ich den Repräsentanten der ungeordneten assoziativen Container, den Container <span style="font-family: courier new,courier;">std::unordered_map.</span></p>
+<h2>std::unordered_map</h2>
+<p>Die Deklaration der Hashtabelle <span style="font-family: courier new,courier;">std::unordered_map</span> bringt sehr viele interessante Details an Licht.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">template</span>&lt;
+    <span style="color: #0000ff;">class</span> <span style="color: #2b91af;">Key</span>,
+    <span style="color: #0000ff;">class</span> <span style="color: #2b91af;">Val</span>,
+    <span style="color: #0000ff;">class</span> <span style="color: #2b91af;">Hash</span> = std::hash&lt;Key&gt;,
+    <span style="color: #0000ff;">class</span> <span style="color: #2b91af;">KeyEqual</span> = std::equal_to&lt;Key&gt;,
+    <span style="color: #0000ff;">class</span> <span style="color: #2b91af;">Allocator</span> = std::allocator&lt; std::pair&lt;<span style="color: #0000ff;">const</span> Key, Val&gt; &gt;
+&gt; <span style="color: #0000ff;">class</span> <span style="color: #2b91af;">unordered_map</span>;</pre>
+</div>
+<p>&nbsp;</p>
+<p>Nun zu den einzelnen Template-Parametern.&nbsp;Das <span style="font-family: courier new,courier;">std::unordered_map</span> assoziiert&nbsp;einen Schlüssel (<span style="font-family: courier new,courier;">Key</span>) mit einem Wert (<span style="font-family: courier new,courier;">Val</span>). Die übrigen drei Template-Parameter werden per Default von dem Typ des Schlüssels und dem des Wertes abgeleitet. Dies gilt für die Hashfunktion (<span style="font-family: courier new,courier;">Hash</span>), die Gleichheitsfunktion (<span style="font-family: courier new,courier;">KeyEqual</span>) und den Speicherbeschaffer (<span style="font-family: courier new,courier;">Allocator</span>). Damit lässt sich einfach ein <span style="font-family: courier new,courier;">std::unordered_map char2int</span> instanziieren.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">std::unordered_map&lt;<span style="color: #2b91af;">char</span>,<span style="color: #2b91af;">int</span>&gt; char2int;
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Nun wird es aber interessanter. Per Default kommt die Hashfunktion <span style="font-family: courier new,courier;">std::hash&lt;Key&gt;</span> und die Gleichheitsfunktion <span style="font-family: courier new,courier;">std::equal_to&lt;Key&gt;</span> zum Einsatz. Somit lässt sich ein <span style="font-family: courier new,courier;">std::unordered_map</span> instanziieren, das eine spezielle Hash- bzw. Gleichheitsfunktion besitzt. Doch wozu ist die Gleichheitsfunktion notwendig? Die Hashfunktion bildet den Schlüssel auf den Hashwert ab. Der Hashwert landet im Bucket. Dabei kann es zu Kollisionen kommen. Das heißt, verschiedene Schlüssel können im gleichen Bucket landen. Mit dieser Kollision, bei der Schlüssel auf einfachere Hashwerte abgebildet werden, muss das <span style="font-family: courier new,courier;">std::unordered_map</span> umgehen können. Genau hierzu benötigt der assoziative Container die Gleichheitsfunktion. Nur noch der Vollständigkeit halber. Mit dem Speicherbeschaffer (<span style="font-family: courier new,courier;">Allocator</span>) lässt sich die Speicherstrategie des Containers anpassen.</p>
+<p>Welche Bedingungen müssen der Schlüssel und der Wert eines ungeordneten assoziativen Containers erfüllen?</p>
+<p>Der Schlüssel muss</p>
+<ul>
+<li>mit dem Gleichheitskriterium vergleichbar sein,</li>
+<li>als Hashwert zur Verfügung stehen,</li>
+<li>kopier- und verschiebbar sein.</li>
+</ul>
+<p>Der Wert muss</p>
+<ul>
+<li>default-konstruierbar sein,</li>
+<li>kopier- und verschiebbar sein.</li>
+</ul>
+<h2>Die Hashfunktion</h2>
+<p>Eine Hashfunktion ist dann gut, wenn sie bei ihrer Abbildung von den Schlüsseln auf deren Hashwerte möglichst wenig Kollisionen erzeugt und ihre Hashwerte gleichmäßig auf die Buckets verteilt. Da die Ausführungszeit der Hashfunktion konstant ist, ist dies im optimalen Fall auch der Zugriff auf die Elemente des Containers.</p>
+<p>Die Hashfunktion</p>
+<ul>
+<li>ist für fundamentale Datentypen wie Wahrheitswerte, Ganzzahlen und Fließkommazahlen vordefiniert,</li>
+<li>gibt es für die Datentypen<span style="font-family: courier new,courier;"> std::string</span> und <span style="font-family: courier new,courier;">std::wstring,</span></li>
+<li>erzeugt für einen C-String <span style="font-family: courier new,courier;">const char*</span> einen Hashwert der Zeigeradresse,</li>
+<li>kann für eigene Datentypen definiert werden.</li>
+</ul>
+<p>Wende ich nun die Theorie des bisherigen Artikels für einen eigenen Datentyp an, den ich als Schlüssel eines ungeordneten Containers verwenden will, gelten für diesen Datentyp zwei Bedingungen. Er benötigt eine Hashfunktion und muss auf Gleichheit vergleichbar sein.</p>
+<!-- HTML generated using hilite.me -->
+<div>&nbsp;</div>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+55
+56
+57
+58
+59
+60
+61
+62
+63
+64
+65
+66
+67
+68
+69
+70
+71
+72
+73
+74
+75
+76</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// hashFunction.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;ostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;unordered_map&gt;</span>
+
+<span style="color: #0000ff;">struct</span> MyInt{
+  MyInt(<span style="color: #2b91af;">int</span> v):val(v){}
+  <span style="color: #2b91af;">bool</span> <span style="color: #0000ff;">operator</span>== (<span style="color: #0000ff;">const</span> MyInt&amp; other) <span style="color: #0000ff;">const</span> {
+    <span style="color: #0000ff;">return</span> val == other.val;
+  }
+  <span style="color: #2b91af;">int</span> val;
+};
+
+<span style="color: #0000ff;">struct</span> MyHash{
+  std::<span style="color: #2b91af;">size_t</span> <span style="color: #0000ff;">operator</span>()(MyInt m) <span style="color: #0000ff;">const</span> {
+    std::hash&lt;<span style="color: #2b91af;">int</span>&gt; hashVal;
+    <span style="color: #0000ff;">return</span> hashVal(m.val);
+  }
+};
+
+<span style="color: #0000ff;">struct</span> MyAbsHash{
+  std::<span style="color: #2b91af;">size_t</span> <span style="color: #0000ff;">operator</span>()(MyInt m) <span style="color: #0000ff;">const</span> {
+    std::hash&lt;<span style="color: #2b91af;">int</span>&gt; hashVal;
+    <span style="color: #0000ff;">return</span> hashVal(abs(m.val));
+  }
+};
+
+<span style="color: #0000ff;">struct</span> MyEq{
+  <span style="color: #2b91af;">bool</span> <span style="color: #0000ff;">operator</span>() (<span style="color: #0000ff;">const</span> MyInt&amp; l, <span style="color: #0000ff;">const</span> MyInt&amp; r) <span style="color: #0000ff;">const</span> {
+    <span style="color: #0000ff;">return</span> abs(l.val) ==  abs(r.val);
+  }
+};
+
+std::ostream&amp; <span style="color: #0000ff;">operator</span> &lt;&lt; (std::ostream&amp; strm, <span style="color: #0000ff;">const</span> MyInt&amp; myIn){
+  strm &lt;&lt; <span style="color: #a31515;">"MyInt("</span> &lt;&lt; myIn.val &lt;&lt; <span style="color: #a31515;">")"</span>;
+  <span style="color: #0000ff;">return</span> strm;
+}
+
+<span style="color: #2b91af;">int</span> main(){
+
+  std::cout &lt;&lt; std::endl;
+
+  std::hash&lt;<span style="color: #2b91af;">int</span>&gt; hashVal;
+
+  <span style="color: #008000;">// a few hash values</span>
+  <span style="color: #0000ff;">for</span> ( <span style="color: #2b91af;">int</span> i= -2; i &lt;= 1 ; ++i){
+    std::cout &lt;&lt; <span style="color: #a31515;">"hashVal("</span> &lt;&lt; i &lt;&lt; <span style="color: #a31515;">"): "</span> &lt;&lt; hashVal(i) &lt;&lt; std::endl;
+  }
+
+  std::cout &lt;&lt; std::endl;
+
+  <span style="color: #0000ff;">typedef</span> std::unordered_map&lt;MyInt,<span style="color: #2b91af;">int</span>,MyHash&gt; MyIntMap;
+
+  std::cout &lt;&lt; <span style="color: #a31515;">"MyIntMap: "</span>;
+  MyIntMap myMap{{MyInt(-2),-2},{MyInt(-1),-1},{MyInt(0),0},{MyInt(1),1}};
+
+  <span style="color: #0000ff;">for</span>(<span style="color: #0000ff;">auto</span> m : myMap) std::cout &lt;&lt; <span style="color: #a31515;">'{'</span> &lt;&lt; m.first &lt;&lt; <span style="color: #a31515;">','</span> &lt;&lt; m.second &lt;&lt; <span style="color: #a31515;">'}'</span>;
+
+  std::cout &lt;&lt; std::endl &lt;&lt; std::endl;
+
+  <span style="color: #0000ff;">typedef</span> std::unordered_map&lt;MyInt,<span style="color: #2b91af;">int</span>,MyAbsHash,MyEq&gt; MyAbsMap;
+  std::cout &lt;&lt; <span style="color: #a31515;">"MyAbsMap: "</span>;
+  MyAbsMap myAbsMap{{MyInt(-2),-2},{MyInt(-1),-1},{MyInt(0),0},{MyInt(1),1}};
+
+  <span style="color: #0000ff;">for</span>(<span style="color: #0000ff;">auto</span> m : myAbsMap) std::cout &lt;&lt; <span style="color: #a31515;">'{'</span> &lt;&lt; m.first &lt;&lt; <span style="color: #a31515;">','</span> &lt;&lt; m.second &lt;&lt; <span style="color: #a31515;">'}'</span>;
+
+  std::cout &lt;&lt; std::endl &lt;&lt; std::endl;
+
+  std::cout &lt;&lt; <span style="color: #a31515;">"myAbsMap[MyInt(-2)]: "</span> &lt;&lt; myAbsMap[MyInt(-2)] &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"myAbsMap[MyInt(2)]: "</span> &lt;&lt; myAbsMap[MyInt(2)] &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"myAbsMap[MyInt(3)]: "</span> &lt;&lt; myAbsMap[MyInt(3)] &lt;&lt; std::endl;
+
+  std::cout &lt;&lt; std::endl;
+
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div>&nbsp;</div>
+<p>&nbsp;</p>
+<p>Meine Analyse des Programms beginnt in der <span style="font-family: courier new,courier;">main</span>-Funktion. Am einfachsten ist es natürlich, die Ausgabe des Programms in Augenwinkel zu behalten. In Zeile 44 erzeugt ich die Hashfunktion <span style="font-family: courier new,courier;">hasVal</span> und verwende diese anschließend, um die Hashwerte in Zeile 48 auszugeben. <span style="font-family: courier new,courier;">hasVal</span> gibt Hashwerte vom Typ <span style="font-family: courier new,courier;">std::size_t</span> zurück. <span style="font-family: courier new,courier;">std::size_t</span> repräsentiert eine ausreichend große vorzeichenlose Ganzzahl. <span style="font-family: courier new,courier;">MyIntMap</span> in Zeile 53 erklärt einen neuen Namen für einen Typ. Dieser verwendet <span style="font-family: courier new,courier;">MyInt</span> (Zeile 7 - 13) als Schlüssel. Nun benötigt mein Datentyp noch eine Hashfunktion und eine Gleichheitsfunktion. Als Hashfunktion verwendet <span style="font-family: courier new,courier;">MyInt</span> die Klasse <span style="font-family: courier new,courier;">M</span>yHash (Zeile 15 - 20). Sie greift auf die Implementierung der Hashfunktion für den Datentyp <span style="font-family: courier new,courier;">int</span> zurück. Die Gleichheitsfunktion habe ich bereits für den Datentyp überladen.&nbsp;</p>
+<p>Eine andere Strategie verfolgt der Datentyp MyAbsMap. Seinem Namen folgend, bildet MyAbsMap den Hashwert basierend auf dem absoluten Wert der ganzen Zahl (Zeile 25). Als Gleichheitsfunktion kommt die Klasse <span style="font-family: courier new,courier;">MyEq</span> mit dem überladenen Klammeroperator zum Einsatz. <span style="font-family: courier new,courier;">MyEq</span> interessiert sich konsequenterweise nur für den absoluten Wert der Ganzzahl. Die Ausgabe zeigt schön, das die Hashfunktion von <span style="font-family: courier new,courier;">MyAbsMap</span> für <em>verschiedene</em> Schlüssel den gleichen Hashwert zurückgibt. Das Ergebnis ist, das der Wert für die Schlüssel<span style="font-family: courier new,courier;"> MyInt(-2)</span> (Zeile 70) als auch<span style="font-family: courier new,courier;"> MyInt(2)</span> (Zeile 71) identisch -2 ist. Dies gilt, obwohl ich <span style="font-family: courier new,courier;">MyAbsMap</span> nicht mit einem Paar <span style="font-family: courier new,courier;">(MyInt(2),2)</span> in Zeile 64 initialisiert habe.</p>
+<p>&nbsp;</p>
+<p>&nbsp;<img src="images/blog/EmbeddedProgrammierung/Hashfunktionen/hashfunction.png" alt="hashfunction" /></p>
+<p>&nbsp;</p>
+<h2>Wie geht's weiter?</h2>
+<p>Eine Kleinigkeit fehlt noch um Hashfunktionen besser zu verstehen. Die Hashfunktion bildet den Schlüssel auf den Hashwert ab. Dabei ordnet sie einem Schlüssel vom Typ<span style="font-family: courier new,courier;"> int</span> od<span id="transmark"></span>er auch <span style="font-family: courier new,courier;"> std::string</span> seinen Bucket zu. Wie ist das sinnvoll möglich? Stehen doch der potentiell unendlichen Anzahl von Schüsseln eines Datentyps eine endliche Anzahl von Buckets gegenüber. Das ist aber nicht die einzige Frage. Wieviel Elemente landen in dem Bucket? Oder anders augedrückt. Wie häufig kommen Kollisionen vor? Fragen, auf die der <a href="index.php/blog/buckets-kapazitaet-und-ladefaktor">nächste Artikel </a>Antworten gibt.&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="166" height="212" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Hole dir dein E-Book. Unterstütze meinen Blog.</span></strong></p>
+<p>&nbsp;</p>

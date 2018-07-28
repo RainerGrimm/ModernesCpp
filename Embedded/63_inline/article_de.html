@@ -1,0 +1,231 @@
+<p>Dank<span style="font-family: courier new,courier;"> inline</span> kann der Compiler einen Funktionsaufruf durch seinen Funktionskörper ersetzen. Zwei Gründe sprechen für das Verwenden von <span style="font-family: courier new,courier;">inline</span>-Funktionen. Performanz und Sicherheit.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p>Eigentlich habe ich mir vorgenommen, mir in diesem Beitrag&nbsp;nur die Performanzbrille aufzusetzen. Gott sei Dank, habe ich noch rechtzeitig meine Scheuklappen abgelegt. Ein großer Vorteil von <span style="font-family: courier new,courier;">inline</span>-Funktionen ist es, dass durch sie Makros als Funktionsersatz überflüssig werden.</p>
+<h2>Makro must go</h2>
+<p>Makros stellen nur ein einfaches Mittel zur Textsubstitution dar. Makros besitzen kein Verständnis von der C++-Syntax. Daher kann viel schief gehen.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// macro.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+
+<span style="color: #0000ff;">#define  absMacro(i) ( (i) &gt;= 0 ? (i) : -(i) )</span>
+
+<span style="color: #0000ff;">inline</span> <span style="color: #2b91af;">int</span> absFunction(<span style="color: #2b91af;">int</span> i){
+  <span style="color: #0000ff;">return</span> i &gt;= 0 ? i : -i;
+}
+
+<span style="color: #2b91af;">int</span> func(){ 
+  std::cout &lt;&lt; <span style="color: #a31515;">"func called"</span> &lt;&lt; std::endl;
+  <span style="color: #0000ff;">return</span> 0;
+}
+
+
+<span style="color: #2b91af;">int</span> main(){
+  
+  std::cout &lt;&lt; std::endl;
+  
+  <span style="color: #0000ff;">auto</span> i(0);
+  <span style="color: #0000ff;">auto</span> res = absMacro(++i);   
+  std::cout &lt;&lt; <span style="color: #a31515;">"res: "</span> &lt;&lt; res &lt;&lt; std::endl;
+  absMacro(func());
+  
+  std::cout &lt;&lt; std::endl;
+  
+  i=0;
+  res= absFunction(++i);     
+  std::cout &lt;&lt; <span style="color: #a31515;">"res: "</span> &lt;&lt; res &lt;&lt; std::endl;
+  absFunction(func());
+  
+  std::cout &lt;&lt; std::endl;
+  
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p><img src="images/blog/EmbeddedProgrammierung/inline/inline.png" alt="inline" /></p>
+<p>Sowohl das Makro in Zeile 5 als auch die <span style="font-family: courier new,courier;">inline</span>-Funktion in Zeile 5 geben den absoluten Wert ihres Arguments zurück. Im konkreten Fall rufe ich die Funktionen mit<span style="font-family: courier new,courier;"> ++i </span>auf. i ist in dem konkreten Fall 0. Das Ergebnis sollte daher 1 sein. Sollte. Den in dem Makro wird der Ausdruck <span style="font-family: courier new,courier;">i</span> zweimal inkrementiert. Konsequenterweise ist das Ergebnis 2 anstelle von 1. Schön zeigt dies die Funktion <span style="font-family: courier new,courier;">func.</span> Verwende ich diese als Argument, wird sie in dem Makro zwei-, in der inline-Funktion einmal ausgeführt.</p>
+<p>Welche Automatismen finden bei inline-Funktionen statt?</p>
+<h2>inline</h2>
+<p>Zuerst einmal, ist nicht alles so einfach, wie es scheint. Wird eine Funktionsdefinition mit dem Schlüsselwort<span style="font-family: courier new,courier;"> inline</span> versehen, ist das für den Compiler nur eine Empfehlung. Ihm steht es frei, den Funktionsaufruf direkt durch den Funktionskörper zu ersetzen. Es geht aber auch anders. Moderne Compiler wie der Microsoft Visual C++ - , der gcc- oder der clang-Compiler<em> inlinen</em> eine Funktion auch automatisch, falls es aus Optimierungsgründen angesagt ist.</p>
+<p>Nun muss ich im Konjunktiv argumentieren. Angenommen, der Compiler folgt meiner Aufforderung und setzte das<span style="font-family: courier new,courier;"> inline</span>-Schlüsselwort in der <span style="font-family: courier new,courier;">exchange-</span>Funktion um.&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">inline</span> <span style="color: #2b91af;">void</span> exchange(<span style="color: #2b91af;">int</span>&amp; x, <span style="color: #2b91af;">int</span>&amp; y){
+  <span style="color: #2b91af;">int</span> temp= x;
+  x= y;
+  y= temp;
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Was passiert nun bei einem Funktionsaufruf?</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">...
+<span style="color: #0000ff;">auto</span> a(2011);
+<span style="color: #0000ff;">auto</span> b(2014);
+exchange(a,b);
+...
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Der Compiler ersetzt den Funktionsaufruf durch seinen Funktionskörper.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">...
+<span style="color: #0000ff;">auto</span> a(2011);
+<span style="color: #0000ff;">auto</span> b(2014);
+<span style="color: #2b91af;">int</span> temp= a;
+a= b;
+b= temp;
+...
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>An dem kleinen Beispiel lassen sich schön die Vor- und Nachteile der inline-Funktionen festmachen.</p>
+<h3>Vorteile</h3>
+<ul>
+<li>Kein Funktionsaufruf ist notwendig.</li>
+<li>Variablen müssen nicht auf den Funktionsstack geschoben bzw. wieder von ihm entfernt werden.</li>
+<li>Die Funktion benötigt keinen Rückgabewert.</li>
+<li>Der<a href="https://de.wikipedia.org/wiki/Befehlscache"> Befehlscache</a> kann optimaler verwendet werden. Neue Befehle müssen nicht umständlich geladen, sondern können sofort ausgeführt werden.</li>
+</ul>
+<h3>Nachteile</h3>
+<ul>
+<li>Die Größe der ausführbaren Datei wächst.</li>
+</ul>
+<p>Auch wenn ich hier nur ein Nachteil genannt habe, soll dies keine Wertung sein. Im Wesentlichen ist die Verwendung des Schlüsselworts <span style="font-family: courier new,courier;">inline</span> eine Abwägung von Performanz versus Größe der ausführbaren Datei. Das war die einfache Richtschnur. Im Detail ist die Abwägung deutlich diffiziler. So kann die ausführbare Datei durch <span style="font-family: courier new,courier;">inline</span> schneller oder langsamer, größer oder kleiner sein werden. <span style="font-family: courier new,courier;">inline</span> kann den Absturz des Programms verursachen oder verhindern oder auch die Anzahl der <a href="https://en.wikipedia.org/wiki/CPU_cache#Cache_miss">Cache-Misses </a>erhöhen oder reduzieren. Wer sich verwirren lassen will, den verweise ich gerne auf die FAQ zu inline-Funktionen auf <a href="https://isocpp.org/wiki/faq/inline-functions">isocpp.org</a>.&nbsp;</p>
+<p>Bisher habe ich inline nur im Zusammenhang mit Funktionen beschrieben. Natürlich lassen sich Methoden auch <span style="font-family: courier new,courier;">inline</span> definieren.</p>
+<h2>inline-Methoden</h2>
+<p>Eine Methode wird implizit und explizit zur inline-Methode. Implizit wird eine Methode zur inline-Methode, wenn sie im Klassenkörper definiert wird. Explizit, wenn sie außerhalb der Klasse definiert und mit dem Schlüsselwort <span style="font-family: courier new,courier;">inline</span> versehen wird.</p>
+<!-- HTML generated using hilite.me --><!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// inline.cpp</span>
+
+<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">MyClass</span>{
+public:
+  <span style="color: #2b91af;">void</span> implicitInline(){};
+  <span style="color: #2b91af;">void</span> explicitInline();
+  <span style="color: #0000ff;">inline</span> <span style="color: #2b91af;">void</span> notInline();
+};
+
+<span style="color: #0000ff;">inline</span> <span style="color: #2b91af;">void</span> MyClass::explicitInline(){}
+<span style="color: #2b91af;">void</span> MyClass::notInline(){}
+
+<span style="color: #2b91af;">int</span> main(){
+
+  MyClass cl;
+  cl.implicitInline();
+  cl.explicitInline();
+  cl.notInline();
+
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>So ist die Methode<span style="font-family: courier new,courier;"> implicitInline</span> in Zeile 5 <span style="font-family: courier new,courier;">inline</span>, da sie im Klassenkörper definiert wird. So ist die Methode <span style="font-family: courier new,courier;">explicitInline</span> in Zeile 6 <span style="font-family: courier new,courier;">inline</span>, da bei ihrer Definition das Schlüsselwort <span style="font-family: courier new,courier;">inline</span> angewandt wird. Ich will gerne explizit betonen. Komm&nbsp;nur bei der Methodendeklaration das Wort <span style="font-family: courier new,courier;">inline</span> zum Einsatz, besitzt dies keine Auswirkung. Genau dieser Fehler ist mir&nbsp;bei der Methode <span style="font-family: courier new,courier;">notInline</span> in Zeile 7 unterlaufen.</p>
+<h2>Allgemeine Empfehlung</h2>
+<p>Guter Rat ist teuer. Soll das Schlüsselwort<span style="font-family: courier new,courier;"> inline</span> immer oder nie verwendet werden? So einfach kann ich es mir natürlich nicht machen. Die Verwendung von <span style="font-family: courier new,courier;">inline</span> ist dann angesagt, wenn eine Funktion einen kleinen Funktionskörper besitzt, zeitkritisch ist und nicht allzu häufig aufgerufen wird. Damit überwiegen die Performanzvorteile der ausführbaren Datei häufig die Nachteile, die durch eine größere ausführbare Datei entstehen.</p>
+<p>Um das große Bild nicht zu verlieren.&nbsp;2006 verfasste die Working Group WG 21 den <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/TR18015.pdf">ISO/IEC TR 18015</a> zur C++ Performanz. In dem Abschnitt 5.3.4 gehen sie explizit auf das Schlüsselwort <span style="font-family: courier new,courier;">inline</span> für fünf populäre C++-Compiler ein. In ihrem Vergleich berücksichtigen sie Funktion, <span style="font-family: courier new,courier;">inline</span>-Funktionen und Makros. Mein Fazit aus ihrer Performanzmessung ist es, dass einerseits <span style="font-family: courier new,courier;">inline</span>-Funktionsaufruf um den Faktor 2 - 17 schneller sind als nicht <span style="font-family: courier new,courier;">inline</span>-Funktionen und das andererseits Makros und <span style="font-family: courier new,courier;">inline</span>-Funktionen in der gleichen Performanzliga spielen.</p>
+<p><strong>Wem eine einfache Fausformel nicht reicht, der kommt am Profilieren seines ausführbaren Programms nicht vorbei. Dies gilt natürlich insbesondere für embedded Systeme, in den Speicher typischerweise eine kritische Ressource ist.</strong></p>
+<p><em>Nachdem ich einige Aufmerksamkeit auf <a href="https://www.reddit.com/r/cpp/comments/5c1dbt/inline/">Reddit </a>erfahren habe, da ich den wichtigsten Punkte zu inline Funktionen vergessen habe, hier ein paar Wort zu ORD.</em></p>
+<h2>ODR&nbsp;</h2>
+<p>ODR steht für One Definition Rule und sagt im Falle einer Funktion aus.</p>
+<ul>
+<li>Eine Funktion kann nicht mehr als eine Definition pro Übersetzungseinheit besitzen.</li>
+<li>Eine Funktion kann nicht mehr als eine Definition pro Programm besitzen.</li>
+<li>Eine <span style="font-family: courier new,courier;">inline</span> Funktionen mit <em>ex</em><em>ternal linkage</em> kann in mehr als einer Übersetzungseinheit definiert werden. Für jede Definition muss aber gelten, dass sie identisch ist.</li>
+</ul>
+<p>In modernen Compilern besitzt das Schlüsselwort <span style="font-family: courier new,courier;">inline</span> nicht mehr die Funktionalität, Funktionen zu inlinen. Moderene Compiler ignorieren es fast nahezu. Der Anwendungsfall für <span style="font-family: courier new,courier;">inline</span> besteht darin,&nbsp;Funktionen auszuzeichnen, die gemäß der ODR Regel richtig sind. Der Name <span style="font-family: courier new,courier;">inline</span> ist&nbsp;mittlerweile sehr irreführend.</p>
+<h3>C versus C++</h3>
+<p>Sorry, aber die Verwirrung geht weiter. Ich will einen Punkt explizit betonen. <span style="font-family: courier new,courier;">inline</span> Funktionen besitzen per default <strong><em>external linkage</em></strong><span id="transmark"></span> in C++. Das gilt aber nicht für C. <span style="font-family: courier new,courier;">inline</span> Funktionen besitzen per default <strong><em>internal linkage</em></strong>. Die Details dazu kannst du schön in dem Artikel <a href="http://www.ibm.com/support/knowledgecenter/ssw_ibm_i_72/rzarg/inline_linkage.htm">Linkage of inline functions </a>nachlesen.</p>
+<h2>Wie geht's weiter?</h2>
+<p>Nun verlassen ich&nbsp;klassisches C++ und wende mich wieder modernem C++ zu. In C++11 wurde das Schlüsselwort <span style="font-family: courier new,courier;">constexpr</span> eingeführt. Damit lassen sich Werte, Funktionen und eigene Datentypen definieren, die zur Compilezeit evaluiert werden können. Alles, was zur Compilezeit ausgeführt wird, bietet deutliche Vorteile. Welche, das zeigt der <a href="index.php/blog/konstante-ausdruecke-mit-constexpr">nächste Artikel</a>.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="166" height="212" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Hole dir dein E-Book. Unterstütze meinen Blog.</span></strong></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>

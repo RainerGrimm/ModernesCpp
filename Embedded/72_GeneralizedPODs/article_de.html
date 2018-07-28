@@ -1,0 +1,125 @@
+<p><strong>P</strong>lain <strong>O</strong>ld<strong> D</strong>ata (PODs) folgen dem C-Standardlayout. Damit können sie direkt mit den <a href="index.php/blog/type-traits-performanz-zaehlt">performanten C-Funktionen</a> <span style="font-family: courier new,courier;">memcopy </span>oder <span style="font-family: courier new,courier;">memmove</span> kopiert, mit <span style="font-family: courier new,courier;">memset </span>initialisiert oder auch mit<span style="font-family: courier new,courier;"> memcmp</span> verglichen werden.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<h2>PODs</h2>
+<p>PODs sind in klassischem C++ fundamentale Datentypen wie Wahrheitswerte, Ganzzahlen oder Fließkommazahlen. Diese Einschränkung ändert sich in C++11, den nun können selbst benutzerdefinierte Klassentypen wie Klassen und Strukturen PODs sein.&nbsp;Der Einfachheit halber spreche ich im weiteren Artikel nur noch von Klassen.</p>
+<p>Welche Eigenschaften muss in C++11 eine Klasse erfüllen um ein POD zu sein? Eine Klasse ist ein POD, wenn sie trivial ist, ein Standardlayout besitzt und alle ihre nicht statischen Datenelemente auch PODs sind. Kompakt ist die Definition zwar, doch was bedeutet, das eine Klasse trivial ist und ein Standardlayout besitzt?</p>
+<p>Nun liest sich der Standard wie ein juristischer Text.</p>
+<h3>Triviale Klasse</h3>
+<p>Eine Klasse ist trivial, wenn sie</p>
+<ul>
+<li>einen trivialen Default-Konstruktor besitzt.</li>
+<li>trivial kopierbar ist.
+<p>&nbsp;</p>
+</li>
+</ul>
+<p>Eine trivial kopierbare Klasse ist eine Klasse, die</p>
+<ul>
+<li>keinen nicht-trivialen Copy- oder Move-Konstruktor besitzt.</li>
+<li>keinen nicht-trivialen Copy- oder Move-Zuweisungsoperator besitzt.</li>
+<li>einen trivialen Destruktor besitzt.</li>
+</ul>
+<p>Nicht-trivial heißt vereinfachend gesprochen, das die entsprechende Methode vom Entwickler implementiert wurde. Wird eine Methode direkt vom Compiler mit dem Schlüsselwort <span style="font-family: courier new,courier;">default</span> angefordert oder erzeugt sie der Compiler automatisch, ist sie&nbsp;trivial.</p>
+<p>Weiter geht es im C++-Standard mit dem Standardlayout.</p>
+<h3>Standardlayout</h3>
+<p>Eine Klasse besitzt ein Standardlayout, wenn sie</p>
+<ul>
+<li>keine virtuelle Funktion besitzt.</li>
+<li>keine virtuelle Basisklasse besitzt.</li>
+<li>keine Referenzen besitzt.</li>
+<li>keine verschiedenen Zugriffsspezifizierer (<span style="font-family: courier new,courier;">public, protected</span> und <span style="font-family: courier new,courier;">private</span>) besitzt.</li>
+</ul>
+<p>Da ist es schon viel einfacher, den Compiler mit Hilfe der <a href="index.php/blog/typeigenschaften-abfragenhttp:/www.grimm-jaud.de/index.php/blog/typeigenschaften-abfragen">Type-Traits Bibliothek</a> zu fragen, ob die Klasse ein POD ist.</p>
+<h3>Introspektion mit der Type-Traits Bibliothek</h3>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; border-width: .1em .1em .1em .8em; padding: .2em .6em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// pod.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;type_traits&gt;</span>
+
+<span style="color: #0000ff;">struct</span> Pod{
+  <span style="color: #2b91af;">int</span> a;
+};
+
+<span style="color: #0000ff;">struct</span> NotPod{
+    <span style="color: #2b91af;">int</span> i;
+  private:
+    <span style="color: #2b91af;">int</span> j;
+};
+
+<span style="color: #2b91af;">int</span> main(){
+
+  std::cout &lt;&lt; std::boolalpha &lt;&lt; std::endl;
+  
+  std::cout &lt;&lt; <span style="color: #a31515;">"std::is_pod&lt;Pod&gt;::value: "</span> &lt;&lt; std::is_pod&lt;Pod&gt;::value &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"std::is_pod&lt;NotPod&gt;::value: "</span> &lt;&lt; std::is_pod&lt;NotPod&gt;::value &lt;&lt; std::endl;
+  
+  std::cout &lt;&lt; std::endl;
+   
+  std::cout &lt;&lt; <span style="color: #a31515;">"std::is_trivial&lt;NotPod&gt;::value: "</span> &lt;&lt; std::is_trivial&lt;NotPod&gt;::value &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"std::is_standard_layout&lt;NotPod&gt;::value: "</span> &lt;&lt; std::is_standard_layout&lt;NotPod&gt;::value &lt;&lt; std::endl;
+  
+  std::cout &lt;&lt; std::endl;
+  
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Die Klasse <span style="font-family: courier new,courier;">Pod</span> in den Zeilen 6 - 8 ist ein POD, die Klasse <span style="font-family: courier new,courier;">NotPod</span> in den Zeilen 10 - 15 nicht. Die Antwort gibt uns die Funktion<span style="font-family: courier new,courier;"> std::is_pod</span> der Type-Traits Bibliothek in den Zeilen 21 und 22. Es geht noch genauer mit der Type-Traits Bibliothek. In den Zeilen 26 und 27 analysiere ich die Klasse <span style="font-family: courier new,courier;">NotPod</span> einen Schritt weiter. Das Ergebnis ist, das <span style="font-family: courier new,courier;">NotPod</span> zwar trivial ist, aber kein Standardlayout besitzt. <span style="font-family: courier new,courier;">NotPod</span> besitzt kein Standardlayout, da die Variable i <span style="font-family: courier new,courier;">public</span>, j hingegen <span style="font-family: courier new,courier;">private</span> ist.<br />Die ganze Prosa in Anwendung zeigt die Ausgabe des Programms.</p>
+<p><img src="images/blog/EmbeddedProgrammierung/PlainOldData/POD.PNG" alt="POD" width="800" height="255" /></p>
+<h2>Wie geht's weiter?</h2>
+<p>Mit diesem technischen Artikel schließe ich vorerst die Miniserie rund um die Feature in C++ ab, die unter dem Performanzblickwinkel besonders interessant sind. Weiter geht es im <a href="https://www.grimm-jaud.de/index.php/blog/sorgfaeltiger-umgang-mit-ressourcen">nächsten Artikel</a> mit den C++-Featuren zum sorgfältigen Umgang mit Ressourcen. Speichermanagement besitzt einen sehr hohen Stellenwert in der embedded Entwicklung. Um so besser, das C++11 mit den drei neuen Smart Pointern<span style="font-family: courier new,courier;"> std:::shared_ptr, std::unique_ptr</span> und<span style="font-family: courier new,courier;"> std::weak_ptr</span> das explizite Speichermanagement mit <span style="font-family: courier new,courier;">new</span> fast überflüssig macht.</p>
+<h2>Was du immer schon wissen wolltest</h2>
+<p>In dem Artikel <a href="index.php/modernes-c-in-der-praxis-linux-magazin-a">Automatik mit Methode</a> im Linux-Magazin 08/2014 gehe ich detailliert auf das Schlüsselwort <span style="font-family: courier new,courier;">default</span> ein.</p>
+<p>Die Details zum Move-Konstruktor und den Move-Zuweisungsoperator kannst du in dem Artikel<a href="index.php/modernes-c-in-der-praxis-linux-magazin-a"> Rasch verschoben</a> im Linux-Magazin 12/2012 nachlesen.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="166" height="212" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Hole dir dein E-Book. Unterstütze meinen Blog.</span></strong></p>
+<p>&nbsp;</p>

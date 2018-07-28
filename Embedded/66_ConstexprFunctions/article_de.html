@@ -1,0 +1,200 @@
+<p><span style="font-family: courier new,courier;">constexpr</span> Funktionen sind Funktionen, die zur Compilezeit ausgeführt werden können. Hört sich erst mal nicht so spannend an. Ist es aber, denn durch <span style="font-family: courier new,courier;">constexpr</span> Funktionen können Berechnungen auf die Compilezeit verschoben werden. Damit stehen deren Ergebnisse als Konstanten im ROM zur Laufzeit zur Verfügung. Darüber hinaus sind <span style="font-family: courier new,courier;">constexpr</span> Funktionen implizit <span style="font-family: courier new,courier;">inli</span>ne.</p>
+<hr id="system-readmore" />
+<p>Mit C++14 wurde die Syntax für konstante Ausdrücke in der Form von <span style="font-family: courier new,courier;">constexpr</span> Funktionen deutlich erweitert. Aus der Positiv- wurde eine Negativliste. Musste sich der Entwickler in C++11 noch die wenigen Feature merken, die in <span style="font-family: courier new,courier;">constexpr</span> Funktinon erlaubt sind, reicht es für ihn in C++14 aus, die wenigen Feature im Gedächtnis zu behalten, die nicht erlaubt sind.</p>
+<h2>C++11</h2>
+<p>Für constexpr <strong>Funktionen</strong> gelten einige Einschränkungen:</p>
+<ul>
+<li>Sie darf nicht virtuell sein.</li>
+<li>Sowohl die Argumente als auch der Rückgabewert müssen selbst konstante Ausdrücke sein.</li>
+</ul>
+<p>Weiter geht es mit dem<strong> Funktionskörper</strong>. Für diesen gilt im Wesentlichen, dass er&nbsp;</p>
+<ul>
+<li>entweder als <span style="font-family: courier new,courier;">default</span> oder <span style="font-family: courier new,courier;">delete</span> definiert ist&nbsp;oder</li>
+<li>nur genau eine Rückgabeanweisung enthält.</li>
+</ul>
+<p>Lässt sich damit eine vernünftige Funktion schreiben? Ja, das zeigen die <span style="font-family: courier new,courier;">constexpr</span> Funktionen aus dem Artikel <a href="index.php/blog/konstante-ausdruecke-mit-constexpr">Konstante Audrücke mit <span style="font-family: courier new,courier;">constexpr</span></a><span style="font-family: courier new,courier;">. </span>Lediglich die Funktion <span style="font-family: courier new,courier;">getAverageDistance </span>setzt den C++14-Standard voraus.</p>
+<p>Glücklicherweise gibt es den ternären Operator und Rekursion in C++, so dass ich den ggt-Algorithmus als <span style="font-family: courier new,courier;">constexpr</span> Funktion implementieren kann.&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// constexpr11.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+
+constexpr <span style="color: #2b91af;">int</span> gcd(<span style="color: #2b91af;">int</span> a, <span style="color: #2b91af;">int</span> b){
+  <span style="color: #0000ff;">return</span> (b== 0) ? a : gcd(b, a % b);
+}
+
+<span style="color: #2b91af;">int</span> main(){
+  
+  std::cout &lt;&lt; std::endl;
+  
+  constexpr <span style="color: #2b91af;">int</span> i= gcd(11,121);
+  
+  <span style="color: #2b91af;">int</span> a= 11;
+  <span style="color: #2b91af;">int</span> b= 121;
+  <span style="color: #2b91af;">int</span> j= gcd(a,b);
+
+  std::cout &lt;&lt; <span style="color: #a31515;">"gcd(11,121): "</span> &lt;&lt; i &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"gcd(a,b): "</span> &lt;&lt; j &lt;&lt; std::endl;
+  
+  std::cout &lt;&lt; std::endl;
+ 
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>In Zeile 6 ist der <a href="https://de.wikipedia.org/wiki/Euklidischer_Algorithmus">Euklid-Algorithmus</a> mit der Hilfe des ternären Operators und Rekursion implementiert. Verständlicher Code schaut anders aus. Natürlich kann die <span style="font-family: courier new,courier;">gcd</span>-Funktion auch mit Argumenten gefüttert werden, die keine konstanten Ausdrücke sind (Zeile 15 und 16). Dann wird das Ergebnis konsequenterweise zur Laufzeit berechnet und kann nur durch einen nicht-konstanten Ausdruck (Zeile 17) angenommen werden.</p>
+<p>Das Ergebnis des Programms ich nicht so spannend.</p>
+<p>&nbsp;<img src="images/blog/EmbeddedProgrammierung/constexprFunctions/constexpr11.png" alt="constexpr11" /></p>
+<p>Einen genaueren Blick will ich aber gerne noch auf die erzeugten Assembleranweisungen des Programms werfen. Die sind sehr aufschlussreich, und setzen&nbsp;keine tiefen Assemblerkenntnisse voraus.</p>
+<p>&nbsp;<img src="images/blog/EmbeddedProgrammierung/constexprFunctions/constexpr11Objectdump.png" alt="constexpr11Objectdump" width="800" height="293" /></p>
+<p>Der Aufruf der <span style="font-family: courier new,courier;">constexpr</span> Funktion in Zeile 13 im Sourcecode führt dazu, dass der Wert als Konstante<span style="font-family: courier new,courier;"> 0xb</span> bereits im Objektcode zur Verfügung steht. Dies steht im Gegensatz zu dem Funktionsaufruf <span style="font-family: courier new,courier;">gcd(a,b)</span> in Zeile 17. In diesem Fall muss der Prozessor erst die Variablen auf den Funktionsstack schieben (Anweisungen 400939 - 400941 im Objektdump), anschließend die Funktion aufrufen (<span style="font-family: courier new,courier;">callq</span>) und das Ergebnis des Funktionsaufrufs in der Variable j speichern (400948).</p>
+<p>Natürlich lassen sich noch mächtigere <span style="font-family: courier new,courier;">constexpr</span> Funktionen definieren, indem ternären Operatoren ineinander verschachtelt werden. Das muss aber nicht sein. Mit C++14 folgen <span style="font-family: courier new,courier;">constexpr</span> Funktionen fast der gewohnten C++-Syntax.</p>
+<h2>C++14</h2>
+<p><span style="font-family: courier new,courier;">constexpr</span> Funktionen können<span id="transmark"></span></p>
+<ul>
+<li>bedingte Sprung- und Iterationsanweisungen enthalten.</li>
+<li>mehrere Anweisungen enthalten.</li>
+<li><span style="font-family: courier new,courier;">constexpr</span> Funktionen aufrufen.</li>
+<li>fundamentale Datentypen verwenden, die mit einem konstanten Ausdruck initialisiert werden müssen.</li>
+</ul>
+<p>Dem entgegen steht, das <span style="font-family: courier new,courier;">constexpr</span> Funktionen in C++14 keine statischen oder<span style="font-family: courier new,courier;"> thread_local</span> Daten verwenden dürfen. Auch ein <span style="font-family: courier new,courier;">try</span>-Block oder eine <span style="font-family: courier new,courier;">goto</span>-Anweisungen ist nicht erlaubt. Mit diesen Erweiterungen, ist der ggt-Algorithmus deutlich einfacher in C++14 zu implementieren.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// constexpr14.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+
+constexpr <span style="color: #0000ff;">auto</span> gcd(<span style="color: #2b91af;">int</span> a, <span style="color: #2b91af;">int</span> b){
+  <span style="color: #0000ff;">while</span> (b != 0){
+    <span style="color: #0000ff;">auto</span> t= b;
+    b= a % b;
+    a= t;
+  }
+  <span style="color: #0000ff;">return</span> a;
+}
+
+<span style="color: #2b91af;">int</span> main(){
+  
+ std::cout &lt;&lt; std::endl;
+  
+  constexpr <span style="color: #2b91af;">int</span> i= gcd(11,121);
+  
+  <span style="color: #2b91af;">int</span> a= 11;
+  <span style="color: #2b91af;">int</span> b= 121;
+  <span style="color: #2b91af;">int</span> j= gcd(a,b);
+
+  std::cout &lt;&lt; <span style="color: #a31515;">"gcd(11,121): "</span> &lt;&lt; i &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"gcd(a,b): "</span> &lt;&lt; j &lt;&lt; std::endl;
+  
+  std::cout &lt;&lt; std::endl;
+ 
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Auf die Ausgabe des Programms verzichtet ich, das sie identisch ist mit der Ausgabe der C++11 Variante des ggt-Algorithmus.</p>
+<p>Dank einer Diskussion mit Odin Holmes auf der Facebookgruppe <a href="https://www.facebook.com/groups/modernescpp/">Modernes C++ </a>möchte ich noch ein sehr interessanten Anwendungsfall für <span style="font-family: courier new,courier;">constexpr</span> Funktionen vorstellen.&nbsp;</p>
+<h2>Reine Funktionen</h2>
+<p><span style="font-family: courier new,courier;">constexpr</span> Funktionen können auch zur Laufzeit ausgeführt werden. Wird der Rückgabewert einer <span style="font-family: courier new,courier;">constexpr</span> Funktion von einer <span style="font-family: courier new,courier;">constexpr</span> Variable oder Objekt angenommen, wird die Funktion zur Compilezeit ausgeführt. Welchen Grund kann es nun geben, eine <span style="font-family: courier new,courier;">constexpr</span> Funktion zur Laufzeit auszuführen? Der naheliegendste Grund ist sicher, dass die Funktion schon als <span style="font-family: courier new,courier;">constexpr</span> Funktion vorliegt. Warum sollte sie daher nicht auch zu Laufzeit ausgeführt werden. Es gibt aber einen viel überzeugenderes Argument dafür, <span style="font-family: courier new,courier;">constexpr</span> Funktionen zur Laufzeit auszuführen,</p>
+<p>Eine <span style="font-family: courier new,courier;">constexpr</span> Funktion kann potentiell zur Compilezeit ausgeführt werden. Zur Compilezeit gibt es keinen Zustand. Hier befinden wir uns in einer rein funktionalen Subsprache der imperativen Programmiersprache C++. Insbesondere bedeutet dies, das zur Compilezeit ausgeführte <span style="font-family: courier new,courier;">constexpr</span> Funktionen reine Funktionen sein müssen. Wird nun dieser Funktionsaufruf zur Laufzeit ausgeführt, indem das Ergebnis ohne <span style="font-family: courier new,courier;">constexpr</span> angenommen wird, bleibt der Funktionsaufruf rein. Reine Funktionen sind Funktionen,&nbsp;die immer den gleichen Wert zurückgeben, wenn sie mit den gleichen Argumenten aufgerufen werden. Reine Funktionen verhalten sich wie unendlich große Tabellen, in denen der Wert einfach nur nachgeschlagen wird. Diese Zusicherung, dass ein Ausdruck immer den gleichen Wert zurückgibt, wenn er mit dem gleichen Argumenten bedient wird, nennt sich Referenzielle Transparenz.</p>
+<p>Reine Funktionen haben viele Vorteile:</p>
+<ul>
+<li>Der Funktionsaufruf kann&nbsp;durch sein Ergebnis ersetzt werden.</li>
+<li>Die Ausführung von reine Funktionen kann automatisch auf andere Threads verteilt werden.</li>
+<li>Funktionsaufrufe können umsortiert werden.</li>
+<li>Sie können einfach refaktoriert werden.</li>
+</ul>
+<p>Die letzten drei Punkte gelten, da reine Funktionen keinen Programmzustand verändern und damit von diesem nicht abhängen. Gerne werden reine Funktionen auch mathematische Funktionen genannt.</p>
+<p>Es gibt daher viele Gründe, <span style="font-family: courier new,courier;">constexpr</span> Funktionen zu verwenden. Die Tabelle bringt nochmals die Unterschiede von reinen und unreinen Funktionen auf den Punkt.</p>
+<p><img src="images/blog/EmbeddedProgrammierung/constexprFunctions/ReinVersuUnrein.png" alt="ReinVersuUnrein" width="600" height="198" /></p>
+<p>Wer mehr über die Charakteristiken der funktionalen Programmierung wissen will, den verweise ich gerne auf meinen frei zugänglichen Artikel <a href="http://www.linux-magazin.de/Online-Artikel/Funktionale-Programmierung-1-Grundzuege?category=0">Grundzüge der funktionalen Programmierung</a> für das Linux-Magazin Online.</p>
+<h3>Rein und Reiner</h3>
+<p>Ich will es gerne noch explizit betonen. <span style="font-family: courier new,courier;">constexpr</span> Funktionen sind nicht per se rein. Vielen Dank an Herrn Marcel Wid, der mich darauf aufmerksam gemacht hat. Sie sind nur reiner als gewöhnliche Funktionen, da in ihnen zum Beispiel nur Funktionen verwendet werden können, die selbst <span style="font-family: courier new,courier;">constexpr</span> Funktionen sind. Wer nur reine Funktionen verwenden will, dem lege ich das Studium der rein funktionalen Programmiersprache <a href="https://www.haskell.org/">Haskell</a> ans Herz. Mit dem sehr lesenswerten Buch<a href="http://learnyouahaskell.com/"> Learn You a Haskell For Great Good</a> von Miran Lipovaca gibt es die ideale Einstiegslektüre, die dazu auch noch online zur Verfügung steht.&nbsp;</p>
+<h2>Wie geht's weiter?</h2>
+<p>In dem Artikel<a href="index.php/blog/immer-sicherer"> Immer Sicher </a>habe ich den ggt-Algorithmus immer weiter optimiert, damit er typsicherer wird. Dank der Funktion <span style="font-family: courier new,courier;">static_assert</span> und den Funktionen der Type-Traits Bibliothek gelang dies relativ beeindruckend. Doch das ist noch nicht die ganze Geschichte zu der Type-Traits Bibliothek. Dank ihrer Introspektionsfähigkeit zur Compilezeit ist es möglich, sich selbst optimierende Programme zu schreiben. Wie? Das zeigt der <a href="index.php/blog/type-traits-performanz-zaehlt">nächste Artikel.</a></p>
+<h2>Was du schon immer wissen wolltest</h2>
+<p>Die Charakteristiken der funktionalen Programmierung stelle ich in meinen Artikel <a href="http://www.linux-magazin.de/Online-Artikel/Funktionale-Programmierung-1-Grundzuege?category=0">Grundzüge der funktionalen Programmierung</a> für das Linux-Magazin Online genauer vor.</p>
+<p>Für das Linux-Magazin habe ich das Buch <a href="http://learnyouahaskell.com/">Learn You A Haskell for Great Good </a>von Miran Lipovaca rezensiert. Hier geht es direkt zur<a href="http://www.linux-magazin.de/Ausgaben/2011/06/Buecher?category=0"> Rezension</a> eines meiner Lieblingsbücher.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="166" height="212" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Hole dir dein E-Book. Unterstütze meinen Blog.</span></strong></p>
+<p>&nbsp;</p>
