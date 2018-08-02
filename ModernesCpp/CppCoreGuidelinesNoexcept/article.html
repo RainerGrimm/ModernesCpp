@@ -1,0 +1,175 @@
+<p>If you skim through the remaining rules to error handling, you often read the word&nbsp;<span style="font-family: 'courier new', courier;">noexcept</span>. Before I write about the rules to error handling, I write first about the <span style="font-family: 'courier new', courier;">noexcept</span> specifier and the <span style="font-family: 'courier new', courier;">noexcept</span> operator in this post.&nbsp;</p>
+<hr id="system-readmore" />
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesNoexcept/teddy-562960_1280.jpg" alt="teddy 562960 1280" width="600" height="486" /></p>
+<h2><span style="font-family: courier new, courier;">noexcept</span></h2>
+<p><span style="font-family: courier new, courier;">noexcept</span> exists in two forms since C++11: as a specifier and as an operator. The C++ core guidelines uses the specifier.</p>
+<h3><span style="font-family: courier new, courier;">noexcept</span> as specifier</h3>
+<p>By declaring a function, a method, or a lambda-function as <span style="font-family: courier new, courier;">noexcept</span>, you specify that these does not throw an exception and if they throw, you do not care and let the program just crash. For simplicity reasons, I will write about function but mean also methods and function templates. There are various ways to express your intention:</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">func1</span>() noexcept;        <span style="color: #0099ff; font-style: italic;">// does not throw</span>
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">func2</span>() noexcept(<span style="color: #336666;">true</span>);  <span style="color: #0099ff; font-style: italic;">// does not throw</span>
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">func3</span>() <span style="color: #006699; font-weight: bold;">throw</span>();         <span style="color: #0099ff; font-style: italic;">// does not throw</span>
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">func4</span>() noexcept(<span style="color: #336666;">false</span>); <span style="color: #0099ff; font-style: italic;">// may throw</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The <span style="font-family: courier new, courier;">noexcept</span> specification is equivalent to the <span style="font-family: courier new, courier;">noexcept(true)</span> specification.<span style="font-family: courier new, courier;"> throw(</span>) is equivalent to <span style="font-family: courier new, courier;">noexcept(tru</span>e) but was deprecated with C++11 and will be removed with C++20. In contrast, <span style="font-family: courier new, courier;">noexcept(false)</span> means that the function may throw an exception. The <span style="font-family: courier new, courier;">noexcept</span> specification is part of the function type but can not be used for function overloading.&nbsp;</p>
+<p>There are two good reasons for the use of <span style="font-family: courier new, courier;">noexcept</span>: First, an exception specifier documents the behaviour of the function. If a function is specified as <span style="font-family: courier new, courier;">noexcept</span>, it can be safely used in a non-throwing function. Second, it is an optimisation opportunity for the compiler. <span style="font-family: courier new, courier;">noexcept</span> may not call <code style="background-color: #ffffff; color: #000000; font-size: 12.8px; font-style: normal; font-weight: 400; letter-spacing: normal; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; word-spacing: 0px;"></code><span style="color: #000000; font-family: DejaVuSans, 'DejaVu Sans', arial, sans-serif; font-size: 12.8px; font-style: normal; font-weight: 400; letter-spacing: normal; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; word-spacing: 0px; background-color: #ffffff; float: none;"></span><span class="t-lc" style="color: #000000; font-size: 12.8px; font-style: normal; font-weight: 400; letter-spacing: normal; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; word-spacing: 0px; background-color: #ffffff; font-family: courier new, courier;"><a style="text-decoration: none; color: #0b0080; background: rgba(0, 0, 0, 0) none repeat scroll 0% 0%;" title="cpp/error/unexpected" href="https://en.cppreference.com/w/cpp/error/unexpected">std::unexpected</a></span><span style="color: #000000; font-family: DejaVuSans, 'DejaVu Sans', arial, sans-serif; font-size: 12.8px; font-style: normal; font-weight: 400; letter-spacing: normal; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; word-spacing: 0px; background-color: #ffffff; float: none;"></span>and may not unwind the stack. The initialisation of a container may cheap move the elements into the container if the move constructor is declared as noexcept. If not declared as noexcept, the elements may be expensive copied into the container.<br /><span style="color: #000000; font-family: DejaVuSans, 'DejaVu Sans', arial, sans-serif; font-size: 12.8px; font-style: normal; font-weight: 400; letter-spacing: normal; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; word-spacing: 0px; background-color: #ffffff; float: none;"></span></p>
+<p>Each function in C++ is either&nbsp;non-throwing&nbsp;or&nbsp;potentially throwing. Potentially throwing means:</p>
+<ol>
+<li>The function may use a function that may throw.</li>
+<li>The function is declared without a&nbsp;<span style="font-family: courier new, courier;">noexcept</span> specification.</li>
+<li>The function uses a <span style="font-family: courier new, courier;">dynamic_cast</span> to a reference type.</li>
+</ol>
+<p>There is an exception to the rule 2, that functions are potentially throwing if they have no <span style="font-family: courier new, courier;">noexcept</span> specification. These exceptions include the following six special member functions. They are implicitly non-throwing.<i style="color: #000000; font-family: DejaVuSans, 'DejaVu Sans', arial, sans-serif; font-size: 12.8px; font-weight: 400; letter-spacing: normal; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; word-spacing: 0px; background-color: #ffffff;"> </i></p>
+<ul>
+<li>Default constructor and destructor</li>
+<li>Move and copy constructor</li>
+<li>Move and copy assignment operator</li>
+</ul>
+<p>This special six member such as the destructor can only be non-throwing if all destructors of the attributes and the bases-classes are non-throwing. Of course, the corresponding statement will hold for the five other special member functions.</p>
+<p>What happens when you throw an exception in a function which is declared as non-throwing? In this case,<span style="font-family: courier new, courier;"></span> <a href="https://en.cppreference.com/w/cpp/error/terminate"><span style="font-family: courier new, courier;">std::terminate</span></a> is called. <span style="font-family: courier new, courier;">std::terminate</span> calls the currently installed <a href="https://en.cppreference.com/w/cpp/error/terminate_handler">std::terminate_handler</a> which calls <a href="https://en.cppreference.com/w/cpp/utility/program/abort">std::abort</a>&nbsp;by default.The result is an abnormal program termination.</p>
+<p>For completeness, is want to present&nbsp;<span style="font-family: courier new, courier;">noexcept</span> as operator.</p>
+<h3><span style="font-family: courier new, courier;">noexcept</span> as operator</h3>
+<p>The <span style="font-family: courier new, courier;"><code>noexcept</code></span> operator checks at compile-time if an expression does not throw an exception. The <span style="font-family: courier new, courier;">noexcept</span> operator does not evaluate the expression. It can be used in a <span style="font-family: courier new, courier;">noexcept</span> specifier of a function template to declare that the function may throw exceptions depending on the current type.</p>
+<p>To make my description clear here is a simple example of a function template which copies it return value.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// noexceptOperator.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;array&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">NoexceptCopy</span>{
+<span style="color: #9999ff;">public:</span>
+  std<span style="color: #555555;">::</span>array<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>, <span style="color: #ff6600;">5</span><span style="color: #555555;">&gt;</span> arr{<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">5</span>};             <span style="color: #0099ff; font-style: italic;">// (2)</span>
+};
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">NonNoexceptCopy</span>{
+<span style="color: #9999ff;">public:</span>
+  std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> v{<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span> , <span style="color: #ff6600;">5</span>};                <span style="color: #0099ff; font-style: italic;">// (3)</span>
+};
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span> 
+T copy(T <span style="color: #006699; font-weight: bold;">const</span><span style="color: #555555;">&amp;</span> src) noexcept(noexcept(T(src))){     <span style="color: #0099ff; font-style: italic;">// (1)</span>
+  <span style="color: #006699; font-weight: bold;">return</span> src; 
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main(){
+    
+    NoexceptCopy noexceptCopy;
+    NonNoexceptCopy nonNoexceptCopy;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>boolalpha <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"noexcept(copy(noexceptCopy)): "</span> <span style="color: #555555;">&lt;&lt;</span>            <span style="color: #0099ff; font-style: italic;">// (4)</span>
+                  noexcept(copy(noexceptCopy)) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+                   
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"noexcept(copy(nonNoexceptCopy)): "</span> <span style="color: #555555;">&lt;&lt;</span>         <span style="color: #0099ff; font-style: italic;">// (5)</span>
+                  noexcept(copy(nonNoexceptCopy)) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}
+</pre>
+</div>
+<p></p>
+<p>Of course, the most interesting line in this example is the line (1). In particular,<span> the </span>expression <span style="font-family: courier new, courier;">noexcept(noexcept(T(src)). </span>The inner noexcept ist the <span style="font-family: courier new, courier;">noexcept</span> operator and the outer the <span style="font-family: courier new, courier;">noexcept</span> specifier. The expression <span style="font-family: courier new, courier;">noexcept(T(src))</span> checks in this case if the copy constructor is non-throwing<span style="font-family: courier new, courier;">.</span>This is the case for the class<span style="font-family: courier new, courier;"> Noexcept </span>(2) but not for the class<span style="font-family: courier new, courier;"> NonNoexcept (3) b</span>ecause of the copy constructor of<span style="font-family: courier new, courier;">&nbsp;std::vector&nbsp;</span>that may throw<span style="font-family: courier new, courier;">.</span> Consequently, the expression (4) returns <span style="font-family: courier new, courier;">true</span> and the expression (5) returns <span style="font-family: courier new, courier;">false. <br /></span></p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesNoexcept/noexceptOperator.png" alt="noexceptOperator" width="400" height="168" /></p>
+<p>Maybe you know about it. You can check at compile time with the help of the type traits library if a type T has a non-throwing copy constructor: <span style="font-family: courier new, courier;">std::is_nothrow_copy_constructible::value</span>. Based on this predicate you can use instead of the noexcept operator the predicate from the type traits library:</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span> 
+T copy(T <span style="color: #006699; font-weight: bold;">const</span><span style="color: #555555;">&amp;</span> src) noexcept(std<span style="color: #555555;">::</span>is_nothrow_copy_constructible<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value){
+  <span style="color: #006699; font-weight: bold;">return</span> src; 
+}
+</pre>
+</div>
+<p></p>
+<p>I don't know which version of <span style="font-family: courier new, courier;">copy</span> do you prefer? I prefer the type traits version because it is more expressive.</p>
+<p>The next rule&nbsp;is about the noexcept specifier.</p>
+<h2><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Re-noexcept">E.12: Use <code class="highlighter-rouge no-highlight">noexcept</code> when exiting a function because of a <code class="highlighter-rouge no-highlight">throw</code> is impossible or unacceptable</a></h2>
+<p>The title of this rule may be a little bit confusing. It says that you should declare a function as <span style="font-family: courier new, courier;">noexcept,</span> if</p>
+<ul>
+<li>it does not throw or</li>
+<li>you don't care in case of an exception. You&nbsp;are willing to crash the program because you can not handle an exception such as <a href="https://en.cppreference.com/w/cpp/memory/new/bad_alloc"><span style="font-family: courier new, courier;">std::bad_alloc</span></a> due to memory exhaustion.</li>
+</ul>
+<p>&nbsp;It's not a good idea to throw an exception if you are the direct owner of an object.</p>
+<h2><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Re-never-throw">E.13: Never throw while being the direct owner of an object</a></h2>
+<p>Here is an example to direct ownership from the guidelines:</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">leak</span>(<span style="color: #007788; font-weight: bold;">int</span> x)   <span style="color: #0099ff; font-style: italic;">// don't: may leak</span>
+{
+    <span style="color: #006699; font-weight: bold;">auto</span> p <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">new</span> <span style="color: #007788; font-weight: bold;">int</span>{<span style="color: #ff6600;">7</span>};
+    <span style="color: #006699; font-weight: bold;">if</span> (x <span style="color: #555555;">&lt;</span> <span style="color: #ff6600;">0</span>) <span style="color: #006699; font-weight: bold;">throw</span> Get_me_out_of_here{};  <span style="color: #0099ff; font-style: italic;">// may leak *p</span>
+    <span style="color: #0099ff; font-style: italic;">// ...</span>
+    <span style="color: #006699; font-weight: bold;">delete</span> p;   <span style="color: #0099ff; font-style: italic;">// we may never get here</span>
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>If the throw is fired the memory is lost and you have a leak. The simple solution is to get rid of the ownership and make the C++ runtime to the direct owner of the object. Just create a local object or at least a guard as a local object. And you know the C++ runtime takes care of local objects. Here are three variations of this idea.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">leak</span>(<span style="color: #007788; font-weight: bold;">int</span> x)   <span style="color: #0099ff; font-style: italic;">// don't: may leak</span>
+{
+    <span style="color: #006699; font-weight: bold;">auto</span> p1 <span style="color: #555555;">=</span> <span style="color: #007788; font-weight: bold;">int</span>{<span style="color: #ff6600;">7</span>};
+    <span style="color: #006699; font-weight: bold;">auto</span> p2 <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>make_unique<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span>(<span style="color: #ff6600;">7</span>);
+    <span style="color: #006699; font-weight: bold;">auto</span> p3 <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span>(<span style="color: #ff6600;">7</span>);
+    <span style="color: #006699; font-weight: bold;">if</span> (x <span style="color: #555555;">&lt;</span> <span style="color: #ff6600;">0</span>) <span style="color: #006699; font-weight: bold;">throw</span> Get_me_out_of_here{}; 
+    <span style="color: #0099ff; font-style: italic;">// ...</span>
+}
+</pre>
+</div>
+<p></p>
+<p><span style="font-family: courier new, courier;">p1</span> is locally created but <span style="font-family: courier new, courier;">p2</span> and <span style="font-family: courier new, courier;">p3</span> are kinds of guards for the objects. The <span style="font-family: courier new, courier;">std::vector </span>uses the heap to manage its data. Additionally, with all three variations, you get rid of the delete call.<span style="font-family: courier new, courier;"> </span></p>
+<h2>What's next?</h2>
+<p>Of course, my story with exceptions and error handling continues in the next post.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Eric Pederson, Paul Baxter,&nbsp; Meeting C++, Matt Braun, Avi Lachmish, Adrian Muntea, and Roman Postanciuc. <span class="sc-bxivhb huvVuj" style="color: #052d49; font-family: America, sans-serif; letter-spacing: inherit; margin: 0px; position: relative; text-align: inherit; text-transform: inherit; text-shadow: none; font-weight: 400; font-size: 1rem; line-height: 1.5;"><span class="sc-bxivhb fjhgUr" style="color: #052d49; font-family: America, sans-serif; letter-spacing: inherit; margin: 0px; position: relative; text-align: inherit; text-transform: inherit; text-shadow: none; font-weight: bold; font-size: 1rem; line-height: 1.5;"></span></span><span class="sc-bxivhb huvVuj" style="color: #052d49; font-family: America, sans-serif; letter-spacing: inherit; margin: 0px; position: relative; text-align: inherit; text-transform: inherit; text-shadow: none; font-weight: 400; font-size: 1rem; line-height: 1.5;"><span class="sc-bxivhb fjhgUr" style="color: #052d49; font-family: America, sans-serif; letter-spacing: inherit; margin: 0px; position: relative; text-align: inherit; text-transform: inherit; text-shadow: none; font-weight: bold; font-size: 1rem; line-height: 1.5;"></span></span><br /></strong></p>
+<p><strong>&nbsp;</strong></p>
+<p>&nbsp;</p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 600 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
