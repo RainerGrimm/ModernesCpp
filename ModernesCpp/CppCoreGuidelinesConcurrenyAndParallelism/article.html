@@ -1,14 +1,14 @@
 <p><span style="color: #000000; font-family: 'Noto Serif', serif; font-size: 16px; font-style: normal; font-weight: 400; letter-spacing: normal; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; word-spacing: 0px; background-color: #ffffff; float: none;">C++11 is the first C++ standard that deals with concurrency. The basic building block for concurrency is a thread; therefore, most of the rules are explicitly about threads. This changed dramatically with C++17.<br /></span></p>
 <p>&nbsp;</p>
 <hr id="system-readmore" />
-<p>&nbsp;<img src="images/blog/ModernCpp/CppCoreGuidelinesConcurrenyAndParallelism/timeline11_14.png" alt="timeline11 14" width="700" height="350" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesConcurrenyAndParallelism/timeline11_14.png" alt="timeline11 14" width="700" height="350" /></p>
 <p>&nbsp;</p>
 <p><span>With <strong>C++17</strong> we got the parallel algorithms of the Standard Template Library (STL). That means, most of the algorithms of the STL can be executed sequential, parallel, or vectorized. For the curious reader: I have already written two posts to the parallel STL. The post <a href="index.php/parallel-algorithm-of-the-standard-template-library">Parallel Algorithms of the Standard Template Librar</a>y explains the execution policy which you can use the run an existing algorithm sequential, parallel, or parallel and vectorised. C++17 also gave new algorithms which are meant to run in parallel or vectorised. Here are the details: <a href="index.php/c-17-new-algorithm-of-the-standard-template-library">C++17: New Parallel Algorithms of the Standard Template Library.</a><br /></span></p>
 <p><span>The concurrency story in C++ goes on. With C++20 we can hope for extended futures, coroutines, transactions, and more. From the bird's eye view, the concurrency facilities of C++11 and C++14 are only the implementations details on which the higher abstraction of C++17 and C++20 are based on. Here is a series of posts about out concurrent future in<a href="index.php/category/multithreading-c-17-and-c-20"> C++20</a>.<br /></span></p>
 <p>Said that the rules are mainly about threads because neither GCC nor Clang or MSVC&nbsp; has fully implemented the parallel algorithms of the STL. There can not be best practices written to features that are not available (parallel STL) or even not standardised. &nbsp;</p>
 <p>This is the first rule to keep in mind when you read the rules. These rules are about available multithreading in C++11 and C++14. The second rule to keep in mind is that multithreading is very challenging. This means the rules want to give guidance to the novice and not to the experts in this domain. The rules to the memory model will follow in the future.</p>
 <p>Now, let's start and dive into the first rule.</p>
-<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rconc-multi">CP.1: Assume that your code will run as part of a multi-threaded program</a></h3>
+<h2><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rconc-multi">CP.1: Assume that your code will run as part of a multi-threaded program</a></h2>
 <p>I was astonished I read this rule the first time. Why should I optimise for the special case? To make it clear this rule is mainly about code that is used in libraries, not about the application. And the experience shows that library code is often reused. This means you maybe optimise for the general case, which is fine.</p>
 <p>To make the point of the rule clear, here is the small example.</p>
 <p>&nbsp;</p>
@@ -34,7 +34,7 @@
 <p>A <strong>data race</strong> is a situation, in which at least two threads access a shared variable at the same time. At least one thread tries to modify the variable.</p>
 <p>The rest is quite simple. If you have a data race in your program, your program has undefined behaviour. Undefined behaviour means, you can not reason anymore about your program because all can happen. I mean all. In my seminars, I often say: If your program has undefined behaviour, it has cache-fire semantic. Even your computer can cache fire.</p>
 <p>If you read the definition of data race quite carefully, you will notice that shared mutable state is necessary for having a data race. Here is a picture to make this observation quite obvious.</p>
-<p>&nbsp;<img src="images/blog/ModernCpp/CppCoreGuidelinesConcurrenyAndParallelism/SharedMutable.png" alt="SharedMutable" width="300" height="211" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesConcurrenyAndParallelism/SharedMutable.png" alt="SharedMutable" width="300" height="211" /></p>
 <p>So, what can you do to get rid of the data race? Making the static variables <span style="font-family: courier\ new, courier;">cached_x</span> (1) and <span style="font-family: courier\ new, courier;">cached_result</span> (2) immutable (<span style="font-family: courier\ new, courier;">const</span>) makes no sense. This means both static should not be shared. Here are a few ways to achieve this.</p>
 <ol>
 <li>Protect both static by their own lock.</li>
@@ -105,14 +105,14 @@ std<span style="color: #555555;">::</span>mutex cachedComputationMutex;         
 <p>&nbsp;</p>
 <p>First, the C++11 standard guarantees that static variables are initialised in a thread-safe way; therefore, I have not to protect their initialisation in all programs.</p>
 <ol>
-<li>This version is a little bit tricky because I have to acquire both locks in an atomic step. C++17 supports <span style="font-family: courier\ new, courier;">std::scoped_lock</span> which can lock an arbitrary number of mutexes in an atomic step. In C++11 you have to use instead of an <span style="font-family: courier\ new, courier;">std::unqiue_lock</span> in combination with the function<span style="font-family: courier\ new, courier;"> std::lock</span>.&nbsp; My previous post <a href="index.php/prefer-locks-to-mutexes">Prefer Locks to Mutexes </a>provides you more details.</li>
+<li>This version is a little bit tricky because I have to acquire both locks in an atomic step. C++17 supports <span style="font-family: courier\ new, courier;">std::scoped_lock</span> which can lock an arbitrary number of mutexes in an atomic step. In C++11 you have to use instead of an <span style="font-family: courier\ new, courier;">std::unqiue_lock</span> in combination with the function<span style="font-family: courier\ new, courier;"> std::lock</span>.&nbsp; My previous post <a href="index.php/prefer-locks-to-mutexes">Prefer Locks to Mutexes </a>provides you more details. <strong>This solution has a race condition on <span style="font-family: courier\ new, courier;">cached_x</span> and <span style="font-family: courier\ new, courier;">cached_result</span> because they must be accessed atomically.</strong></li>
 <li>Version 2 uses a more coarse-grained locking. Usually, you should not use coarse-grained lock such in version but instead use fine-grained locking but in this use-casem it may be fine.</li>
 <li>This is the most coarse-grained solution because the entire function is locked. Of course, the downside is that the user of the function is responsible for the synchronisation. In general, that is a bad idea.</li>
 <li>Just make the static variables <span style="font-family: courier\ new, courier;">thread_loca</span>l and you are done<span style="font-family: courier\ new, courier;"></span><span style="font-family: courier\ new, courier;"></span><span style="font-family: courier\ new, courier;"></span><span style="font-family: courier\ new, courier;"> </span></li>
 </ol>
 <p>In he end, its a question of performance and your users. Therefore try each variation, measure, and think about the people who should use and maintain your code.</p>
-<h3>What's next?</h3>
-<p>This post was just the starting point through a long journey of rules to concurrency in C++. In the next post, I will take about threads and shared state.</p>
+<h2>What's next?</h2>
+<p>This post was just the starting point through a long journey of rules to concurrency in C++. In the <a href="index.php/c-core-guidelines-more-rules-to-concurrency-and-parallelism">next post</a>, I will take about threads and shared state.</p>
 <p>&nbsp;</p>
 <p>&nbsp;</p>
 <p>&nbsp;</p>
@@ -120,7 +120,7 @@ std<span style="color: #555555;">::</span>mutex cachedComputationMutex;         
 <p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Eric Pederson, Paul Baxter, &nbsp;Sai Raghavendra Prasad Poosa, Meeting C++, Matt Braun, Avi Lachmish, and Adrian Muntea.&nbsp;<span class="sc-bxivhb huvVuj" style="color: #052d49; font-family: America, sans-serif; letter-spacing: inherit; margin: 0px; position: relative; text-align: inherit; text-transform: inherit; text-shadow: none; font-weight: 400; font-size: 1rem; line-height: 1.5;"><span class="sc-bxivhb fjhgUr" style="color: #052d49; font-family: America, sans-serif; letter-spacing: inherit; margin: 0px; position: relative; text-align: inherit; text-transform: inherit; text-shadow: none; font-weight: bold; font-size: 1rem; line-height: 1.5;"></span></span><br /></strong></p>
 <p><strong>&nbsp;</strong></p>
 <p>&nbsp;</p>
-<table border="0" style="width: 800px; height: 250px;" cellpadding="8"><caption>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
 <h2>Get your e-book at leanpub:</h2>
 </caption>
 <tbody>
@@ -138,7 +138,7 @@ std<span style="color: #555555;">::</span>mutex cachedComputationMutex;         
 </td>
 </tr>
 <tr>
-<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img src="images/books/cover.png" alt="cover" width="173" height="220" style="border: medium none #000000;" /></a></td>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
 <td style="text-align: center;">&nbsp;</td>
 <td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
 <td style="width: 5px; text-align: center;">&nbsp;</td>
@@ -161,5 +161,3 @@ std<span style="color: #555555;">::</span>mutex cachedComputationMutex;         
 </tr>
 </tbody>
 </table>
-<div id="s3gt_translate_tooltip_mini" class="s3gt_translate_tooltip_mini_box" style="background: initial !important; border: initial !important; border-radius: initial !important; border-spacing: initial !important; border-collapse: initial !important; direction: ltr !important; flex-direction: initial !important; font-weight: initial !important; height: initial !important; letter-spacing: initial !important; min-width: initial !important; max-width: initial !important; min-height: initial !important; max-height: initial !important; margin: auto !important; outline: initial !important; padding: initial !important; position: absolute; table-layout: initial !important; text-align: initial !important; text-shadow: initial !important; width: initial !important; word-break: initial !important; word-spacing: initial !important; overflow-wrap: initial !important; box-sizing: initial !important; display: initial !important; color: inherit !important; font-size: 13px !important; font-family: X-LocaleSpecific, sans-serif, Tahoma, Helvetica !important; line-height: 13px !important; vertical-align: top !important; white-space: inherit !important; left: 206px; top: 1744px; opacity: 0.6;">&nbsp;</div>
-<div id="s3gt_translate_tooltip_mini" class="s3gt_translate_tooltip_mini_box" style="background: initial !important; border: initial !important; border-radius: initial !important; border-spacing: initial !important; border-collapse: initial !important; direction: ltr !important; flex-direction: initial !important; font-weight: initial !important; height: initial !important; letter-spacing: initial !important; min-width: initial !important; max-width: initial !important; min-height: initial !important; max-height: initial !important; margin: auto !important; outline: initial !important; padding: initial !important; position: absolute; table-layout: initial !important; text-align: initial !important; text-shadow: initial !important; width: initial !important; word-break: initial !important; word-spacing: initial !important; overflow-wrap: initial !important; box-sizing: initial !important; display: initial !important; color: inherit !important; font-size: 13px !important; font-family: X-LocaleSpecific, sans-serif, Tahoma, Helvetica !important; line-height: 13px !important; vertical-align: top !important; white-space: inherit !important; left: 654px; top: 1899px; opacity: 0.3;">&nbsp;</div>
