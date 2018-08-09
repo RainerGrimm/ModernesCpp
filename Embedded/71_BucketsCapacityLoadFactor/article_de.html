@@ -1,52 +1,16 @@
-<p>Der entscheidende Grund für die konstante Zugriffszeit der ungeordneten assoziativen Container sind deren <a href="index.php/blog/hashtabellen">Hashfunktionen.</a> In bekannter Manier bietet C++ viele Stellschrauben für Hashfunktionen an. Einerseits bringt C++ einen reichen Satz an Hashfunktionen mit, andererseits lassen sich auch eigene Hashfunktionen verwenden. Selbst die Verteilung der Hashwerte auf die Buckets kann angepasst werden.</p>
+<p>Die Hashfunktion bildet die potentiell unendliche Anzahl von Schlüssel auf eine endliche Anzahl von Buckets ab. Welche Strategie dabei die C++-Laufzeit verfolgt und wie diese angepasst werden kann, zeigt dieser Artikel.</p>
 <hr id="system-readmore" />
-<p>&nbsp;</p>
-<p>Bevor ich aber konkret auf die Hashfunktionen eingehe, muss ich erst die Deklaration der ungeordneten assoziativen Container genauer betrachten, um nicht das große Bild zu verlieren. Exemplarisch betrachte ich den Repräsentanten der ungeordneten assoziativen Container, den Container <span style="font-family: courier new,courier;">std::unordered_map.</span></p>
-<h2>std::unordered_map</h2>
-<p>Die Deklaration der Hashtabelle <span style="font-family: courier new,courier;">std::unordered_map</span> bringt sehr viele interessante Details an Licht.</p>
-<!-- HTML generated using hilite.me -->
-<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
-<pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">template</span>&lt;
-    <span style="color: #0000ff;">class</span> <span style="color: #2b91af;">Key</span>,
-    <span style="color: #0000ff;">class</span> <span style="color: #2b91af;">Val</span>,
-    <span style="color: #0000ff;">class</span> <span style="color: #2b91af;">Hash</span> = std::hash&lt;Key&gt;,
-    <span style="color: #0000ff;">class</span> <span style="color: #2b91af;">KeyEqual</span> = std::equal_to&lt;Key&gt;,
-    <span style="color: #0000ff;">class</span> <span style="color: #2b91af;">Allocator</span> = std::allocator&lt; std::pair&lt;<span style="color: #0000ff;">const</span> Key, Val&gt; &gt;
-&gt; <span style="color: #0000ff;">class</span> <span style="color: #2b91af;">unordered_map</span>;</pre>
-</div>
-<p>&nbsp;</p>
-<p>Nun zu den einzelnen Template-Parametern.&nbsp;Das <span style="font-family: courier new,courier;">std::unordered_map</span> assoziiert&nbsp;einen Schlüssel (<span style="font-family: courier new,courier;">Key</span>) mit einem Wert (<span style="font-family: courier new,courier;">Val</span>). Die übrigen drei Template-Parameter werden per Default von dem Typ des Schlüssels und dem des Wertes abgeleitet. Dies gilt für die Hashfunktion (<span style="font-family: courier new,courier;">Hash</span>), die Gleichheitsfunktion (<span style="font-family: courier new,courier;">KeyEqual</span>) und den Speicherbeschaffer (<span style="font-family: courier new,courier;">Allocator</span>). Damit lässt sich einfach ein <span style="font-family: courier new,courier;">std::unordered_map char2int</span> instanziieren.</p>
-<!-- HTML generated using hilite.me -->
-<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
-<pre style="margin: 0; line-height: 125%;">std::unordered_map&lt;<span style="color: #2b91af;">char</span>,<span style="color: #2b91af;">int</span>&gt; char2int;
-</pre>
-</div>
-<p>&nbsp;</p>
-<p>Nun wird es aber interessanter. Per Default kommt die Hashfunktion <span style="font-family: courier new,courier;">std::hash&lt;Key&gt;</span> und die Gleichheitsfunktion <span style="font-family: courier new,courier;">std::equal_to&lt;Key&gt;</span> zum Einsatz. Somit lässt sich ein <span style="font-family: courier new,courier;">std::unordered_map</span> instanziieren, das eine spezielle Hash- bzw. Gleichheitsfunktion besitzt. Doch wozu ist die Gleichheitsfunktion notwendig? Die Hashfunktion bildet den Schlüssel auf den Hashwert ab. Der Hashwert landet im Bucket. Dabei kann es zu Kollisionen kommen. Das heißt, verschiedene Schlüssel können im gleichen Bucket landen. Mit dieser Kollision, bei der Schlüssel auf einfachere Hashwerte abgebildet werden, muss das <span style="font-family: courier new,courier;">std::unordered_map</span> umgehen können. Genau hierzu benötigt der assoziative Container die Gleichheitsfunktion. Nur noch der Vollständigkeit halber. Mit dem Speicherbeschaffer (<span style="font-family: courier new,courier;">Allocator</span>) lässt sich die Speicherstrategie des Containers anpassen.</p>
-<p>Welche Bedingungen müssen der Schlüssel und der Wert eines ungeordneten assoziativen Containers erfüllen?</p>
-<p>Der Schlüssel muss</p>
+<p>Um das große Bild nicht zu verlieren, will ich es gerne explizit betonen. Auch wenn ich in diesem Artikel <span style="font-family: courier new,courier;">std::unordered_set</span> als Repräsentant für einen ungeordneten assoziativen Container verwende, gelten die Aussagen dieses Artikels für alle ungeordneten assoziaitiven Container. Mit deren Systematik habe ich mich ausführlich bereits im Artikel <a href="index.php/blog/hashtabellen">Hashtabellen</a> auseinandergesetzt.&nbsp;</p>
+<h2>Rehashing</h2>
+<p>In welchen Bucket ein Schlüssel landet, darüber entscheidet die Hashfunktion. Da die Hashfunktion den potentiell unendlich großen Schlüsselraum auf eine endliche Anzahl von Buckets reduziert, kommt es natürlich vor, dass verschiedene Schlüssel im gleichen Bucket landen. Dieser Vorgang wird als Kollision bezeichnet. Im Bucket selber werden die Schlüssel typischerweise als verlinkte Liste gespeichert. Daraus lässt es sich schön ableiten, wie schnell der Zugriff auf einen Schlüssel in einem ungeordneten assoziativen Container ist. <strong>Zum einen ist die Anwendung der Hashfunktion eine konstante Operation, zum anderen ist das Suchen in der verlinkten Liste eine lineare Operation.</strong> Das Ziel der Hashfunktion muss es daher sein, möglichst wenig Kollisionen zu erzeugen.</p>
+<p>Die Anzahl der Buckets wird als Kapazität, die durchschnittliche Anzahl der Elemente je Bucket als Ladefaktor bezeichnet. Die C++-Laufzeit erzeugt in der Regel neue Buckets dann, wenn der Ladefaktor 1 übersteigt.&nbsp;Dieser Vorgang wird Rehashing genannt und kann auch explizit angefordert werden, <span style="font-family: courier new,courier;"></span><span style="font-family: courier new,courier;"></span>indem die Kapazität eines ungeodneten assoziativen Containers durch seine Methode <span style="font-family: courier new,courier;">rehash(val)</span> auf einen höheren Wert gesetzt wird<span style="font-family: courier new,courier;"></span>.Um die Begrifflichkeit besser auseinander zu halten, fasse ich sie nochmals zusammen.</p>
 <ul>
-<li>mit dem Gleichheitskriterium vergleichbar sein,</li>
-<li>als Hashwert zur Verfügung stehen,</li>
-<li>kopier- und verschiebbar sein.</li>
+<li><strong>Kapazität:</strong> Anzahl de Buckets</li>
+<li><strong><span style="color: #000000;">Ladefaktor:</span></strong> Durchschnittliche Anzahl der Elemente (Schlüssel) je Bucket</li>
+<li><strong>Rehashing</strong>: Erzeugen neuer Buckets&nbsp;</li>
 </ul>
-<p>Der Wert muss</p>
-<ul>
-<li>default-konstruierbar sein,</li>
-<li>kopier- und verschiebbar sein.</li>
-</ul>
-<h2>Die Hashfunktion</h2>
-<p>Eine Hashfunktion ist dann gut, wenn sie bei ihrer Abbildung von den Schlüsseln auf deren Hashwerte möglichst wenig Kollisionen erzeugt und ihre Hashwerte gleichmäßig auf die Buckets verteilt. Da die Ausführungszeit der Hashfunktion konstant ist, ist dies im optimalen Fall auch der Zugriff auf die Elemente des Containers.</p>
-<p>Die Hashfunktion</p>
-<ul>
-<li>ist für fundamentale Datentypen wie Wahrheitswerte, Ganzzahlen und Fließkommazahlen vordefiniert,</li>
-<li>gibt es für die Datentypen<span style="font-family: courier new,courier;"> std::string</span> und <span style="font-family: courier new,courier;">std::wstring,</span></li>
-<li>erzeugt für einen C-String <span style="font-family: courier new,courier;">const char*</span> einen Hashwert der Zeigeradresse,</li>
-<li>kann für eigene Datentypen definiert werden.</li>
-</ul>
-<p>Wende ich nun die Theorie des bisherigen Artikels für einen eigenen Datentyp an, den ich als Schlüssel eines ungeordneten Containers verwenden will, gelten für diesen Datentyp zwei Bedingungen. Er benötigt eine Hashfunktion und muss auf Gleichheit vergleichbar sein.</p>
-<!-- HTML generated using hilite.me -->
-<div>&nbsp;</div>
+<p>Diese Kenngrößen lassen sich in C++ sowohl bestimmen als auch verändern.</p>
+<p>&nbsp;</p>
 <!-- HTML generated using hilite.me -->
 <div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
 <table>
@@ -117,92 +81,70 @@
 62
 63
 64
-65
-66
-67
-68
-69
-70
-71
-72
-73
-74
-75
-76</pre>
+65</pre>
 </td>
 <td>
-<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// hashFunction.cpp</span>
+<pre style="margin: 0; line-height: 125%;">// rehash.cpp
 
-<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
-<span style="color: #0000ff;">#include &lt;ostream&gt;</span>
-<span style="color: #0000ff;">#include &lt;unordered_map&gt;</span>
+<span style="color: #008000;">#include &lt;iostream&gt;</span>
+<span style="color: #008000;">#include &lt;random&gt;</span>
+<span style="color: #008000;">#include &lt;unordered_set&gt;</span>
 
-<span style="color: #0000ff;">struct</span> MyInt{
-  MyInt(<span style="color: #2b91af;">int</span> v):val(v){}
-  <span style="color: #2b91af;">bool</span> <span style="color: #0000ff;">operator</span>== (<span style="color: #0000ff;">const</span> MyInt&amp; other) <span style="color: #0000ff;">const</span> {
-    <span style="color: #0000ff;">return</span> val == other.val;
-  }
-  <span style="color: #2b91af;">int</span> val;
-};
-
-<span style="color: #0000ff;">struct</span> MyHash{
-  std::<span style="color: #2b91af;">size_t</span> <span style="color: #0000ff;">operator</span>()(MyInt m) <span style="color: #0000ff;">const</span> {
-    std::hash&lt;<span style="color: #2b91af;">int</span>&gt; hashVal;
-    <span style="color: #0000ff;">return</span> hashVal(m.val);
-  }
-};
-
-<span style="color: #0000ff;">struct</span> MyAbsHash{
-  std::<span style="color: #2b91af;">size_t</span> <span style="color: #0000ff;">operator</span>()(MyInt m) <span style="color: #0000ff;">const</span> {
-    std::hash&lt;<span style="color: #2b91af;">int</span>&gt; hashVal;
-    <span style="color: #0000ff;">return</span> hashVal(abs(m.val));
-  }
-};
-
-<span style="color: #0000ff;">struct</span> MyEq{
-  <span style="color: #2b91af;">bool</span> <span style="color: #0000ff;">operator</span>() (<span style="color: #0000ff;">const</span> MyInt&amp; l, <span style="color: #0000ff;">const</span> MyInt&amp; r) <span style="color: #0000ff;">const</span> {
-    <span style="color: #0000ff;">return</span> abs(l.val) ==  abs(r.val);
-  }
-};
-
-std::ostream&amp; <span style="color: #0000ff;">operator</span> &lt;&lt; (std::ostream&amp; strm, <span style="color: #0000ff;">const</span> MyInt&amp; myIn){
-  strm &lt;&lt; <span style="color: #a31515;">"MyInt("</span> &lt;&lt; myIn.val &lt;&lt; <span style="color: #a31515;">")"</span>;
-  <span style="color: #0000ff;">return</span> strm;
+void getInfo(const std::unordered_set&lt;int&gt;&amp; hash){
+  std::cout &lt;&lt; <span style="color: #a31515;">"hash.bucket_count(): "</span> &lt;&lt; hash.bucket_count() &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"hash.load_factor(): "</span> &lt;&lt; hash.load_factor() &lt;&lt; std::endl;
 }
 
-<span style="color: #2b91af;">int</span> main(){
+void fillHash(std::unordered_set&lt;int&gt;&amp; h,int n){
+  std::random_device seed;
+  // default generator
+  std::mt19937 engine(seed());
+  // get random numbers 0 - 1000
+  std::uniform_int_distribution&lt;&gt; uniformDist(0,1000);
 
-  std::cout &lt;&lt; std::endl;
-
-  std::hash&lt;<span style="color: #2b91af;">int</span>&gt; hashVal;
-
-  <span style="color: #008000;">// a few hash values</span>
-  <span style="color: #0000ff;">for</span> ( <span style="color: #2b91af;">int</span> i= -2; i &lt;= 1 ; ++i){
-    std::cout &lt;&lt; <span style="color: #a31515;">"hashVal("</span> &lt;&lt; i &lt;&lt; <span style="color: #a31515;">"): "</span> &lt;&lt; hashVal(i) &lt;&lt; std::endl;
+  <span style="color: #0000ff;">for</span> ( int i=1; i&lt;= n; ++i){
+    h.insert(uniformDist(engine));
   }
+}
+
+int main(){
 
   std::cout &lt;&lt; std::endl;
 
-  <span style="color: #0000ff;">typedef</span> std::unordered_map&lt;MyInt,<span style="color: #2b91af;">int</span>,MyHash&gt; MyIntMap;
+  std::unordered_set&lt;int&gt; hash;
+  std::cout &lt;&lt; <span style="color: #a31515;">"hash.max_load_factor(): "</span> &lt;&lt; hash.max_load_factor() &lt;&lt; std::endl;
 
-  std::cout &lt;&lt; <span style="color: #a31515;">"MyIntMap: "</span>;
-  MyIntMap myMap{{MyInt(-2),-2},{MyInt(-1),-1},{MyInt(0),0},{MyInt(1),1}};
+  std::cout &lt;&lt; std::endl;
 
-  <span style="color: #0000ff;">for</span>(<span style="color: #0000ff;">auto</span> m : myMap) std::cout &lt;&lt; <span style="color: #a31515;">'{'</span> &lt;&lt; m.first &lt;&lt; <span style="color: #a31515;">','</span> &lt;&lt; m.second &lt;&lt; <span style="color: #a31515;">'}'</span>;
+  getInfo(hash);
 
-  std::cout &lt;&lt; std::endl &lt;&lt; std::endl;
+  std::cout &lt;&lt; std::endl;
 
-  <span style="color: #0000ff;">typedef</span> std::unordered_map&lt;MyInt,<span style="color: #2b91af;">int</span>,MyAbsHash,MyEq&gt; MyAbsMap;
-  std::cout &lt;&lt; <span style="color: #a31515;">"MyAbsMap: "</span>;
-  MyAbsMap myAbsMap{{MyInt(-2),-2},{MyInt(-1),-1},{MyInt(0),0},{MyInt(1),1}};
+  // only to be sure
+  hash.insert(500);
+  // get the bucket of 500
+  std::cout &lt;&lt; <span style="color: #a31515;">"hash.bucket(500): "</span> &lt;&lt; hash.bucket(500) &lt;&lt; std::endl;
 
-  <span style="color: #0000ff;">for</span>(<span style="color: #0000ff;">auto</span> m : myAbsMap) std::cout &lt;&lt; <span style="color: #a31515;">'{'</span> &lt;&lt; m.first &lt;&lt; <span style="color: #a31515;">','</span> &lt;&lt; m.second &lt;&lt; <span style="color: #a31515;">'}'</span>;
+  std::cout &lt;&lt; std::endl;
 
-  std::cout &lt;&lt; std::endl &lt;&lt; std::endl;
+  // add 100 elements
+  fillHash(hash,100);
+  getInfo(hash);
 
-  std::cout &lt;&lt; <span style="color: #a31515;">"myAbsMap[MyInt(-2)]: "</span> &lt;&lt; myAbsMap[MyInt(-2)] &lt;&lt; std::endl;
-  std::cout &lt;&lt; <span style="color: #a31515;">"myAbsMap[MyInt(2)]: "</span> &lt;&lt; myAbsMap[MyInt(2)] &lt;&lt; std::endl;
-  std::cout &lt;&lt; <span style="color: #a31515;">"myAbsMap[MyInt(3)]: "</span> &lt;&lt; myAbsMap[MyInt(3)] &lt;&lt; std::endl;
+  std::cout &lt;&lt; std::endl;
+
+  // at least 500 buckets
+  std::cout &lt;&lt; <span style="color: #a31515;">"hash.rehash(500): "</span> &lt;&lt; std::endl;
+  hash.rehash(500);
+
+  std::cout &lt;&lt; std::endl;
+
+  getInfo(hash);
+
+  std::cout &lt;&lt; std::endl;
+
+  // get the bucket of 500
+  std::cout &lt;&lt; <span style="color: #a31515;">"hash.bucket(500): "</span> &lt;&lt; hash.bucket(500) &lt;&lt; std::endl;
 
   std::cout &lt;&lt; std::endl;
 
@@ -213,15 +155,18 @@ std::ostream&amp; <span style="color: #0000ff;">operator</span> &lt;&lt; (std::o
 </tbody>
 </table>
 </div>
-<div>&nbsp;</div>
 <p>&nbsp;</p>
-<p>Meine Analyse des Programms beginnt in der <span style="font-family: courier new,courier;">main</span>-Funktion. Am einfachsten ist es natürlich, die Ausgabe des Programms in Augenwinkel zu behalten. In Zeile 44 erzeugt ich die Hashfunktion <span style="font-family: courier new,courier;">hasVal</span> und verwende diese anschließend, um die Hashwerte in Zeile 48 auszugeben. <span style="font-family: courier new,courier;">hasVal</span> gibt Hashwerte vom Typ <span style="font-family: courier new,courier;">std::size_t</span> zurück. <span style="font-family: courier new,courier;">std::size_t</span> repräsentiert eine ausreichend große vorzeichenlose Ganzzahl. <span style="font-family: courier new,courier;">MyIntMap</span> in Zeile 53 erklärt einen neuen Namen für einen Typ. Dieser verwendet <span style="font-family: courier new,courier;">MyInt</span> (Zeile 7 - 13) als Schlüssel. Nun benötigt mein Datentyp noch eine Hashfunktion und eine Gleichheitsfunktion. Als Hashfunktion verwendet <span style="font-family: courier new,courier;">MyInt</span> die Klasse <span style="font-family: courier new,courier;">M</span>yHash (Zeile 15 - 20). Sie greift auf die Implementierung der Hashfunktion für den Datentyp <span style="font-family: courier new,courier;">int</span> zurück. Die Gleichheitsfunktion habe ich bereits für den Datentyp überladen.&nbsp;</p>
-<p>Eine andere Strategie verfolgt der Datentyp MyAbsMap. Seinem Namen folgend, bildet MyAbsMap den Hashwert basierend auf dem absoluten Wert der ganzen Zahl (Zeile 25). Als Gleichheitsfunktion kommt die Klasse <span style="font-family: courier new,courier;">MyEq</span> mit dem überladenen Klammeroperator zum Einsatz. <span style="font-family: courier new,courier;">MyEq</span> interessiert sich konsequenterweise nur für den absoluten Wert der Ganzzahl. Die Ausgabe zeigt schön, das die Hashfunktion von <span style="font-family: courier new,courier;">MyAbsMap</span> für <em>verschiedene</em> Schlüssel den gleichen Hashwert zurückgibt. Das Ergebnis ist, das der Wert für die Schlüssel<span style="font-family: courier new,courier;"> MyInt(-2)</span> (Zeile 70) als auch<span style="font-family: courier new,courier;"> MyInt(2)</span> (Zeile 71) identisch -2 ist. Dies gilt, obwohl ich <span style="font-family: courier new,courier;">MyAbsMap</span> nicht mit einem Paar <span style="font-family: courier new,courier;">(MyInt(2),2)</span> in Zeile 64 initialisiert habe.</p>
-<p>&nbsp;</p>
-<p>&nbsp;<img src="images/blog/EmbeddedProgrammierung/Hashfunktionen/hashfunction.png" alt="hashfunction" /></p>
-<p>&nbsp;</p>
+<p>Zuerst zu den beiden Hilfsfunktionen <span style="font-family: courier new,courier;">getInfo</span> (Zeile 7 - 10) und <span style="font-family: courier new,courier;">fillHash</span> (Zeile 12 - 22). Die Funktion <span style="font-family: courier new,courier;">getInfo</span> gibt für eine <span style="font-family: courier new,courier;">std::unordered_set</span> die Anzahl seiner Buckets und den Ladefaktor aus. Die Funktion<span style="font-family: courier new,courier;"> fillHash</span> füllt seinen ungeordneten assoziativen Container mit n zufällig erzeugen Ganzzahlen.</p>
+<p>Interessant ist es, die Ausgabe des Programms unter Linux mit der unter Windows zu vergleichen. Unter Linux kam in bekannter Manier der GCC-, unter Windows der cl.exe-Compiler zum Einsatz. Beide Programme habe ich ohne Optimierungsflag übersetzt.</p>
+<p><img src="images/blog/EmbeddedProgrammierung/BucketsKapazitaetLadefaktor/rehashLinux.png" alt="rehashLinux" /></p>
+<p>Zuerst interessiert mich der maximale Ladefaktor (Zeile 29) des leeren Containers. Wird der maximale Ladefaktor überschritten, findet ein <em>Rehashing</em> des ungeordneten assoziativen Containers statt. Der maximale Ladefaktor ist sowohl unter Linux wie auch unter Windows1. Interessanterweise legt der GCC auf Verdacht 11 Buckets, der cl.exe nur 8 Buckets an. Der Ladefaktor ist natürlich auf beiden Plattformen 0. Wird der Schlüssel 500 (Zeile 38) in die Hashtabelle geschoben, landet er auf Linux im Bucket 5, auf Windows im Bucket 6. In Zeile 45 füge ich 100 Elemente zur Hashtabelle hinzu. Während Linux danach 97 Buckets besitzt, besitzt Windows 512 Buckets. Das Linux nur 97 Buckets besitzt, ist dadurch zu erklären, dass unter Linux durch Zufall einige gleiche Schlüssel erzeugt wurden. Während Linux mit seinem Ladefaktor dadurch schon nahe an 1 ist, kann unter Windows die Hashtabelle noch sehr viele Elemente aufnehmen, bevor es mit einem Ladefaktor von 1 automatisch zum <em>Rehashen</em> kommt. Das <em>Rehashen</em>&nbsp;stoße ich explizit für Linux in Zeile 51&nbsp;an, in dem ich fordere, dass die Hashtabelle mindestens 500 Buckets besitzen soll. Damit bestätigt sich meine Aussage. Während Linux die neuen Buckets erzeugt und auch die Schlüssel neu verteilt, ist das <em>Rehashing</em> unter Windows nicht notwendig, da die Hashtabelle bereits 512 Buckets besitzt. Sowohl unter Linux als auch unter Windows ist der Schlüssel 500 (Zeile 61) letztendlich in einem anderen Bucket wie zu Beginn des Progamms (Zeile 40).</p>
+<p><img src="images/blog/EmbeddedProgrammierung/BucketsKapazitaetLadefaktor/rehashWindows.PNG" alt="rehashWindows" /></p>
+<p>Aus einer einzelnen Beobachtung ist es fragwürdig eine Schlussfolgerung zu ziehen. Es scheint aber, dass die Linux-Laufzeit die minimalen Speicherforderungen der Hashtabelle höher gewichtet als die Windows-Laufzeit.<em></em>&nbsp;Windows legt bereits mit 101 Schlüsseln 512 Buckets (Zeile 45) an. Damit spart sich Windows das teure <em>Rehashen</em> und erkauft sich dies mit einer deutlichen überdimensionierten Hashtabelle. Beim <em>Reha</em>shen werden gegebenenfalls nicht nur neue Buckets angelegt, sondern auch die bestehenden Schlüssel neu verteilt.</p>
+<h3>Daumenregel</h3>
+<p>Falls du weißt, wie groß&nbsp;dein ungeordneter assoziativer Container&nbsp;wird, solltest du mit einer <em>vernünftigen</em> Anzahl an Buckets starten. Damit kannst du das oftmalige teure Rehashing vermeiden. Rehashing bedeutet immer Speicherallokation und die Neuverteilung der Schlüssel. Dies Frage ist natürlich, was heißt <em>vernünftig.</em> Meine Daumenregel ist es, mit einer Anzahl an Buckets zu starten, die der Anzahl an Schlüsseln entspricht. Damit ist der Ladefaktor nahe an 1.</p>
+<p>Gerade zu dieser Daumenregel<span id="transmark"></span> bin ich auf Anmerkungen gespannt, die ich gegebenenfalls wieder in diesen Artikel einfliesen lasse.</p>
 <h2>Wie geht's weiter?</h2>
-<p>Eine Kleinigkeit fehlt noch um Hashfunktionen besser zu verstehen. Die Hashfunktion bildet den Schlüssel auf den Hashwert ab. Dabei ordnet sie einem Schlüssel vom Typ<span style="font-family: courier new,courier;"> int</span> od<span id="transmark"></span>er auch <span style="font-family: courier new,courier;"> std::string</span> seinen Bucket zu. Wie ist das sinnvoll möglich? Stehen doch der potentiell unendlichen Anzahl von Schüsseln eines Datentyps eine endliche Anzahl von Buckets gegenüber. Das ist aber nicht die einzige Frage. Wieviel Elemente landen in dem Bucket? Oder anders augedrückt. Wie häufig kommen Kollisionen vor? Fragen, auf die der <a href="index.php/blog/buckets-kapazitaet-und-ladefaktor">nächste Artikel </a>Antworten gibt.&nbsp;</p>
+<p>POD's steht für <strong>P</strong>lain <strong>O</strong>ld <strong>D</strong>ata. Dies sind Datentypen, die ein C-Standardlayout besitzen. Damit können sie direkt mit den effizienten C-Funktionen wie <span style="font-family: courier new,courier;">memcpy,</span> <span style="font-family: courier new,courier;">memmove, memcmp</span> oder <span style="font-family: courier new,courier;">memset</span> manipuliert werden. C++11 ermöglicht es, das selbst Klassen PODs sind. Welche Bedingungen dazu ein Klasse erfüllen muss, davor erzählt der<a href="index.php/blog/plain-old-data"> nächste Artike</a>l.</p>
 <p>&nbsp;</p>
 <p>&nbsp;</p>
 <p>&nbsp;</p>
