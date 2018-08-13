@@ -1,0 +1,222 @@
+<p>To make my point clear, this post is about the exception case that you can not throw an exception. If your program runs in a restricted embedded environment or you have to fulfil a hard-real-time requirement, this situation may be not so exceptional to you.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesCantThrow/accident-994009_1280.jpg" alt="accident 994009 1280" width="500" height="375" /></p>
+<p>Let's start with the exceptional environment in which you can't throw exceptions. My original plan was to write at least about the rules E.19 to E.27. But I get stuck at rule E.19.</p>
+<h2><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Re-finally">E.19: Use a <code class="highlighter-rouge no-highlight">final_action</code> object to express cleanup if no suitable resource handle is available</a></h2>
+<p class="pv-top-card-section__name Sans-26px-black-85%">The first rule may surprise you because you never heard about <span style="font-family: courier new, courier;">final_action</span>. Me too. Therefore I researched. During my research, I found the excellent post to this rule by <strong>Bartłomiej Filipek</strong>.&nbsp;Bartłomiej Filipek it the author of the well-known C++-blog: <a href="https://www.bfilipek.com/p/start-here.html">Bartek's coding blog</a>. With his permission, I'm happy to incorporate his post <a href="https://www.bfilipek.com/2017/04/finalact.html">Beautiful code: final_act from GSL</a> into my post. Here we are.</p>
+<p>Sometimes there’s a need to invoke a special action at the end of the scope: it could be a resource releasing code, flag set, code guard, begin/end function calls, etc. Recently, I’ve found a beautiful utility that helps in that cases. <br />Let’s meet <span style="font-family: courier new, courier;"><code>gsl::final_act</code>/<code>finally</code>.</span></p>
+<h3>Intro</h3>
+<p><strong>Follow-up</strong> post here: <a href="http://www.bfilipek.com/2017/04/finalact-follow-up.html" target="_self">link</a>.</p>
+<p>Imagine we have the following code:</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">addExtraNodes</span>();
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">removeExtraNodes</span>();
+
+<span style="color: #007788; font-weight: bold;">bool</span> Scanner<span style="color: #555555;">::</span>scanNodes()
+{
+    <span style="color: #0099ff; font-style: italic;">// code...</span>
+    addExtraNodes();
+
+    <span style="color: #0099ff; font-style: italic;">// code...</span>
+    removeExtraNodes();
+    <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #336666;">true</span>;
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>We have a bunch of objects that <strong><span style="font-family: courier new, courier;"><code>scanNodes</code></span></strong> scans (global or shared container), but then we need to add some extra nodes to check. We want to preserve the initial container state, so at the end, we’re required to remove those additional nodes.</p>
+<p>Of course, the design of the whole scan code could be much better so that we work on a copy of the container and adding or removing extra stuff would not be a problem. But there are places, especially in legacy code, where you work on some global container, and special care needs to be taken when changing it. A lot of bugs can happen when you modify a state, and someone expects a different state of the shared container.</p>
+<p>My code seems to be working as expected… right? I call <strong><span style="font-family: courier new, courier;"><code>removeExtraNodes</code></span></strong> at the end of the function.</p>
+<p>But what if there are multiple returns from <strong><span style="font-family: courier new, courier;"><code>scanNodes</code></span></strong>? It’s simple: we need to add multiple calls to <strong><span style="font-family: courier new, courier;"><code>removeExtraNodes</code>.</span></strong> Ok….</p>
+<p>What if there are some exceptions thrown? Then we also need to call our cleanup function before we throw…</p>
+<p>So it appears we need to call <strong><span style="font-family: courier new, courier;"><code>removeExtraNodes</code></span></strong> not only before the last return!</p>
+<h3>Help needed</h3>
+<p>Let’s look at the C++ Core Guidelines. They suggest doing the following thing:</p>
+<p><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#e19-use-a-final_action-object-to-express-cleanup-if-no-suitable-resource-handle-is-available">E.19: Use a final_action object to express cleanup if no suitable resource handle is available</a></p>
+<p>The guideline says that we should strive for a better design, but still, it’s better than goto; exit approach, or doing nothing.</p>
+<p>Ok… but what’s the solution here:</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">bool</span> Scanner<span style="color: #555555;">::</span>scanNodes()
+{
+    <span style="color: #0099ff; font-style: italic;">// code...</span>
+    addExtraNodes();
+    <span style="color: #006699; font-weight: bold;">auto</span> _ <span style="color: #555555;">=</span> finally([] { removeExtraNodes(); });
+
+    <span style="color: #0099ff; font-style: italic;">// code...</span>
+
+    <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #336666;">true</span>;
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>What happened here?</p>
+<p>All I did was to wrap the call to <span style="font-family: courier new, courier;"><strong><code>removeExtraNodes</code></strong></span> in a special object that will call a given callable object in its destructor. This is exactly what we need!</p>
+<p>Where can we find that magical <span style="font-family: courier new, courier;"><code>finally()</code></span> code?</p>
+<p>Just see <a href="https://github.com/Microsoft/GSL/blob/master/include/gsl/gsl_util">Guideline Support Library/gsl_util.h</a>.</p>
+<h3>Under the hood</h3>
+<p>The code is short, so I can even paste it here:</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">F</span><span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">final_act</span>
+{
+<span style="color: #9999ff;">public:</span>
+    <span style="color: #006699; font-weight: bold;">explicit</span> final_act(F f) noexcept 
+      <span style="color: #555555;">:</span> f_(std<span style="color: #555555;">::</span>move(f)), invoke_(<span style="color: #336666;">true</span>) {}
+
+    final_act(final_act<span style="color: #555555;">&amp;&amp;</span> other) noexcept 
+     <span style="color: #555555;">:</span> f_(std<span style="color: #555555;">::</span>move(other.f_)), 
+       invoke_(other.invoke_)
+    {
+        other.invoke_ <span style="color: #555555;">=</span> <span style="color: #336666;">false</span>;
+    }
+
+    final_act(<span style="color: #006699; font-weight: bold;">const</span> final_act<span style="color: #555555;">&amp;</span>) <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">delete</span>;
+    final_act<span style="color: #555555;">&amp;</span> <span style="color: #006699; font-weight: bold;">operator</span><span style="color: #555555;">=</span>(<span style="color: #006699; font-weight: bold;">const</span> final_act<span style="color: #555555;">&amp;</span>) <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">delete</span>;
+
+    <span style="color: #555555;">~</span>final_act() noexcept
+    {
+        <span style="color: #006699; font-weight: bold;">if</span> (invoke_) f_();
+    }
+
+<span style="color: #9999ff;">private:</span>
+    F f_;
+    <span style="color: #007788; font-weight: bold;">bool</span> invoke_;
+};
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Isn’t that beautiful?!</p>
+<p>The above class takes a callable object - <strong><span style="font-family: courier new, courier;"><code>f_</code></span></strong> - and then it will call it when it’s about to be destroyed. So even if your code returns early or throws an exception your cleanup code is required to be invoked.</p>
+<p>To work nicely with move semantics, there has to be an additional boolean parameter <strong><span style="font-family: courier new, courier;"><code>invoke_</code></span></strong>. This will guarantee that we won’t call the code for temporary objects. See this commit for more information if needed: <a href="https://github.com/Microsoft/GSL/pull/90"> <br />Final_act copy/move semantics is wrong</a>.</p>
+<p><span lang="EN-GB" style="font-family: 'Arial', sans-serif; color: black;">In C++17 we have </span><span style="font-size: 12pt; font-family: 'Times New Roman', serif;"><a href="http://www.bfilipek.com/2017/01/cpp17features.html#template-argument-deduction-for-class-templates"><span style="font-size: 11pt; font-family: 'Arial', sans-serif; color: black;"></span><span lang="EN-GB" style="font-size: 11pt; font-family: 'Arial', sans-serif; color: #1155cc;">Template argument deduction for class templates</span></a></span><span style="font-family: 'Arial', sans-serif; color: black;"> <span lang="EN-GB">– that’s why you can also declare <span style="font-family: courier new, courier;">final_act</span> object as: </span></span></p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">final_act <span style="color: #cc00ff;">_f</span>([] { removeExtraNodes(); })</pre>
+</div>
+<p>&nbsp;</p>
+<p>Before C++17, we have to use the helper function <span style="font-family: courier new, courier;">finally</span> to make our life easier:</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">F</span><span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">inline</span> final_act<span style="color: #555555;">&lt;</span>F<span style="color: #555555;">&gt;</span> finally(<span style="color: #006699; font-weight: bold;">const</span> F<span style="color: #555555;">&amp;</span> f) noexcept
+{
+    <span style="color: #006699; font-weight: bold;">return</span> final_act<span style="color: #555555;">&lt;</span>F<span style="color: #555555;">&gt;</span>(f);
+}
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">F</span><span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">inline</span> final_act<span style="color: #555555;">&lt;</span>F<span style="color: #555555;">&gt;</span> finally(F<span style="color: #555555;">&amp;&amp;</span> f) noexcept
+{
+    <span style="color: #006699; font-weight: bold;">return</span> final_act<span style="color: #555555;">&lt;</span>F<span style="color: #555555;">&gt;</span>(std<span style="color: #555555;">::</span>forward<span style="color: #555555;">&lt;</span>F<span style="color: #555555;">&gt;</span>(f));
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>So all in all, we can use <code>finally()</code> function in the client code. Maybe that could change in C++17 as we’ll get <a href="http://www.bfilipek.com/2017/01/cpp17features.html#template-argument-deduction-for-class-templates">Template argument deduction for class templates</a>.</p>
+<p>What’s nice about this code?</p>
+<ul>
+<li>Clean, simple code</li>
+<li>Expressive, no comments needed</li>
+<li>Does one thing only</li>
+<li>It’s generic, so works on anything that’s callable</li>
+<li>Modern C++: so supports move semantics, noexcept,</li>
+</ul>
+<h3>Important note: final act should be noexcept</h3>
+<p>As explained many times through the comments in GSL repo (for example<a href="https://github.com/Microsoft/GSL/pull/13"> here</a>),<a href="https://github.com/Microsoft/GSL/issues?utf8=%E2%9C%93&amp;q=is%3Aissue%20is%3Aclosed%20final_act"> other issues, </a>and from<a href="https://github.com/Microsoft/GSL/issues/12#issuecomment-143589911"> Final_act can lead to program termination if the final act throws an exception</a>:</p>
+<p>Final_act should be <span style="font-family: courier new, courier;">noexcept.</span> It is conceptually just a handy way for the user to conjure up a destructor, and destructors should be noexcept. If something it invokes happens to throw, then the program will terminate.</p>
+<p>In other words you should write the code that will be called with the same assumptions as other destructor code… so don’t throw anything there. That might be a little limitation when you want to call some ‘normal’ code, not just some clean-up stuff (on the other hand might that would be a bad design after-all?).</p>
+<h3>Where could be used?</h3>
+<p>Just to be clear: don’t use <strong><span style="font-family: courier new, courier;"><code>finally</code></span></strong> approach too often! With the proper design, your objects shouldn’t work on a global state and take benefit from RAII as much as possible. Still, there are situations where <strong><span style="font-family: courier new, courier;"><code>finally</code></span></strong> is nice to use:</p>
+<ul>
+<li><span lang="EN-GB" style="font-family: 'Arial', sans-serif;">transactions</span><span lang="EN-GB" style="font-family: 'Arial', sans-serif;">. That’s a general term for all of the actions that should be reverted when something fails. If you copied 95% of a file and got an error, you cannot leave such possibly corrupted file; you have to remove it and maybe start again. If you connected to a database and you want to write some records, you assume it’s <b>atomic</b>. </span></li>
+<li>begin/end functions - where you’re required to call <strong><span style="font-family: courier new, courier;"><code>end</code></span></strong> after something started. As in our example.</li>
+<li>flag setters. You have a shared flag, and you set it to a new state, but you have to reset it to the old state when you’re done.</li>
+<li>resources without RAII support. The guideline shows an example with malloc/free. If you cannot wrap it in an RAII object (for example by <a href="http://www.bfilipek.com/2016/04/custom-deleters-for-c-smart-pointers.html">using smart pointers and custom deleters</a>), <strong><span style="font-family: courier new, courier;"><code>final_act</code></span></strong> might work.</li>
+<li>safely closing the connection - as another example for resource clean-up in fact.</li>
+</ul>
+<p>Do you see other places where <strong><span style="font-family: courier new, courier;"><code>final_act</code></span></strong> can help?</p>
+<p>You can also look at this list: <a href="https://rnestler.github.io/c-list-of-scopeguard.html">C++ List of ScopeGuard</a> that appeared some time on Reddit (<a href="https://www.reddit.com/r/cpp/comments/4ecf5a/c_list_of_scopeguard/">thread here</a>)</p>
+<h3>Summary</h3>
+<p><strong>Follow-up</strong> post here: <a href="http://www.bfilipek.com/2017/04/finalact-follow-up.html" target="_self">link</a>.</p>
+<p><strong><span style="font-family: courier new, courier;"><code>final_act</code>/<code>finally</code></span></strong> is a beautiful and well-designed tool that can help with a dirty job of cleaning stuff. In your code, you should go for a better approach to clean things/resources, but if that’s not possible <span style="font-family: courier new, courier;"><code>final_act</code></span> is a great solution.</p>
+<p>Do you use similar classes to clean things in your code?</p>
+<h2>What's next?</h2>
+<p>if you can't throw an exception and can't use finally, you have a problem. I will solve this issue in my next post.</p>
+<h2>Further information</h2>
+<p>Recently <strong>Bartłomiej Filipek </strong>published his first book <strong>C++17 in Detail</strong>. If you'd like to learn the new standard in an effective and a practical way then you can check out the book here: <a href="https://leanpub.com/cpp17indetail" target="_blank" rel="noopener">https://leanpub.com/cpp17indetail</a>.<strong>&nbsp;</strong></p>
+<h3>For Free: Four Vouchers for C++ in Detail</h3>
+<p>I'm happy to announce that <strong>Bartłomiej Filipek </strong>gave me four vouchers for his books. Read here the details to get them:<a href="index.php/four-vouchers-to-win"> For Free: Four Vouchers to Win</a>.&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Eric Pederson, Paul Baxter,&nbsp; Meeting C++, Matt Braun, Avi Lachmish, Roman Postanciuc, and Venkata Ramesh Gudpati.</strong></p>
+<p></p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>&nbsp;</caption>
+<tbody>
+<tr>
+<td><br />
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td><br />
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td><br />
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td><br />
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<br />
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td><br />
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0"><br />
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<br />
+<p>In sum, you get more than 600 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+<br />&nbsp;</td>
+</tr>
+</tbody>
+</table>
+<p></p>
+<p>&nbsp;</p>
+<table>
+<tbody>
+<tr>
+<td><br />
+<h2>&nbsp;Get your interactive course at educative</h2>
+</td>
+</tr>
+<tr>
+<td><br />
+<h4 class="_3fBEwsM053hx2mPd0uV0nT" style="text-align: center;">Modern C++ Concurrency in Practice: Get the most out of any machine</h4>
+</td>
+</tr>
+<tr>
+<td><a href="https://goo.gl/2qWUkK"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseConcurrency/educative.png" alt="educative" width="500" height="253" /></a></td>
+</tr>
+<tr>
+<td><br />
+<p>Based on my book "Concurrency with Modern C++" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>140 lessons</li>
+<li>110 code playgrounds =&gt; Run in browser</li>
+<li>78 code snippets</li>
+<li>55 illustrations</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
