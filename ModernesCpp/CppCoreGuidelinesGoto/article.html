@@ -1,0 +1,242 @@
+<p>If you can't throw an exception and can't use <code>final_action</code> (<code>finally</code>) from the <a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#S-gsl">guideline support library</a>, you have a problem. Exceptional states require exceptional actions: <code>goto.</code> Really?</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesGoto/firefighters-1147795_1280.jpg" alt="firefighters 1147795 1280" width="500" height="332" /></p>
+<p>To be honest, I was quite surprised to read in the guidelines about <code>goto exit;</code> as the final rescue. Here are the remaining rules to error handling in the C++ core guidelines.</p>
+<ul>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Re-no-throw-raii">E.25: If you can’t throw exceptions, simulate RAII for resource management</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Re-no-throw-crash">E.26: If you can’t throw exceptions, consider failing fast</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Re-no-throw-codes">E.27: If you can’t throw exceptions, use error codes systematically</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Re-specifications">E.30: Don’t use exception specifications</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Re_catch">E.31: Properly order your <code class="highlighter-rouge no-highlight">catch</code>-clauses</a></li>
+</ul>
+<p>The first three rules are quite related; therefore, I will write about them together.</p>
+<h2><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Re-no-throw-raii">E5: If you can’t throw exceptions, simulate RAII for resource management</a>, <a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Re-no-throw-crash">E.26: If you can’t throw exceptions, consider failing fast</a>, and <a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Re-no-throw-codes">E.27: If you can’t throw exceptions, use error codes systematically</a></h2>
+<p>The idea of RAII is quite simple. If you have to take care of a resource, put the resource into a class<code>.</code> Use the constructor of the class for the initialisation and the destructor for the destruction of the resource. When you create a local instance of the class&nbsp;on the stack, the C++-runtime takes care of the resource and you are done. For more information to RAII, read my previous post <a href="index.php/garbage-collectio-no-thanks">Garbage Collection - No Thanks</a>.</p>
+<p>What does it mean to simulate RAII for resource management? Imagine, you have a function <code>func</code> which exists with an exception if G<code>adget</code> can't be created.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">func</span>(zstring arg)
+{
+    Gadget g {arg};
+    <span style="color: #0099ff; font-style: italic;">// ...</span>
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>If you can not throw an exception, you should simulate RAII by adding a <code>valid</code> method to <code>Gadget.</code></p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">error_indicator <span style="color: #cc00ff;">func</span>(zstring arg)
+{
+    Gadget g {arg};
+    <span style="color: #006699; font-weight: bold;">if</span> (<span style="color: #555555;">!</span>g.valid()) <span style="color: #006699; font-weight: bold;">return</span> gadget_construction_error;
+    <span style="color: #0099ff; font-style: italic;">// ...</span>
+    <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #ff6600;">0</span>;   <span style="color: #0099ff; font-style: italic;">// zero indicates "good"</span>
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>In this case, the caller has to test the return value.</p>
+<p>The rules E.26 is straightforward. If there is no way to recover from an error such as memory exhaustion, fail fast. If you can't throw an exception call <a href="https://en.cppreference.com/w/cpp/utility/program/abort"><code>std::abort</code></a> which causes an abnormal program termination.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">f</span>(<span style="color: #007788; font-weight: bold;">int</span> n)
+{
+    <span style="color: #0099ff; font-style: italic;">// ...</span>
+    p <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">static_cast</span><span style="color: #555555;">&lt;</span>X<span style="color: #555555;">*&gt;</span>(malloc(n, X));
+    <span style="color: #006699; font-weight: bold;">if</span> (<span style="color: #555555;">!</span>p) abort();     <span style="color: #0099ff; font-style: italic;">// abort if memory is exhausted</span>
+    <span style="color: #0099ff; font-style: italic;">// ...</span>
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p><code>std::abort</code> will only cause an abnormal program termination if you don't install a signal handler which catches the signal <span class="t-lc"><a title="cpp/utility/program/SIG types" href="https://en.cppreference.com/w/cpp/utility/program/SIG_types">SIGABRT. </a></span></p>
+<p>The function f behaves such as the following function:</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">f</span>(<span style="color: #007788; font-weight: bold;">int</span> n)
+{
+    <span style="color: #0099ff; font-style: italic;">// ...</span>
+    p <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">new</span> X[n];    <span style="color: #0099ff; font-style: italic;">// throw if memory is exhausted (by default, terminate)</span>
+    <span style="color: #0099ff; font-style: italic;">// ...</span>
+}
+</pre>
+</div>
+<p></p>
+<p>Now, I will write about the non-word&nbsp;<code>goto </code>in rule E.27.</p>
+<p>In case of an error, you have a few issues to solve according to the guidelines:</p>
+<ol>
+<li>how do you transmit an error indicator from out of a function?</li>
+<li>how do you release all resources from a function before doing an error exit?</li>
+<li>What do you use as an error indicator?</li>
+</ol>
+<p>In general, your function should have two return values. The value and the error indicator; therefore, <code>std::pair</code> is a good fit. Releasing the resources may easily become a maintenance nightmare, even if you encapsulate the cleanup code in functions.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">std<span style="color: #555555;">::</span>pair<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>, error_indicator<span style="color: #555555;">&gt;</span> user()
+{
+    Gadget g1 <span style="color: #555555;">=</span> make_gadget(<span style="color: #ff6600;">17</span>);
+    <span style="color: #006699; font-weight: bold;">if</span> (<span style="color: #555555;">!</span>g1.valid()) {
+            <span style="color: #006699; font-weight: bold;">return</span> {<span style="color: #ff6600;">0</span>, g1_error};
+    }
+
+    Gadget g2 <span style="color: #555555;">=</span> make_gadget(<span style="color: #ff6600;">17</span>);
+    <span style="color: #006699; font-weight: bold;">if</span> (<span style="color: #555555;">!</span>g2.valid()) {
+            cleanup(g1);
+            <span style="color: #006699; font-weight: bold;">return</span> {<span style="color: #ff6600;">0</span>, g2_error};
+    }
+
+    <span style="color: #0099ff; font-style: italic;">// ...</span>
+
+    <span style="color: #006699; font-weight: bold;">if</span> (all_foobar(g1, g2)) {
+        cleanup(g1);
+        cleanup(g2);
+        <span style="color: #006699; font-weight: bold;">return</span> {<span style="color: #ff6600;">0</span>, foobar_error};
+    <span style="color: #0099ff; font-style: italic;">// ...</span>
+
+    cleanup(g1);
+    cleanup(g2);
+    <span style="color: #006699; font-weight: bold;">return</span> {res, <span style="color: #ff6600;">0</span>};
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Okay, seems to be correct! Or?</p>
+<p>Do you know, what <strong>DRY</strong> stands for? <strong>D</strong>on't <strong>R</strong>epeat <strong>Y</strong>ourself. Although the cleanup code is encapsulated into functions the code has a smell of code repetition because the cleanup functions are invoked in various places. How can we get rid of the repetition? Just put the cleanup code at the end of the function and jump to it.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">std<span style="color: #555555;">::</span>pair<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>, error_indicator<span style="color: #555555;">&gt;</span> user()
+{
+    error_indicator err <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>;
+
+    Gadget g1 <span style="color: #555555;">=</span> make_gadget(<span style="color: #ff6600;">17</span>);
+    <span style="color: #006699; font-weight: bold;">if</span> (<span style="color: #555555;">!</span>g1.valid()) {
+            err <span style="color: #555555;">=</span> g1_error;          <span style="color: #0099ff; font-style: italic;">// (1)</span>
+            <span style="color: #006699; font-weight: bold;">goto</span> exit;
+    }
+
+    Gadget g2 <span style="color: #555555;">=</span> make_gadget(<span style="color: #ff6600;">17</span>);
+    <span style="color: #006699; font-weight: bold;">if</span> (<span style="color: #555555;">!</span>g2.valid()) {
+            err <span style="color: #555555;">=</span> g2_error;          <span style="color: #0099ff; font-style: italic;">// (1)</span>
+            <span style="color: #006699; font-weight: bold;">goto</span> exit;
+    }
+
+    <span style="color: #006699; font-weight: bold;">if</span> (all_foobar(g1, g2)) {
+        err <span style="color: #555555;">=</span> foobar_error;          <span style="color: #0099ff; font-style: italic;">// (1)</span>
+        <span style="color: #006699; font-weight: bold;">goto</span> exit;
+    }
+    <span style="color: #0099ff; font-style: italic;">// ...</span>
+
+<span style="color: #9999ff;">exit:</span>
+  <span style="color: #006699; font-weight: bold;">if</span> (g1.valid()) cleanup(g1);
+  <span style="color: #006699; font-weight: bold;">if</span> (g2.valid()) cleanup(g2);
+  <span style="color: #006699; font-weight: bold;">return</span> {res, err};
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Admitted, with the help of <code>goto</code> the overall structure of the function is quite clear. In case of an error, just the error indicator (1) is set. Exceptional states require exceptional actions.&nbsp;</p>
+<h2><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Re-specifications">E.30: Don’t use exception specifications</a></h2>
+<p>First, here is an example of an exception specification:</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">use</span>(<span style="color: #007788; font-weight: bold;">int</span> arg)
+    <span style="color: #006699; font-weight: bold;">throw</span>(X, Y)
+{
+    <span style="color: #0099ff; font-style: italic;">// ...</span>
+    <span style="color: #006699; font-weight: bold;">auto</span> x <span style="color: #555555;">=</span> f(arg);
+    <span style="color: #0099ff; font-style: italic;">// ...</span>
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>This means that the function use may allow throwing an exception of type <code>X</code>, or <code>Y</code>. If a different exception is thrown, <code>std::terminate</code> is called.</p>
+<p>Dynamic exception specification with argument <code>throw(X, Y</code>) and without argument <code>throw()</code>&nbsp;is deprecated since C++11. Dynamic exceptions specification with arguments is removed with C++17 but dynamic exception specification without argument will be removed with C++20. th<code>row()</code> is equivalent to <code>noexcept.</code> Here are more details: <a href="index.php/c-core-guidelines-the-noexcept-specifier-and-operator">C++ Core Guidelines: The noexcept Specifier and Operator.</a>&nbsp;</p>
+<p>If you don't know the last rule, it can be very surprising.</p>
+<h2><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Re_catch">E.31: Properly order your <code class="highlighter-rouge no-highlight">catch</code>-clauses</a></h2>
+<p>An exception is cached according to the best fit strategy. This means the first exception handler that fits for an actual exception is used. This is the reason you should structure your exception handler from specific to general. If not your specific exception handler may never be invoked. In the following example, the <code>DivisionByZeroException</code> is derived from <code>std::exception.</code></p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">try{
+    <span style="color: #0099ff; font-style: italic;">// throw an exception   (1) </span>
+}
+<span style="color: #006699; font-weight: bold;">catch</span>(<span style="color: #006699; font-weight: bold;">const</span> DivisionByZeroException<span style="color: #555555;">&amp;</span> ex){ .... } <span style="color: #0099ff; font-style: italic;">// (2) </span>
+<span style="color: #006699; font-weight: bold;">catch</span>(<span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span>exception<span style="color: #555555;">&amp;</span> ex{ .... }           <span style="color: #0099ff; font-style: italic;">// (3) </span>
+<span style="color: #006699; font-weight: bold;">catch</span>(...){ .... }                               <span style="color: #0099ff; font-style: italic;">// (4) </span>
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>In this case, the <code>DivisionByZeroException</code> (2) is used first for handling the exception thrown in line (1). If the specific handler does not work, all exceptions derived from <code>std::exception</code> (3) are caught in the following line. The last exception handler has an ellipsis (4) and can, therefore, catch all exceptions.&nbsp;</p>
+<h2>What's next?</h2>
+<p>As promised, I write in the next post about the five rules for constants and immutability in C++.</p>
+<h2>&nbsp;</h2>
+<h2>&nbsp;</h2>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Eric Pederson, Paul Baxter,&nbsp; Meeting C++, Matt Braun, Avi Lachmish, Roman Postanciuc, Venkata Ramesh Gudpati, and Tobias Zindl.<br /></strong></p>
+<p>&nbsp;</p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at Leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 600 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
+<p></p>
+<table>
+<tbody>
+<tr>
+<td>
+<h2>&nbsp;Get your interactive course at educative</h2>
+</td>
+</tr>
+<tr>
+<td>
+<h4 class="_3fBEwsM053hx2mPd0uV0nT" style="text-align: center;">Modern C++ Concurrency in Practice: Get the most out of any machine</h4>
+</td>
+</tr>
+<tr>
+<td><a href="https://goo.gl/2qWUkK"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseConcurrency/educative.png" alt="educative" width="500" height="253" /></a></td>
+</tr>
+<tr>
+<td>
+<p>Based on my book "Concurrency with Modern C++" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>140 lessons</li>
+<li>110 code playgrounds =&gt; Run in browser</li>
+<li>78 code snippets</li>
+<li>55 illustrations</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
