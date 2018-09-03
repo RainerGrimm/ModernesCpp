@@ -1,0 +1,155 @@
+<p>Today's post is about the right way to throw and catch exceptions. This means in particular when you should throw and how you should catch an exception.</p>
+<hr id="system-readmore" />
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesExceptionHandling/disappointment-3151237_1280.jpg" alt="disappointment 3151237 1280" width="700" height="466" /></p>
+<p>Here are the rules for today:</p>
+<ul>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Re-exception-types">E.14: Use purpose-designed user-defined types as exceptions (not built-in types)</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Re-exception-ref">E.15: Catch exceptions from a hierarchy by reference</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Re-never-fail">E.16: Destructors, deallocation, and <code class="highlighter-rouge no-highlight">swap</code> must never fail</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Re-not-always">E.17: Don’t try to catch every exception in every function</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Re-catch">E.18: Minimize the use of explicit <code class="highlighter-rouge no-highlight">try</code>/<code class="highlighter-rouge no-highlight">catch</code></a></li>
+</ul>
+<p>Let me directly jump into the first one.</p>
+<h2><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Re-exception-types">E.14: Use purpose-designed user-defined types as exceptions (not built-in types)</a></h2>
+<p>You should not use standard exceptions types or even built-in types as an exception. Here are the two don't from the guidelines:</p>
+<h3>A built-in type</h3>
+<div style="background: #f0f3f3 none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">my_code</span>()     <span style="color: #0099ff; font-style: italic;">// Don't</span>
+{
+    <span style="color: #0099ff; font-style: italic;">// ...</span>
+    <span style="color: #006699; font-weight: bold;">throw</span> <span style="color: #ff6600;">7</span>;       <span style="color: #0099ff; font-style: italic;">// 7 means "moon in the 4th quarter"</span>
+    <span style="color: #0099ff; font-style: italic;">// ...</span>
+}
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">your_code</span>()   <span style="color: #0099ff; font-style: italic;">// Don't</span>
+{
+    try {
+        <span style="color: #0099ff; font-style: italic;">// ...</span>
+        my_code();
+        <span style="color: #0099ff; font-style: italic;">// ...</span>
+    }
+    <span style="color: #006699; font-weight: bold;">catch</span>(<span style="color: #007788; font-weight: bold;">int</span> i) {  <span style="color: #0099ff; font-style: italic;">// i == 7 means "input buffer too small"</span>
+        <span style="color: #0099ff; font-style: italic;">// ...</span>
+    }
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>In this case, the exception is just an <span style="font-family: courier new, courier;">int</span> without any semantic. What <span style="font-family: Courier New, Courier, monospace;">7 </span>mean stands in the comment, but should better be a self-describing type. The comment can be wrong. To be sure, you have to look up in the documentation to get an idea. You can not attach any meaningful information to an exception of kind <span style="font-family: courier new, courier;">int</span>. If you have a <span style="font-family: Courier New, Courier, monospace;">7</span>, I assume, you use at least the numbers 1 to 6 for your exception handling. <span style="font-family: courier new, courier;">1</span> meaning an unspecific error and so on. This is way too sophisticated, error-prone, and quite hard to read and to maintain.</p>
+<h3>A standard exception</h3>
+<div style="background: #f0f3f3 none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">my_code</span>()   <span style="color: #0099ff; font-style: italic;">// Don't</span>
+{
+    <span style="color: #0099ff; font-style: italic;">// ...</span>
+    <span style="color: #006699; font-weight: bold;">throw</span> runtime_error{<span style="color: #cc3300;">"moon in the 4th quarter"</span>};
+    <span style="color: #0099ff; font-style: italic;">// ...</span>
+}
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">your_code</span>()   <span style="color: #0099ff; font-style: italic;">// Don't</span>
+{
+    try {
+        <span style="color: #0099ff; font-style: italic;">// ...</span>
+        my_code();
+        <span style="color: #0099ff; font-style: italic;">// ...</span>
+    }
+    <span style="color: #006699; font-weight: bold;">catch</span>(<span style="color: #006699; font-weight: bold;">const</span> runtime_error<span style="color: #555555;">&amp;</span>) {   <span style="color: #0099ff; font-style: italic;">// runtime_error means "input buffer too small"</span>
+        <span style="color: #0099ff; font-style: italic;">// ...</span>
+    }
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Using a standard exception instead of a built-in type is better because you can attach additional information to an exception or build hierarchies of exceptions. This is better but not good.&nbsp; Why? The exception is too generic. It's just a <span style="font-family: courier new, courier;">runtime_error</span>. Image the function <span style="font-family: courier new, courier;">my_code</span> is part of an input sub-system. If the caller of the function catches the exception by <span style="font-family: courier new, courier;">std::runtime_error,</span> he has no idea if it was a generic error such as "<span style="font-family: courier new, courier;">input buffer too small</span>" or a sub-system specific error such as "<span style="font-family: courier new, courier;">input device is not connected</span>".</p>
+<p>To overcome these issues derive your specific exception from <span style="font-family: courier new, courier;">std::exception</span>. Here is a short example to give you the idea:</p>
+<div style="background: #f0f3f3 none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">InputSubSystemException</span><span style="color: #555555;">:</span> <span style="color: #006699; font-weight: bold;">public</span> std<span style="color: #555555;">::</span>exception{
+    <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">char</span><span style="color: #555555;">*</span> what() <span style="color: #006699; font-weight: bold;">const</span> noexcept override {
+        <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc3300;">"Provide more details to the exception"</span>;
+    }
+};
+</pre>
+</div>
+<p>Now, the client of the input sub-system can specifically catch the exception via<span style="font-family: courier new, courier;"> catch(const InputSubSystemException&amp; ex)</span>. Additionally, you can refine the exception hierarchy by further deriving from the class <span style="font-family: courier new, courier;">InputSubSystemException.</span></p>
+<h2><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Re-exception-ref">E.15: Catch exceptions from a hierarchy by reference</a></h2>
+<p>If you catch an exception from a hierarchy by-value, you may become a victim of slicing.</p>
+<p>Imagine, you derive from <span style="font-family: courier new, courier;">InputSubSystemException</span> (rule E.14) a new exception class <span style="font-family: courier new, courier;">USBInputException</span> and catch the exception by-value of type <span style="font-family: courier new, courier;">InputSubSystemException.</span><span style="font-family: courier new, courier;"> </span><span style="font-family: courier new, courier;"><span style="font-family: Helvetica, Arial, sans-serif;">Now, an exception of type</span></span><span style="font-family: courier new, courier;"><span style="font-family: Helvetica, Arial, sans-serif;"> </span></span><span style="font-family: courier new, courier;">USBInputException</span> is thrown.</p>
+<div style="background: #f0f3f3 none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">subSystem</span>(){
+    <span style="color: #0099ff; font-style: italic;">// ...</span>
+    <span style="color: #006699; font-weight: bold;">throw</span> <span style="color: #00aa88; font-weight: bold;">USBInputException</span><span style="color: #555555;">();</span>
+    <span style="color: #0099ff; font-style: italic;">// ...</span>
+}
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">clientCode</span>(){
+    try{
+        subSystem();
+    }
+    <span style="color: #006699; font-weight: bold;">catch</span>(InputSubSystemException e) {   <span style="color: #0099ff; font-style: italic;">// slicing may happen</span>
+        <span style="color: #0099ff; font-style: italic;">// ...</span>
+    }
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>By catching the <span style="font-family: courier new, courier;">USBInputException</span> by-value to <span style="font-family: courier new, courier;">InputSubSystemException, </span>slicing kicks in and <span style="font-family: Courier New, Courier, monospace;">e</span> has the simpler type&nbsp; <span style="font-family: courier new, courier;">InputSubSystemException. </span>Read the details of slicing in my previous post: <a href="index.php/c-core-guidelines-do-s-and-don-ts">C++ Core Guidelines: Rules about Don'ts. </a><span style="font-family: Times New Roman, Times, serif;"><br /></span></p>
+<p>To say it explicitly:</p>
+<ol>
+<li>Catch your exception by const reference and only by reference if you want to modify the exception.</li>
+<li>If you rethrow an exception e in the exception handler, just use throw and not throw e. In the second case, e would be copied.<span style="font-family: courier new, courier;"><span style="font-family: Times New Roman, Times, serif;"><br /> </span></span></li>
+</ol>
+<h2><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Re-never-fail">E.16: Destructors, deallocation, and <code class="highlighter-rouge no-highlight">swap</code> must never fail</a></h2>
+<p>This rule&nbsp;is quite obvious. Destructors and deallocations should never throw because their no reliable way to handle an exception during the destruction of an object.</p>
+<p><span style="font-family: Courier New, Courier, monospace;">swap </span>is often used as a basic building block for implementing copy and move semantic for a type. If an exception happens during <span style="font-family: Courier New, Courier, monospace;">swap </span>you are, therefore, left with a non-initialised or not fully initialised object. Read more about the noexcept swap here: <a href="index.php/c-core-guidelines-comparison-swap-and-hash">C++ Core Guidelines: Comparison, Swap, and Hash</a>.<span style="font-family: Times New Roman, Times, serif;"><br /></span></p>
+<p>The next two rules to the adequate usage of try and except are quite similar.</p>
+<h2><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Re-not-always">E.17: Don’t try to catch every exception in every function</a> and<a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Re-catch"> E.18: Minimize the use of explicit <code class="highlighter-rouge no-highlight">try</code>/<code class="highlighter-rouge no-highlight">catch</code></a></h2>
+<p>From the control flow perspective, <span style="font-family: Courier New, Courier, monospace;">try/catch</span> has a lot in common with the <span style="font-family: Courier New, Courier, monospace;">goto </span>statement. This means if an exception is thrown, the control flow directly jumps to the exception handler which is maybe in a totally different function of even sub-system. At the end you may get <a href="https://en.wikipedia.org/wiki/Spaghetti_code">spaghetti code</a>; meaning code that has a difficult to predict and to maintain control flow.</p>
+<p>In the end, we are back to rule <a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Re-design">E.1: Develop an error-handling strategy early in a design. </a></p>
+<p>Now, the question is: How should you structure your exception handling? I think you should ask yourself the question: Is it possible to handle the exception locally? If yes, do it. If no, let the exception propagate until you can sufficiently handle it. Often sub-system boundaries are the appropriate place to handle exceptions because you want to protect the client of the sub-system for arbitrary exceptions. At the boundary level, you have the interface consisting of the regularly and irregularly control flow. The regular communication is the functional aspect of the interface or what the system should do. The irregular communication stands for the non-functional aspects or how the system should perform. A big part of the non-functional aspects is the exception-handling and, therefore, the right place to handle the propagated exceptions.</p>
+<h2>What's next?</h2>
+<p>Six rules to error handling are still left in the C++ core guidelines. They are the topic for the next post before I go on with the rules to constants and immutability.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Eric Pederson, Paul Baxter,&nbsp; Meeting C++, Matt Braun, Avi Lachmish, Roman Postanciuc, and Venkata Ramesh Gudpati.</strong></p>
+<p>&nbsp;</p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 600 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>

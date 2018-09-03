@@ -1,0 +1,196 @@
+<p>I give in this post an introduction to the rules for generic programming in C++. Generic programming is from my point of view the outstanding feature and the future of C++. Hence it follows, that this and the upcoming posts are about the future of C++.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesGeneric/future.jpg" alt="future" width="500" height="333" /></p>
+<p>First of all, I use the term templates and generic programming, whatever fits best. Of course, I know that templates are just a way to write generic code. I assume, you know what templates in C++ are but you don't know what does generic programming mean? Here is my favourite definition from <a href="https://en.wikipedia.org/wiki/Generic_programming">Wikipedia.</a></p>
+<ul>
+<li><b>Generic programming</b> is a style of computer programming in which algorithms are written in terms of types <i>to-be-specified-later</i> that are then <i>instantiated</i> when needed for specific types provided as parameters.</li>
+</ul>
+<p>The rules to templates are about the current C++17 and the upcoming C++20 standard. Of course, I assume that we will get concepts with C++20. In sum, there are 100 rules to concepts, template interfaces, template definitions, template hierarchies, variadic templates, and template metaprogramming. The first five rules are quite general.</p>
+<ul>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-raise">T.1: Use templates to raise the level of abstraction of code</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-algo">T.2: Use templates to express algorithms that apply to many argument types</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-cont">T.3: Use templates to express containers and ranges</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-generic-oo">T.5: Combine generic and OO techniques to amplify their strengths, not their costs</a></li>
+</ul>
+<p>In the examples, concepts are often commented out. If you want to try them out, comment them in and use at least a&nbsp; GCC 6.1 compiler with the flag&nbsp;<code>-fconcepts</code> or an online compiler: <a href="https://en.cppreference.com/w/cpp/language/constraints">constraints and concepts.</a></p>
+<p>Concepts are predicates on templates that are evaluated at compile time. They should model semantic categories such as&nbsp;<code>Number,&nbsp;</code><code>Callable, Iterator</code> or <code>Range</code> but not syntactic restrictions such as <code>HasPlus,</code> or <code>IsInvocable. </code>Here are more details to <a href="index.php/tag/concepts">concepts.</a></p>
+<p>Maybe, you are puzzled by the difference between semantic categories and syntactic restrictions. The first rule helps to distinguish both terms.</p>
+<h2><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-raise">T.1: Use templates to raise the level of abstraction of code</a></h2>
+<p>Here is the example from the guidelines but I called the second concept <code>Addable. </code></p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+    <span style="color: #0099ff; font-style: italic;">// requires Incrementable&lt;T&gt;</span>
+T sum1(vector<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;&amp;</span> v, T s)
+{
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> x <span style="color: #555555;">:</span> v) s <span style="color: #555555;">+=</span> x;
+    <span style="color: #006699; font-weight: bold;">return</span> s;
+}
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+    <span style="color: #0099ff; font-style: italic;">// requires Addable&lt;T&gt;</span>
+T sum2(vector<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;&amp;</span> v, T s)
+{
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> x <span style="color: #555555;">:</span> v) s <span style="color: #555555;">=</span> s <span style="color: #555555;">+</span> x;
+    <span style="color: #006699; font-weight: bold;">return</span> s;
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>What is wrong with both concepts? Both concepts are too specific. Both concepts are based on specific operations such as the increment and the + operation. Let's go one step further from the syntactic constraints to the semantic category <code>Arithmetic.</code></p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+    <span style="color: #0099ff; font-style: italic;">// requires Arithmetic&lt;T&gt;</span>
+T sum(vector<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;&amp;</span> v, T s)
+{
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> x <span style="color: #555555;">:</span> v) s <span style="color: #555555;">+=</span> x;
+    <span style="color: #006699; font-weight: bold;">return</span> s;
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Now, the algorithm has the minimal requirements. Hold: the algorithm is better but not good. It only works only on a <code>std::vector</code>. It's generic on the type of the container but not on the container. Let me generalise the sum algorithm once more.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> Cont, <span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+    <span style="color: #0099ff; font-style: italic;">// requires Container&lt;Cont&gt;</span>
+    <span style="color: #0099ff; font-style: italic;">// &amp;&amp; Arithmetic&lt;T&gt;</span>
+T sum(Cont<span style="color: #555555;">&amp;</span> v, T s)
+{
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> x <span style="color: #555555;">:</span> v) s <span style="color: #555555;">+=</span> x;
+    <span style="color: #006699; font-weight: bold;">return</span> s;
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Now, it's fine. Maybe you prefer are a more concise definition of sum. Instead of the keyword typename, I use the concepts directly.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span>Container Cont, Arithmetic T<span style="color: #555555;">&gt;</span>
+T sum(Cont<span style="color: #555555;">&amp;</span> cont, T s){
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> x <span style="color: #555555;">:</span> cont) s <span style="color: #555555;">+=</span> x;
+    <span style="color: #006699; font-weight: bold;">return</span> s;
+}
+</pre>
+</div>
+<h2><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-algo">T.2: Use templates to express algorithms that apply to many argument types</a></h2>
+<p>When you study the first overload of <code>std::find</code> at <a href="https://en.cppreference.com/w/cpp/algorithm/find">cppreference.com,</a> it looks like this:</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span> <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">InputIt</span>, <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">T</span> <span style="color: #555555;">&gt;</span>
+InputIt find( InputIt first, InputIt last, <span style="color: #006699; font-weight: bold;">const</span> T<span style="color: #555555;">&amp;</span> value );
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The types of the Iterators are encoded in their names: <code>InputIt</code> stands for input iterator and means that is an iterator that can read from the pointed-to element. There are two issues with this declaration:</p>
+<ol>
+<li>The requirements for the iterators are encoded in the name. This reminds me of the infamous <a href="https://en.wikipedia.org/wiki/Hungarian_notation">Hungarian notation</a>.&nbsp;</li>
+<li>There is no requirement stated that the pointed-to element can be compared with the value.</li>
+</ol>
+<p>Let me use the iterator concept directly:</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span>Input_iterator Iter, <span style="color: #006699; font-weight: bold;">typename</span> Val<span style="color: #555555;">&gt;</span>
+    <span style="color: #0099ff; font-style: italic;">// Equality_comparable&lt;Value_type&lt;Iter&gt;, Val&gt;</span>
+Iter find(Iter b, Iter e, Val v)
+{
+    <span style="color: #0099ff; font-style: italic;">// ...</span>
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<h2><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-cont">T.3: Use templates to express containers and ranges</a></h2>
+<p>Okay. It's quite obvious to make a container generic. For example, here is a&nbsp;<code>Vector.</code></p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+    <span style="color: #0099ff; font-style: italic;">// requires Regular&lt;T&gt;</span>
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Vector</span> {
+    <span style="color: #0099ff; font-style: italic;">// ...</span>
+    T<span style="color: #555555;">*</span> elem;   <span style="color: #0099ff; font-style: italic;">// points to sz Ts</span>
+    <span style="color: #007788; font-weight: bold;">int</span> sz;
+};
+
+Vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">double</span><span style="color: #555555;">&gt;</span> v(<span style="color: #ff6600;">10</span>);
+v[<span style="color: #ff6600;">7</span>] <span style="color: #555555;">=</span> <span style="color: #ff6600;">9.9</span>;
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Okay fine but when is a user-defined type <code>T</code> regular? The document Fundamentals of Generic Programming defines a type T regular if it behaves like a built-in type such as <code>bool,</code> <code>int,</code> or <code>double.</code> I should mention it. The paper Fundamentals of Generic Programming is from James C. Dehnert and Alexander Stepanov. I assume you know already Alexander Stephanov by name. He is the well-known father of the Standard Template Library.</p>
+<p>The document states that a type T is called regular, if it defines the following operations:</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesGeneric/regular.png" alt="regular" width="300" height="156" /></p>
+<p>The equality, inequality, and ordering operation on T could be defined component-wise.</p>
+<h2>What's next?</h2>
+<p>My original plan was to write about rule 5:&nbsp;<a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-generic-oo">T.5: Combine generic and OO techniques to amplify their strengths, not their costs.</a> I changed my plan because rule 5 is quite short and mentioned type erasure as a use-case for this technique. Type erasure is a technique to represent various concrete types through a single interface. Type erasure with templates could not be explained in a few sentences; therefore, I will write in my next post about this challenging technique.</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Eric Pederson, Paul Baxter,&nbsp; Meeting C++, Matt Braun, Avi Lachmish, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, and Mielo.<br /></strong></p>
+<p>&nbsp;</p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at Leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 600 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
+<p></p>
+<table>
+<tbody>
+<tr>
+<td>
+<h2>&nbsp;Get your interactive course at educative</h2>
+</td>
+</tr>
+<tr>
+<td>
+<h4 class="_3fBEwsM053hx2mPd0uV0nT" style="text-align: center;">Modern C++ Concurrency in Practice: Get the most out of any machine</h4>
+</td>
+</tr>
+<tr>
+<td><a href="https://goo.gl/2qWUkK"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseConcurrency/educative.png" alt="educative" width="500" height="253" /></a></td>
+</tr>
+<tr>
+<td>
+<p>Based on my book "Concurrency with Modern C++" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>140 lessons</li>
+<li>110 code playgrounds =&gt; Run in browser</li>
+<li>78 code snippets</li>
+<li>55 illustrations</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
