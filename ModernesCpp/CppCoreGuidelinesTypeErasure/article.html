@@ -1,0 +1,226 @@
+<p id="t5-combine-generic-and-oo-techniques-to-amplify-their-strengths-not-their-costs">,Rule "T.5: Combine generic and OO techniques to amplify their strengths, not their costs"&nbsp; of the core guidelines to generic programming uses type erasure as an example. Type erasure? Really! Of course, it takes me two posts to explain this advanced template technique.</p>
+<hr id="system-readmore" />
+<p></p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesTypeErasure/fear.png" alt="fear" width="500" height="375" /></p>
+<p>First of all: What does type erasure mean?</p>
+<ul>
+<li><strong>Type Erasure: </strong>Type Erasure enables it to use various concrete types through a single generic interface.</li>
+</ul>
+<p>Of course, you already quite often used type erasure in C++ or C. The C-ish way of type erasure is a void pointer; the C++-ish way of type erasure is object-orientation. Let's start with a void pointer.</p>
+<h2>Void Pointer</h2>
+<p>Let's have a closer look at the declaration of <code>std::qsort</code>:</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">qsort</span>(<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #555555;">*</span>ptr, std<span style="color: #555555;">::</span><span style="color: #007788; font-weight: bold;">size_t</span> count, std<span style="color: #555555;">::</span><span style="color: #007788; font-weight: bold;">size_t</span> size, cmp);
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>with:</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">cmp</span>(<span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">void</span> <span style="color: #555555;">*</span>a, <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">void</span> <span style="color: #555555;">*</span>b);
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The comparison function cmp<code></code> should return a</p>
+<ul>
+<li>negative integer: the&nbsp;first argument is less than the second</li>
+<li>zero: both arguments are equal</li>
+<li>positive integer: the&nbsp;first argument is greater than the second</li>
+</ul>
+<p>Thanks to the void pointer, <code>std::qsort</code> is generally applicable but also quite error-prone.</p>
+<p>Maybe you want to sort a <code>std::vector&lt;int&gt;,</code> but you used a comparator for C-strings. The compiler can not catch this error because the type information was removed. You end with undefined behaviour.</p>
+<p>In C++ we can do better:</p>
+<h2>Object Orientation</h2>
+<p>Here is a simple example, which serves as a starting point for further variations.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// typeErasureOO.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;string&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">struct</span> BaseClass{                                       <span style="color: #0099ff; font-style: italic;">// (2)</span>
+	<span style="color: #006699; font-weight: bold;">virtual</span> std<span style="color: #555555;">::</span>string getName() <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>;
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> Bar<span style="color: #555555;">:</span> BaseClass{                                  <span style="color: #0099ff; font-style: italic;">// (4)</span>
+	std<span style="color: #555555;">::</span>string getName() <span style="color: #006699; font-weight: bold;">const</span> override {
+	    <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc3300;">"Bar"</span>;
+	}
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> Foo<span style="color: #555555;">:</span> BaseClass{                                  <span style="color: #0099ff; font-style: italic;">// (4)</span>
+	std<span style="color: #555555;">::</span>string getName() <span style="color: #006699; font-weight: bold;">const</span> override{
+	    <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc3300;">"Foo"</span>;
+	}
+};
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">printName</span>(std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">const</span> BaseClass<span style="color: #555555;">*&gt;</span> vec){      <span style="color: #0099ff; font-style: italic;">// (3)</span>
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> v<span style="color: #555555;">:</span> vec) std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> v<span style="color: #555555;">-&gt;</span>getName() <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+}
+
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+	
+	std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+	
+	Foo foo;
+	Bar bar; 
+	
+	std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">const</span> BaseClass<span style="color: #555555;">*&gt;</span> vec{<span style="color: #555555;">&amp;</span>foo, <span style="color: #555555;">&amp;</span>bar};   <span style="color: #0099ff; font-style: italic;">// (1)</span>
+	
+	printName(vec);
+	
+	std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}
+</pre>
+</div>
+<p></p>
+<p><code>std::vector&lt;const Base*&gt;</code> (1) has a pointer to a constant <code>BaseClasses</code>. <code>BaseClass</code> is abstract Base Class, which is used in (3). <code>Foo</code> and <code>Bar</code> (4) are the concrete classes.</p>
+<p>The output of the program is not so thrilling.</p>
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesTypeErasure/typeErasureOO.png" alt="typeErasureOO" width="300" height="178" /></p>
+<p id="firstHeading" class="firstHeading" lang="en">To say it more formally. <code>Foo</code> and <code>Bar</code> implement the interface of the <code>BaseClass</code> and can, therefore, be used instead of <code>BaseClass.</code> This principle is called <a href="https://en.wikipedia.org/wiki/Liskov_substitution_principle">Liskov substitution principle</a> and is type erasure in OO.</p>
+<p>In Objekt Orientation you implement an interface. In dynamically typed languages such as Python, you are not interested in interfaces you are interested in behaviour.</p>
+<h2>Templates</h2>
+<p>Let me make a short detour.</p>
+<p><img style="margin: 20px; float: left;" src="images/blog/ModernCpp/CppCoreGuidelinesTypeErasure/snake-312561_1280.png" alt="snake 312561 1280" width="300" height="268" /></p>
+<p>In Python, you care about behaviour and not about formal interfaces. This idea is well-known as <a href="https://en.wikipedia.org/wiki/Duck_typing">duck typing. </a>To make it short, the expression goes back to the poem from <a href="https://de.wikipedia.org/wiki/James_Whitcomb_Riley">James </a><a href="https://de.wikipedia.org/wiki/James_Whitcomb_Riley">Whitcomb</a><a href="https://de.wikipedia.org/wiki/James_Whitcomb_Riley"> Rileys:</a> Here it is:</p>
+<p style="text-align: center;">&nbsp;</p>
+<p style="text-align: center;">“When I see a bird that walks like a duck and swims like a duck and quacks like a duck, I call that bird a duck.”</p>
+<p>What does that mean? Imagine a function <code>acceptOnlyDucks</code>&nbsp;that only accepts ducks as an argument. In statically typed languages such as C++, all types which are derived from <code>Duck</code> can be used to invoke the function. In Python, all types, which behave like <code>Duck</code>'s, can be used to invoke the function. To make it more concrete. If a bird behaves like a <code>Duck</code> it is a <code>Duck</code>. There is often a proverb used in Python to describe this behaviour quite good.</p>
+<p style="text-align: center;">Don't ask for permission, ask for forgiveness.</p>
+<p>In case of our Duck, this means, that you invoke the function <code>acceptsOnlyDucks</code> with a bird and hope for the best. If something bad happens, you catch the exception with an except clause. Often this strategy works very well and very fast in Python.</p>
+<p>Okay, this is the end of my detour. Maybe you wonder, why I wrote about duck typing in this C++ post. The reason is quite straightforward. Thanks to templates, we have duck typing in C++. When you combine duck typing together with OO, it becomes even type safe.</p>
+<p><code>std::function</code> as a polymorphic function wrapper is a nice example to type erasure in C++.</p>
+<h3>std::function</h3>
+<p><code>std::function</code> can accept all, which behaves like a function. To be more precise. This can be any callable such as a function, a function object, a function object created by <code>std::bind</code>, or just a lambda function.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// callable.cpp</span>
+
+<span style="color: #009999;">#include &lt;cmath&gt;</span>
+<span style="color: #009999;">#include &lt;functional&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;map&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">double</span> <span style="color: #cc00ff;">add</span>(<span style="color: #007788; font-weight: bold;">double</span> a, <span style="color: #007788; font-weight: bold;">double</span> b){
+	<span style="color: #006699; font-weight: bold;">return</span> a <span style="color: #555555;">+</span> b;
+}
+
+<span style="color: #006699; font-weight: bold;">struct</span> Sub{
+	<span style="color: #007788; font-weight: bold;">double</span> <span style="color: #006699; font-weight: bold;">operator</span>()(<span style="color: #007788; font-weight: bold;">double</span> a, <span style="color: #007788; font-weight: bold;">double</span> b){
+		<span style="color: #006699; font-weight: bold;">return</span> a <span style="color: #555555;">*</span> b;
+	}
+};
+
+<span style="color: #007788; font-weight: bold;">double</span> <span style="color: #cc00ff;">multThree</span>(<span style="color: #007788; font-weight: bold;">double</span> a, <span style="color: #007788; font-weight: bold;">double</span> b, <span style="color: #007788; font-weight: bold;">double</span> c){
+	<span style="color: #006699; font-weight: bold;">return</span> a <span style="color: #555555;">*</span> b <span style="color: #555555;">*</span> c;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+    
+    <span style="color: #006699; font-weight: bold;">using</span> <span style="color: #006699; font-weight: bold;">namespace</span> std<span style="color: #555555;">::</span>placeholders;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+    std<span style="color: #555555;">::</span>map<span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">char</span> , std<span style="color: #555555;">::</span>function<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">double</span>(<span style="color: #007788; font-weight: bold;">double</span>, <span style="color: #007788; font-weight: bold;">double</span>)<span style="color: #555555;">&gt;&gt;</span> dispTable{  <span style="color: #0099ff; font-style: italic;">// (1)</span>
+        {<span style="color: #cc3300;">'+'</span>, add },                                         <span style="color: #0099ff; font-style: italic;">// (2)</span>
+        {<span style="color: #cc3300;">'-'</span>, Sub() },                                       <span style="color: #0099ff; font-style: italic;">// (3)</span>
+        {<span style="color: #cc3300;">'*'</span>, std<span style="color: #555555;">::</span>bind(multThree, <span style="color: #ff6600;">1</span>, _1, _2) },             <span style="color: #0099ff; font-style: italic;">// (4)</span>
+        {<span style="color: #cc3300;">'/'</span>,[](<span style="color: #007788; font-weight: bold;">double</span> a, <span style="color: #007788; font-weight: bold;">double</span> b){ <span style="color: #006699; font-weight: bold;">return</span> a <span style="color: #555555;">/</span> b; }}};      <span style="color: #0099ff; font-style: italic;">// (5)</span>
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"3.5 + 4.5 = "</span> <span style="color: #555555;">&lt;&lt;</span> dispTable[<span style="color: #cc3300;">'+'</span>](<span style="color: #ff6600;">3.5</span>, <span style="color: #ff6600;">4.5</span>) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"3.5 - 4.5 = "</span> <span style="color: #555555;">&lt;&lt;</span> dispTable[<span style="color: #cc3300;">'-'</span>](<span style="color: #ff6600;">3.5</span>, <span style="color: #ff6600;">4.5</span>) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"3.5 * 4.5 = "</span> <span style="color: #555555;">&lt;&lt;</span> dispTable[<span style="color: #cc3300;">'*'</span>](<span style="color: #ff6600;">3.5</span>, <span style="color: #ff6600;">4.5</span>) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"3.5 / 4.5 = "</span> <span style="color: #555555;">&lt;&lt;</span> dispTable[<span style="color: #cc3300;">'/'</span>](<span style="color: #ff6600;">3.5</span>, <span style="color: #ff6600;">4.5</span>) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>I use in this example a dispatch table (1) which maps characters to callables. A callable can be a function (1), a function object (2), a function object created by <code>std::bind</code> (3), or a lambda function. The key point of <code>std::function</code> is, that it accepts all different <em>function types</em> and erasure their types. <code>std::functio</code>n requires from its callables that its takes two <code>double's</code> and return a <code>double: std::function&lt;double(double, double)&gt;.</code></p>
+<p>To complete the example, here is the output.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesTypeErasure/callable.png" alt="callable" width="350" height="217" /></p>
+<p>Bevor I write in the next post more about type erasure with templates, let me summarise the three techniques to implement type erasure.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesTypeErasure/TypeErasureCompare.png" alt="TypeErasureCompare" width="500" height="122" /></p>
+<p>You can implement type erasure with void-pointers, object-orientation, or templates. Only the implementation with templates is type safe and don't require a type hierarchy. The missing details to templates will follow.</p>
+<h2>What's next?</h2>
+<p>I assume, you want to know, how type erasure with templates is implemented? Of course, you have to wait for my next post.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Eric Pederson, Paul Baxter,&nbsp; Meeting C++, Matt Braun, Avi Lachmish, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, and Mielo.<br /></strong></p>
+<p>&nbsp;</p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at Leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 600 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
+<p></p>
+<table>
+<tbody>
+<tr>
+<td>
+<h2>&nbsp;Get your interactive course at educative</h2>
+</td>
+</tr>
+<tr>
+<td>
+<h4 class="_3fBEwsM053hx2mPd0uV0nT" style="text-align: center;">Modern C++ Concurrency in Practice: Get the most out of any machine</h4>
+</td>
+</tr>
+<tr>
+<td><a href="https://goo.gl/2qWUkK"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseConcurrency/educative.png" alt="educative" width="500" height="253" /></a></td>
+</tr>
+<tr>
+<td>
+<p>Based on my book "Concurrency with Modern C++" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>140 lessons</li>
+<li>110 code playgrounds =&gt; Run in browser</li>
+<li>78 code snippets</li>
+<li dir="rtl">55 illustrations</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
