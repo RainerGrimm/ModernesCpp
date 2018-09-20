@@ -1,0 +1,350 @@
+<p>In the last post <a href="index.php/c-core-guidelines-type-erasure">C++ Core Guidelines: Type Erasure</a>, I presented two ways to implement type erasure: void pointers and object-orientation. In this post, I bridge dynamic polymorphism (object-orientation) with static polymorphism (templates) to get type erasure with templates.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesTypeErasureDetails/bridge.jpg" alt="bridge" width="500" height="333" /></p>
+<p>As our starting point and as a reminder, here is type erasure based on object-orientation.</p>
+<h2>Type erasure with object-orientation</h2>
+<p>Type erasure with object-orientation boils down to an inheritance hierarchy.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// typeErasureOO.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;string&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">struct</span> BaseClass{                                     <span style="color: #0099ff; font-style: italic;">// (2)</span>
+	<span style="color: #006699; font-weight: bold;">virtual</span> std<span style="color: #555555;">::</span>string getName() <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>;
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> Bar<span style="color: #555555;">:</span> BaseClass{
+	std<span style="color: #555555;">::</span>string getName() <span style="color: #006699; font-weight: bold;">const</span> override {
+	    <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc3300;">"Bar"</span>;
+	}
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> Foo<span style="color: #555555;">:</span> BaseClass{
+	std<span style="color: #555555;">::</span>string getName() <span style="color: #006699; font-weight: bold;">const</span> override{
+	    <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc3300;">"Foo"</span>;
+	}
+};
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">printName</span>(std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">const</span> BaseClass<span style="color: #555555;">*&gt;</span> vec){    <span style="color: #0099ff; font-style: italic;">// (3)</span>
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> v<span style="color: #555555;">:</span> vec) std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> v<span style="color: #555555;">-&gt;</span>getName() <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+}
+
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+	
+	std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+	
+	Foo foo;
+	Bar bar; 
+	
+	std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">const</span> BaseClass<span style="color: #555555;">*&gt;</span> vec{<span style="color: #555555;">&amp;</span>foo, <span style="color: #555555;">&amp;</span>bar};    <span style="color: #0099ff; font-style: italic;">// (1)</span>
+	
+	printName(vec);
+	
+	std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The key point is that you can use instances of <code>Foo</code> or <code>Bar</code> instead of an instance for <code>BaseClass.</code> For further details, read the post <a href="index.php/c-core-guidelines-type-erasure">C++ Core Guidelines: Type Erasure.</a></p>
+<p>What are the pros and cons of this implementation with OO?</p>
+<p><strong>Pros:</strong></p>
+<ul>
+<li>Typesafe</li>
+<li>Easy to implement</li>
+</ul>
+<p><strong>Cons:</strong></p>
+<ul>
+<li>Virtual dispatch</li>
+<li>Intrusive, because the derived class must know about its base</li>
+</ul>
+<p>Let's see which drawbacks type erasure with templates solve.</p>
+<h2>Type erasure with templates</h2>
+<p>Here is the templates program which corresponds to the previous OO program.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// typeErasure.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;memory&gt;</span>
+<span style="color: #009999;">#include &lt;string&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Object</span> {                                              <span style="color: #0099ff; font-style: italic;">// (2)</span>
+	 
+<span style="color: #9999ff;">public:</span>
+    <span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>                                   <span style="color: #0099ff; font-style: italic;">// (3)</span>
+    Object(<span style="color: #006699; font-weight: bold;">const</span> T<span style="color: #555555;">&amp;</span> obj)<span style="color: #555555;">:</span> object(std<span style="color: #555555;">::</span>make_shared<span style="color: #555555;">&lt;</span>Model<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;&gt;</span>(std<span style="color: #555555;">::</span>move(obj))){}
+      
+    std<span style="color: #555555;">::</span>string getName() <span style="color: #006699; font-weight: bold;">const</span> {                           <span style="color: #0099ff; font-style: italic;">// (4)</span>
+        <span style="color: #006699; font-weight: bold;">return</span> object<span style="color: #555555;">-&gt;</span>getName(); 
+    }
+	
+   <span style="color: #006699; font-weight: bold;">struct</span> Concept {                                         <span style="color: #0099ff; font-style: italic;">// (5)</span>
+       <span style="color: #006699; font-weight: bold;">virtual</span> <span style="color: #555555;">~</span>Concept() {}
+	   <span style="color: #006699; font-weight: bold;">virtual</span> std<span style="color: #555555;">::</span>string getName() <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>;
+   };
+
+   <span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span> <span style="color: #006699; font-weight: bold;">typename</span> T <span style="color: #555555;">&gt;</span>                                   <span style="color: #0099ff; font-style: italic;">// (6)</span>
+   <span style="color: #006699; font-weight: bold;">struct</span> Model <span style="color: #555555;">:</span> Concept {
+       Model(<span style="color: #006699; font-weight: bold;">const</span> T<span style="color: #555555;">&amp;</span> t) <span style="color: #555555;">:</span> object(t) {}
+	   std<span style="color: #555555;">::</span>string getName() <span style="color: #006699; font-weight: bold;">const</span> override {
+		   <span style="color: #006699; font-weight: bold;">return</span> object.getName();
+	   }
+     <span style="color: #9999ff;">private:</span>
+       T object;
+   };
+
+   std<span style="color: #555555;">::</span>shared_ptr<span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">const</span> Concept<span style="color: #555555;">&gt;</span> object;
+};
+
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">printName</span>(std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span>Object<span style="color: #555555;">&gt;</span> vec){                    <span style="color: #0099ff; font-style: italic;">// (7)</span>
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> v<span style="color: #555555;">:</span> vec) std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> v.getName() <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+}
+
+<span style="color: #006699; font-weight: bold;">struct</span> Bar{
+    std<span style="color: #555555;">::</span>string getName() <span style="color: #006699; font-weight: bold;">const</span> {                           <span style="color: #0099ff; font-style: italic;">// (8)</span>
+        <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc3300;">"Bar"</span>;
+    }
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> Foo{
+    std<span style="color: #555555;">::</span>string getName() <span style="color: #006699; font-weight: bold;">const</span> {                           <span style="color: #0099ff; font-style: italic;">// (8)</span>
+        <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc3300;">"Foo"</span>;
+    }
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+	
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+	
+    std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span>Object<span style="color: #555555;">&gt;</span> vec{Object(Foo()), Object(Bar())};  <span style="color: #0099ff; font-style: italic;">// (1)</span>
+	
+    printName(vec);
+	
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Okay, what is happening here? Don't be irritated by the names <code>Object</code>, <code>Concept</code>, and <code>Model</code>. They are typically used for type erasure in the literature. So I stick to them.</p>
+<p>First of all. My <code>std:</code>:vector uses instances (1) of type <code>Object</code> (2) and not pointers such as in the first OO example. This instances can be created with arbitrary types because it has a generic constructor (3). Object has the <code>getName</code> method (4) which is directly forwarded to the <code>getName</code> of object. object is of type <code>std::shared_ptr&lt;const Concept&gt;</code>. The <code>getName</code> method of <code>Concept</code> is pure virtual (5), therefore, due to virtual dispatch, the <code>getName</code> method of <code>Model</code> (6) is used.&nbsp; In the end, the <code>getName</code> methods of <code>Bar</code> and <code>Foo</code> (8) are applied in the <code>printName </code>function (7).</p>
+<p>Here is the output of the program.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesTypeErasureDetails/typeErasure.png" alt="typeErasure" width="300" height="178" /></p>
+<p>Of course, this implementation is type-safe.</p>
+<h2>Error messages</h2>
+<p>I'm currently giving a C++ class. We quite often have discussions about error messages with templates; therefore, I was curious about the error messages if I change the classes <code>Foo</code> and <code>Bar</code> a little bit. Here is the incorrect implementation:</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">struct</span> Bar{
+    std<span style="color: #555555;">::</span>string get() <span style="color: #006699; font-weight: bold;">const</span> {                             <span style="color: #0099ff; font-style: italic;">// (1)</span>
+        <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc3300;">"Bar"</span>;
+    }
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> Foo{
+    std<span style="color: #555555;">::</span>string get_name() <span style="color: #006699; font-weight: bold;">const</span> {                        <span style="color: #0099ff; font-style: italic;">// (2)</span>
+        <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc3300;">"Foo"</span>;
+    }
+};
+</pre>
+</div>
+<p></p>
+<p>I renamed the method <code>getName</code> to <code>get</code> (1) and to <code>get_name (2).&nbsp;</code></p>
+<p>Here are the error message, copied from the <a href="https://godbolt.org/">Compiler Explorer. </a></p>
+<p>I start with the ugliest one from Clang 6.0.0 one and end with the quite good one from&nbsp; GCC 8.2.&nbsp; The error message from MSVC 19 is something in between. To be honest, I was totally astonished, because I thought that clang would produce the clearest error message.</p>
+<h3>Clang 6.0.0</h3>
+<p>I can only display half of the error message because it's too much for once screenshot.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesTypeErasureDetails/errorClang.png" alt="errorClang" width="700" height="426" /></p>
+<p>&nbsp;</p>
+<h3>MSVC 19</h3>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesTypeErasureDetails/errorWindows.png" alt="errorWindows" width="700" height="215" /></p>
+<h3>GCC 8.2</h3>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesTypeErasureDetails/errorGcc.png" alt="errorGcc" width="700" height="124" /></p>
+<p>Please look carefully at the screenshot of GCC 8.2. It says: "<samp>27:20: error: 'const struct Foo' has no member named 'getName'; did you mean 'get_name'?". </samp>Isn't that great!</p>
+<p>The error message from MSVC and in particular from Clang is quite bad.&nbsp; This should not be the end of my post.</p>
+<h2>My Challenge</h2>
+<p>Now I want to solve the challenge: How can I detect at compile time if a given class has a specific method. In our case, the classes <code>Bar</code> and <code>Foo</code> should have a method <code>getName. </code>I played with <a href="https://en.cppreference.com/w/cpp/language/sfinae">SFINAE</a>, experimented with the C++11 variant <a href="https://en.cppreference.com/w/cpp/types/enable_if">std::enable_if</a>, and ended with the <a href="https://en.cppreference.com/w/cpp/experimental/is_detected">detection idiom</a> which is part of the <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2015/n4562.html">library fundamental TS v2</a>. To use it, you have to include the header from the experimental namespace (1). Here is the modified example:</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// typeErasureDetection.cpp</span>
+
+<span style="color: #009999;">#include &lt;experimental/type_traits&gt;                                 </span><span style="color: #0099ff; font-style: italic;">// (1)          </span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;memory&gt;</span>
+<span style="color: #009999;">#include &lt;string&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">using</span> getName_t <span style="color: #555555;">=</span> decltype( std<span style="color: #555555;">::</span>declval<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&amp;&gt;</span>().getName() );         <span style="color: #0099ff; font-style: italic;">// (2)</span>
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Object</span> {                                              
+	 
+<span style="color: #9999ff;">public:</span>
+    <span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>                                   
+    Object(<span style="color: #006699; font-weight: bold;">const</span> T<span style="color: #555555;">&amp;</span> obj)<span style="color: #555555;">:</span> object(std<span style="color: #555555;">::</span>make_shared<span style="color: #555555;">&lt;</span>Model<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;&gt;</span>(std<span style="color: #555555;">::</span>move(obj))){   <span style="color: #0099ff; font-style: italic;">// (3)</span>
+      
+        static_assert(std<span style="color: #555555;">::</span>experimental<span style="color: #555555;">::</span>is_detected<span style="color: #555555;">&lt;</span>getName_t, decltype(obj)<span style="color: #555555;">&gt;::</span>value, 
+                                                     <span style="color: #cc3300;">"No method getName available!"</span>);
+        
+    }
+      
+    std<span style="color: #555555;">::</span>string getName() <span style="color: #006699; font-weight: bold;">const</span> {                           
+        <span style="color: #006699; font-weight: bold;">return</span> object<span style="color: #555555;">-&gt;</span>getName(); 
+    }
+	
+   <span style="color: #006699; font-weight: bold;">struct</span> Concept {                                         
+       <span style="color: #006699; font-weight: bold;">virtual</span> <span style="color: #555555;">~</span>Concept() {}
+	   <span style="color: #006699; font-weight: bold;">virtual</span> std<span style="color: #555555;">::</span>string getName() <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>;
+   };
+
+   <span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span> <span style="color: #006699; font-weight: bold;">typename</span> T <span style="color: #555555;">&gt;</span>                                   
+   <span style="color: #006699; font-weight: bold;">struct</span> Model <span style="color: #555555;">:</span> Concept {
+       Model(<span style="color: #006699; font-weight: bold;">const</span> T<span style="color: #555555;">&amp;</span> t) <span style="color: #555555;">:</span> object(t) {}
+	   std<span style="color: #555555;">::</span>string getName() <span style="color: #006699; font-weight: bold;">const</span> override {
+		   <span style="color: #006699; font-weight: bold;">return</span> object.getName();
+	   }
+     <span style="color: #9999ff;">private:</span>
+       T object;
+   };
+
+   std<span style="color: #555555;">::</span>shared_ptr<span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">const</span> Concept<span style="color: #555555;">&gt;</span> object;
+};
+
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">printName</span>(std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span>Object<span style="color: #555555;">&gt;</span> vec){                    
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> v<span style="color: #555555;">:</span> vec) std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> v.getName() <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+}
+
+<span style="color: #006699; font-weight: bold;">struct</span> Bar{
+    std<span style="color: #555555;">::</span>string get() <span style="color: #006699; font-weight: bold;">const</span> {                           
+        <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc3300;">"Bar"</span>;
+    }
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> Foo{
+    std<span style="color: #555555;">::</span>string get_name() <span style="color: #006699; font-weight: bold;">const</span> {                           
+        <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc3300;">"Foo"</span>;
+    }
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+	
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+	
+    std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span>Object<span style="color: #555555;">&gt;</span> vec{Object(Foo()), Object(Bar())};  <span style="color: #0099ff; font-style: italic;"></span>
+	
+    printName(vec);
+	
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}
+</pre>
+</div>
+<p></p>
+<p>I added the lines (1), (2), and (3). Line (2) deduces the type of the member function<code> getName()</code>. <a href="https://en.cppreference.com/w/cpp/utility/declval">std::declval </a>from C++11 is a function which allows you to use member functions in <code><span class="t-c"><span class="mw-geshi cpp source-cpp">decltype</span></span></code> expressions without the need to construct the object. The crucial part of the detection idiom is the function<code> std::experimental::is_detected</code> from the type traits library in the <code>static_assert</code> (3).</p>
+<p>Let's see what the Clang 6.0.0 produces if I execute the program in the Compiler Explorer:</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesTypeErasureDetails/errorClangDetection.png" alt="errorClangDetection" width="700" height="509" /></p>
+<p>Wow! That is still too much output. To be honest. The state of the feature is still experimental. If you look carefully at the output of the error message and you search for <code>static_assert,</code> you find the answer you are looking for.&nbsp; Here are the first three lines of the output.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesTypeErasureDetails/errorClangDetectionFocus.png" alt="errorClangDetectionFocus" width="700" height="60" /></p>
+<p>Great! At least you can grep for the string "<code>No method getName Available</code>" in the error message.</p>
+<p>Before I end the post, here are the pros and cons of type erasure with templates:</p>
+<p><strong>Pros:</strong></p>
+<ul>
+<li>Typesafe</li>
+<li>Non-intrusive, because the derived class need not to know the base class</li>
+</ul>
+<p><strong>Cons:</strong></p>
+<ul>
+<li>Virtual dispatch</li>
+<li>Difficult to implement</li>
+</ul>
+<p>In the end, the difference of type erasure with object-orientation and with templates mainly boils down to two points:</p>
+<ul>
+<li>Intrusive versus non-intrusive</li>
+<li>Easy versus difficult to implement</li>
+</ul>
+<h2>What's next?</h2>
+<p>This is the end of my detour. in the next post I will continue my journey through generic programming; to be more specific, I will write about concepts.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Eric Pederson, Paul Baxter,&nbsp; Meeting C++, Matt Braun, Avi Lachmish, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, and Mielo.<br /></strong></p>
+<p>&nbsp;</p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at Leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 600 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
+<p></p>
+<table>
+<tbody>
+<tr>
+<td>
+<h2>&nbsp;Get your interactive course at educative</h2>
+</td>
+</tr>
+<tr>
+<td>
+<h4 class="_3fBEwsM053hx2mPd0uV0nT" style="text-align: center;">Modern C++ Concurrency in Practice: Get the most out of any machine</h4>
+</td>
+</tr>
+<tr>
+<td><a href="https://goo.gl/2qWUkK"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseConcurrency/educative.png" alt="educative" width="500" height="253" /></a></td>
+</tr>
+<tr>
+<td>
+<p>Based on my book "Concurrency with Modern C++" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>140 lessons</li>
+<li>110 code playgrounds =&gt; Run in browser</li>
+<li>78 code snippets</li>
+<li>55 illustrations</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
