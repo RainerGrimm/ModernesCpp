@@ -1,0 +1,276 @@
+<p>We will get concepts with high probability&nbsp;in C++20. Here are from the C++ core guidelines the rules to use them.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesConceptsUsage/dice-3613500_1280.png" alt="dice 3613500 1280" width="400" height="444" /></p>
+<p>First, let me go one&nbsp;step back. What are concepts?</p>
+<ul>
+<li><span style="color: #444444; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 14px; font-style: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing: 0px; background-color: #ffffff; float: none;"><strong>Concepts</strong> are a compile-time predicate. This means concepts can be evaluated at compile-time and return a boolean.&nbsp;</span></li>
+</ul>
+<p>The next questions are. What are the pros of concepts in C++?&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Concepts</strong></p>
+<ul>
+<li>Empower programmer to directly express their requirements as part of the interface.</li>
+<li>Support the overloading of functions and the specialisation of class templates based on the requirements of the template parameters.</li>
+<li>Produce drastically improved error messages by comparing the requirements of the template parameter with the applied template arguments.</li>
+<li>Can be used as placeholders for generic programming.</li>
+<li>Empower you to define your concepts.</li>
+</ul>
+<p>Now, one step forward. Here are the four rules for today:</p>
+<ul style="margin-top: 0px; margin-bottom: 1rem; color: #515151; font-family: 'PT Sans', Helvetica, Arial, sans-serif; font-size: 20px; font-style: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing: 0px; background-color: #ffffff;">
+<li><a style="color: #268bd2; text-decoration: none;" href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-concepts">T.10: Specify concepts for all template arguments</a></li>
+<li><a style="color: #268bd2; text-decoration: none;" href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-std-concepts">T.11: Whenever possible use standard concepts</a></li>
+<li><a style="color: #268bd2; text-decoration: none;" href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-auto">T.12: Prefer concept names over&nbsp;<code class="highlighter-rouge no-highlight" style="font-family: 'Roboto Mono', monospace; padding: 0.2em; font-size: 18px; background-color: #f9f9f9;">auto</code>&nbsp;for local variables</a></li>
+<li><a style="color: #268bd2; text-decoration: none;" href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-shorthand">T.13: Prefer the shorthand notation for simple, single-type argument concepts</a></li>
+</ul>
+<p>Let's start with the first rule.</p>
+<h2><a style="color: #268bd2; text-decoration: none;" href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-concepts">T.10: Specify concepts for all template arguments</a></h2>
+<p>There is not much to add to this rule. Because of correctness and readability, you should use concepts for all template parameters. You can do it in a verbose way.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0000ff;">template</span>&lt;<span style="color: #0000ff;">typename</span> T&gt;
+requires Integral&lt;T&gt;()
+T gcd(T a, T b){
+  <span style="color: #0000ff;">if</span>( b == 0 ){ <span style="color: #0000ff;">return</span> a; }
+  <span style="color: #0000ff;">else</span>{
+    <span style="color: #0000ff;">return</span> gcd(b, a % b);
+  }
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Or you can do it more concise.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0000ff;">template</span>&lt;Integral T&gt;
+T gcd(T a, T b){
+  <span style="color: #0000ff;">if</span>( b == 0 ){ <span style="color: #0000ff;">return</span> a; }
+  <span style="color: #0000ff;">else</span>{
+    <span style="color: #0000ff;">return</span> gcd(b, a % b);
+  }
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>In the first example,&nbsp; I specify the concept in the require clause, but I can use the concept <code>Integral</code> just in place of the keyword typename or class. The concept <code>Integral</code> has to be a&nbsp; constant expression that returns a boolean.&nbsp;</p>
+<p>I created the concept by using <code><span style="font-family: 'courier new', courier;">std::is_integral</span></code> from the type traits library.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0000ff;">template</span>&lt;<span style="color: #0000ff;">typename</span> T&gt;
+concept <span style="color: #2b91af;">bool</span> Integral(){
+  <span style="color: #0000ff;">return</span> std::is_integral&lt;T&gt;::value;
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Defining your concepts such as I did it, is not the best idea.</p>
+<h2><a style="color: #268bd2; text-decoration: none;" href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-std-concepts">T.11: Whenever possible use standard concepts</a></h2>
+<p>Okay, if possible you should use the concepts from the Guidelines Support Library (GSL) or the Ranges TS. Let's see what we have. I ignore the concepts of the GSL because they are mainly part of the Ranges TS. Here are the concepts of the Range TS from the document <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2016/n4569.pdf">N4569</a>: Working Draft, C++ Extension for Ranges.</p>
+<h3>Core language concepts</h3>
+<ul>
+<li><code>Same</code></li>
+<li><code>DerivedFrom</code></li>
+<li><code>ConvertibleTo</code></li>
+<li><code>Common</code></li>
+<li><code>Integral</code></li>
+<li><code>Signed Integral</code></li>
+<li><code>Unsigned Integral</code></li>
+<li><code>Assignable</code></li>
+<li><code>Swappable</code></li>
+</ul>
+<h3>Comparison concepts</h3>
+<ul>
+<li><code>Boolean</code></li>
+<li><code>EqualityComparable</code></li>
+<li><code>StrictTotallyOrdered</code></li>
+</ul>
+<h3 style="color: #000000;">Object concepts</h3>
+<ul>
+<li><code>Destructible</code></li>
+<li><code>Constructible</code></li>
+<li><code>DefaultConstructible</code></li>
+<li><code>MoveConstructible</code></li>
+<li><code>Copy Constructible</code></li>
+<li><code>Movable</code></li>
+<li><code>Copyable</code></li>
+<li><code>Semiregular</code></li>
+<li><code>Regular</code></li>
+</ul>
+<h3>Callable concepts</h3>
+<ul>
+<li><code>Callable</code></li>
+<li><code>RegularCallable</code></li>
+<li><code>Predicate</code></li>
+<li><code>Relation</code></li>
+<li><code>StrictWeakOrder</code></li>
+</ul>
+<p>If you want to know, what each of this concepts means, the already mentioned document <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2016/n4569.pdf">N4569</a> gives you the answers. The concept definitions are based on the <a href="https://en.cppreference.com/w/cpp/header/type_traits">type traits library</a>. Here are for example the definitions of the concepts <code>Integral, Signed Integral</code>, and<code> Unsigned Integral</code>.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">T</span><span style="color: #555555;">&gt;</span>
+concept <span style="color: #007788; font-weight: bold;">bool</span> Integral() {
+    <span style="color: #006699; font-weight: bold;">return</span> is_integral<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value;
+}
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">T</span><span style="color: #555555;">&gt;</span>
+concept <span style="color: #007788; font-weight: bold;">bool</span> SignedIntegral() {
+    <span style="color: #006699; font-weight: bold;">return</span> Integral<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span>() <span style="color: #555555;">&amp;&amp;</span> is_signed<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value;
+}
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">T</span><span style="color: #555555;">&gt;</span>
+concept <span style="color: #007788; font-weight: bold;">bool</span> UnsignedIntegral() {
+    <span style="color: #006699; font-weight: bold;">return</span> Integral<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span>() <span style="color: #555555;">&amp;&amp;</span> <span style="color: #555555;">!</span>SignedIntegral<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span>();
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The functions <code>std::is_integral&lt;T&gt;</code> and <code>std::is_signed&lt;T&gt;</code>&nbsp;are predicates from the type traits library.</p>
+<p>Additionally, there are the names used in the&nbsp;<span style="color: #000000; font-family: DejaVuSans, 'DejaVu Sans', arial, sans-serif; font-size: 12.8px; font-style: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing: 0px; background-color: #ffffff; float: none;">text of the C++ standard to define the expectations of the standard library. They are concepts which are not enforced but document the requirement for an algorithm such as <a href="https://en.cppreference.com/w/cpp/algorithm/sort"><code>std::sort</code></a>.&nbsp;</span></p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span> <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">RandomIt</span> <span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">void</span> sort( RandomIt first, RandomIt last );
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The first overload of <code>std::sort</code> requires two <strong>RandomAccessIterato</strong>r's. Now, I have to say what a <strong>RandomAccessIterator</strong> is:</p>
+<ul>
+<li><span style="color: #000000; font-family: DejaVuSans, 'DejaVu Sans', arial, sans-serif; font-size: 12.8px; font-style: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing: 0px; background-color: #ffffff; float: none;">A&nbsp;</span><strong class="selflink" style="font-weight: bold; color: #000000; font-family: DejaVuSans, 'DejaVu Sans', arial, sans-serif; font-size: 12.8px; font-style: normal; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing: 0px; background-color: #ffffff;"><span style="font-family: Georgia, 'DejaVu Serif', serif;">RandomAccessIterator</span></strong><span style="color: #000000; font-family: DejaVuSans, 'DejaVu Sans', arial, sans-serif; font-size: 12.8px; font-style: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing: 0px; background-color: #ffffff; float: none;">&nbsp;is a&nbsp;</span><strong>BidirectionalIterator</strong><span style="color: #000000; font-family: DejaVuSans, 'DejaVu Sans', arial, sans-serif; font-size: 12.8px; font-style: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing: 0px; background-color: #ffffff; float: none;">&nbsp;that can be moved to point to any element in constant time.</span></li>
+<li><span style="color: #000000; font-family: DejaVuSans, 'DejaVu Sans', arial, sans-serif; font-size: 12.8px; font-style: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing: 0px; background-color: #ffffff; float: none;">A&nbsp;</span><strong class="selflink" style="font-weight: bold; color: #000000; font-family: DejaVuSans, 'DejaVu Sans', arial, sans-serif; font-size: 12.8px; font-style: normal; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing: 0px; background-color: #ffffff;"><span style="font-family: Georgia, 'DejaVu Serif', serif;">BidirectionalIterator</span></strong><span style="color: #000000; font-family: DejaVuSans, 'DejaVu Sans', arial, sans-serif; font-size: 12.8px; font-style: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing: 0px; background-color: #ffffff; float: none;">&nbsp;is a&nbsp;</span><strong><span style="font-family: Georgia, 'DejaVu Serif', serif;">ForwardIterator</span></strong><span style="color: #000000; font-family: DejaVuSans, 'DejaVu Sans', arial, sans-serif; font-size: 12.8px; font-style: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing: 0px; background-color: #ffffff; float: none;"><strong>&nbsp;</strong>that can be moved in both directions&nbsp;</span></li>
+<li><span style="color: #000000; font-family: DejaVuSans, 'DejaVu Sans', arial, sans-serif; font-size: 12.8px; font-style: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing: 0px; background-color: #ffffff; float: none;">A&nbsp;</span><strong class="selflink" style="font-weight: bold; color: #000000; font-family: DejaVuSans, 'DejaVu Sans', arial, sans-serif; font-size: 12.8px; font-style: normal; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing: 0px; background-color: #ffffff;"><span style="font-family: Georgia, 'DejaVu Serif', serif;">ForwardIterator</span></strong><span style="color: #000000; font-family: DejaVuSans, 'DejaVu Sans', arial, sans-serif; font-size: 12.8px; font-style: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing: 0px; background-color: #ffffff; float: none;">&nbsp;is an&nbsp;</span><strong><span style="font-family: Georgia, 'DejaVu Serif', serif;">Iterator</span></strong><span style="color: #000000; font-family: DejaVuSans, 'DejaVu Sans', arial, sans-serif; font-size: 12.8px; font-style: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing: 0px; background-color: #ffffff; float: none;">&nbsp;that can read data from the pointed-to element.</span></li>
+<li><span style="color: #000000; font-family: DejaVuSans, 'DejaVu Sans', arial, sans-serif; font-size: 12.8px; font-style: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing: 0px; background-color: #ffffff; float: none;">The&nbsp;</span><strong class="selflink" style="font-weight: bold; color: #000000; font-family: DejaVuSans, 'DejaVu Sans', arial, sans-serif; font-size: 12.8px; font-style: normal; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing: 0px; background-color: #ffffff;"><span style="font-family: Georgia, 'DejaVu Serif', serif;">Iterator</span></strong><span style="color: #000000; font-family: DejaVuSans, 'DejaVu Sans', arial, sans-serif; font-size: 12.8px; font-style: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing: 0px; background-color: #ffffff; float: none;">&nbsp;requirements describe types that can be used to identify and traverse the elements of a container.</span></li>
+</ul>
+<p><span style="color: #000000; font-family: DejaVuSans, 'DejaVu Sans', arial, sans-serif; font-size: 12.8px; font-style: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing: 0px; background-color: #ffffff; float: none;">For the details to the named requirements used in the text of the C++ standard, read<a href="https://en.cppreference.com/w/cpp/named_req"> cppreference.com</a>.&nbsp;</span></p>
+<h2><a style="color: #268bd2; text-decoration: none;" href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-auto">T.12: Prefer concept names over&nbsp;<code class="highlighter-rouge no-highlight" style="font-family: 'Roboto Mono', monospace; padding: 0.2em; font-size: 18px; background-color: #f9f9f9;">auto</code>&nbsp;for local variables</a></h2>
+<p><code>auto</code> is an unconstrained concept (placeholder) but you should use constrained concepts.&nbsp;<span style="color: #444444; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 14px; font-style: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing: 0px; background-color: #ffffff; float: none;">You can use constrained concepts in each situation where you can use unconstrained placeholders (</span><span style="color: #444444; font-size: 14px; font-style: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing: 0px; background-color: #ffffff; font-family: 'courier new', courier;">auto</span><span style="color: #444444; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 14px; font-style: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing: 0px; background-color: #ffffff; float: none;">).&nbsp;</span>If this is not an intuitive rule?</p>
+<p>Here is an example to make my point.&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// constrainedUnconstrainedConcepts.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;type_traits&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>                                 <span style="color: #0099ff; font-style: italic;">// (1)</span>
+concept <span style="color: #007788; font-weight: bold;">bool</span> Integral(){                
+  <span style="color: #006699; font-weight: bold;">return</span> std<span style="color: #555555;">::</span>is_integral<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> getIntegral(<span style="color: #007788; font-weight: bold;">int</span> val){
+  <span style="color: #006699; font-weight: bold;">return</span> val <span style="color: #555555;">*</span> <span style="color: #ff6600;">5</span>;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main(){
+  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>boolalpha <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  
+  std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> myVec{<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">5</span>};
+  <span style="color: #006699; font-weight: bold;">for</span> (Integral<span style="color: #555555;">&amp;</span> i<span style="color: #555555;">:</span> myVec) std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> i <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span>;   <span style="color: #0099ff; font-style: italic;">// (2)</span>
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;  
+
+  Integral b<span style="color: #555555;">=</span> <span style="color: #336666;">true</span>;                                 <span style="color: #0099ff; font-style: italic;">// (3)</span>
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> b <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  
+  Integral integ<span style="color: #555555;">=</span> getIntegral(<span style="color: #ff6600;">10</span>);                  <span style="color: #0099ff; font-style: italic;">// (4)</span>
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> integ <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  
+  <span style="color: #006699; font-weight: bold;">auto</span> integ1<span style="color: #555555;">=</span> getIntegral(<span style="color: #ff6600;">10</span>);                     <span style="color: #0099ff; font-style: italic;">// (5)</span>
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> integ1 <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p style="margin: 0px 0px 10px; color: #444444; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 14px; font-style: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing: 0px; background-color: #ffffff;">I defined the concept&nbsp;<code><span>Integral&nbsp;</span></code>in line (1). Hence I iterate over integrals in the range-based for-loop in line (2) and the variables<span>&nbsp;<code>b</code></span>&nbsp;and <code>integ</code> in line (3) and (4) has to be integrals. &nbsp;I'm not so strict in line (5). Here I'm fine with an unconstrained concept.</p>
+<p style="margin: 0px 0px 10px; color: #444444; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 14px; font-style: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing: 0px; background-color: #ffffff;">In the end, the output of the program.&nbsp;</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesConceptsUsage/constrainedUnconstrainedConcepts.png" alt="constrainedUnconstrainedConcepts" width="700" height="174" /></p>
+<p>&nbsp;</p>
+<h2><a style="color: #268bd2; text-decoration: none;" href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-shorthand">T.13: Prefer the shorthand notation for simple, single-type argument concepts</a></h2>
+<p>The example from the C++ Core Guidelines looks quite innocent but has the potential to revolutionise the way we write templates. Here it is.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>       <span style="color: #0099ff; font-style: italic;">// Correct but verbose: "The parameter is</span>
+<span style="color: #0099ff; font-style: italic;">//    requires Sortable&lt;T&gt;   // of type T which is the name of a type</span>
+<span style="color: #007788; font-weight: bold;">void</span> sort(T<span style="color: #555555;">&amp;</span>);             <span style="color: #0099ff; font-style: italic;">// that is Sortable"</span>
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span>Sortable T<span style="color: #555555;">&gt;</span>       <span style="color: #0099ff; font-style: italic;">// Better (assuming support for concepts): "The parameter is of type T</span>
+<span style="color: #007788; font-weight: bold;">void</span> sort(T<span style="color: #555555;">&amp;</span>);             <span style="color: #0099ff; font-style: italic;">// which is Sortable"</span>
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">sort</span>(Sortable<span style="color: #555555;">&amp;</span>);      <span style="color: #0099ff; font-style: italic;">// Best (assuming support for concepts): "The parameter is Sortable"</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>This example shows three variations to declare the function template <code>sort</code>. All variations are semantically equivalent and require that the template parameter supports the concept <code>Sortable</code>. The last variation looks like a function declaration but is a function template declaration because the parameter is a concept and not a concrete type. To say it once more:<strong style="font-weight: bold; color: #444444; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 14px; font-style: normal; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing: 0px; background-color: #ffffff;">&nbsp;<code>sort</code> becomes due to the concept parameter a function template.</strong>&nbsp;<span style="font-family: 'courier new', courier;"></span><span style="color: #444444; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 14px; font-style: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing: 0px; background-color: #ffffff; float: none;">&nbsp;&nbsp;</span></p>
+<h2>What's next?</h2>
+<p>The C++ core guidelines say: "Defining good concepts is non-trivial. Concepts are meant to represent fundamental concepts in an application domain."&nbsp; Let's see what that mean in my next post.</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Eric Pederson, Paul Baxter,&nbsp; Meeting C++, Matt Braun, Avi Lachmish, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Mielo, and Dilettant. <br /></strong></p>
+<p><strong>Thanks in particular to:&nbsp; <a href="https://www.takeupcode.com"><img style="vertical-align: top;" src="images/patreon/TakeUpCode-450-60.png" alt="TakeUpCode 450 60" width="150" height="20" /> </a></strong></p>
+<p>&nbsp;</p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at Leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 600 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
+<p></p>
+<table>
+<tbody>
+<tr>
+<td>
+<h2>&nbsp;Get your interactive course at educative</h2>
+</td>
+</tr>
+<tr>
+<td>
+<h4 class="_3fBEwsM053hx2mPd0uV0nT" style="text-align: center;">Modern C++ Concurrency in Practice: Get the most out of any machine</h4>
+</td>
+</tr>
+<tr>
+<td><a href="https://goo.gl/2qWUkK"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseConcurrency/educative.png" alt="educative" width="500" height="253" /></a></td>
+</tr>
+<tr>
+<td>
+<p>Based on my book "Concurrency with Modern C++" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>140 lessons</li>
+<li>110 code playgrounds =&gt; Run in browser</li>
+<li>78 code snippets</li>
+<li>55 illustrations</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
