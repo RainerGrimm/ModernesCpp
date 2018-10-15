@@ -1,0 +1,222 @@
+<p>Although rule T.11 states: <a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-std-concepts">Whenever possible use standard concepts </a>you sometimes have to define your concepts. This post gives you rules to do it.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesConceptsDefinition/definition-390785_1280.jpg" alt="definition 390785 1280" width="600" height="407" /></p>
+<p>The C++ core guidelines has nine rules for defining concepts. Seven of them have content. Here are the first four for today.</p>
+<ul>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-low">T.20: Avoid “concepts” without meaningful semantics</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-complete">T.21: Require a complete set of operations for a concept</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-axiom">T.22: Specify axioms for concepts</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-refine">T.23: Differentiate a refined concept from its more general case by adding new use patterns</a></li>
+</ul>
+<p>Let's see how to define concepts</p>
+<h2><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-low">T.20: Avoid “concepts” without meaningful semantics</a></h2>
+<p>This rule is quite obvious but what does meaningful semantic mean. Meaningful semantics are not just simple constraints such as <code>has_plus</code> but concepts such as <code>Number,</code> <code>Range,</code> or <code>InputIterator.&nbsp;</code></p>
+<p>For example, the following concept <code>Addable</code> requires <code>has_plus</code> and is, therefore, also fulfilled by a string.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+concept Addable <span style="color: #555555;">=</span> has_plus<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span>;    <span style="color: #0099ff; font-style: italic;">// bad; insufficient</span>
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span>Addable N<span style="color: #555555;">&gt;</span> <span style="color: #006699; font-weight: bold;">auto</span> algo(<span style="color: #006699; font-weight: bold;">const</span> N<span style="color: #555555;">&amp;</span> a, <span style="color: #006699; font-weight: bold;">const</span> N<span style="color: #555555;">&amp;</span> b) <span style="color: #0099ff; font-style: italic;">// use two numbers</span>
+{
+    <span style="color: #0099ff; font-style: italic;">// ...</span>
+    <span style="color: #006699; font-weight: bold;">return</span> a <span style="color: #555555;">+</span> b;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> x <span style="color: #555555;">=</span> <span style="color: #ff6600;">7</span>;
+<span style="color: #007788; font-weight: bold;">int</span> y <span style="color: #555555;">=</span> <span style="color: #ff6600;">9</span>;
+<span style="color: #006699; font-weight: bold;">auto</span> z <span style="color: #555555;">=</span> algo(x, y);   <span style="color: #0099ff; font-style: italic;">// z = 16</span>
+
+string xx <span style="color: #555555;">=</span> <span style="color: #cc3300;">"7"</span>;
+string yy <span style="color: #555555;">=</span> <span style="color: #cc3300;">"9"</span>;
+<span style="color: #006699; font-weight: bold;">auto</span> zz <span style="color: #555555;">=</span> algo(xx, yy);   <span style="color: #0099ff; font-style: italic;">// zz = "79"</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>I assume this was not your intention because the function template <code>algo</code> should accept arguments which model numbers and not just addable. The solution is quite simple. Define and use a concept <code>Number</code> with a meaningful semantic.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #0099ff; font-style: italic;">// The operators +, -, *, and / for a number </span>
+<span style="color: #0099ff; font-style: italic;">// are assumed to follow the usual mathematical rules</span>
+concept Number <span style="color: #555555;">=</span> has_plus<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span>
+                 <span style="color: #555555;">&amp;&amp;</span> has_minus<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span>
+                 <span style="color: #555555;">&amp;&amp;</span> has_multiply<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span>
+                 <span style="color: #555555;">&amp;&amp;</span> has_divide<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span>;
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span>Number N<span style="color: #555555;">&gt;</span> <span style="color: #006699; font-weight: bold;">auto</span> algo(<span style="color: #006699; font-weight: bold;">const</span> N<span style="color: #555555;">&amp;</span> a, <span style="color: #006699; font-weight: bold;">const</span> N<span style="color: #555555;">&amp;</span> b)
+{
+    <span style="color: #0099ff; font-style: italic;">// ...</span>
+    <span style="color: #006699; font-weight: bold;">return</span> a <span style="color: #555555;">+</span> b;
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Now the invocation of <code>algo</code> with a string would give an error. The next rule is a particular case of this rule.</p>
+<h2><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-complete">T.21: Require a complete set of operations for a concept</a></h2>
+<p>First of all, what is a complete set of operations? Here are two complete sets for <code>Arithmetic</code> and <code>Comparable.</code></p>
+<ul>
+<li><strong>Arithmetic:</strong><code> +, -, *, /, +=, -=, *=, /=</code></li>
+<li><strong>Comparable:<code> &lt;, &gt;, &lt;=, &gt;=, ==, !=</code></strong></li>
+</ul>
+<p>Do you want for what the acronym POLA stands for? It stands for <a href="https://en.wikipedia.org/wiki/Principle_of_least_astonishment"><strong>P</strong>rinciple <strong>O</strong>f<strong> L</strong>east <strong>A</strong>stonishment</a>. You can quite easily break this principle of good software design if you implement just a partial set of operations.</p>
+<p>Here is a very promising example from the guidelines.&nbsp; The concept <code>Minimal</code> in this case supports<code>==, &lt;</code> and&nbsp;<code>+.</code></p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">f</span>(<span style="color: #006699; font-weight: bold;">const</span> Minimal<span style="color: #555555;">&amp;</span> x, <span style="color: #006699; font-weight: bold;">const</span> Minimal<span style="color: #555555;">&amp;</span> y)
+{
+    <span style="color: #006699; font-weight: bold;">if</span> (<span style="color: #555555;">!</span>(x <span style="color: #555555;">==</span> y)) { <span style="color: #0099ff; font-style: italic;">/* ... */</span> }    <span style="color: #0099ff; font-style: italic;">// OK</span>
+    <span style="color: #006699; font-weight: bold;">if</span> (x <span style="color: #555555;">!=</span> y) { <span style="color: #0099ff; font-style: italic;">/* ... */</span> }       <span style="color: #0099ff; font-style: italic;">// surprise! error</span>
+
+    <span style="color: #006699; font-weight: bold;">while</span> (<span style="color: #555555;">!</span>(x <span style="color: #555555;">&lt;</span> y)) { <span style="color: #0099ff; font-style: italic;">/* ... */</span> }  <span style="color: #0099ff; font-style: italic;">// OK</span>
+    <span style="color: #006699; font-weight: bold;">while</span> (x <span style="color: #555555;">&gt;=</span> y) { <span style="color: #0099ff; font-style: italic;">/* ... */</span> }    <span style="color: #0099ff; font-style: italic;">// surprise! error</span>
+
+    x <span style="color: #555555;">=</span> x <span style="color: #555555;">+</span> y;          <span style="color: #0099ff; font-style: italic;">// OK</span>
+    x <span style="color: #555555;">+=</span> y;             <span style="color: #0099ff; font-style: italic;">// surprise! error</span>
+}
+</pre>
+</div>
+<h2><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-axiom">T.22: Specify axioms for concepts</a></h2>
+<p>First of all: What is an axiom? Here is my definition from <a href="https://en.wikipedia.org/wiki/Axiom">Wikipedia</a>:</p>
+<ul>
+<li>An <b>axiom</b> or <b>postulate</b> is a statement that is taken to be true, to serve as a premise or starting point for further reasoning and arguments.</li>
+</ul>
+<p>Because C++ does not support axioms, you have to express them with comments. If C++ does support them in the future, you can remove the comment symbol<code> //</code> in front of the axiom in the following example.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+    <span style="color: #0099ff; font-style: italic;">// axiom(T a, T b) { a + b == b + a; a - a == 0; a * (b + c) == a * b + a * c; /*...*/ }</span>
+    concept Number <span style="color: #555555;">=</span> requires(T a, T b) {
+        {a <span style="color: #555555;">+</span> b} <span style="color: #555555;">-&gt;</span> T;  
+        {a <span style="color: #555555;">-</span> b} <span style="color: #555555;">-&gt;</span> T;
+        {a <span style="color: #555555;">*</span> b} <span style="color: #555555;">-&gt;</span> T;
+        {a <span style="color: #555555;">/</span> b} <span style="color: #555555;">-&gt;</span> T;
+    }
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The axiom means in this case that the number follow the mathematical rules. In contrast, the concept requires that a Number has to support the binary operations <code>+, -, *,</code> and <code>/</code> and that the result is convertible to <code>T. T</code> is the type of the arguments.</p>
+<h2><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-refine">T.23: Differentiate a refined concept from its more general case by adding new use patterns</a></h2>
+<p>If two concepts have the same requirements, they are logically equivalent. This means the compiler can't distinguish them and, therefore, may not choose automatically the correct one during overload resolution.</p>
+<p>To make the rule clear, here is a simplified version of the concept <code>BidirectionalIterator</code> and the refined concept <code>RandomAccessIterator.<br /></code></p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> I<span style="color: #555555;">&gt;</span>
+concept <span style="color: #007788; font-weight: bold;">bool</span> BidirectionalIterator <span style="color: #555555;">=</span> ForwardIterator<span style="color: #555555;">&lt;</span>I<span style="color: #555555;">&gt;</span> <span style="color: #555555;">&amp;&amp;</span> 
+                                     requires(I iter){ 
+                                         <span style="color: #555555;">--</span>iter;  
+                                         iter<span style="color: #555555;">--</span>; 
+                                     }  
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> I<span style="color: #555555;">&gt;</span>
+concept <span style="color: #007788; font-weight: bold;">bool</span> RandomAccessIterator <span style="color: #555555;">=</span> BidirectionalIterator<span style="color: #555555;">&lt;</span>I<span style="color: #555555;">&gt;</span> <span style="color: #555555;">&amp;&amp;<span style="color: #555555;"></span><span style="color: #555555;"></span></span> <br />                                    Integer&lt;N&gt; &amp;&amp;
+                                    requires(I iter, I iter2, N n<span style="color: #006699; font-weight: bold;"></span>){
+                                        iter <span style="color: #555555;">+=</span> n;               <span style="color: #0099ff; font-style: italic;">// increment or decrement an iterator</span>
+                                        iter <span style="color: #555555;">-=</span> n;
+                                        n <span style="color: #555555;">+</span> iter;                <span style="color: #0099ff; font-style: italic;">// return a temp iterator</span>
+                                        iter <span style="color: #555555;">+</span> n;
+                                        iter <span style="color: #555555;">-</span> n; 
+                                        iter[n];                 <span style="color: #0099ff; font-style: italic;">// access the element</span><br />                                        iter1 - iter2;           <span style="color: #0099ff; font-style: italic;">// subtract two iterators</span><br />                                        iter1 &lt; iter2;           <span style="color: #0099ff; font-style: italic;">// compare two iterators </span><br />                                        iter1 &lt;= iter2;<br />                                        iter1 &gt; iter2;<br />                                        iter1 &gt;= iter2;
+                                    }
+</pre>
+</div>
+<p></p>
+<p><code><a href="https://en.cppreference.com/w/cpp/iterator/advance">std::advance</a>(i, n)</code> increments a given iterator i by n elements. Depending on the value of <code>n</code>, the iterator is <code></code>incremented or decremented. When the iterator <code>i</code> is a bidirectional iterator<code>, std::advance</code> has to step <code>n</code> times one element forwards or backwards. But when the iterator i is a random access iterator, just <code>n</code> is added to the iterator.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span>BidirectionalIterator I<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">void</span> advance(I<span style="color: #555555;">&amp;</span> iter, <span style="color: #007788; font-weight: bold;">int</span> n){...}
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span>RandomAccessIterator I<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">void</span> advance(I<span style="color: #555555;">&amp;</span> iter, <span style="color: #007788; font-weight: bold;">int</span> n){...}
+
+std<span style="color: #555555;">::</span>list<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> lst{<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">5</span>, <span style="color: #ff6600;">6</span>, <span style="color: #ff6600;">7</span>, <span style="color: #ff6600;">8</span>, <span style="color: #ff6600;">9</span>};
+std<span style="color: #555555;">::</span>list<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;::</span>iterator listIt <span style="color: #555555;">=</span> lst.begin();
+std<span style="color: #555555;">::</span>advance(listIt, <span style="color: #ff6600;">2</span>);   <span style="color: #0099ff; font-style: italic;">// BidirectionalIterator</span>
+
+std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> vec{<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">5</span>, <span style="color: #ff6600;">6</span>, <span style="color: #ff6600;">7</span>, <span style="color: #ff6600;">8</span>, <span style="color: #ff6600;">9</span>};
+std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;::</span>iterator vecIt <span style="color: #555555;">=</span> vec.begin();
+std<span style="color: #555555;">::</span>advance(vecIt, <span style="color: #ff6600;">2</span>);    <span style="color: #0099ff; font-style: italic;">// RandomAccessIterator</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>In case of the <code>std::vector&lt;int&gt;, vec.begin()</code> returns an random access iterator and, therefore, the fast variant of <code>std::advance</code> is used.</p>
+<p>Each container of the STL creates an iterator specific to its structure. Here is the overview:</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesConceptsDefinition/IteratorCategories.png" alt="IteratorCategories" width="500" height="302" /></p>
+<h2>What's next?</h2>
+<p id="t24-use-tag-classes-or-traits-to-differentiate-concepts-that-differ-only-in-semantics">Three rules to the definition of concepts are left. In particular, the next rule "T.24: Use tag classes or traits to differentiate concepts that differ only in semantics." sound quite interesting. Let's see in the next post what a tag class or traits class is.&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Eric Pederson, Paul Baxter,&nbsp; Meeting C++, Matt Braun, Avi Lachmish, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Mielo, and Dilettant. <br /></strong></p>
+<p><strong>Thanks in particular to:&nbsp; <a href="https://www.takeupcode.com"><img style="vertical-align: top;" src="images/patreon/TakeUpCode-450-60.png" alt="TakeUpCode 450 60" width="150" height="20" /> </a></strong></p>
+<p>&nbsp;</p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at Leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 600 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
+<p></p>
+<table>
+<tbody>
+<tr>
+<td>
+<h2>&nbsp;Get your interactive course at educative</h2>
+</td>
+</tr>
+<tr>
+<td>
+<h4 class="_3fBEwsM053hx2mPd0uV0nT" style="text-align: center;">Modern C++ Concurrency in Practice: Get the most out of any machine</h4>
+</td>
+</tr>
+<tr>
+<td><a href="https://goo.gl/2qWUkK"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseConcurrency/educative.png" alt="educative" width="500" height="253" /></a></td>
+</tr>
+<tr>
+<td>
+<p>Based on my book "Concurrency with Modern C++" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>140 lessons</li>
+<li>110 code playgrounds =&gt; Run in browser</li>
+<li>78 code snippets</li>
+<li>55 illustrations</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
