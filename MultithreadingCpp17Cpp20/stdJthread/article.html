@@ -1,0 +1,238 @@
+<p>One of the participants in my <a href="https://cppcon.org/cppcon-2018-program/">CppCon 2018</a> workshop asked me: "Can a <span style="font-family: courier new, courier;">std::thread</span> be interrupted?". No, was my answer but this is not correct anymore. With C++20 we might get a <span style="font-family: courier new, courier;">std::jthread.</span></p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p>Let me continue my story from the CppCon 2018. During a break of my concurrency workshop, I had a chat with Nicolai (Josuttis). He asked me what I think about the new proposal&nbsp;<a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p0660r5.pdf">P0660: Cooperatively Interruptible Joining Thread. </a>At this point, I didn't know the proposal. Nicolai is together with Herb Sutter and Anthony Williams one of the authors of the proposal. Today's post is about the concurrent future. Here is the big picture to concurrency in current and upcoming C++.</p>
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/MultithreadingCpp17Cpp20/CooperativelyJoiningThread/timeline.png" alt="timeline" width="600" height="269" /></p>
+<p>&nbsp;</p>
+<p>From the title of the paper <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p0660r5.pdf">Cooperatively Interruptible Joining Thread </a>you may guess that the new thread has two new capabilities: interruptable and automatically joining. Let me first write about automatically joining.<a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p0660r5.pdf"> </a></p>
+<h2>Automatically joining</h2>
+<p>This is the non-intuitive behaviour of <span style="font-family: courier new, courier;">std::thread.</span> If a <span style="font-family: courier new, courier;">std::thread</span> is still joinable, <span style="font-family: courier new, courier;">std::terminate</span> is called in its destructor. A thread <span style="font-family: 'courier new', courier;">thr</span> is joinable if either <span style="font-family: courier new, courier;">thr.join() </span>nor <span style="font-family: courier new, courier;">thr.detach()</span> was called.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// threadJoinable.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;thread&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>boolalpha;
+    
+    std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> thr{[]{ std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Joinable std::thread"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl; }};
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"thr.joinable(): "</span> <span style="color: #555555;">&lt;&lt;</span> thr.joinable() <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>When executed, the program terminates.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/MultithreadingCpp17Cpp20/CooperativelyJoiningThread/threadJoinable.png" alt="threadJoinable" width="500" height="279" /></p>
+<p></p>
+<p>Both threads terminate. In the second run, the thread thr has enough time to display its message: "Joinable std::thread".</p>
+<p>In the next example, I replace the header<span style="font-family: courier new, courier;"> &lt;thread&gt;</span> with <span style="font-family: courier new, courier;">"jthread.hpp" </span>and use <span style="font-family: courier new, courier;">std::jthread</span> from the upcoming C++ standard.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// jthreadJoinable.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include "jthread.hpp"</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>boolalpha;
+    
+    std<span style="color: #555555;">::</span>jthread thr{[]{ std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Joinable std::thread"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl; }};
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"thr.joinable(): "</span> <span style="color: #555555;">&lt;&lt;</span> thr.joinable() <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+}
+</pre>
+</div>
+<p></p>
+<p>Now, the thread <span style="font-family: courier new, courier;">thr</span> automatically joins in its destructor such as in this case if still joinable.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/MultithreadingCpp17Cpp20/CooperativelyJoiningThread/jthreadJoinable.png" alt="jthreadJoinable" width="350" height="177" /></p>
+<h2>Interrupt a <span style="font-family: courier new, courier;">std::jthread</span></h2>
+<p>To get a general idea, let me present a simple example.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// interruptJthread.cpp</span>
+
+<span style="color: #009999;">#include "jthread.hpp"</span>
+<span style="color: #009999;">#include &lt;chrono&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">using</span> <span style="color: #006699; font-weight: bold;">namespace</span><span style="color: #555555;">::</span>std<span style="color: #555555;">::</span>literals;
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>jthread nonInterruptable([]{                                   <span style="color: #0099ff; font-style: italic;">// (1)</span>
+        <span style="color: #007788; font-weight: bold;">int</span> counter{<span style="color: #ff6600;">0</span>};
+        <span style="color: #006699; font-weight: bold;">while</span> (counter <span style="color: #555555;">&lt;</span> <span style="color: #ff6600;">10</span>){
+            std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>sleep_for(<span style="color: #ff6600;">0.2</span>s);
+            std<span style="color: #555555;">::</span>cerr <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"nonInterruptable: "</span> <span style="color: #555555;">&lt;&lt;</span> counter <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl; 
+            <span style="color: #555555;">++</span>counter;
+        }
+    });
+    
+    std<span style="color: #555555;">::</span>jthread interruptable([](std<span style="color: #555555;">::</span>interrupt_token itoken){         <span style="color: #0099ff; font-style: italic;">// (2)</span>
+        <span style="color: #007788; font-weight: bold;">int</span> counter{<span style="color: #ff6600;">0</span>};
+        <span style="color: #006699; font-weight: bold;">while</span> (counter <span style="color: #555555;">&lt;</span> <span style="color: #ff6600;">10</span>){
+            std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>sleep_for(<span style="color: #ff6600;">0.2</span>s);
+            <span style="color: #006699; font-weight: bold;">if</span> (itoken.is_interrupted()) <span style="color: #006699; font-weight: bold;">return</span>;                        <span style="color: #0099ff; font-style: italic;">// (3)</span>
+            std<span style="color: #555555;">::</span>cerr <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"interruptable: "</span> <span style="color: #555555;">&lt;&lt;</span> counter <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl; 
+            <span style="color: #555555;">++</span>counter;
+        }
+    });
+    
+    std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>sleep_for(<span style="color: #ff6600;">1</span>s);
+    
+    std<span style="color: #555555;">::</span>cerr <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cerr <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Main thread interrupts both jthreads"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span> endl;
+    nonInterruptable.interrupt();
+    interruptable.interrupt();                                          <span style="color: #0099ff; font-style: italic;">// (4)</span>
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+}
+</pre>
+</div>
+<p></p>
+<p>I started in the main program the two threads <span style="font-family: courier new, courier;">nonInterruptable</span> and <span style="font-family: courier new, courier;">interruptable</span> (lines 1 and 2). In contrast to the thread <span style="font-family: courier new, courier;">nonInterruptable,</span> the thread <span style="font-family: courier new, courier;">interruptable</span> gets a <span style="font-family: courier new, courier;">std::interrupt_token</span> and uses it in line 3 to check if it was interrupted: <span style="font-family: courier new, courier;">itoken.is_interrupted().</span> In case of an interrupt the lambda function returns and, therefore, the thread ends. The call<span style="font-family: courier new, courier;"> interruptable.interrupt()</span> (line 4) triggers the end of the thread. This does not hold for the previous call <span style="font-family: courier new, courier;">nonInterruptable.interrupt(),</span> which does not have an effect.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/MultithreadingCpp17Cpp20/CooperativelyJoiningThread/interruptJthread.png" alt="interruptJthread" width="400" height="382" /></p>
+<p>Here are more details to interrupt tokens, the joining threads, and condition variables.</p>
+<h3>Interrupt Tokens</h3>
+<p>An interrupt token <span style="font-family: courier new, courier;">std::interrupt_token</span> models shared ownership and can be used to signal once if the token is valid. It provides the three methods <span style="font-family: courier new, courier;">valid,</span> <span style="font-family: courier new, courier;">is_interrupted,</span> and <span style="font-family: courier new, courier;">interrupt.</span></p>
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/MultithreadingCpp17Cpp20/CooperativelyJoiningThread/interrupt_token.png" alt="interrupt token" width="600" height="195" /></p>
+<p>If the interrupt token should be temporarily disabled, you can replace it with a default constructed token. A default constructed token is not valid. The following code snippet shows how to disable and enable the capability of a thread to accept signals.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">std<span style="color: #555555;">::</span>jthread jthr([](std<span style="color: #555555;">::</span>interrupt_token itoken){
+    ...
+    std<span style="color: #555555;">::</span>interrupt_token interruptDisabled; 
+    std<span style="color: #555555;">::</span>swap(itoken, interruptDisabled);     <span style="color: #0099ff; font-style: italic;">// (1)       </span>
+    ...
+    std<span style="color: #555555;">::</span>swap(itoken, interruptDisabled);     <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    ...
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>&nbsp;<span style="font-family: courier new, courier;">std::interrupt_token interruptDisabled</span> is not valid. This means that the thread can not accept an interrupt from the line (1) to (2) but after line (2) its possible.</p>
+<h3>Joining Threads</h3>
+<p>A <span style="font-family: courier new, courier;">std::jhread</span> is a<span style="font-family: courier new, courier;"> std::thread</span> with the additional functionality to signal an interrupt and to automatically<span style="font-family: courier new, courier;"> join()</span>. To support this functionality it has a <span style="font-family: courier new, courier;">std::interrupt_token.</span></p>
+<h3><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/MultithreadingCpp17Cpp20/CooperativelyJoiningThread/jthread.png" alt="jthread" width="600" height="86" /></h3>
+<h3>New Wait Overloads for Condition Variables</h3>
+<p>The two wait variations <span style="font-family: courier new, courier;"></span><span style="font-family: courier new, courier;">wait_for</span>, and <span style="font-family: courier new, courier;">wait_until</span> of the <span style="font-family: 'courier new', courier;">std::condition_variable</span> get new overloads. They take a s<span style="font-family: courier new, courier;">td::interrupt_token.</span></p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Predicate</span><span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">bool</span> wait_until(unique_lock<span style="color: #555555;">&lt;</span>mutex<span style="color: #555555;">&gt;&amp;</span> lock, 
+                Predicate pred, 
+                interrupt_token itoken);
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Rep</span>, <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Period</span>, <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Predicate</span><span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">bool</span> wait_for(unique_lock<span style="color: #555555;">&lt;</span>mutex<span style="color: #555555;">&gt;&amp;</span> lock, 
+              <span style="color: #006699; font-weight: bold;">const</span> chrono<span style="color: #555555;">::</span>duration<span style="color: #555555;">&lt;</span>Rep, Period<span style="color: #555555;">&gt;&amp;</span> rel_time, 
+              Predicate pred, 
+              interrupt_token itoken);
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Clock</span>, <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Duration</span>, <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Predicate</span><span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">bool</span> wait_until(unique_lock<span style="color: #555555;">&lt;</span>mutex<span style="color: #555555;">&gt;&amp;</span> lock, 
+                <span style="color: #006699; font-weight: bold;">const</span> chrono<span style="color: #555555;">::</span>time_point<span style="color: #555555;">&lt;</span>Clock, Duration<span style="color: #555555;">&gt;&amp;</span> abs_time, 
+                Predicate pred, 
+                interrupt_token itoken);
+</pre>
+</div>
+<p></p>
+<p>This new overloads require a predicate. The versions ensure to get notified if an interrupt is signalled for the passed <span style="font-family: courier new, courier;">std::interrupt_token itoken</span>. After the wait calls, you can check if an interrupt occurred.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">cv.wait_until(lock, predicate, itoken);
+<span style="color: #006699; font-weight: bold;">if</span> (itoken.is_interrupted()){
+    <span style="color: #0099ff; font-style: italic;">// interrupt occurred</span>
+}
+</pre>
+</div>
+<p></p>
+<h2>What's next?</h2>
+<p>As I promised in my last post, my next post is about the remaining rules for defining concepts.</p>
+<p></p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Eric Pederson, Paul Baxter,&nbsp; Meeting C++, Matt Braun, Avi Lachmish, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Mielo, Dilettant, and Marko.<br /></strong></p>
+<p><strong>Thanks in particular to:&nbsp; <a href="https://www.takeupcode.com"><img style="vertical-align: top;" src="images/patreon/TakeUpCode-450-60.png" alt="TakeUpCode 450 60" width="150" height="20" /> </a></strong></p>
+<p>&nbsp;</p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at Leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 600 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
+<p></p>
+<table>
+<tbody>
+<tr>
+<td>
+<h2>&nbsp;Get your interactive course at educative</h2>
+</td>
+</tr>
+<tr>
+<td>
+<h4 class="_3fBEwsM053hx2mPd0uV0nT" style="text-align: center;">Modern C++ Concurrency in Practice: Get the most out of any machine</h4>
+</td>
+</tr>
+<tr>
+<td><a href="https://goo.gl/2qWUkK"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseConcurrency/educative.png" alt="educative" width="500" height="253" /></a></td>
+</tr>
+<tr>
+<td>
+<p>Based on my book "Concurrency with Modern C++" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>140 lessons</li>
+<li>110 code playgrounds =&gt; Run in browser</li>
+<li>78 code snippets</li>
+<li>55 illustrations</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
