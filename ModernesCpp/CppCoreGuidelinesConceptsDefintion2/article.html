@@ -1,0 +1,309 @@
+<p>Let me continue with the rules for defining concepts in the guidelines. In this post, the first of the three remaining rules is quite sophisticated.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesConceptsDefinition2/fern-821293_1280.jpg" alt="fern 821293 1280" width="600" height="373" /></p>
+<p>&nbsp;Here are the rules for today:</p>
+<ul>
+<li><a style="color: #268bd2; text-decoration: none;" href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-tag">T.24: Use tag classes or traits to differentiate concepts that differ only in semantics</a></li>
+<li><a style="color: #268bd2; text-decoration: none;" href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-not">T.25: Avoid complimentary constraints</a></li>
+<li><a style="color: #268bd2; text-decoration: none;" href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-use">T.26: Prefer to define concepts in terms of use-patterns rather than simple syntax</a></li>
+</ul>
+<p>The explanation to the first rules is quite concise. Maybe, too concise.</p>
+<h2><a style="color: #268bd2; text-decoration: none;" href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-tag">T.24: Use tag classes or traits to differentiate concepts that differ only in semantics</a></h2>
+<p>This is the reason for this rule from the guidelines: "Two concepts requiring the same syntax but having different semantics leads to ambiguity unless the programmer differentiates them."</p>
+<p>Let's assume; I defined the <span style="font-family: 'courier new', courier;">is_contiguous</span> trait. In this case, I can use it to distinguish a random access iterator<span style="font-family: 'courier new', courier;"> RA_iter</span> from a contiguous iterator <span style="font-family: 'courier new', courier;">Contiguous_iter</span>.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> I<span style="color: #555555;">&gt;</span>    <span style="color: #0099ff; font-style: italic;">// iterator providing random access</span>
+concept <span style="color: #007788; font-weight: bold;">bool</span> RA_iter <span style="color: #555555;">=</span> ...;
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> I<span style="color: #555555;">&gt;</span>    <span style="color: #0099ff; font-style: italic;">// iterator providing random access to contiguous data</span>
+concept <span style="color: #007788; font-weight: bold;">bool</span> Contiguous_iter <span style="color: #555555;">=</span>
+    RA_iter<span style="color: #555555;">&lt;</span>I<span style="color: #555555;">&gt;</span> <span style="color: #555555;">&amp;&amp;</span> is_contiguous<span style="color: #555555;">&lt;</span>I<span style="color: #555555;">&gt;::</span>value;  <span style="color: #0099ff; font-style: italic;">// using is_contiguous trait</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>I can even wrap a tag class such as <span style="font-family: 'courier new', courier;">is_contiguous</span> into a concept an use it. Now, I have a more straightforward expression of my idea contiguous iterator <span style="font-family: 'courier new', courier;">Contiguous_ite</span>r.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> I<span style="color: #555555;">&gt;</span> concept Contiguous <span style="color: #555555;">=</span> is_contiguous<span style="color: #555555;">&lt;</span>I<span style="color: #555555;">&gt;::</span>value;
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> I<span style="color: #555555;">&gt;</span>
+concept <span style="color: #007788; font-weight: bold;">bool</span> Contiguous_iter <span style="color: #555555;">=</span> RA_iter<span style="color: #555555;">&lt;</span>I<span style="color: #555555;">&gt;</span> <span style="color: #555555;">&amp;&amp;</span> Contiguous<span style="color: #555555;">&lt;</span>I<span style="color: #555555;">&gt;</span>;
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Okay, let me first explain two key terms: traits and tag dispatching.</p>
+<h3>Traits</h3>
+<p>Traits are class templates which extract properties from a generic type.&nbsp;</p>
+<p>The following program&nbsp;presents for each of the 14 primary type categories of the <a href="https://en.cppreference.com/w/cpp/header/type_traits">type-traits library</a>&nbsp;a type which satisfies the specific trait. The primary type categories are complete and don’t overlap. So each type is a member of a type category. If you check a type category for your type, the request is independent of the <span style="font-family: 'courier new', courier;">const</span> or <span style="font-family: 'courier new', courier;">volatile</span> qualifiers.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// traitsPrimary.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;type_traits&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">using</span> <span style="color: #006699; font-weight: bold;">namespace</span> std;
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">void</span> getPrimaryTypeCategory(){
+
+  cout <span style="color: #555555;">&lt;&lt;</span> boolalpha <span style="color: #555555;">&lt;&lt;</span> endl;
+
+  cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"is_void&lt;T&gt;::value: "</span> <span style="color: #555555;">&lt;&lt;</span> is_void<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> endl;
+  cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"is_integral&lt;T&gt;::value: "</span> <span style="color: #555555;">&lt;&lt;</span> is_integral<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> endl;
+  cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"is_floating_point&lt;T&gt;::value: "</span> <span style="color: #555555;">&lt;&lt;</span> is_floating_point<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> endl;
+  cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"is_array&lt;T&gt;::value: "</span> <span style="color: #555555;">&lt;&lt;</span> is_array<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> endl;
+  cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"is_pointer&lt;T&gt;::value: "</span> <span style="color: #555555;">&lt;&lt;</span> is_pointer<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> endl;
+  cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"is_reference&lt;T&gt;::value: "</span> <span style="color: #555555;">&lt;&lt;</span> is_reference<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> endl;
+  cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"is_member_object_pointer&lt;T&gt;::value: "</span> <span style="color: #555555;">&lt;&lt;</span> is_member_object_pointer<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> endl;
+  cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"is_member_function_pointer&lt;T&gt;::value: "</span> <span style="color: #555555;">&lt;&lt;</span> is_member_function_pointer<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> endl;
+  cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"is_enum&lt;T&gt;::value: "</span> <span style="color: #555555;">&lt;&lt;</span> is_enum<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> endl;
+  cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"is_union&lt;T&gt;::value: "</span> <span style="color: #555555;">&lt;&lt;</span> is_union<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> endl;
+  cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"is_class&lt;T&gt;::value: "</span> <span style="color: #555555;">&lt;&lt;</span> is_class<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> endl;
+  cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"is_function&lt;T&gt;::value: "</span> <span style="color: #555555;">&lt;&lt;</span> is_function<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> endl;
+  cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"is_lvalue_reference&lt;T&gt;::value: "</span> <span style="color: #555555;">&lt;&lt;</span> is_lvalue_reference<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> endl;
+  cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"is_rvalue_reference&lt;T&gt;::value: "</span> <span style="color: #555555;">&lt;&lt;</span> is_rvalue_reference<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> endl;
+
+  cout <span style="color: #555555;">&lt;&lt;</span> endl;
+
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main(){
+    
+    getPrimaryTypeCategory<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">void</span><span style="color: #555555;">&gt;</span>();              <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    getPrimaryTypeCategory<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">short</span><span style="color: #555555;">&gt;</span>();             <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    getPrimaryTypeCategory<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">double</span><span style="color: #555555;">&gt;</span>();
+    getPrimaryTypeCategory<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span> []<span style="color: #555555;">&gt;</span>();
+    getPrimaryTypeCategory<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">*&gt;</span>();
+    getPrimaryTypeCategory<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&amp;&gt;</span>();
+    <span style="color: #006699; font-weight: bold;">struct</span> A{
+        <span style="color: #007788; font-weight: bold;">int</span> a;
+        <span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">f</span>(<span style="color: #007788; font-weight: bold;">double</span>){<span style="color: #006699; font-weight: bold;">return</span> <span style="color: #ff6600;">2011</span>;}
+    };
+    getPrimaryTypeCategory<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span> A<span style="color: #555555;">::*&gt;</span>();
+    getPrimaryTypeCategory<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span> (A<span style="color: #555555;">::*</span>)(<span style="color: #007788; font-weight: bold;">double</span>)<span style="color: #555555;">&gt;</span>();
+    <span style="color: #006699; font-weight: bold;">enum</span> E{
+        e<span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span>,
+    };
+    getPrimaryTypeCategory<span style="color: #555555;">&lt;</span>E<span style="color: #555555;">&gt;</span>();
+    <span style="color: #006699; font-weight: bold;">union</span> U{
+      <span style="color: #007788; font-weight: bold;">int</span> u;
+    };
+    getPrimaryTypeCategory<span style="color: #555555;">&lt;</span>U<span style="color: #555555;">&gt;</span>();
+    getPrimaryTypeCategory<span style="color: #555555;">&lt;</span>string<span style="color: #555555;">&gt;</span>();
+    getPrimaryTypeCategory<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span> <span style="color: #555555;">*</span> (<span style="color: #007788; font-weight: bold;">double</span>)<span style="color: #555555;">&gt;</span>();
+    getPrimaryTypeCategory<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&amp;&gt;</span>();              <span style="color: #0099ff; font-style: italic;">// (2)         </span>
+    getPrimaryTypeCategory<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&amp;&amp;&gt;</span>();             <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>I don't want to bore you to death. Therefore, there is only the output of the lines (1).</p>
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesConceptsDefinition2/traitsPrimary1.png" alt="traitsPrimary1" width="450" height="557" /></p>
+<p>And here is the output of the lines (2).</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesConceptsDefinition2/traitsPrimary2.png" alt="traitsPrimary2" width="450" height="549" /></p>
+<h3>Tag Dispatching</h3>
+<p>Tag dispatching enables it to choose a function based on the properties of its types. The decision takes place at compile time and traits which I explained the last paragraph are used.&nbsp;</p>
+<p>A typical example of tag dispatching is the <span style="font-family: 'courier new', courier;"><a href="https://en.cppreference.com/w/cpp/iterator/advance">std::advance</a>&nbsp;</span>algorithm from the Standard Template Library. <span style="font-family: 'courier new', courier;">std::advance(it, n)</span> increments the iterator<span style="font-family: 'courier new', courier;"> it</span> by <span style="font-family: 'courier new', courier;">n</span> elements. The program shows you the key idea.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// advanceTagDispatch.cpp</span>
+
+<span style="color: #009999;">#include &lt;iterator&gt;</span>
+<span style="color: #009999;">#include &lt;forward_list&gt;</span>
+<span style="color: #009999;">#include &lt;list&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> InputIterator, <span style="color: #006699; font-weight: bold;">typename</span> Distance<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">void</span> advance_impl(InputIterator<span style="color: #555555;">&amp;</span> i, Distance n, std<span style="color: #555555;">::</span>input_iterator_tag) {
+	std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"InputIterator used"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl; 
+    <span style="color: #006699; font-weight: bold;">while</span> (n<span style="color: #555555;">--</span>) <span style="color: #555555;">++</span>i;
+}
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> BidirectionalIterator, <span style="color: #006699; font-weight: bold;">typename</span> Distance<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">void</span> advance_impl(BidirectionalIterator<span style="color: #555555;">&amp;</span> i, Distance n, std<span style="color: #555555;">::</span>bidirectional_iterator_tag) {
+	std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"BidirectionalIterator used"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    <span style="color: #006699; font-weight: bold;">if</span> (n <span style="color: #555555;">&gt;=</span> <span style="color: #ff6600;">0</span>) 
+        <span style="color: #006699; font-weight: bold;">while</span> (n<span style="color: #555555;">--</span>) <span style="color: #555555;">++</span>i;
+    <span style="color: #006699; font-weight: bold;">else</span> 
+        <span style="color: #006699; font-weight: bold;">while</span> (n<span style="color: #555555;">++</span>) <span style="color: #555555;">--</span>i;
+}
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> RandomAccessIterator, <span style="color: #006699; font-weight: bold;">typename</span> Distance<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">void</span> advance_impl(RandomAccessIterator<span style="color: #555555;">&amp;</span> i, Distance n, std<span style="color: #555555;">::</span>random_access_iterator_tag) {
+	std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"RandomAccessIterator used"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    i <span style="color: #555555;">+=</span> n;
+}
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> InputIterator, <span style="color: #006699; font-weight: bold;">typename</span> Distance<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">void</span> advance_(InputIterator<span style="color: #555555;">&amp;</span> i, Distance n) {
+    <span style="color: #006699; font-weight: bold;">typename</span> std<span style="color: #555555;">::</span>iterator_traits<span style="color: #555555;">&lt;</span>InputIterator<span style="color: #555555;">&gt;::</span>iterator_category category;    <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    advance_impl(i, n, category);                                                <span style="color: #0099ff; font-style: italic;">// (2)</span>
+}
+  
+<span style="color: #007788; font-weight: bold;">int</span> main(){
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> myVec{<span style="color: #ff6600;">0</span>, <span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">5</span>, <span style="color: #ff6600;">6</span>, <span style="color: #ff6600;">7</span>, <span style="color: #ff6600;">8</span>, <span style="color: #ff6600;">9</span>};
+    <span style="color: #006699; font-weight: bold;">auto</span> myVecIt <span style="color: #555555;">=</span> myVec.begin();                                                <span style="color: #0099ff; font-style: italic;">// (3)</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"*myVecIt: "</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #555555;">*</span>myVecIt <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    advance_(myVecIt, <span style="color: #ff6600;">5</span>);
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"*myVecIt: "</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #555555;">*</span>myVecIt <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>list<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> myList{<span style="color: #ff6600;">0</span>, <span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">5</span>, <span style="color: #ff6600;">6</span>, <span style="color: #ff6600;">7</span>, <span style="color: #ff6600;">8</span>, <span style="color: #ff6600;">9</span>};
+    <span style="color: #006699; font-weight: bold;">auto</span> myListIt <span style="color: #555555;">=</span> myList.begin();                                              <span style="color: #0099ff; font-style: italic;">// (4)</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"*myListIt: "</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #555555;">*</span>myListIt <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    advance_(myListIt, <span style="color: #ff6600;">5</span>);
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"*myListIt: "</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #555555;">*</span>myListIt <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>forward_list<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> myForwardList{<span style="color: #ff6600;">0</span>, <span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">5</span>, <span style="color: #ff6600;">6</span>, <span style="color: #ff6600;">7</span>, <span style="color: #ff6600;">8</span>, <span style="color: #ff6600;">9</span>};
+    <span style="color: #006699; font-weight: bold;">auto</span> myForwardListIt <span style="color: #555555;">=</span> myForwardList.begin();                                <span style="color: #0099ff; font-style: italic;">// (5)</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"*myForwardListIt: "</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #555555;">*</span>myForwardListIt <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    advance_(myForwardListIt, <span style="color: #ff6600;">5</span>);
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"*myForwardListIt: "</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #555555;">*</span>myForwardListIt <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The expression&nbsp;<span style="font-family: 'courier new', courier;">std::iterator_traits::iterator_category category&nbsp;</span>determines the iterator category at compile time. Based on the iterator category the most specific variable of the function&nbsp;<span style="font-family: 'courier new', courier;">advance_impl(i, n, category)&nbsp;</span>is used in line (2). Each container returns an iterator of the iterator category which corresponds to its structure. Therefore, line (3) gives a random access iterator, line (4) gives a bidirectional iterator, and line (5) gives a forward iterator which is also an input iterator.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesConceptsDefinition2/advanceTagDispatch.png" alt="advanceTagDispatch" width="400" height="335" />From the performance point of view, this distinction makes a lot of sense because a random access iterator can be faster incremented than a bidirectional iterator, and a bidirectional iterator can be faster incremented than an input iterator. From the users perspective, you invoke<span style="font-family: 'courier new', courier;"> std::advance(it, 5</span>) and you get the fastest version which your container satisfies.</p>
+<p>This was quite verbose. I have not so much to add the two remaining rules.</p>
+<h2><a style="color: #268bd2; text-decoration: none;" href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-not">T.25: Avoid complimen</a><a style="color: #268bd2; text-decoration: none;" href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-not">tary constraints</a></h2>
+<p>The example from the guidelines shows complimentary constraints.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span> 
+    requires <span style="color: #555555;">!</span>C<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span> <span style="color: #0099ff; font-style: italic;">// bad </span>
+<span style="color: #007788; font-weight: bold;">void</span> f(); 
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span> 
+    requires C<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span> 
+<span style="color: #007788; font-weight: bold;">void</span> f();
+</pre>
+</div>
+<p><br class="no-highlight" style="font-family: 'Roboto Mono', monospace; padding: 0.5em; font-size: 16px; background-color: transparent; display: inline-block; min-width: 50em; color: black;" /></p>
+<p>Avoid it. Make an unconstrained template and a constrained template&nbsp;instead.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>   <span style="color: #0099ff; font-style: italic;">// general template</span>
+    <span style="color: #007788; font-weight: bold;">void</span> f();
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>   <span style="color: #0099ff; font-style: italic;">// specialization by concept</span>
+    requires C<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">void</span> f();
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>You can even set the unconstrained version to <span style="font-family: 'courier new', courier;">delete</span> such that the constrained versions is only usable.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">void</span> f() <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">delete</span>;
+</pre>
+</div>
+<p>&nbsp;</p>
+<h2><a style="color: #268bd2; text-decoration: none;" href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-use">T.26: Prefer to define concepts in terms of use-patterns rather than simple syntax</a></h2>
+<p>The title for this guideline is quite vague, but the example is self-explanatory.</p>
+<p>Instead of using the concepts <span style="font-family: courier new, courier;">has_equal</span> and <span style="font-family: courier new, courier;">has_not_equal</span> to define the concept <span style="font-family: courier new, courier;">Equality </span></p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span> concept Equality <span style="color: #555555;">=</span> has_equal<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span> <span style="color: #555555;">&amp;&amp;</span> has_not_equal<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span>;
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>use the usage-pattern. This is more readable than the previous version:</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span> concept Equality <span style="color: #555555;">=</span> requires(T a, T b) {
+    <span style="color: #007788; font-weight: bold;">bool</span> <span style="color: #555555;">==</span> { a <span style="color: #555555;">==</span> b }
+    <span style="color: #007788; font-weight: bold;">bool</span> <span style="color: #555555;">==</span> { a <span style="color: #555555;">!=</span> b }
+    <span style="color: #0099ff; font-style: italic;">// axiom { !(a == b) == (a != b) }</span>
+    <span style="color: #0099ff; font-style: italic;">// axiom { a = b; =&gt; a == b }  // =&gt; means "implies"</span>
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The concept <span style="font-family: 'courier new', courier;">Equality</span> requires in this case that you can apply <span style="font-family: courier new, courier;">==</span> and <span style="font-family: courier new, courier;">!=</span> to the arguments and both operations return <span style="font-family: courier new, courier;">bool.</span></p>
+<h2>What's next?</h2>
+<p>Here is a part of the opening from the C++ core guidelines to template interfaces: "...the interface to a template is a critical concept - a contract between a user and an implementer - and should be carefully designed.". You see, the next post is critical.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Eric Pederson, Paul Baxter,&nbsp; Meeting C++, Matt Braun, Avi Lachmish, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Mielo, Dilettant, and Marko.<br /></strong></p>
+<p><strong>Thanks in particular to:&nbsp; <a href="https://www.takeupcode.com"><img style="vertical-align: top;" src="images/patreon/TakeUpCode-450-60.png" alt="TakeUpCode 450 60" width="150" height="20" /> </a></strong></p>
+<p>&nbsp;</p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at Leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 600 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
+<p></p>
+<table>
+<tbody>
+<tr>
+<td>
+<h2>&nbsp;Get your interactive course at educative</h2>
+</td>
+</tr>
+<tr>
+<td>
+<h4 class="_3fBEwsM053hx2mPd0uV0nT" style="text-align: center;">Modern C++ Concurrency in Practice: Get the most out of any machine</h4>
+</td>
+</tr>
+<tr>
+<td><a href="https://goo.gl/2qWUkK"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseConcurrency/educative.png" alt="educative" width="500" height="253" /></a></td>
+</tr>
+<tr>
+<td>
+<p>Based on my book "Concurrency with Modern C++" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>140 lessons</li>
+<li>110 code playgrounds =&gt; Run in browser</li>
+<li>78 code snippets</li>
+<li>55 illustrations</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
