@@ -1,0 +1,259 @@
+<p>An interface is a contract between a user and an implementer and should, therefore, be written with great care. This holds also true if you pass an operation as argument.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesTemplateInterfaces/contract.png" alt="contract" width="500" height="544" /></p>
+<p></p>
+<p>Today, I'm just writing about rule 40 because function objects are used quite heavily in modern C++.&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;</p>
+<h2><a style="color: #268bd2; text-decoration: none;" href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-fo">T.40: Use function objects to pass operations to algorithms</a></h2>
+<p>First of all, you may be irritated that the rules didn't explicitly mention lambda functions but use them. I write about this point later in detail.</p>
+<p>There are various ways to sort a vector of strings.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// functionObjects.cpp</span>
+
+<span style="color: #009999;">#include &lt;algorithm&gt;</span>
+<span style="color: #009999;">#include &lt;functional&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;iterator&gt;</span>
+<span style="color: #009999;">#include &lt;string&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">bool</span> <span style="color: #cc00ff;">lessLength</span>(<span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span>string<span style="color: #555555;">&amp;</span> f, <span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span>string<span style="color: #555555;">&amp;</span> s){      <span style="color: #0099ff; font-style: italic;">// (6) </span>
+    <span style="color: #006699; font-weight: bold;">return</span> f.length() <span style="color: #555555;">&lt;</span> s.length();
+}
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">GreaterLength</span>{                                              <span style="color: #0099ff; font-style: italic;">// (7)</span>
+    <span style="color: #9999ff;">public:</span>
+        <span style="color: #007788; font-weight: bold;">bool</span> <span style="color: #006699; font-weight: bold;">operator</span>()(<span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span>string<span style="color: #555555;">&amp;</span> f, <span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span>string<span style="color: #555555;">&amp;</span> s) <span style="color: #006699; font-weight: bold;">const</span>{
+            <span style="color: #006699; font-weight: bold;">return</span> f.length() <span style="color: #555555;">&gt;</span> s.length();
+    }
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+
+    std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>string<span style="color: #555555;">&gt;</span> myStrVec <span style="color: #555555;">=</span> {<span style="color: #cc3300;">"523345"</span>, <span style="color: #cc3300;">"4336893456"</span>, <span style="color: #cc3300;">"7234"</span>, 
+	                                     <span style="color: #cc3300;">"564"</span>, <span style="color: #cc3300;">"199"</span>, <span style="color: #cc3300;">"433"</span>, <span style="color: #cc3300;">"2435345"</span>};
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>;                                      
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"ascending with function object"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;  
+    std<span style="color: #555555;">::</span>sort(myStrVec.begin(), myStrVec.end(), std<span style="color: #555555;">::</span>less<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>string<span style="color: #555555;">&gt;</span>()); <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">const</span> <span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;</span> str<span style="color: #555555;">:</span> myStrVec) std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> str <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span>;  
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n\n</span><span style="color: #cc3300;">"</span>;
+  
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"descending with function object"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;             
+    std<span style="color: #555555;">::</span>sort(myStrVec.begin(), myStrVec.end(), std<span style="color: #555555;">::</span>greater<span style="color: #555555;">&lt;&gt;</span>());         <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">const</span> <span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;</span> str<span style="color: #555555;">:</span> myStrVec) std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> str <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span>;  
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n\n</span><span style="color: #cc3300;">"</span>;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"ascending by length with function"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>sort(myStrVec.begin(), myStrVec.end(), lessLength);               <span style="color: #0099ff; font-style: italic;">// (3)</span>
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">const</span> <span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;</span> str<span style="color: #555555;">:</span> myStrVec) std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> str <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span>;  
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n\n</span><span style="color: #cc3300;">"</span>;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"descending by length with function object"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>sort(myStrVec.begin(), myStrVec.end(), GreaterLength());          <span style="color: #0099ff; font-style: italic;">// (4)</span>
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">const</span> <span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;</span> str<span style="color: #555555;">:</span> myStrVec) std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> str <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span>;  
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n\n</span><span style="color: #cc3300;">"</span>;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"ascending by length with lambda function"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>sort(myStrVec.begin(), myStrVec.end(),                           <span style="color: #0099ff; font-style: italic;">// (5)</span>
+              [](<span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span>string<span style="color: #555555;">&amp;</span> f, <span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span>string<span style="color: #555555;">&amp;</span> s){ 
+		          <span style="color: #006699; font-weight: bold;">return</span> f.length() <span style="color: #555555;">&lt;</span> s.length(); 
+			  });
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">const</span> <span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;</span> str<span style="color: #555555;">:</span> myStrVec) std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> str <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span>;  
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n\n</span><span style="color: #cc3300;">"</span>;
+
+}
+</pre>
+</div>
+<p></p>
+<p>The program sorts a vector of strings lexicographically and based on the length of the strings. I&nbsp;used in the lines (1) and (2) two function objects from the Standard template library. A function object is an instance of a class for which the call operator (<span style="font-family: courier new, courier;">operater ()</span>) is overloaded. Often, there are falsely called functors. I hope, you notice the difference between the call<span style="font-family: courier new, courier;"> std<span style="color: #555555;">::</span>sort(myStrVec.begin(), myStrVec.end(), std<span style="color: #555555;">::</span>less<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>string<span style="color: #555555;">&gt;</span>())</span> in line (1) and <span style="font-family: courier new, courier;">std<span style="color: #555555;">::</span>sort(myStrVec.begin(), myStrVec.end(), std<span style="color: #555555;">::</span>greater<span style="color: #555555;">&lt;&gt;</span>())&nbsp;</span>n line (2). The second expression (<span style="font-family: courier new, courier;">std<span style="color: #555555;">::</span>greater<span style="color: #555555;">&lt;&gt;</span>()</span>), in which I provided no type for the predicate, is valid since C++14. I sorted in the lines (3), (4), and (5) by using a function (6), a function object (7), and a lambda function (5). This time, the length of the strings was the sorting criteria.</p>
+<p>For completeness, here is the output of the program.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesTemplateInterfaces/functionObjects.png" alt="functionObjects" width="500" height="357" /></p>
+<p>The rules states you should <span style="color: #000000;">"<a style="color: #000000;" href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-fo">Use function objects to pass operations to algorithms". </a></span></p>
+<h3>Advantages of function objects</h3>
+<p><span style="color: #000000;"><a style="color: #000000;" href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-fo">My argumentation boils down to three points: Performance, Expressiveness, and State. It makes my answer quite easy that lambda functions are function objects under the hood. </a></span></p>
+<h4>Performance</h4>
+<p>The more the optimiser can reason locally, the more optimisation is possible. A function object (4) or a lambda function (5) can be generated just in place. Compare this to a function that was defined in a different translation unit. If you don't believe me, use the <a href="https://godbolt.org/">compiler explorer</a> and compare the assembler instructions. Of course, compile with maximum optimisation.</p>
+<h4>Expressiveness</h4>
+<p>"Explicit is better than implicit". This meta-rule from Python also applies to C++. It means that your code should explicitly express its intent. Of course, this holds in particular for lambda functions such in line (5). Compare this with the function <span style="font-family: courier new, courier;">lessLength</span> in line (6) which is used in line (3). Imagine your coworker would name the function <span style="font-family: courier new, courier;">foo</span>; therefore, you have not idea what the function should do. You have to document their usage such as in the following line.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// sorts the vector ascending, based on the length of its strings </span>
+std<span style="color: #555555;">::</span>sort(myStrVec.begin(), myStrVec.end(), foo); <span style="color: #0099ff; font-style: italic;"></span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Further, you have to hope that your coworker wrote a correct predicate. If you don't believe him you have to look at the implementation. Maybe that's not possible because you just have the declaration of the function. With a lambda function, your coworker can not fool you. The code is the truth. Let me put it more provocative:&nbsp;<strong>Your code should be such expressive that it needs no documentation.&nbsp; </strong></p>
+<h4>State</h4>
+<p>In contrast to a function, a function object can have state. The code example makes my point.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// sumMe.cpp</span>
+
+<span style="color: #009999;">#include &lt;algorithm&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">SumMe</span>{
+  <span style="color: #007788; font-weight: bold;">int</span> sum{<span style="color: #ff6600;">0</span>};
+  <span style="color: #9999ff;">public:</span>
+    SumMe() <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">default</span>;
+
+    <span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">operator</span>()(<span style="color: #007788; font-weight: bold;">int</span> x){
+      sum <span style="color: #555555;">+=</span> x;
+    }
+
+    <span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">getSum</span>(){
+      <span style="color: #006699; font-weight: bold;">return</span> sum;
+    }
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+
+    std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> intVec{<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">5</span>, <span style="color: #ff6600;">6</span>, <span style="color: #ff6600;">7</span>, <span style="color: #ff6600;">8</span>, <span style="color: #ff6600;">9</span>, <span style="color: #ff6600;">10</span>}; 
+
+    SumMe sumMe<span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>for_each(intVec.begin(), intVec.end(), SumMe()); <span style="color: #0099ff; font-style: italic;"> // (1)</span>
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Sum of intVec= "</span> <span style="color: #555555;">&lt;&lt;</span> sumMe.getSum() <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;      <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The <span style="font-family: courier new, courier;">std::for_each</span> call in line (1) is crucial.<span style="font-family: courier new, courier;"> std::for_each</span>&nbsp;is a special algorithm of the Standard Template Library because it can return its callable. I invoke <span style="font-family: courier new, courier;">std::for_each</span> with the&nbsp; function object <span style="font-family: courier new, courier;">SumMe</span> and can, therefore, store the result of the function call directly in the function object. I ask in line (2) for the sum of all calls which is the state of the function object.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesTemplateInterfaces/sumUp.png" alt="sumUp" width="350" height="187" /></p>
+<p>&nbsp;</p>
+<p>Just to be complete. Lambda functions can also have state. You can use a lambda function to accumulate the values.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// sumMeLambda.cpp</span>
+
+<span style="color: #009999;">#include &lt;algorithm&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+	
+	std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+    std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> intVec{<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">5</span>, <span style="color: #ff6600;">6</span>, <span style="color: #ff6600;">7</span>, <span style="color: #ff6600;">8</span>, <span style="color: #ff6600;">9</span>, <span style="color: #ff6600;">10</span>};
+
+    std<span style="color: #555555;">::</span>for_each(intVec.begin(), intVec.end(),
+	            [sum <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>](<span style="color: #007788; font-weight: bold;">int</span> i) <span style="color: #006699; font-weight: bold;">mutable</span> {
+				    sum <span style="color: #555555;">+=</span> i; 
+				    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> sum <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+				});
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Okay, this lambda function looks scary. First of all, the variable <span style="font-family: courier new, courier;">sum</span> represents the state of the lambda function. With C++14, the so-called initialisation capture of lambdas is supported. <span style="font-family: courier new, courier;">sum = 0&nbsp;</span>declares and initialises a variable of type <span style="font-family: courier new, courier;">int</span> which is only valid in the scope of the lambda function. Lambda functions are per default <span style="font-family: courier new, courier;">const</span>. By declaring it as <span style="font-family: courier new, courier;">mutable</span>, I can add the numbers to <span style="font-family: courier new, courier;">sum</span>.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesTemplateInterfaces/sumUpLambda.png" alt="sumUpLambda" width="300" height="263" /></p>
+<p>&nbsp;</p>
+<p>I stated that lambda functions are functions objects under the hood. <a href="https://cppinsights.io/">C++ Insight</a> makes the proof for my statement to a piece of cake.</p>
+<h3>Lambda Functions are Function Objects</h3>
+<p>A lambda function is just <a href="https://en.wikipedia.org/wiki/Syntactic_sugar">syntactic sugar</a> for a function object which is instantiated in place. C++ Insight shows which transformations the compiler applies to lambda functions.</p>
+<p>Let's start simple. When I run the following small lambda function in C++ Insight</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesTemplateInterfaces/sourceLambda.PNG" alt="sourceLambda" width="400" height="124" /></p>
+<p>the tool gives me the unsugared syntactic sugar:</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesTemplateInterfaces/insightLambda.PNG" alt="insightLambda" width="600" height="329" /></p>
+<p>The compiler generates a function object <span style="font-family: courier new, courier;">__lamda_2_16</span> (lines 4 - 11), instantiates it in line 13, and uses it line 14. That's all!</p>
+<p>The next example is a little bit more complicated. Now, the lambda function <span style="font-family: courier new, courier;">addTo</span> adds the sum to the variable c which is captured by copy.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesTemplateInterfaces/sourceLambdaCapture.PNG" alt="sourceLambdaCapture" width="400" height="111" /></p>
+<p>&nbsp;</p>
+<p>In this case, the autogenerated function object&nbsp;gets a member c and a constructor. This is the code from C++ Insight.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesTemplateInterfaces/insightLambdaCapture.PNG" alt="insightLambdaCapture" width="600" height="502" /></p>
+<h2>What's next?</h2>
+<p>This was just the first rule to templates interfaces. My next post continues their story.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Eric Pederson, Paul Baxter,&nbsp; Meeting C++, Matt Braun, Avi Lachmish, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Dilettant, Marko, and Ramesh Jangama.<br /></strong></p>
+<p><strong>Thanks in particular to:&nbsp; <a href="https://www.takeupcode.com"><img style="vertical-align: top;" src="images/patreon/TakeUpCode-450-60.png" alt="TakeUpCode 450 60" width="150" height="20" /> </a></strong></p>
+<p>&nbsp;</p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at Leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 600 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
+<p></p>
+<table style="width: 800px;">
+<tbody>
+<tr>
+<td colspan="2">
+<h2>Get your interactive course</h2>
+&nbsp;</td>
+</tr>
+<tr>
+<td>
+<h4 class="_3fBEwsM053hx2mPd0uV0nT" style="text-align: center;">Modern C++ Concurrency in Practice</h4>
+</td>
+<td>
+<h4>C++ Standard Library including C++14 &amp; C++17</h4>
+</td>
+</tr>
+<tr>
+<td><a href="https://goo.gl/2qWUkK"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseConcurrency/educative.png" alt="educative" width="300" height="152" /></a></td>
+<td><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseLibrary/CLibrary.png" alt="CLibrary" width="300" height="150" /></td>
+</tr>
+<tr>
+<td>
+<p>Based on my book "Concurrency with Modern C++" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>140 lessons</li>
+<li>110 code playgrounds =&gt; Runs in the browser</li>
+<li>78 code snippets</li>
+<li>55 illustrations</li>
+</ul>
+</td>
+<td>
+<p>Based on my book "The C++ Standard Library" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>149 lessons</li>
+<li>111 code playgrounds =&gt; Runs in the browser</li>
+<li>164 code snippets</li>
+<li>25 illustrations</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
