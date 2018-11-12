@@ -1,0 +1,230 @@
+<p>This post is about template interfaces which are due to the C++ core guidelines: "...a critical concept", because a template interface is "a contract between a user and an implementer - and should be carefully designed.".</p>
+<hr id="system-readmore" />
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesInterfacesOfTremplates/automatic.jpg" alt="automatic" width="500" height="282" /></p>
+<p>Here are the rules for today:</p>
+<ul>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-essential">T.41: Require only essential properties in a template’s concepts</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-alias">T.42: Use template aliases to simplify notation and hide implementation details</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-using">T.43: Prefer <code class="highlighter-rouge no-highlight">using</code> over <code class="highlighter-rouge no-highlight">typedef</code> for defining aliases</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-deduce">T.44: Use function templates to deduce class template argument types (where feasible)</a></li>
+</ul>
+<p>Let me start with the first rule T.41:</p>
+<h2><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-essential">T.41: Require only essential properties in a template’s concepts</a></h2>
+<p>What does it mean to specify only the essential properties? The guidelines provide an example of a sort algorithm which has debug support.</p>
+<div id="preview">
+<div style="background: #f0f3f3 none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span>Sortable S<span style="color: #555555;">&gt;</span>
+    requires Streamable<span style="color: #555555;">&lt;</span>S<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">void</span> sort(S<span style="color: #555555;">&amp;</span> s)  <span style="color: #0099ff; font-style: italic;">// sort sequence s</span>
+{
+    <span style="color: #006699; font-weight: bold;">if</span> (debug) cerr <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"enter sort( "</span> <span style="color: #555555;">&lt;&lt;</span> s <span style="color: #555555;">&lt;&lt;</span>  <span style="color: #cc3300;">")</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>;
+    <span style="color: #0099ff; font-style: italic;">// ...</span>
+    <span style="color: #006699; font-weight: bold;">if</span> (debug) cerr <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"exit sort( "</span> <span style="color: #555555;">&lt;&lt;</span> s <span style="color: #555555;">&lt;&lt;</span>  <span style="color: #cc3300;">")</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>;
+}
+</pre>
+</div>
+</div>
+<p><br />Now, one question remains: What is the issue if you specify non-essential properties. This means that your concepts are strongly bound the implementation. The result may be that a small change of the implementation changes your concepts. In the end, you interface becomes quite unstable.&nbsp;</p>
+<h2><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-alias">T.42: Use template aliases to simplify notation and hide implementation details</a></h2>
+<p>Since C++11 we have templates aliases. A template alias is a name that refers to a family of types. Using them makes your code more readable and helps you to get rid of type traits. My previous post&nbsp; <a href="https://www.modernescpp.com/index.php/c-core-guidelines-definition-of-concepts-the-second">C++ Core Guidelines: Definition of Concepts, the Second</a> provides more information to type traits.</p>
+<p>Let's see the guidelines mean by readability. The first example uses type traits:</p>
+<div id="preview">
+<div style="background: #f0f3f3 none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">void</span> user(T<span style="color: #555555;">&amp;</span> c)
+{
+    <span style="color: #0099ff; font-style: italic;">// ...</span>
+    <span style="color: #006699; font-weight: bold;">typename</span> container_traits<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value_type x; <span style="color: #0099ff; font-style: italic;">// bad, verbose</span>
+    <span style="color: #0099ff; font-style: italic;">// ...</span>
+}
+</pre>
+</div>
+</div>
+<p>Here is the corresponding case with template aliases.</p>
+<div id="preview">
+<div style="background: #f0f3f3 none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">using</span> Value_type <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">typename</span> container_traits<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value_type;
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">user2</span>(T<span style="color: #555555;">&amp;</span> c)
+{
+    <span style="color: #0099ff; font-style: italic;">// ...</span>
+    Value_type<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span> x;
+    <span style="color: #0099ff; font-style: italic;">// ...</span>
+}
+</pre>
+</div>
+</div>
+<p><br />Readability is also the argument which holds for the next rule</p>
+<h2><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-using">T.43: Prefer <code class="highlighter-rouge no-highlight">using</code> over <code class="highlighter-rouge no-highlight">typedef</code> for defining aliases</a></h2>
+<p>There are two arguments from the readability perspective to prefer <span style="font-family: Courier New, Courier, monospace;">using </span>over <span style="font-family: Courier New, Courier, monospace;">typedef</span>. First, <span style="font-family: Courier New, Courier, monospace;">using </span>comes first when used. Second, <span style="font-family: Courier New, Courier, monospace;">using </span>feels quite similar to <span style="font-family: Courier New, Courier, monospace;">auto</span>. Additionally, using can easily be used for template aliases.</p>
+<div id="preview">
+<div style="background: #f0f3f3 none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #006699; font-weight: bold;">typedef</span> <span style="color: #cc00ff;">int</span> (<span style="color: #555555;">*</span>PFI)(<span style="color: #007788; font-weight: bold;">int</span>);     <span style="color: #0099ff; font-style: italic;">// OK, but convoluted</span>
+
+<span style="color: #006699; font-weight: bold;">using</span> PFI2 <span style="color: #555555;">=</span> <span style="color: #007788; font-weight: bold;">int</span> (<span style="color: #555555;">*</span>)(<span style="color: #007788; font-weight: bold;">int</span>);   <span style="color: #0099ff; font-style: italic;">// OK, preferred</span>
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">typedef</span> <span style="color: #007788; font-weight: bold;">int</span> (<span style="color: #555555;">*</span>PFT)(T);       <span style="color: #0099ff; font-style: italic;">// error (1) </span>
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">using</span> PFT2 <span style="color: #555555;">=</span> <span style="color: #007788; font-weight: bold;">int</span> (<span style="color: #555555;">*</span>)(T);     <span style="color: #0099ff; font-style: italic;">// OK</span>
+</pre>
+</div>
+</div>
+<p><br />The first two lines define a pointer to a function (<span style="font-family: Courier New, Courier, monospace;">PFI </span>and <span style="font-family: Courier New, Courier, monospace;">PFI2</span>) which takes an <span style="font-family: Courier New, Courier, monospace;">int </span>and returns an <span style="font-family: Courier New, Courier, monospace;">int</span>. In the first case <span style="font-family: Courier New, Courier, monospace;">typedef </span>is used and in the second line <span style="font-family: Courier New, Courier, monospace;">using</span>. The last two lines define a function template (<span style="font-family: Courier New, Courier, monospace;">PFT2</span>) which takes a type parameter<span style="font-family: Courier New, Courier, monospace;"> T</span> and returns an <span style="font-family: Courier New, Courier, monospace;">int</span>.&nbsp; The line (1) is not valid.</p>
+<h2><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-deduce">T.44: Use function templates to deduce class template argument types (where feasible)</a></h2>
+<p>The primary reason that we have too many <span style="font-family: courier new, courier;">make_</span> functions such as <span style="font-family: courier new, courier;">std::make_tuple</span> or <span style="font-family: courier new, courier;">std::make_unique</span> is that a function template can deduce its template arguments from it function arguments. During this process, the compiler applies a few simple conversions such as removing the outermost <span style="font-family: courier new, courier;">const/volatile</span> qualifier and decaying C-arrays and functions to a pointer to the first element of the C-arrray or a pointer to the function.</p>
+<p>This automatic template argument deduction makes our life as a programmer much easier.</p>
+<p>Instead of typing</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">std<span style="color: #555555;">::</span>tuple<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>, <span style="color: #007788; font-weight: bold;">double</span>, std<span style="color: #555555;">::</span>string<span style="color: #555555;">&gt;</span> myTuple <span style="color: #555555;">=</span> {<span style="color: #ff6600;">2011</span>, <span style="color: #ff6600;">20.11</span>, <span style="color: #cc3300;">"C++11"</span>};
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>you use the factory function <span style="font-family: courier new, courier;">std::make_tuple</span>.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">auto</span> myTuple <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>make_tuple(<span style="color: #ff6600;">2011</span>, <span style="color: #ff6600;">20.11</span>, <span style="color: #cc3300;">"C++11"</span>);
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Sad to say but automatic template type deduction is in C++ only available for function templates. Why? Constructors of class templates are special static function. Right! With C++17, the compiler can deduce its template arguments from its constructor arguments. Here is the way to define <span style="font-family: courier new, courier;">myTuple</span> in C++17.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">std<span style="color: #555555;">::</span>tuple myTuple <span style="color: #555555;">=</span> {<span style="color: #ff6600;">2017</span>, <span style="color: #ff6600;">20.17</span>, <span style="color: #cc3300;">"C++17"</span>};
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>An obvious effect of this C++17 feature is that most of the <span style="font-family: courier new, courier;">make_</span> function become obsolete with C++17.</p>
+<p>If you want to know the details about class template argument deduction including the argument deduction guide, read the post <a href="https://arne-mertz.de/2017/06/class-template-argument-deduction/">Modern C++ Features - Class Template Argument Deduction</a> from Arne Mertz.</p>
+<h3>Teachability of C++</h3>
+<p>I have to admit, I like this C++17 feature. As a C++ trainer, my job is it to explain this difficult stuff. The more symmetric C++ becomes the easier&nbsp;is it for me to speak about the general ideas.&nbsp; Now I can say: "A template can automatically deduce its template arguments from its function arguments.".&nbsp; In the past, I had to say this works only for function templates.</p>
+<p>Here is a simple example:</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// templateArgumentDeduction.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">void</span> showMe(<span style="color: #006699; font-weight: bold;">const</span> T<span style="color: #555555;">&amp;</span> t){
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> t <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+}
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">struct</span> ShowMe{
+  ShowMe(<span style="color: #006699; font-weight: bold;">const</span> T<span style="color: #555555;">&amp;</span> t){
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> t <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  }
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+  showMe(<span style="color: #ff6600;">5.5</span>);          <span style="color: #0099ff; font-style: italic;">// not showMe&lt;double&gt;(5.5);</span>
+  showMe(<span style="color: #ff6600;">5</span>);            <span style="color: #0099ff; font-style: italic;">// not showMe&lt;int&gt;(5);</span>
+    
+  ShowMe(<span style="color: #ff6600;">5.5</span>);          <span style="color: #0099ff; font-style: italic;">// not ShowMe&lt;double&gt;(5.5);</span>
+  ShowMe(<span style="color: #ff6600;">5</span>);            <span style="color: #0099ff; font-style: italic;">// not ShowMe&lt;int&gt;(5);</span>
+  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The usage of the function template <span style="font-family: courier new, courier;">showMe</span> or the class template <span style="font-family: courier new, courier;">ShowMe</span> feels the same. From the user perspective, you don't know that you use a template.</p>
+<p>With a current GCC 8.2, the program compiles and runs.</p>
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesInterfacesOfTremplates/templateArgumentDeduction.png" alt="templateArgumentDeduction" width="700" height="252" /></p>
+<p>To be more specific template argument deduction should work since GCC 7, Clang 5, and MSVC 19.14. <a href="https://en.cppreference.com/w/cpp/compiler_support">cppreference.com </a>gives you the details to the compiler support.</p>
+<h2>What's next?</h2>
+<p>Do you know what a Regular or SemiRegular type is? If not, the next post to template interfaces is just the right one for you. Rule T.46 states: "Require template arguments to be at least <span style="font-family: courier new, courier;">Regular</span> or <span style="font-family: courier new, courier;">SemiRegular.".</span></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Eric Pederson, Paul Baxter,&nbsp; Meeting C++, Matt Braun, Avi Lachmish, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Dilettant, Marko, and Ramesh Jangama.<br /></strong></p>
+<p><strong>Thanks in particular to:&nbsp; <a href="https://www.takeupcode.com"><img style="vertical-align: top;" src="images/patreon/TakeUpCode-450-60.png" alt="TakeUpCode 450 60" width="150" height="20" /> </a></strong></p>
+<p>&nbsp;</p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at Leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 600 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
+<p></p>
+<table style="width: 800px;">
+<tbody>
+<tr>
+<td colspan="2">
+<h2>Get your interactive course</h2>
+&nbsp;</td>
+</tr>
+<tr>
+<td>
+<h4 class="_3fBEwsM053hx2mPd0uV0nT" style="text-align: center;">Modern C++ Concurrency in Practice</h4>
+</td>
+<td>
+<h4>C++ Standard Library including C++14 &amp; C++17</h4>
+</td>
+</tr>
+<tr>
+<td><a href="https://goo.gl/2qWUkK"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseConcurrency/educative.png" alt="educative" width="300" height="152" /></a></td>
+<td><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseLibrary/CLibrary.png" alt="CLibrary" width="300" height="150" /></td>
+</tr>
+<tr>
+<td>
+<p>Based on my book "Concurrency with Modern C++" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>140 lessons</li>
+<li>110 code playgrounds =&gt; Runs in the browser</li>
+<li>78 code snippets</li>
+<li>55 illustrations</li>
+</ul>
+</td>
+<td>
+<p>Based on my book "The C++ Standard Library" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>149 lessons</li>
+<li>111 code playgrounds =&gt; Runs in the browser</li>
+<li>164 code snippets</li>
+<li>25 illustrations</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
