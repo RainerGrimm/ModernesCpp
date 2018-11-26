@@ -1,0 +1,262 @@
+<p>The topic for today is quite important when you create your type:&nbsp;<span style="font-family: courier new, courier;">Regular</span> and <span style="font-family: courier new, courier;">SemiRegular </span>types.<code class="highlighter-rouge no-highlight"><br /></code></p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesRegularSemirRegular/banner-1183445_1280.jpg" alt="banner 1183445 1280" width="600" height="180" /></p>
+<p>Here is the exact rule for today.</p>
+<h2><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-regular">T.46: Require template arguments to be at least <code class="highlighter-rouge no-highlight">Regular</code> or <code class="highlighter-rouge no-highlight">SemiRegular</code></a></h2>
+<p>Okay, the first question I have to answer is quite obvious. What is a <span style="font-family: courier new, courier;">Regular</span> or a <span style="font-family: courier new, courier;">SemiRegular</span> type? My answer is based on the proposal <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p0898r3.pdf">p0898</a>.&nbsp;I assume you may already guess it. <span style="font-family: courier new, courier;">Regular</span> and <span style="font-family: courier new, courier;">SemiRegular</span> are concepts, which&nbsp;are defined by concepts.</p>
+<h3><span style="font-family: courier new, courier;">Regular</span></h3>
+<ul>
+<li><span style="font-family: courier new, courier;">DefaultConstructible</span></li>
+<li><span style="font-family: courier new, courier;">CopyConstructible, CopyAssignable</span></li>
+<li><span style="font-family: courier new, courier;">MoveConstructible, MoveAssignable</span></li>
+<li><span style="font-family: courier new, courier;">Destructible</span></li>
+<li><span style="font-family: courier new, courier;">Swappable</span></li>
+<li><span style="font-family: courier new, courier;">EqualityComparable</span></li>
+</ul>
+<h3><span style="font-family: courier new, courier;">SemiRegular</span></h3>
+<ul>
+<li><span style="font-family: courier new, courier;">Regular - EqualityComparable</span></li>
+</ul>
+<p>The term <span style="font-family: courier new, courier;"><strong>Regular</strong></span> goes back to the father of the Standard Template Library <a href="https://en.wikipedia.org/wiki/Alexander_Stepanov">Alexander Stepanov</a>. He introduced the term it in his book Fundamentals of Generic Programming for which you have here a <a href="http://stepanovpapers.com/DeSt98.pdf">short excerpt</a>. It's quite easy to remember the eight concepts used to define a regular type. There is the well-known <a href="index.php/c-core-guidelines-constructors-assignments-and-desctructors">rule of six</a>:</p>
+<ul>
+<li>Default constructor:<span style="font-family: courier new, courier;"> <code class="highlighter-rouge no-highlight">X()</code></span></li>
+<li>Copy constructor: <code class="highlighter-rouge no-highlight"><span style="font-family: courier new, courier;">X(const X&amp;</span>)</code></li>
+<li>Copy assignment: <span style="font-family: courier new, courier;"><code class="highlighter-rouge no-highlight">operator=(const X&amp;)</code></span></li>
+<li>Move constructor: <span style="font-family: courier new, courier;"><code class="highlighter-rouge no-highlight">X(X&amp;&amp;)</code></span></li>
+<li>Move assignment: <code class="highlighter-rouge no-highlight"><span style="font-family: courier new, courier;">operator=(X&amp;&amp;)</span></code></li>
+<li>Destructor: <span style="font-family: courier new, courier;"><code class="highlighter-rouge no-highlight">~X()</code></span></li>
+</ul>
+<p>Just add the <span style="font-family: courier new, courier;">Swappable</span> and <span style="font-family: courier new, courier;">EqualityComparable</span> concepts to it. There is a more informal way to say that a type<span style="font-family: courier new, courier;"> T</span> is regular: <span style="font-family: courier new, courier;">T</span> behaves like an <span style="font-family: courier new, courier;">int</span>.&nbsp;</p>
+<p>To get <strong><span style="font-family: courier new, courier;">SemiRegular</span></strong>, you have to subtract <span style="font-family: courier new, courier;">EqualityComparable</span> from <span style="font-family: courier new, courier;">Regular</span>.</p>
+<p>I hear your next question: Why should our template arguments at least be&nbsp;<span style="font-family: courier new, courier;">Regular</span> or <span style="font-family: courier new, courier;">SemiRegular </span>or do as the ints do? <strong>The STL containers and algorithms, in particular, assume <span style="font-family: courier new, courier;">Regular</span> data types.</strong><span style="font-family: courier new, courier;"> </span></p>
+<p>What is commonly used but not a Regular type? Right: a reference.</p>
+<h3>References are not <span style="font-family: courier new, courier;">Regular</span></h3>
+<p>Thanks to the<a href="https://en.cppreference.com/w/cpp/header/type_traits"> type-traits library</a> the following program checks at compile time if <span style="font-family: courier new, courier;">int&amp;</span> is a <span style="font-family: courier new, courier;">SemiRegular</span> type.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// semiRegular.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;type_traits&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>boolalpha <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"std::is_default_constructible&lt;int&amp;&gt;::value: "</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>is_default_constructible<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&amp;&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"std::is_copy_constructible&lt;int&amp;&gt;::value: "</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>is_copy_constructible<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&amp;&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"std::is_copy_assignable&lt;int&amp;&gt;::value: "</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>is_copy_assignable<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&amp;&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"std::is_move_constructible&lt;int&amp;&gt;::value: "</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>is_move_constructible<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&amp;&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"std::is_move_assignable&lt;int&amp;&gt;::value: "</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>is_move_assignable<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&amp;&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"std::is_destructible&lt;int&amp;&gt;::value: "</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>is_destructible<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&amp;&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"std::is_swappable&lt;int&amp;&gt;::value: "</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>is_swappable<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&amp;&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;        <span style="color: #0099ff; font-style: italic;">// requires C++17</span>
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>First of all. The function<span style="font-family: courier new, courier;"> std::is_swappable</span> requires C++17. Second here is the output.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesRegularSemirRegular/semiRegular.png" alt="semiRegular" width="500" height="273" /></p>
+<p>You see, a reference such as <span style="font-family: courier new, courier;">an int</span>&amp; is not default constructible. The output shows that a reference is not <span style="font-family: courier new, courier;">SemiRegular</span> and, therefore, not <span style="font-family: courier new, courier;">Regular.</span> To check, if a type is <span style="font-family: courier new, courier;">Regular</span> at compile time, I need a function <span style="font-family: courier new, courier;">isEqualityComparable</span> which is not part of the type-traits library. Let's do it by myself.</p>
+<h4>isEqualityComparable</h4>
+<p>In C++20 we might get the <a href="https://en.cppreference.com/w/cpp/experimental/is_detected">detection idiom</a> which is part of the <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2015/n4562.html">library fundamental TS v2</a>. Now, it a piece of cake to implement<span style="font-family: courier new, courier;"> isEqualityComparable</span>.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// equalityComparable.cpp</span>
+
+<span style="color: #009999;">#include &lt;experimental/type_traits&gt;                                                       <span style="color: #0099ff; font-style: italic;">// (1)</span></span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">using</span> <span style="color: #007788; font-weight: bold;">equal_comparable_t</span> <span style="color: #555555;">=</span> decltype(std<span style="color: #555555;">::</span>declval<span style="color: #555555;">&lt;</span>T&amp;<span style="color: #555555;">&gt;</span>() <span style="color: #555555;">==</span> std<span style="color: #555555;">::</span>declval<span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;"></span>T&amp;<span style="color: #555555;">&gt;</span>());           <span style="color: #009999;"><span style="color: #0099ff; font-style: italic;">// (2)</span></span>
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">struct</span> isEqualityComparable<span style="color: #555555;">:</span> 
+       std<span style="color: #555555;">::</span>experimental<span style="color: #555555;">::</span>is_detected<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">equal_comparable_t</span>, T<span style="color: #555555;">&gt;</span>{};                           <span style="color: #009999;"><span style="color: #0099ff; font-style: italic;">// (3)</span></span>
+
+<span style="color: #006699; font-weight: bold;">struct</span> EqualityComparable { };                                                            <span style="color: #009999;"><span style="color: #0099ff; font-style: italic;">// (4)</span></span>
+<span style="color: #007788; font-weight: bold;">bool</span> <span style="color: #006699; font-weight: bold;">operator</span> <span style="color: #555555;">==</span> (EqualityComparable <span style="color: #006699; font-weight: bold;">const</span><span style="color: #555555;">&amp;</span>, EqualityComparable <span style="color: #006699; font-weight: bold;">const</span><span style="color: #555555;">&amp;</span>) { <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #336666;">true</span>; }
+
+<span style="color: #006699; font-weight: bold;">struct</span> NotEqualityComparable { };                                                         <span style="color: #009999;"><span style="color: #0099ff; font-style: italic;">// (5)</span></span>
+ 
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>boolalpha <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"isEqualityComparable&lt;EqualityComparable&gt;::value: "</span> <span style="color: #555555;">&lt;&lt;</span> 
+                  isEqualityComparable<span style="color: #555555;">&lt;</span>EqualityComparable<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+                  
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"isEqualityComparable&lt;NotEqualityComparable&gt;::value: "</span> <span style="color: #555555;">&lt;&lt;</span> 
+                  isEqualityComparable<span style="color: #555555;">&lt;</span>NotEqualityComparable<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The new feature is in the <span style="font-family: courier new, courier;">experimental</span> namespace (1). Line (3) is the crucial one. It detects if the expression (2) is valid for the type T.&nbsp; The type-trait <span style="font-family: courier new, courier;">isEqualityComparable</span> works for an <span style="font-family: courier new, courier;">EqualityComparable</span> (4) and a <span style="font-family: courier new, courier;">NotEqualityComparable</span>&nbsp;(5) type. Only <span style="font-family: courier new, courier;">EqualityCompable</span> returns <span style="font-family: courier new, courier;">true</span> because I overloaded the Equal-Comparison Operator.</p>
+<p>To compile the program, you need a new C++ compiler such as GCC 8.2.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesRegularSemirRegular/equalityComparable.png" alt="equalityComparable" width="600" height="283" /></p>
+<p>Until C++20, comparison operators are automatically generated for arithmetic types, enumerations, and with restrictions for pointers. This may change with C++20 due to the <a href="https://en.cppreference.com/w/cpp/language/default_comparisons">spaceship operator</a>: <span style="font-family: courier new, courier;">&lt;=&gt;.</span>&nbsp; With C++20, when a class defines <span class="t-c"><span class="mw-geshi cpp source-cpp">operator <span class="sy1" style="font-family: courier new, courier;">&lt;=&gt;,</span></span></span> automatically the operators&nbsp;<span style="font-family: courier new, courier;"> ==,&nbsp;!=, &lt;, &lt;=, &gt;, </span>and<span style="font-family: courier new, courier;"> &gt;=&nbsp;</span>are generated. It's even possible just to define operator <span style="font-family: courier new, courier;">&lt;=&gt;</span> as defaulted such as for the type <span style="font-family: courier new, courier;">Point.</span></p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Point</span> {
+   <span style="color: #007788; font-weight: bold;">int</span> x;
+   <span style="color: #007788; font-weight: bold;">int</span> y;
+<span style="color: #9999ff;">public:</span>
+   <span style="color: #006699; font-weight: bold;">auto</span> <span style="color: #006699; font-weight: bold;">operator</span><span style="color: #555555;">&lt;=&gt;</span>(<span style="color: #006699; font-weight: bold;">const</span> Point<span style="color: #555555;">&amp;</span>) <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">default</span>;
+   ....
+};
+<span style="color: #0099ff; font-style: italic;">// compiler generates all six relational operators</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>In this case, the compiler will generate the implementation. The default operator&lt;=&gt; performs a lexicographical comparison on its bases (left-to-right, depth-first) and continues with its non-static member in declaration order. This comparison applies to. This means the evaluation of a logical expression ends if the result is known.</p>
+<p>&nbsp;</p>
+<p>Now, I have all the ingredients to define <span style="font-family: courier new, courier;">Regular</span> and <span style="font-family: courier new, courier;">SemiRegular.</span> Here are my new type-traits.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// isRegular.cpp</span>
+
+<span style="color: #009999;">#include &lt;experimental/type_traits&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">using</span> <span style="color: #007788; font-weight: bold;">equal_comparable_t</span> <span style="color: #555555;">=</span> decltype(std<span style="color: #555555;">::</span>declval<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&amp;&gt;</span>() <span style="color: #555555;">==</span> std<span style="color: #555555;">::</span>declval<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&amp;&gt;</span>());
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">struct</span> isEqualityComparable<span style="color: #555555;">:</span> 
+       std<span style="color: #555555;">::</span>experimental<span style="color: #555555;">::</span>is_detected<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">equal_comparable_t</span>, T<span style="color: #555555;">&gt;</span>
+       {};
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">struct</span> isSemiRegular<span style="color: #555555;">:</span> std<span style="color: #555555;">::</span>integral_constant<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">bool</span>,
+                                      std<span style="color: #555555;">::</span>is_default_constructible<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&amp;&amp;</span>
+                                      std<span style="color: #555555;">::</span>is_copy_constructible<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&amp;&amp;</span>
+                                      std<span style="color: #555555;">::</span>is_copy_assignable<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&amp;&amp;</span>
+                                      std<span style="color: #555555;">::</span>is_move_constructible<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&amp;&amp;</span>
+                                      std<span style="color: #555555;">::</span>is_move_assignable<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&amp;&amp;</span>
+                                      std<span style="color: #555555;">::</span>is_destructible<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&amp;&amp;</span>
+                                      std<span style="color: #555555;">::</span>is_swappable<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&gt;</span>{};
+                                      
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">struct</span> isRegular<span style="color: #555555;">:</span> std<span style="color: #555555;">::</span>integral_constant<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">bool</span>, 
+                                         isSemiRegular<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&amp;&amp;</span>
+                                         isEqualityComparable<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&gt;</span>{};
+                                         
+                                            
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>boolalpha <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+                  
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"isSemiRegular&lt;int&gt;::value: "</span> <span style="color: #555555;">&lt;&lt;</span> isSemiRegular<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"isRegular&lt;int&gt;::value: "</span> <span style="color: #555555;">&lt;&lt;</span> isRegular<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"isSemiRegular&lt;int&amp;&gt;::value: "</span> <span style="color: #555555;">&lt;&lt;</span> isSemiRegular<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&amp;&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"isRegular&lt;int&amp;&gt;::value: "</span> <span style="color: #555555;">&lt;&lt;</span> isRegular<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&amp;&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The usage of the new type-traits <span style="font-family: courier new, courier;">isSemiRegular</span> and <span style="font-family: courier new, courier;">isRegular</span> makes the main program quite readable.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesRegularSemirRegular/isRegular.png" alt="isRegular" width="350" height="227" /></p>
+<h2>What's next?</h2>
+<p>With my next post, I jump directly to the template definition.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p></p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Eric Pederson, Paul Baxter,&nbsp; Meeting C++, Matt Braun, Avi Lachmish, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Dilettant, Marko, and Ramesh Jangama.<br /></strong></p>
+<p><strong>Thanks in particular to:&nbsp; <a href="https://www.takeupcode.com"><img style="vertical-align: top;" src="images/patreon/TakeUpCode-450-60.png" alt="TakeUpCode 450 60" width="150" height="20" /> </a></strong></p>
+<p>&nbsp;</p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at Leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 600 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
+<p></p>
+<table style="width: 800px;">
+<tbody>
+<tr>
+<td colspan="2">
+<h2>Get your interactive course</h2>
+&nbsp;</td>
+</tr>
+<tr>
+<td>
+<h4 class="_3fBEwsM053hx2mPd0uV0nT" style="text-align: center;">Modern C++ Concurrency in Practice</h4>
+</td>
+<td>
+<h4>C++ Standard Library including C++14 &amp; C++17</h4>
+</td>
+</tr>
+<tr>
+<td><a href="https://goo.gl/2qWUkK"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseConcurrency/educative.png" alt="educative" width="300" height="152" /></a></td>
+<td><a href="https://www.educative.io/collection/10370001/5712008708096000?authorName=Rainer%20Grimm"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseLibrary/CLibrary.png" alt="CLibrary" width="300" height="150" /></a></td>
+</tr>
+<tr>
+<td>
+<p>Based on my book "Concurrency with Modern C++" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>140 lessons</li>
+<li>110 code playgrounds =&gt; Runs in the browser</li>
+<li>78 code snippets</li>
+<li>55 illustrations</li>
+</ul>
+</td>
+<td>
+<p>Based on my book "The C++ Standard Library" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>149 lessons</li>
+<li>111 code playgrounds =&gt; Runs in the browser</li>
+<li>164 code snippets</li>
+<li>25 illustrations</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
