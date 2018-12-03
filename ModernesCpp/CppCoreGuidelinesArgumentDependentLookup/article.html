@@ -1,0 +1,278 @@
+<p>There is, in particular, one rule left to template interfaces which is quite interesting: T.47: Avoid highly visible unconstrained templates with common names. Admittedly, the rule T47 is often the reason for unexpected behaviour because the wrong function is called.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesArgumentDependentLookup/cat-633081_1280.jpg" alt="cat 633081 1280" width="500" height="375" /></p>
+<p>&nbsp;</p>
+<p>Although I write today mainly about the rule T.47, I have more to say.</p>
+<ul>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-visible">T.47: Avoid highly visible unconstrained templates with common names</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-concept-def">T.48: If your compiler does not support concepts, fake them with <code class="highlighter-rouge no-highlight">enable_if</code></a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-erasure">T.49: Where possible, avoid type-erasure</a></li>
+</ul>
+<p>The get the point of the rule T.47, I have to make a short detour. This detour is about argument-dependent lookup (ADL) also known as koenig lookup named after <a href="https://en.wikipedia.org/wiki/Andrew_Koenig_(programmer)">Andrew Koenig</a>. First of all. What is argument-dependent lookup?</p>
+<h2>Argument-Dependent Lookup (ADL)</h2>
+<p>Here is the definition of ADL:</p>
+<ul>
+<li><strong>Argument-dependent lookup</strong> is a set of rules for the lookup of unqualified function names. Unqualified functions names are additionally looked up in the namespace of their arguments. <br /><br /></li>
+</ul>
+<p>Unqualified function names mean functions without the<code class="highlighter-rouge"> </code>scope&nbsp;operator (::).. Is argument-dependent lookup bad? Off course not, ADL makes our life as a programmer easier. Here is an example.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Argument-dependent lookup"</span>;  
+}	
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Fine. Let me remove the syntactic sugar of operator overloading and use the function call directly.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+    <span style="color: #006699; font-weight: bold;">operator</span><span style="color: #555555;">&lt;&lt;</span>(std<span style="color: #555555;">::</span>cout, <span style="color: #cc3300;">"Argument-dependent lookup"</span>);
+}	
+</pre>
+</div>
+<p></p>
+<p>This equivalent program shows what is happening under the hood. The function <span style="font-family: courier new, courier;">operator&lt;&lt;</span> is called with the two arguments <span style="font-family: courier new, courier;">std::</span>cout and a C-string <span style="font-family: courier new, courier;">"Argument-dependent lookup"</span>.</p>
+<p>Fine? No? The question arises: Where is the definition of the function<span style="font-family: courier new, courier;"> operator&lt;&lt;</span>. Of course, there is no definition in the global namespace. <span style="font-family: courier new, courier;">operator&lt;&lt;</span> is an unqualified function name; therefore, argument-dependent lookup kicks in. The function name is additionally looked up in the namespace of their arguments.&nbsp; In this particular case the namespace <span style="font-family: courier new, courier;">std</span> is due to the first argument <span style="font-family: courier new, courier;">std::cout</span> considered and the lookup find the appropriate candidate: <span class="co1" style="font-family: courier new, courier;">std::operator&lt;&lt;(std::ostream&amp;, const char*). </span><span class="co1">Often ADL provides you precisely the function you are looking for but sometimes ... .&nbsp; </span></p>
+<p>Now, it is the right time to write about rule T.47:</p>
+<h2><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-visible">T.47: Avoid highly visible unconstrained templates with common names</a></h2>
+<p>In the expression<span style="font-family: courier new, courier;"> std::cout &lt;&lt; "Argument-dependent lookup"</span>, the overloaded output operator <span style="font-family: courier new, courier;">&lt;&lt;</span>&nbsp; is the highly visible common name because it is defined in the namespace <span style="font-family: courier new, courier;">std</span>. The following program, based on the program of the core guidelines, shows the crucial point of this rule.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// argumentDependentLookup.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">namespace</span> Bad{
+    
+    <span style="color: #006699; font-weight: bold;">struct</span> Number{ 
+        <span style="color: #007788; font-weight: bold;">int</span> m; 
+    };
+    
+    <span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T1, <span style="color: #006699; font-weight: bold;">typename</span> T2<span style="color: #555555;">&gt;</span> <span style="color: #0099ff; font-style: italic;">// generic equality  (5)</span>
+    <span style="color: #007788; font-weight: bold;">bool</span> <span style="color: #006699; font-weight: bold;">operator</span><span style="color: #555555;">==</span>(T1, T2){ 
+        <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #336666;">false</span>;  
+    }
+    
+}
+
+<span style="color: #006699; font-weight: bold;">namespace</span> Util{
+    
+    <span style="color: #007788; font-weight: bold;">bool</span> <span style="color: #006699; font-weight: bold;">operator</span><span style="color: #555555;">==</span>(<span style="color: #007788; font-weight: bold;">int</span>, Bad<span style="color: #555555;">::</span>Number){   <span style="color: #0099ff; font-style: italic;">// equality to int (4)</span>
+        <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #336666;">true</span>; 
+    } 
+
+    <span style="color: #007788; font-weight: bold;">void</span> compareSize(){
+        Bad<span style="color: #555555;">::</span>Number badNumber{<span style="color: #ff6600;">5</span>};                            <span style="color: #0099ff; font-style: italic;">// (1)</span>
+        std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> vec{<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">5</span>};
+        
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>boolalpha <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+        
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"5 == badNumber: "</span> <span style="color: #555555;">&lt;&lt;</span>                    
+                     (<span style="color: #ff6600;">5</span> <span style="color: #555555;">==</span> badNumber) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;          <span style="color: #0099ff; font-style: italic;">// (2)         </span>
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"vec.size() == badNumber: "</span> <span style="color: #555555;">&lt;&lt;</span> 
+                     (vec.size() <span style="color: #555555;">==</span> badNumber) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl; <span style="color: #0099ff; font-style: italic;">// (3)</span>
+        
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    }
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main(){
+   
+   Util<span style="color: #555555;">::</span>compareSize();
+
+}
+</pre>
+</div>
+<p></p>
+<p>I expect that in both cases (2 and 3) the overloaded <span style="font-family: courier new, courier;">operator ==</span> in Line (4) is called because it takes an argument of type <span style="font-family: courier new, courier;">Bad::Number</span> (1)<span style="font-family: courier new, courier;">; </span>therefore I should get two times<span style="font-family: courier new, courier;"> true.</span></p>
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesArgumentDependentLookup/argumentDependentLookup.png" alt="argumentDependentLookup" width="400" height="175" /></p>
+<p>What happened here? The call in line (3) is resolved by the generic equality operator in line (5)? The reason for my surprise is that <span style="font-family: courier new, courier;">vec.size()</span> returns a value of type <span style="font-family: courier new, courier;">std::size_type</span> which is an unsigned integer type. This means that equality operator requires in line (4) a conversation to <span style="font-family: courier new, courier;">int</span>. This is not necessary for the generic equality in line (5) because this is a fit without conversion. Thanks to argument-dependent lookup, the generic equality operator belongs to the set of possible overloads.</p>
+<p>The rules states "Avoid highly visible unconstrained templates with common names". Let me see what would happen if I follow the rule and disable the generic equality operator. Here is the fixed code.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// argumentDependentLookupResolved.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">namespace</span> Bad{
+    
+    <span style="color: #006699; font-weight: bold;">struct</span> Number{ 
+        <span style="color: #007788; font-weight: bold;">int</span> m; 
+    };
+    
+}
+
+<span style="color: #006699; font-weight: bold;">namespace</span> Util{
+    
+    <span style="color: #007788; font-weight: bold;">bool</span> <span style="color: #006699; font-weight: bold;">operator</span><span style="color: #555555;">==</span>(<span style="color: #007788; font-weight: bold;">int</span>, Bad<span style="color: #555555;">::</span>Number){   <span style="color: #0099ff; font-style: italic;">// compare to int (4)</span>
+        <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #336666;">true</span>; 
+    } 
+
+    <span style="color: #007788; font-weight: bold;">void</span> compareSize(){
+        Bad<span style="color: #555555;">::</span>Number badNumber{<span style="color: #ff6600;">5</span>};                            <span style="color: #0099ff; font-style: italic;">// (1)</span>
+        std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> vec{<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">5</span>};
+        
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>boolalpha <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+        
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"5 == badNumber: "</span> <span style="color: #555555;">&lt;&lt;</span>                    
+                     (<span style="color: #ff6600;">5</span> <span style="color: #555555;">==</span> badNumber) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;          <span style="color: #0099ff; font-style: italic;">// (2)         </span>
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"vec.size() == badNumber: "</span> <span style="color: #555555;">&lt;&lt;</span> 
+                     (vec.size() <span style="color: #555555;">==</span> badNumber) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl; <span style="color: #0099ff; font-style: italic;">// (3)</span>
+        
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    }
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main(){
+   
+   Util<span style="color: #555555;">::</span>compareSize();
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Now, the result matches my expectations.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesArgumentDependentLookup/argumentDependentLookupResolved.png" alt="argumentDependentLookupResolved" width="450" height="171" /></p>
+<p>&nbsp;Here are my remarks to the last two rules for template interfaces.</p>
+<h2><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-concept-def">T.48: If your compiler does not support concepts, fake them with <code class="highlighter-rouge no-highlight">enable_if</code></a></h2>
+<p>Honestly, when I present <span style="font-family: courier new, courier;">std::enable_if</span> in my seminars a few participants are slightly scared. Here is the simplified version of a generic greatest common divisor algorithmn.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// enable_if.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;type_traits&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T,                                       <span style="color: #0099ff; font-style: italic;">// (1)</span>
+         <span style="color: #006699; font-weight: bold;">typename</span> std<span style="color: #555555;">::</span>enable_if<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>is_integral<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value, T<span style="color: #555555;">&gt;::</span>type<span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span><span style="color: #555555;">&gt;</span>       
+T gcd(T a, T b){
+    <span style="color: #006699; font-weight: bold;">if</span>( b <span style="color: #555555;">==</span> <span style="color: #ff6600;">0</span> ){ <span style="color: #006699; font-weight: bold;">return</span> a; }
+    <span style="color: #006699; font-weight: bold;">else</span>{
+        <span style="color: #006699; font-weight: bold;">return</span> gcd(b, a <span style="color: #555555;">%</span> b);                              <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    }
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main(){
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+                                                           <span style="color: #0099ff; font-style: italic;">// (3)</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"gcd(100, 10)= "</span> <span style="color: #555555;">&lt;&lt;</span>  gcd(<span style="color: #ff6600;">100</span>, <span style="color: #ff6600;">10</span>)  <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"gcd(3.5, 4)= "</span> <span style="color: #555555;">&lt;&lt;</span> gcd(<span style="color: #ff6600;">3.5</span>, <span style="color: #ff6600;">4.0</span>) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;     
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The algorithm is way to generic. It should only work for integral types. Now, <span style="font-family: courier new, courier;">std::enable_if</span> from the<a href="https://en.cppreference.com/w/cpp/header/type_traits"> type-traits </a>library in line (1) comes to my rescue.</p>
+<p>The expression <span style="font-family: courier new,courier;">std::is_integral</span> (line 2) is key for the understanding of the program. This line determines whether the type parameter T is integral. If T is not integral and therefore the return value <span style="font-family: courier new,courier;">false</span>, there will be no template instantiations for this specific type.</p>
+<p>Only if <span style="font-family: courier new,courier;">std::is_integral</span>&nbsp;returns <span style="font-family: courier new,courier;">true&nbsp;</span><span style="font-family: courier new,courier;">std::enable_if</span> has a public member typedef <span style="font-family: courier new,courier;">type.</span> If not<span style="font-family: courier new,courier;"> </span>line (1) is not valid. But this is not an error.&nbsp;<span style="font-family: courier new,courier;"> </span></p>
+<p>The C++ standard says:&nbsp;When substituting the deduced type for the template parameter fails, the specialisation is discarded from the overload set instead of causing a compile error. There is a shorter acronym for this rule <a href="http://en.cppreference.com/w/cpp/language/sfinae">SFINAE</a> (<strong>S</strong>ubstitution<strong> F</strong>ailure <strong>I</strong>s <strong>N</strong>ot <strong>A</strong>n <strong>E</strong>rror).</p>
+<p>The output of the compilation (<span style="font-family: courier new, courier;">enable_if.cpp: 20:49</span>) shows it. There is no template specialisation for the type <span style="font-family: courier new,courier;">double </span>available.&nbsp;</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesArgumentDependentLookup/enable_if.png" alt="enable if" width="600" height="230" /></p>
+<p>But the output shows more. (<span style="font-family: courier new, courier;">enable_if.cpp:7:71</span>): "<span style="font-family: courier new, courier;">no named `type* in struct std::enable_if&lt;false, double&gt;</span>".</p>
+<h2><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-erasure">T.49: Where possible, avoid type-erasure</a></h2>
+<p>Strange, I wrote two posts to type-erasure (<a class="postid398" href="https://www.modernescpp.com/index.php/c-core-guidelines-type-erasure">C++ Core Guidelines: Type Erasure</a> and <a class="postid399" href="https://www.modernescpp.com/index.php/c-core-guidelines-type-erasure-with-templates">C++ Core Guidelines: Type Erasure with Templates</a>) and explained this quite challenging technique. Now, I should avoid it, when possible.</p>
+<h2>What's next?</h2>
+<p>With my next post, I jump from the interfaces of templates to their definition.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Eric Pederson, Paul Baxter,&nbsp; Meeting C++, Matt Braun, Avi Lachmish, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Dilettant, Marko, Ramesh Jangama, and </strong><span class="sc-kpOJdX fDWXFa" title="Emyr Williams"><strong>Emyr Williams.</strong> <br /></span></p>
+<p><strong>&nbsp;</strong></p>
+<p><strong>Thanks in particular to:&nbsp; <a href="https://www.takeupcode.com"><img style="vertical-align: top;" src="images/patreon/TakeUpCode-450-60.png" alt="TakeUpCode 450 60" width="150" height="20" /> </a></strong></p>
+<p>&nbsp;</p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at Leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 600 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
+<p></p>
+<table style="width: 800px;">
+<tbody>
+<tr>
+<td colspan="2">
+<h2>Get your interactive course</h2>
+&nbsp;</td>
+</tr>
+<tr>
+<td>
+<h4 class="_3fBEwsM053hx2mPd0uV0nT" style="text-align: center;">Modern C++ Concurrency in Practice</h4>
+</td>
+<td>
+<h4>C++ Standard Library including C++14 &amp; C++17</h4>
+</td>
+</tr>
+<tr>
+<td><a href="https://goo.gl/2qWUkK"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseConcurrency/educative.png" alt="educative" width="300" height="152" /></a></td>
+<td><a href="https://www.educative.io/collection/10370001/5712008708096000?authorName=Rainer%20Grimm"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseLibrary/CLibrary.png" alt="CLibrary" width="300" height="150" /></a></td>
+</tr>
+<tr>
+<td>
+<p>Based on my book "Concurrency with Modern C++" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>140 lessons</li>
+<li>110 code playgrounds =&gt; Runs in the browser</li>
+<li>78 code snippets</li>
+<li>55 illustrations</li>
+</ul>
+</td>
+<td>
+<p>Based on my book "The C++ Standard Library" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>149 lessons</li>
+<li>111 code playgrounds =&gt; Runs in the browser</li>
+<li>164 code snippets</li>
+<li>25 illustrations</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
