@@ -1,0 +1,305 @@
+<p>Template definitions deal with guidelines that are specific to a template implementation. This means in particual this rules focuse on how a template definition depends on its context.</p>
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesTemplateDefinitions/super-charged-engine-2770374_1280.jpg" alt="super charged engine 2770374 1280" width="600" height="400" /></p>
+<p>&nbsp;Here are today's rules for template definitions:</p>
+<ul>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-depend">T.60: Minimize a template’s context dependencies</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-scary">T.61: Do not over-parameterize members (SCARY)</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-nondependent">T.62: Place non-dependent class template members in a non-templated base class</a></li>
+</ul>
+<p>The first rule is quite special.</p>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-depend">T.60: Minimize a template’s context dependencies</a></h3>
+<p>Honestly, it took me a few moments to get this rule. Let's look at the function templates <span style="font-family: courier new, courier;">sort</span> and <span style="font-family: courier new, courier;">algo.</span> Here is a simplified example of the guidelines.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> C<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">void</span> sort(C<span style="color: #555555;">&amp;</span> c)
+{
+    std<span style="color: #555555;">::</span>sort(begin(c), end(c)); <span style="color: #0099ff; font-style: italic;">// necessary and useful dependency</span>
+}
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> Iter<span style="color: #555555;">&gt;</span>
+Iter algo(Iter first, Iter last) {
+    <span style="color: #006699; font-weight: bold;">for</span> (; first <span style="color: #555555;">!=</span> last; <span style="color: #555555;">++</span>first) {
+        <span style="color: #006699; font-weight: bold;">auto</span> x <span style="color: #555555;">=</span> sqrt(<span style="color: #555555;">*</span>first); <span style="color: #0099ff; font-style: italic;">// potentially surprising dependency: which sqrt()?</span>
+        helper(first, x);      <span style="color: #0099ff; font-style: italic;">// potentially surprising dependency:</span>
+                               <span style="color: #0099ff; font-style: italic;">// helper is chosen based on first and x    </span>
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>It would be optimal but not always manageable if a template operates only on its arguments. This holds for the function template <span style="font-family: courier new, courier;">sort</span> but not for <span style="font-family: courier new, courier;">algo.</span>The function template <span style="font-family: courier new, courier;">algo</span> has dependencies to <span style="font-family: courier new, courier;">sqrt</span> and to the function <span style="font-family: courier new, courier;">helper. </span>At the end, the implementation of <span style="font-family: courier new, courier;">algo</span> introduces more dependencies than the interface shows.<span style="font-family: courier new, courier;"><br /></span></p>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-scary">T.61: Do not over-parameterize members (SCARY)</a></h3>
+<p>If a member of a template does not depend on a template parameter remove it from the template. A member may be a type or a method. By following this rule you may decrease the code size because the non-generic code is factored out.</p>
+<p>The example from the guidelines is quite straightforward.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T, <span style="color: #006699; font-weight: bold;">typename</span> A <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>allocator{}<span style="color: #555555;">&gt;</span>
+    <span style="color: #0099ff; font-style: italic;">// requires Regular&lt;T&gt; &amp;&amp; Allocator&lt;A&gt;</span>
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">List</span> {
+<span style="color: #9999ff;">public:</span>
+    <span style="color: #006699; font-weight: bold;">struct</span> Link {   <span style="color: #0099ff; font-style: italic;">// does not depend on A</span>
+        T elem;
+        T<span style="color: #555555;">*</span> pre;
+        T<span style="color: #555555;">*</span> suc;
+    };
+
+    <span style="color: #006699; font-weight: bold;">using</span> iterator <span style="color: #555555;">=</span> Link<span style="color: #555555;">*</span>;
+
+    iterator first() <span style="color: #006699; font-weight: bold;">const</span> { <span style="color: #006699; font-weight: bold;">return</span> head; }
+
+    <span style="color: #0099ff; font-style: italic;">// ...</span>
+<span style="color: #9999ff;">private:</span>
+    Link<span style="color: #555555;">*</span> head;
+};
+
+List<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> lst1;
+List<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>, My_allocator<span style="color: #555555;">&gt;</span> lst2;
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The type <span style="font-family: courier new, courier;">Link</span> does not depend on the template parameter <span style="font-family: courier new, courier;">A</span>. So I can remove it and use it in <span style="font-family: courier new, courier;">List2.</span></p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">template<span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">struct</span> Link {
+    T elem;
+    T<span style="color: #555555;">*</span> pre;
+    T<span style="color: #555555;">*</span> suc;
+};
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T, <span style="color: #006699; font-weight: bold;">typename</span> A <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>allocator{}<span style="color: #555555;">&gt;</span>
+    <span style="color: #0099ff; font-style: italic;">// requires Regular&lt;T&gt; &amp;&amp; Allocator&lt;A&gt;</span>
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">List2</span> {
+<span style="color: #9999ff;">public:</span>
+    <span style="color: #006699; font-weight: bold;">using</span> iterator <span style="color: #555555;">=</span> Link<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;*</span>;
+
+    iterator first() <span style="color: #006699; font-weight: bold;">const</span> { <span style="color: #006699; font-weight: bold;">return</span> head; }
+
+    <span style="color: #0099ff; font-style: italic;">// ...</span>
+<span style="color: #9999ff;">private:</span>
+    Link<span style="color: #555555;">*</span> head;
+};
+
+List<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> lst1;
+List<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>, My_allocator<span style="color: #555555;">&gt;</span> lst2;
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>This was an easy job? Yes? No! The title of this rule writes about SCARY. What does that mean? I'm at least curious but to be honest, you can ignore the next lines.</p>
+<p>The acronym <strong>SCARY</strong> describes assignments and initializations that are <strong>S</strong>eemingly erroneous (appearing <strong>C</strong>onstrained by conflicting generic parameters), but <strong>A</strong>ctually work with the <strong>R</strong>ight implementation (unconstrained b<strong>Y</strong> the conflict due to minimized dependencies).</p>
+<p>I hope, you get it. For the details see <a href="http://www.open-std.org/jtc1/sc22/WG21/docs/papers/2009/n2911.pdf">N2911</a>. In order not to bore you, here is the simplified idea applied to the standard container iterator: they have no dependency to the container's,&nbsp;<span style="font-family: courier new, courier;"><code class="computeroutput"><span class="identifier">key_compare</span></code><code class="computeroutput"><span class="identifier"></span></code></span><span style="font-family: courier new, courier;"><code class="computeroutput"><span class="identifier"><span style="font-family: courier new, courier;">,</span> hasher</span></code>, <code class="computeroutput"><span class="identifier">key_equal</span></code>,</span> or <span style="font-family: courier new, courier;"><code class="computeroutput"><span class="identifier">allocator</span></code></span> types.</p>
+<p>The next rule helps to reduce code bloat.</p>
+<h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-nondependent">T.62: Place non-dependent class template members in a non-templated base class</a></h3>
+<p>Let me say it more informal: put the functionality of the template which does not depend on the template parameters in a non-templated base class.</p>
+<p>The guidelines present a quite obvious example.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Foo</span> {
+<span style="color: #9999ff;">public:</span>
+    <span style="color: #006699; font-weight: bold;">enum</span> { v1, v2 };
+    <span style="color: #0099ff; font-style: italic;">// ...</span>
+};
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The enumeration is independent of the type parameter T and should, therefore, be placed in a non-templated base class.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">struct</span> Foo_base {
+    <span style="color: #006699; font-weight: bold;">enum</span> { v1, v2 };
+    <span style="color: #0099ff; font-style: italic;">// ...</span>
+};
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Foo</span> <span style="color: #555555;">:</span> <span style="color: #006699; font-weight: bold;">public</span> Foo_base {
+<span style="color: #9999ff;">public:</span>
+    <span style="color: #0099ff; font-style: italic;">// ...</span>
+};
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Now, <span style="font-family: courier new, courier;">Foo_base</span> can be used without template arguments and template instantiation.</p>
+<p>This technique is quite interesting if you want to reduce your code size. Here is a simple class template <span style="font-family: courier new, courier;">Array.</span></p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// genericArray.cpp</span>
+
+<span style="color: #009999;">#include &lt;cstddef&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T, std<span style="color: #555555;">::</span><span style="color: #007788; font-weight: bold;">size_t</span> N<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Array</span>{
+<span style="color: #9999ff;">public:</span>
+    Array()<span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">default</span>;
+    <span style="color: #007788; font-weight: bold;">std::size_t</span> getSize() <span style="color: #006699; font-weight: bold;">const</span>{
+        <span style="color: #006699; font-weight: bold;">return</span> N;
+    }
+<span style="color: #9999ff;">private:</span>
+  T elem[N];
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+
+    Array<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>, <span style="color: #ff6600;">100</span><span style="color: #555555;">&gt;</span> arr1;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"arr1.getSize(): "</span> <span style="color: #555555;">&lt;&lt;</span> arr1.getSize() <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+    Array<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>, <span style="color: #ff6600;">200</span><span style="color: #555555;">&gt;</span> arr2;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"arr2.getSize(): "</span> <span style="color: #555555;">&lt;&lt;</span> arr2.getSize() <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>If you study the class template <span style="font-family: courier new, courier;">Array,</span> you will see that the method <span style="font-family: courier new, courier;">getSize</span> is the same except for type parameter N. Let me refactor the code and declare a class template <span style="font-family: courier new, courier;">Array</span> which depends on the type parameter <span style="font-family: courier new, courier;">T.</span></p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// genericArrayInheritance.cpp</span>
+
+<span style="color: #009999;">#include &lt;cstddef&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">ArrayBase</span> {
+<span style="color: #9999ff;">protected:</span>
+    ArrayBase(std<span style="color: #555555;">::</span><span style="color: #007788; font-weight: bold;">size_t</span> n)<span style="color: #555555;">:</span> size(n) {} 
+    std<span style="color: #555555;">::</span><span style="color: #007788; font-weight: bold;">size_t</span> getSize() <span style="color: #006699; font-weight: bold;">const</span> {
+        <span style="color: #006699; font-weight: bold;">return</span> size;
+    };
+<span style="color: #9999ff;">private:</span>
+    std<span style="color: #555555;">::</span><span style="color: #007788; font-weight: bold;">size_t</span> size;
+};
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T, std<span style="color: #555555;">::</span><span style="color: #007788; font-weight: bold;">size_t</span> n<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Array</span><span style="color: #555555;">:</span> <span style="color: #006699; font-weight: bold;">private</span> ArrayBase<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span>{
+<span style="color: #9999ff;">public:</span>    
+    Array()<span style="color: #555555;">:</span> ArrayBase<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span>(n){}
+    std<span style="color: #555555;">::</span><span style="color: #007788; font-weight: bold;">size_t</span> getSize() <span style="color: #006699; font-weight: bold;">const</span> {
+        <span style="color: #006699; font-weight: bold;">return</span>  ArrayBase<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>getSize();
+    }
+<span style="color: #9999ff;">private:</span>
+    T data[n]; 
+};   
+
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+
+    Array<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>, <span style="color: #ff6600;">100</span><span style="color: #555555;">&gt;</span> arr1;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"arr1.getSize(): "</span> <span style="color: #555555;">&lt;&lt;</span> arr1.getSize() <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+    Array<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>, <span style="color: #ff6600;">200</span><span style="color: #555555;">&gt;</span> arr2;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"arr2.getSize(): "</span> <span style="color: #555555;">&lt;&lt;</span> arr2.getSize() <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p><span style="font-family: courier new, courier;">Array</span> has two template parameters for the type <span style="font-family: courier new, courier;">T</span> and the size <span style="font-family: courier new, courier;">n</span> but <span style="font-family: courier new, courier;">ArrayBase</span> only one template parameter for the type <span style="font-family: courier new, courier;">T</span>. <span style="font-family: courier new, courier;">Array</span> derives from <span style="font-family: courier new, courier;">ArrayBase.</span><span style="font-family: courier new, courier;"> </span>This means <span style="font-family: courier new, courier;">ArrayBase</span> is shared between all instantiations of <span style="font-family: courier new, courier;">Array</span> which uses the same type T. In the concrete case, the <span style="font-family: courier new, courier;">getSize</span> method of <span style="font-family: courier new, courier;">Array</span> uses the <span style="font-family: courier new, courier;">getSize</span> method of <span style="font-family: courier new, courier;">ArrayBase.</span></p>
+<p>Thanks to <a href="https://cppinsights.io/">CppInsight</a>, I can show you the compiler generated code.</p>
+<p>Here is the instantiation of<span style="font-family: courier new, courier;"> ArrayBase&lt;int&gt;</span>:</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesTemplateDefinitions/ArrayBase.png" alt="ArrayBase" width="500" height="418" /></p>
+<p>And here the instantiation for <span style="font-family: courier new, courier;">Array&lt;int, 100&gt;</span> and <span style="font-family: courier new, courier;">Array&lt;int, 200&gt;</span>:</p>
+<p><img style="float: left;" src="images/blog/ModernCpp/CppCoreGuidelinesTemplateDefinitions/Array.png" alt="Array" width="400" height="345" /></p>
+<p><img style="float: right;" src="images/blog/ModernCpp/CppCoreGuidelinesTemplateDefinitions/Array200.png" alt="Array200" width="400" height="357" /></p>
+<p>&nbsp;</p>
+<p><span style="font-family: courier new, courier;"></span></p>
+<h3>&nbsp;</h3>
+<h3>&nbsp;</h3>
+<h3>&nbsp;</h3>
+<h3>&nbsp;</h3>
+<h3>&nbsp;</h3>
+<h3>&nbsp;</h3>
+<h3>&nbsp;</h3>
+<h3>&nbsp;</h3>
+<h2>&nbsp;</h2>
+<h2>What's next?</h2>
+<p>Of course, there are more rules left to template definitions. So my story continues with the next post. I hope my explanation to template definitions are good enough because I know many programmers are scared of templates. To me, the ideas of templates are easy to get but the syntax has still potential.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Eric Pederson, Paul Baxter,&nbsp; Meeting C++, Matt Braun, Avi Lachmish, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Dilettant, Marko, Ramesh Jangama, and </strong><span class="sc-kpOJdX fDWXFa" title="Emyr Williams"><strong>Emyr Williams.</strong> <br /></span></p>
+<p><strong>&nbsp;</strong></p>
+<p><strong>Thanks in particular to:&nbsp; <a href="https://www.takeupcode.com"><img style="vertical-align: top;" src="images/patreon/TakeUpCode-450-60.png" alt="TakeUpCode 450 60" width="150" height="20" /> </a></strong></p>
+<p>&nbsp;</p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at Leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 600 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
+<p></p>
+<table style="width: 800px;">
+<tbody>
+<tr>
+<td colspan="2">
+<h2>Get your interactive course</h2>
+&nbsp;</td>
+</tr>
+<tr>
+<td>
+<h4 class="_3fBEwsM053hx2mPd0uV0nT" style="text-align: center;">Modern C++ Concurrency in Practice</h4>
+</td>
+<td>
+<h4>C++ Standard Library including C++14 &amp; C++17</h4>
+</td>
+</tr>
+<tr>
+<td><a href="https://goo.gl/2qWUkK"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseConcurrency/educative.png" alt="educative" width="300" height="152" /></a></td>
+<td><a href="https://www.educative.io/collection/10370001/5712008708096000?authorName=Rainer%20Grimm"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseLibrary/CLibrary.png" alt="CLibrary" width="300" height="150" /></a></td>
+</tr>
+<tr>
+<td>
+<p>Based on my book "Concurrency with Modern C++" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>140 lessons</li>
+<li>110 code playgrounds =&gt; Runs in the browser</li>
+<li>78 code snippets</li>
+<li>55 illustrations</li>
+</ul>
+</td>
+<td>
+<p>Based on my book "The C++ Standard Library" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>149 lessons</li>
+<li>111 code playgrounds =&gt; Runs in the browser</li>
+<li>164 code snippets</li>
+<li>25 illustrations</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
