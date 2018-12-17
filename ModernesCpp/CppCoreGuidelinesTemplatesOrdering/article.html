@@ -1,0 +1,463 @@
+<p>My post for today is just loosely coupled to the rules of the C++ core guidelines because they provide not much content. Inspired by the Guidelines, today's post is about a generic isSmaller function.</p>
+<hr id="system-readmore" />
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CCoreGuidelinesTemplatesSpecialisation/hammer-802301_1280.jpg" alt="hammer 802301 1280" width="500" height="375" />&nbsp;</p>
+<p>Here are the rules for today. They are about the specialisation of templates.</p>
+<ul>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-specialization">T.64: Use specialization to provide alternative implementations of class templates</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-tag-dispatch">T.65: Use tag dispatch to provide alternative implementations of functions</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-specialization2">T.67: Use specialization to provide alternative implementations for irregular types</a></li>
+</ul>
+<p>The specialisation of function templates is also one of my topics for today.</p>
+<h2>Comparing two Accounts: The First</h2>
+<p>Let me start simple. I have a class <span style="font-family: courier new, courier;">Account</span>. I want to know for an account if it is smaller than another account. Smaller means in this case that the balance is lower.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// isSmaller.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Account</span>{
+<span style="color: #9999ff;">public:</span>
+  Account() <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">default</span>;
+  Account(<span style="color: #007788; font-weight: bold;">double</span> b)<span style="color: #555555;">:</span> balance(b){}
+  <span style="color: #007788; font-weight: bold;">double</span> getBalance() <span style="color: #006699; font-weight: bold;">const</span> {
+    <span style="color: #006699; font-weight: bold;">return</span> balance;
+  }
+<span style="color: #9999ff;">private:</span>
+  <span style="color: #007788; font-weight: bold;">double</span> balance{<span style="color: #ff6600;">0.0</span>};
+};
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>                     <span style="color: #0099ff; font-style: italic;">// (1)</span>
+<span style="color: #007788; font-weight: bold;">bool</span> isSmaller(T fir, T sec){
+    <span style="color: #006699; font-weight: bold;">return</span> fir <span style="color: #555555;">&lt;</span> sec;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main(){
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>boolalpha <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+    <span style="color: #007788; font-weight: bold;">double</span> firDoub{};
+    <span style="color: #007788; font-weight: bold;">double</span> secDoub{<span style="color: #ff6600;">2014.0</span>};
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"isSmaller(firDoub, secDoub): "</span> 
+              <span style="color: #555555;">&lt;&lt;</span> isSmaller(firDoub, secDoub) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+    Account firAcc{};
+    Account secAcc{<span style="color: #ff6600;">2014.0</span>};
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"isSmaller(firAcc, secAcc): "</span> 
+              <span style="color: #555555;">&lt;&lt;</span> isSmaller(firAcc, secAcc) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}
+</pre>
+</div>
+<p></p>
+<p>To make my job easy, I wrote a generic <span style="font-family: courier new, courier;">isSmaller</span> function (1) for comparing two values. As you presumably expected, I can not compare accounts because it's<span style="font-family: courier new, courier;"> operator&lt;</span> is not overloaded.</p>
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CCoreGuidelinesTemplatesSpecialisation/isSmaller.png" alt="isSmaller" width="600" height="142" /></p>
+<p>Before I variously solve this issue, I want to make a short detour to<span style="font-family: courier new, courier;"> SemiRegular</span> and <span style="font-family: courier new, courier;">Regular</span> types. This for one reason because the original definition of Regular from <a href="https://en.wikipedia.org/wiki/Alexander_Stepanov">Alexander Stepanov</a> and the definition as a concept in C++20 differs in one critical point: ordering.</p>
+<h2><span style="font-family: courier new, courier;">SemiRegular</span> and <span style="font-family: courier new, courier;">Regular</span> Types</h2>
+<p>The rule <a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-specialization2">T.67: Use specialization to provide alternative implementations for irregular types</a> talks about irregular types. The informal term irregular types stand for types which are either <span style="font-family: courier new, courier;">SemiRegular</span> nor <span style="font-family: courier new, courier;">Regular</span>. Just to remind you. Here is the definition of <span style="font-family: courier new, courier;">SemiRegular</span> and <span style="font-family: courier new, courier;">Regular</span> types.</p>
+<h3><span style="font-family: courier new, courier;">Regular</span></h3>
+<ul>
+<li><span style="font-family: courier new, courier;">DefaultConstructible</span></li>
+<li><span style="font-family: courier new, courier;">CopyConstructible, CopyAssignable</span></li>
+<li><span style="font-family: courier new, courier;">MoveConstructible, MoveAssignable</span></li>
+<li><span style="font-family: courier new, courier;">Destructible</span></li>
+<li><span style="font-family: courier new, courier;">Swappable</span></li>
+<li><span style="font-family: courier new, courier;">EqualityComparable</span></li>
+</ul>
+<h3><span style="font-family: courier new, courier;">SemiRegular</span></h3>
+<ul>
+<li><span style="font-family: courier new, courier;">SemiRegular - EqualityComparable</span></li>
+</ul>
+<p>If you want to know more details to Regular and SemiRegular, read my post&nbsp; <a href="https://www.modernescpp.com/index.php/c-core-guidelines-regular-and-semiregular-typs">C++ Core Guidelines: Regular and SemiRegular Types</a>. Account is a <span style="font-family: courier new, courier;">SemiRegular</span> but not a <span style="font-family: courier new, courier;">Regular</span> type.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// accountSemiRegular.cpp</span>
+
+<span style="color: #009999;">#include &lt;experimental/type_traits&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Account</span>{
+<span style="color: #9999ff;">public:</span>
+  Account() <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">default</span>;
+  Account(<span style="color: #007788; font-weight: bold;">double</span> b)<span style="color: #555555;">:</span> balance(b){}
+  <span style="color: #007788; font-weight: bold;">double</span> getAccount() <span style="color: #006699; font-weight: bold;">const</span> {
+    <span style="color: #006699; font-weight: bold;">return</span> balance;
+  }
+<span style="color: #9999ff;">private:</span>
+  <span style="color: #007788; font-weight: bold;">double</span> balance{<span style="color: #ff6600;">0.0</span>};
+};
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">using</span> <span style="color: #007788; font-weight: bold;">equal_comparable_t</span> <span style="color: #555555;">=</span> decltype(std<span style="color: #555555;">::</span>declval<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&amp;&gt;</span>() <span style="color: #555555;">==</span> std<span style="color: #555555;">::</span>declval<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&amp;&gt;</span>());
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">struct</span> isEqualityComparable<span style="color: #555555;">:</span> 
+       std<span style="color: #555555;">::</span>experimental<span style="color: #555555;">::</span>is_detected<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">equal_comparable_t</span>, T<span style="color: #555555;">&gt;</span>
+       {};
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">struct</span> isSemiRegular<span style="color: #555555;">:</span> std<span style="color: #555555;">::</span>integral_constant<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">bool</span>,
+                                      std<span style="color: #555555;">::</span>is_default_constructible<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&amp;&amp;</span>
+                                      std<span style="color: #555555;">::</span>is_copy_constructible<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&amp;&amp;</span>
+                                      std<span style="color: #555555;">::</span>is_copy_assignable<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&amp;&amp;</span>
+                                      std<span style="color: #555555;">::</span>is_move_constructible<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&amp;&amp;</span>
+                                      std<span style="color: #555555;">::</span>is_move_assignable<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&amp;&amp;</span>
+                                      std<span style="color: #555555;">::</span>is_destructible<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&amp;&amp;</span>
+                                      std<span style="color: #555555;">::</span>is_swappable<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&gt;</span>{};
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">struct</span> isRegular<span style="color: #555555;">:</span> std<span style="color: #555555;">::</span>integral_constant<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">bool</span>, 
+                                         isSemiRegular<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&amp;&amp;</span>
+                                         isEqualityComparable<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&gt;</span>{};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>boolalpha <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"isSemiRegular&lt;Account&gt;::value: "</span> <span style="color: #555555;">&lt;&lt;</span> isSemiRegular<span style="color: #555555;">&lt;</span>Account<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"isRegular&lt;Account&gt;::value: "</span> <span style="color: #555555;">&lt;&lt;</span> isRegular<span style="color: #555555;">&lt;</span>Account<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The output of the program shows it.</p>
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CCoreGuidelinesTemplatesSpecialisation/accountSemiRegular.png" alt="accountSemiRegular" width="400" height="186" /></p>
+<p>For the details to the program, read my already mentioned post: <a href="https://www.modernescpp.com/index.php/c-core-guidelines-regular-and-semiregular-typs">C++ Core Guidelines: Regular and SemiRegular Types</a>.</p>
+<p>By adding the<span style="font-family: courier new, courier;"> operator ==</span> to <span style="font-family: courier new, courier;">Account</span>, <span style="font-family: courier new, courier;">Account</span> becomes <span style="font-family: courier new, courier;">Regular</span>.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// accountRegular.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Account</span>{
+<span style="color: #9999ff;">public:</span>
+    Account() <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">default</span>;
+    Account(<span style="color: #007788; font-weight: bold;">double</span> b)<span style="color: #555555;">:</span> balance(b){}
+    <span style="color: #006699; font-weight: bold;">friend</span> <span style="color: #007788; font-weight: bold;">bool</span> <span style="color: #006699; font-weight: bold;">operator</span> <span style="color: #555555;">==</span> (Account <span style="color: #006699; font-weight: bold;">const</span><span style="color: #555555;">&amp;</span> fir, Account <span style="color: #006699; font-weight: bold;">const</span><span style="color: #555555;">&amp;</span> sec) {   <span style="color: #0099ff; font-style: italic;">// (1)</span>
+        <span style="color: #006699; font-weight: bold;">return</span> fir.getBalance() <span style="color: #555555;">==</span> sec.getBalance();
+    }
+    <span style="color: #007788; font-weight: bold;">double</span> getBalance() <span style="color: #006699; font-weight: bold;">const</span> {
+        <span style="color: #006699; font-weight: bold;">return</span> balance;
+    }
+<span style="color: #9999ff;">private:</span>
+    <span style="color: #007788; font-weight: bold;">double</span> balance{<span style="color: #ff6600;">0.0</span>};
+};
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">bool</span> isSmaller(T fir, T sec){
+    <span style="color: #006699; font-weight: bold;">return</span> fir <span style="color: #555555;">&lt;</span> sec;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main(){
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>boolalpha <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    <span style="color: #007788; font-weight: bold;">double</span> firDou{};
+    <span style="color: #007788; font-weight: bold;">double</span> secDou{<span style="color: #ff6600;">2014.0</span>};
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"isSmaller(firDou, secDou): "</span> <span style="color: #555555;">&lt;&lt;</span> isSmaller(firDou, secDou) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+    Account firAcc{};
+    Account secAcc{<span style="color: #ff6600;">2014.0</span>};
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"isSmaller(firAcc, secAcc): "</span> <span style="color: #555555;">&lt;&lt;</span> isSmaller(firAcc, secAcc) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>But <span style="font-family: courier new, courier;">Account</span> is still not comparable.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CCoreGuidelinesTemplatesSpecialisation/accountRegular.png" alt="accountRegular" width="600" height="134" /></p>
+<p>This is the crucial difference between Regular types defined by Alexander Stepanov and the concept Regular which we get with C++20. Due to Alexander Stepanov, a Regular type should support a&nbsp;<a href="https://en.wikipedia.org/wiki/Total_order"> total ordering</a>.</p>
+<p>Now, I come back to my original plan.</p>
+<h2>Comparing Two Accounts: The Second</h2>
+<p>The key idea for my variations is that instances of <span style="font-family: courier new, courier;">Account</span> should support the generic <span style="font-family: courier new, courier;">isSmaller</span> function.</p>
+<h3>Overloading <span style="font-family: courier new, courier;">operator &lt;</span></h3>
+<p>Overloading <span style="font-family: courier new, courier;">operator &lt;</span> is the probably the most obvious way. Even the error message to the program<span style="font-family: courier new, courier;"> isSmaller.cpp</span> showed it.</p>
+<div style="background: #f0f3f3 none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// accountIsSmaller1.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Account</span>{
+<span style="color: #9999ff;">public:</span>
+    Account() <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">default</span>;
+    Account(<span style="color: #007788; font-weight: bold;">double</span> b)<span style="color: #555555;">:</span> balance(b){}
+    <span style="color: #006699; font-weight: bold;">friend</span> <span style="color: #007788; font-weight: bold;">bool</span> <span style="color: #006699; font-weight: bold;">operator</span> <span style="color: #555555;">==</span> (Account <span style="color: #006699; font-weight: bold;">const</span><span style="color: #555555;">&amp;</span> fir, Account <span style="color: #006699; font-weight: bold;">const</span><span style="color: #555555;">&amp;</span> sec) { 
+        <span style="color: #006699; font-weight: bold;">return</span> fir.getBalance() <span style="color: #555555;">==</span> sec.getBalance();
+    }
+    <span style="color: #006699; font-weight: bold;">friend</span> <span style="color: #007788; font-weight: bold;">bool</span> <span style="color: #006699; font-weight: bold;">operator</span> <span style="color: #555555;">&lt;</span> (Account <span style="color: #006699; font-weight: bold;">const</span><span style="color: #555555;">&amp;</span> fir, Account <span style="color: #006699; font-weight: bold;">const</span><span style="color: #555555;">&amp;</span> sec) { 
+        <span style="color: #006699; font-weight: bold;">return</span> fir.getBalance() <span style="color: #555555;">&lt;</span> sec.getBalance();
+    }
+    <span style="color: #007788; font-weight: bold;">double</span> getBalance() <span style="color: #006699; font-weight: bold;">const</span> {
+      <span style="color: #006699; font-weight: bold;">return</span> balance;
+    }
+<span style="color: #9999ff;">private:</span>
+    <span style="color: #007788; font-weight: bold;">double</span> balance{<span style="color: #ff6600;">0.0</span>};
+};
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">bool</span> isSmaller(T fir, T sec){
+    <span style="color: #006699; font-weight: bold;">return</span> fir <span style="color: #555555;">&lt;</span> sec;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main(){
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>boolalpha <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    <span style="color: #007788; font-weight: bold;">double</span> firDou{};
+    <span style="color: #007788; font-weight: bold;">double</span> secDou{<span style="color: #ff6600;">2014.0</span>};
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"isSmaller(firDou, secDou): "</span> 
+              <span style="color: #555555;">&lt;&lt;</span> isSmaller(firDou, secDou) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+    Account firAcc{};
+    Account secAcc{<span style="color: #ff6600;">2014.0</span>};
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"isSmaller(firAcc, secAcc): "</span> 
+              <span style="color: #555555;">&lt;&lt;</span> isSmaller(firAcc, secAcc) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The output of this and the next program is the same; therefore, I skip it.</p>
+<h3>Full Specialisation of <span style="font-family: courier new, courier;">isSmaller</span></h3>
+<p>If you can not change the definition of <span style="font-family: courier new, courier;">Account</span>, you can at least fully specialise <span style="font-family: Courier New, Courier, monospace;">isSmaller </span>for <span style="font-family: Courier New, Courier, monospace;">Account</span>.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// accountIsSmaller2.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Account</span>{
+<span style="color: #9999ff;">public:</span>
+    Account() <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">default</span>;
+    Account(<span style="color: #007788; font-weight: bold;">double</span> b)<span style="color: #555555;">:</span> balance(b){}
+    <span style="color: #006699; font-weight: bold;">friend</span> <span style="color: #007788; font-weight: bold;">bool</span> <span style="color: #006699; font-weight: bold;">operator</span> <span style="color: #555555;">==</span> (Account <span style="color: #006699; font-weight: bold;">const</span><span style="color: #555555;">&amp;</span> fir, Account <span style="color: #006699; font-weight: bold;">const</span><span style="color: #555555;">&amp;</span> sec) { 
+        <span style="color: #006699; font-weight: bold;">return</span> fir.getBalance() <span style="color: #555555;">==</span> sec.getBalance();
+    }
+    <span style="color: #007788; font-weight: bold;">double</span> getBalance() <span style="color: #006699; font-weight: bold;">const</span> {
+      <span style="color: #006699; font-weight: bold;">return</span> balance;
+    }
+<span style="color: #9999ff;">private:</span>
+    <span style="color: #007788; font-weight: bold;">double</span> balance{<span style="color: #ff6600;">0.0</span>};
+};
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">bool</span> isSmaller(T fir, T sec){
+    <span style="color: #006699; font-weight: bold;">return</span> fir <span style="color: #555555;">&lt;</span> sec;
+}
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;&gt;</span>
+<span style="color: #007788; font-weight: bold;">bool</span> isSmaller<span style="color: #555555;">&lt;</span>Account<span style="color: #555555;">&gt;</span>(Account fir, Account sec){
+    <span style="color: #006699; font-weight: bold;">return</span> fir.getBalance() <span style="color: #555555;">&lt;</span> sec.getBalance();
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main(){
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>boolalpha <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    <span style="color: #007788; font-weight: bold;">double</span> firDou{};
+    <span style="color: #007788; font-weight: bold;">double</span> secDou{<span style="color: #ff6600;">2014.0</span>};
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"isSmaller(firDou, secDou): "</span> 
+              <span style="color: #555555;">&lt;&lt;</span> isSmaller(firDou, secDou) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+    Account firAcc{};
+    Account secAcc{<span style="color: #ff6600;">2014.0</span>};
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"isSmaller(firAcc, secAcc): "</span> 
+              <span style="color: #555555;">&lt;&lt;</span> isSmaller(firAcc, secAcc) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>By the way, a non-generic function&nbsp;<span style="font-family: courier new, courier;">bool isSmaller(Account fir, Account sec</span>) would also do the job.</p>
+<h3>Extend <span style="font-family: courier new, courier;">isSmaller</span> with a Binary Predicate</h3>
+<p>There is another way to extend <span style="font-family: courier new, courier;">isSmaller</span>. I spend the generic function an additional type parameter <span style="font-family: courier new, courier;">Pred</span> which should hold the binary predicate. This pattern is often used in the standard template library.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// accountIsSmaller3.cpp</span>
+
+<span style="color: #009999;">#include &lt;functional&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;string&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Account</span>{
+<span style="color: #9999ff;">public:</span>
+    Account() <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">default</span>;
+    Account(<span style="color: #007788; font-weight: bold;">double</span> b)<span style="color: #555555;">:</span> balance(b){}
+    <span style="color: #006699; font-weight: bold;">friend</span> <span style="color: #007788; font-weight: bold;">bool</span> <span style="color: #006699; font-weight: bold;">operator</span> <span style="color: #555555;">==</span> (Account <span style="color: #006699; font-weight: bold;">const</span><span style="color: #555555;">&amp;</span> fir, Account <span style="color: #006699; font-weight: bold;">const</span><span style="color: #555555;">&amp;</span> sec) { 
+        <span style="color: #006699; font-weight: bold;">return</span> fir.getBalance() <span style="color: #555555;">==</span> sec.getBalance();
+    }
+    <span style="color: #007788; font-weight: bold;">double</span> getBalance() <span style="color: #006699; font-weight: bold;">const</span> {
+      <span style="color: #006699; font-weight: bold;">return</span> balance;
+    }
+<span style="color: #9999ff;">private:</span>
+    <span style="color: #007788; font-weight: bold;">double</span> balance{<span style="color: #ff6600;">0.0</span>};
+};
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T, <span style="color: #006699; font-weight: bold;">typename</span> Pred <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>less<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span> <span style="color: #555555;">&gt;</span>    <span style="color: #0099ff; font-style: italic;">// (1)</span>
+<span style="color: #007788; font-weight: bold;">bool</span> isSmaller(T fir, T sec, Pred pred <span style="color: #555555;">=</span> Pred() ){      <span style="color: #0099ff; font-style: italic;">// (2)</span>
+  <span style="color: #006699; font-weight: bold;">return</span> pred(fir, sec);                                <span style="color: #0099ff; font-style: italic;">// (3)</span>
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main(){
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>boolalpha <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    <span style="color: #007788; font-weight: bold;">double</span> firDou{};
+    <span style="color: #007788; font-weight: bold;">double</span> secDou{<span style="color: #ff6600;">2014.0</span>};
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"isSmaller(firDou, secDou): "</span> 
+              <span style="color: #555555;">&lt;&lt;</span> isSmaller(firDou, secDou) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+    Account firAcc{};
+    Account secAcc{<span style="color: #ff6600;">2014.0</span>};
+    
+    <span style="color: #006699; font-weight: bold;">auto</span> res <span style="color: #555555;">=</span> isSmaller(firAcc, secAcc,                               <span style="color: #0099ff; font-style: italic;">// (4)</span>
+                         [](<span style="color: #006699; font-weight: bold;">const</span> Account<span style="color: #555555;">&amp;</span> fir, <span style="color: #006699; font-weight: bold;">const</span> Account<span style="color: #555555;">&amp;</span> sec){
+                             <span style="color: #006699; font-weight: bold;">return</span> fir.getBalance() <span style="color: #555555;">&lt;</span> sec.getBalance(); 
+                         }
+    );
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"isSmaller(firAcc, secAcc): "</span> <span style="color: #555555;">&lt;&lt;</span>  res <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>string firStr <span style="color: #555555;">=</span> <span style="color: #cc3300;">"AAA"</span>;
+    std<span style="color: #555555;">::</span>string secStr <span style="color: #555555;">=</span> <span style="color: #cc3300;">"BB"</span>;
+     
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"isSmaller(firStr, secStr): "</span> 
+              <span style="color: #555555;">&lt;&lt;</span>  isSmaller(firStr, secStr) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+     <span style="color: #006699; font-weight: bold;">auto</span> res2 <span style="color: #555555;">=</span> isSmaller(firStr, secStr,                             <span style="color: #0099ff; font-style: italic;">// (5)</span>
+                           [](<span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span>string<span style="color: #555555;">&amp;</span> fir, <span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span>string<span style="color: #555555;">&amp;</span> sec){
+                               <span style="color: #006699; font-weight: bold;">return</span> fir.length() <span style="color: #555555;">&lt;</span> sec.length(); 
+                           }
+    );
+     
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"isSmaller(firStr, secStr): "</span> <span style="color: #555555;">&lt;&lt;</span>  res2 <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}
+</pre>
+</div>
+<p></p>
+<p>The generic function has <span style="font-family: courier new, courier;">std::less&lt;T</span>&gt; as the default ordering (1). The binary predicate <span style="font-family: courier new, courier;">Pred</span> is instantiated in line (2) and used in line (3). If you don't specify the binary predicate, <span style="font-family: courier new, courier;">std::less</span> is used. Additionally, you can provide your binary predicate such as in line (4) or line (5). A lambda function is an ideal fit for this job.</p>
+<p>Finally, here is the output of the program:</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CCoreGuidelinesTemplatesSpecialisation/accountIsSmaller3.png" alt="accountIsSmaller3" width="400" height="226" /></p>
+<p>What are the differences between this three techniques?</p>
+<h2>Comparing two Accounts: The Third</h2>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CCoreGuidelinesTemplatesSpecialisation/ComparisonNew.png" alt="ComparisonNew" width="600" height="222" /></p>
+<p></p>
+<p>The full specialisation is not a general solution because it only works for the function <span style="font-family: courier new, courier;">isSmaller</span>. In contrast, the <span style="font-family: courier new, courier;">operator &lt;</span> is quite often applicable, and the predicate can be used by any type. The <span style="font-family: courier new, courier;">operator &lt;</span> and the full specialisation are static. This means, the ordering is defined at compile time and is encoded in the type or the generic function. In contrast, the extension can be invoked with different predicates. This is a runtime decision. The <span style="font-family: courier new, courier;">operator &lt;</span> extends the type, the other both variants the function. The extension with a predicate allows it to order your type in various ways. For example, you can compare strings lexicographically or by their length.</p>
+<p>Based on this comparison a good rule of thumb is it to implement an <span style="font-family: courier new, courier;">operator &lt;</span> for your types and add an extension to your generic functions if necessary. Therefore, your type behaves <span style="font-family: courier new, courier;">Regular</span> according to Alexander Stepanov and also supports customised orderings.</p>
+<h2>What's next?</h2>
+<p>The next post is about templates. In particular, it is about template hierarchies.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Eric Pederson, Paul Baxter,&nbsp; Meeting C++, Matt Braun, Avi Lachmish, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Dilettant, Marko, Ramesh Jangama, and </strong><span class="sc-kpOJdX fDWXFa" title="Emyr Williams"><strong>Emyr Williams.</strong> <br /></span></p>
+<p><strong>&nbsp;</strong></p>
+<p><strong>Thanks in particular to:&nbsp; <a href="https://www.takeupcode.com"><img style="vertical-align: top;" src="images/patreon/TakeUpCode-450-60.png" alt="TakeUpCode 450 60" width="150" height="20" /> </a></strong></p>
+<p>&nbsp;</p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at Leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 600 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
+<p></p>
+<table style="width: 800px;">
+<tbody>
+<tr>
+<td colspan="2">
+<h2>Get your interactive course</h2>
+&nbsp;</td>
+</tr>
+<tr>
+<td>
+<h4 class="_3fBEwsM053hx2mPd0uV0nT" style="text-align: center;">Modern C++ Concurrency in Practice</h4>
+</td>
+<td>
+<h4>C++ Standard Library including C++14 &amp; C++17</h4>
+</td>
+</tr>
+<tr>
+<td><a href="https://goo.gl/2qWUkK"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseConcurrency/educative.png" alt="educative" width="300" height="152" /></a></td>
+<td><a href="https://www.educative.io/collection/10370001/5712008708096000?authorName=Rainer%20Grimm"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseLibrary/CLibrary.png" alt="CLibrary" width="300" height="150" /></a></td>
+</tr>
+<tr>
+<td>
+<p>Based on my book "Concurrency with Modern C++" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>140 lessons</li>
+<li>110 code playgrounds =&gt; Runs in the browser</li>
+<li>78 code snippets</li>
+<li>55 illustrations</li>
+</ul>
+</td>
+<td>
+<p>Based on my book "The C++ Standard Library" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>149 lessons</li>
+<li>111 code playgrounds =&gt; Runs in the browser</li>
+<li>164 code snippets</li>
+<li>25 illustrations</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
