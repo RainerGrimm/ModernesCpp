@@ -1,0 +1,257 @@
+<p>Due to the&nbsp; C++ core guidelines "Templates are the backbone of C++’s support for generic programming and class hierarchies the backbone of its support for object-oriented programming. The two language mechanisms can be used effectively in combination, but a few design pitfalls must be avoided." Let me see what this means.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesTemplateHierarchies/hierarchy-35795_1280.png" alt="hierarchy 35795 1280" width="400" height="328" /></p>
+<p>This section consists of five rules.</p>
+<ul>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-hier">T.80: Do not naively templatize a class hierarchy</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-array">T.81: Do not mix hierarchies and arrays</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-linear">T.82: Linearize a hierarchy when virtual functions are undesirable</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-virtual">T.83: Do not declare a member function template virtual</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-abi">T.84: Use a non-template core implementation to provide an ABI-stable interface</a></li>
+</ul>
+<p>The rule T.81 is too loosely related to templates and hierarchies, and the rule T.82 is empty; therefore, my post boils down to the tree remaining rules.</p>
+<p>I will write about the rules T.80 and T.84 together because T.84 continues the story of T.80.</p>
+<p>&nbsp;</p>
+<h2><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-hier">T.80: Do not naively templatize a class hierarchy </a>and <a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-abi">T.84: Use a non-template core implementation to provide an ABI-stable interface</a></h2>
+<p>Here is as an example a naively templatized class hierarchy from the guidelines:</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">struct</span> Container {         <span style="color: #0099ff; font-style: italic;">// an interface</span>
+    <span style="color: #006699; font-weight: bold;">virtual</span> T<span style="color: #555555;">*</span> get(<span style="color: #007788; font-weight: bold;">int</span> i);
+    <span style="color: #006699; font-weight: bold;">virtual</span> T<span style="color: #555555;">*</span> <span style="color: #cc00ff;">first</span>();
+    <span style="color: #006699; font-weight: bold;">virtual</span> T<span style="color: #555555;">*</span> <span style="color: #cc00ff;">next</span>();
+    <span style="color: #006699; font-weight: bold;">virtual</span> <span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">sort</span>();
+};
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Vector</span> <span style="color: #555555;">:</span> <span style="color: #006699; font-weight: bold;">public</span> Container<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span> {
+<span style="color: #9999ff;">public:</span>
+    <span style="color: #0099ff; font-style: italic;">// ...</span>
+};
+
+Vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> vi;
+Vector<span style="color: #555555;">&lt;</span>string<span style="color: #555555;">&gt;</span> vs;
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Why is this due to the guidelines naively? This is in particular naively because the base class <span style="font-family: courier new, courier;">Container</span> has many virtual functions. The presented designed introduces code bloat. Virtual functions are instantiated every time in a class template. In contrast, non-virtual functions are only instantiated if they are used.</p>
+<p>A simple test with <a href="https://cppinsights.io/">CppInsight</a> proves my point.</p>
+<h3>Non-virtual functions</h3>
+<p>The following program uses a <span style="font-family: courier new, courier;">std::vector&lt;int&gt;</span> and a <span style="font-family: courier new, courier;">std::vector&lt;std::string&gt;</span>.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesTemplateHierarchies/Vector1.png" alt="Vector1" width="300" height="128" /></p>
+<p>CppInsight shows it. No method of <span style="font-family: courier new, courier;">std::vector</span> is instantiated.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesTemplateHierarchies/Vector2.png" alt="Vector2" width="500" height="101" /></p>
+<h3>Virtual functions</h3>
+<p>Here is the simplified program of the C++ core guidelines including the virtual function <span style="font-family: courier new, courier;">sort.</span></p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesTemplateHierarchies/Vector1Virtual.png" alt="Vector1Virtual" width="200" height="228" /></p>
+<p>Now, the virtual function <span style="font-family: courier new, courier;">sort</span> is instantiated. Here is only the output of CppInsight which shows the instantiation of the class template <span style="font-family: courier new, courier;">Container. </span></p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesTemplateHierarchies/Vector2Virtual.png" alt="Vector2Virtual" width="600" height="432" /></p>
+<p>&nbsp;</p>
+<p>In total, I get 100 lines of code in the case of the virtual function.</p>
+<p>The note to the guidelines gives a hint on how to overcome this code bloat. Often you can provide a stable interface by not parameterising a base. This brings me to the related rule <a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-abi">T.84: Use a non-template core implementation to provide an ABI-stable interface</a>.</p>
+<p>Okay, I already have written about this technique in the post <a href="https://www.modernescpp.com/index.php/c-core-guidelines-template-definitons">C++ Core Guidelines: Template Definitions</a>. The rule T.84 mentions an alternative way to address a stable interface: <a href="https://www.modernescpp.com/index.php/c-core-guidelines-template-definitons">Pimpl. </a></p>
+<h3>Pimpl</h3>
+<p>Pimpl stands for "<strong>p</strong>ointer to <strong>impl</strong>ementation" and means to remove implementation details of a class by placing them in a separate class, accessed through a pointer. This technique should be in the toolbox of each serious C++ programmer. Pimpl is often also called compilation firewall because this technique breaks the dependency between the implementation and the users of the class interface. This means the implementation can be changed without recompiling the user code.</p>
+<p>Here is the general structure from Herb Sutters Blog: &nbsp;<span class="reference-text"><a class="external text" href="http://herbsutter.com/gotw/_100/" rel="nofollow">GotW #100</a>: Compilation Firewalls. </span></p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// in header file</span>
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">widget</span> {
+<span style="color: #9999ff;">public:</span>
+    widget();
+    <span style="color: #555555;">~</span>widget();
+<span style="color: #9999ff;">private:</span>
+    <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">impl</span>;                                         <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    unique_ptr<span style="color: #555555;">&lt;</span>impl<span style="color: #555555;">&gt;</span> pimpl;
+};
+ 
+<span style="color: #0099ff; font-style: italic;">// in implementation file                               // (2)                 </span>
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">widget</span><span style="color: #555555;">::</span>impl {
+    <span style="color: #0099ff; font-style: italic;">// :::</span>
+};
+ 
+widget<span style="color: #555555;">::</span>widget() <span style="color: #555555;">:</span> pimpl{ <span style="color: #006699; font-weight: bold;">new</span> impl{ <span style="color: #0099ff; font-style: italic;">/*...*/</span> } } { }
+widget<span style="color: #555555;">::~</span>widget() { }  
+</pre>
+</div>
+<p></p>
+<p>This are the points of this idiom.</p>
+<ol>
+<li><code></code>put all private non-virtual members into <span style="font-family: courier new, courier;">impl</span> (1)</li>
+<li>forward declare <span style="font-family: courier new, courier;">impl <br /></span></li>
+<li>define <span style="font-family: courier new, courier;">impl</span> in the corresponding implementation file (2)<code></code></li>
+</ol>
+<p>Okay. Let me show a full example based on the one from <a href="https://en.cppreference.com/w/cpp/language/pimpl">cppreference.com</a>.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// pimpl.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;memory&gt;</span>
+ 
+<span style="color: #0099ff; font-style: italic;">// interface (widget.h)</span>
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">widget</span> {
+    <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">impl</span>;
+    std<span style="color: #555555;">::</span>unique_ptr<span style="color: #555555;">&lt;</span>impl<span style="color: #555555;">&gt;</span> pImpl;
+ <span style="color: #9999ff;">public:</span>
+    <span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">draw</span>();
+    <span style="color: #007788; font-weight: bold;">bool</span> shown() <span style="color: #006699; font-weight: bold;">const</span> { <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #336666;">true</span>; } 
+    widget(<span style="color: #007788; font-weight: bold;">int</span>);
+    <span style="color: #555555;">~</span>widget(); 
+    widget(widget<span style="color: #555555;">&amp;&amp;</span>) <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">default</span>;  
+    widget(<span style="color: #006699; font-weight: bold;">const</span> widget<span style="color: #555555;">&amp;</span>) <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">delete</span>;
+    widget<span style="color: #555555;">&amp;</span> <span style="color: #006699; font-weight: bold;">operator</span><span style="color: #555555;">=</span>(widget<span style="color: #555555;">&amp;&amp;</span>); 
+    widget<span style="color: #555555;">&amp;</span> <span style="color: #006699; font-weight: bold;">operator</span><span style="color: #555555;">=</span>(<span style="color: #006699; font-weight: bold;">const</span> widget<span style="color: #555555;">&amp;</span>) <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">delete</span>;
+};
+ 
+<span style="color: #0099ff; font-style: italic;">// implementation (widget.cpp)</span>
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">widget</span><span style="color: #555555;">::</span>impl {
+    <span style="color: #007788; font-weight: bold;">int</span> n; <span style="color: #0099ff; font-style: italic;">// private data</span>
+ <span style="color: #9999ff;">public:</span>
+    <span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">draw</span>(<span style="color: #006699; font-weight: bold;">const</span> widget<span style="color: #555555;">&amp;</span> w) {                             <span style="color: #0099ff; font-style: italic;">// (1)</span>
+        <span style="color: #006699; font-weight: bold;">if</span>(w.shown())
+            std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"drawing a widget "</span> <span style="color: #555555;">&lt;&lt;</span> n <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    }
+    impl(<span style="color: #007788; font-weight: bold;">int</span> n) <span style="color: #555555;">:</span> n(n) {}
+};
+<span style="color: #007788; font-weight: bold;">void</span> widget<span style="color: #555555;">::</span>draw() { pImpl<span style="color: #555555;">-&gt;</span>draw(<span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">this</span>); }                  <span style="color: #0099ff; font-style: italic;">// (2)</span>
+widget<span style="color: #555555;">::</span>widget(<span style="color: #007788; font-weight: bold;">int</span> n) <span style="color: #555555;">:</span> pImpl{std<span style="color: #555555;">::</span>make_unique<span style="color: #555555;">&lt;</span>impl<span style="color: #555555;">&gt;</span>(n)} {}
+widget<span style="color: #555555;">::~</span>widget() <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">default</span>;                                 <span style="color: #0099ff; font-style: italic;">// (3)</span>
+widget<span style="color: #555555;">&amp;</span> widget<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">operator</span><span style="color: #555555;">=</span>(widget<span style="color: #555555;">&amp;&amp;</span>) <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">default</span>;
+ 
+<span style="color: #0099ff; font-style: italic;">// user (main.cpp)</span>
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>()
+{
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+	
+    widget w(<span style="color: #ff6600;">7</span>);
+    w.draw();
+	
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+   
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The <span style="font-family: courier new, courier;">draw</span> call of the class <span style="font-family: courier new, courier;">impl</span> uses a back-reference to <span style="font-family: courier new, courier;">widget</span> (lines (1) and (2)). The destructor and the move assignment operator (line (3)) must be user-defined in the implementation file base because <span class="t-lc"><a title="cpp/memory/unique ptr" href="https://en.cppreference.com/w/cpp/memory/unique_ptr">std::unique_ptr</a></span> requires that the pointed-to type is a complete type.</p>
+<p>The program behaves as expected:</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesTemplateHierarchies/pimpl.png" alt="pimpl" width="250" height="172" /></p>
+<p>Besides its pros, the pimpl idiom has two cons: there is an additional pointer indirection, and you have to store the pointer.</p>
+<p>The last guideline for this post is about a typical misconception.</p>
+<h2><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-virtual">T.83: Do not declare a member function template virtual</a></h2>
+<p>Let me try to use a virtual member function template.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// virtualMember.cpp</span>
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Shape</span> {
+    <span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">T</span><span style="color: #555555;">&gt;</span>
+    <span style="color: #006699; font-weight: bold;">virtual</span> <span style="color: #007788; font-weight: bold;">bool</span> intersect(T<span style="color: #555555;">*</span> p);
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+    
+    Shape shape;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>&nbsp;The error message from my GCC 8.2 compiler is crystal-clear:</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesTemplateHierarchies/virtualMember.png" alt="virtualMember" width="500" height="153" /></p>
+<h2>What's next?</h2>
+<p>The next guidelines and, therefore, my next post is about variadic templates. Variadic templates are templates which can accept an arbitrary number of arguments. The rules in the guidelines to variadic templates as many rules to templates consist only of the headings. This means I write in my next post more general about variadic templates.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Eric Pederson, Paul Baxter,&nbsp; Meeting C++, Matt Braun, Avi Lachmish, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Dilettant, Marko, Ramesh Jangama, and </strong><span class="sc-kpOJdX fDWXFa" title="Emyr Williams"><strong>Emyr Williams.</strong> <br /></span></p>
+<p><strong>&nbsp;</strong></p>
+<p><strong>Thanks in particular to:&nbsp; <a href="https://www.takeupcode.com"><img style="vertical-align: top;" src="images/patreon/TakeUpCode-450-60.png" alt="TakeUpCode 450 60" width="150" height="20" /> </a></strong></p>
+<p>&nbsp;</p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at Leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 600 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
+<p></p>
+<table style="width: 800px;">
+<tbody>
+<tr>
+<td colspan="2">
+<h2>Get your interactive course</h2>
+&nbsp;</td>
+</tr>
+<tr>
+<td>
+<h4 class="_3fBEwsM053hx2mPd0uV0nT" style="text-align: center;">Modern C++ Concurrency in Practice</h4>
+</td>
+<td>
+<h4>C++ Standard Library including C++14 &amp; C++17</h4>
+</td>
+</tr>
+<tr>
+<td><a href="https://goo.gl/2qWUkK"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseConcurrency/educative.png" alt="educative" width="300" height="152" /></a></td>
+<td><a href="https://www.educative.io/collection/10370001/5712008708096000?authorName=Rainer%20Grimm"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseLibrary/CLibrary.png" alt="CLibrary" width="300" height="150" /></a></td>
+</tr>
+<tr>
+<td>
+<p>Based on my book "Concurrency with Modern C++" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>140 lessons</li>
+<li>110 code playgrounds =&gt; Runs in the browser</li>
+<li>78 code snippets</li>
+<li>55 illustrations</li>
+</ul>
+</td>
+<td>
+<p>Based on my book "The C++ Standard Library" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>149 lessons</li>
+<li>111 code playgrounds =&gt; Runs in the browser</li>
+<li>164 code snippets</li>
+<li>25 illustrations</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
