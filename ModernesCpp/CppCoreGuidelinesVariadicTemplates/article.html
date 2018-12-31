@@ -1,0 +1,293 @@
+<p>Variadic templates are a typical feature of C++: from the users perspective they are easy to use, but from the implementor's perspective they look quite scary. Today's post is mainly about the implementor's perspective.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesVariadicTemplates/theater-311730_1280.png" alt="theater 311730 1280" width="400" height="247" /></p>
+<p>Before I write about the details to variadic temples,&nbsp;I want to make a short remark about my introduction to this post. I often wear two heads, when I teach C++: one for the user and one for the implementor. Features such as templates are easy to use but challenging to implement. This significant gap is typically for C++ and I assume deeper than in other mainstream programming languages such as Python, Java, or even C. Honestly, I have no problem with this gap. I call this gap abstraction, and it is an essential part of the power of C++. The art of the implementer of the library or framework is it to provide easy to use (difficult to misuse) and stable interfaces.&nbsp; If you don't get the point, wait for the next section, when I develop <span style="font-family: courier new, courier;">std::make_unique</span>.</p>
+<p>Today's post is based on three rules:</p>
+<ul>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-variadic">T.100: Use variadic templates when you need a function that takes a variable number of arguments of a variety of types</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-variadic-pass">T.101: ??? How to pass arguments to a variadic template ???</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-variadic-process">T.102: ??? How to process arguments to a variadic template ???</a></li>
+</ul>
+<p>You can already guess it. The three rules are title-only; therefore, I make one story out of the first three rules.</p>
+<p>As promised, I want to develop <span style="font-family: courier new, courier;">std::make_unique. std::make_unique</span> is a function template that returns a dynamically allocated object, protected by a std<span style="font-family: courier new, courier;">::unique_ptr</span>. Let me show you a few use-cases.<span style="font-family: courier new, courier;"><br /></span></p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// makeUnique.cpp</span>
+
+<span style="color: #009999;">#include &lt;memory&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">struct</span> MyType{
+    MyType(<span style="color: #007788; font-weight: bold;">int</span>, <span style="color: #007788; font-weight: bold;">double</span>, <span style="color: #007788; font-weight: bold;">bool</span>){};
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+    
+    <span style="color: #007788; font-weight: bold;">int</span> lvalue{<span style="color: #ff6600;">2020</span>};
+    
+    std::unique_ptr&lt;int&gt; <span style="color: #555555;"></span><span style="color: #555555;"></span><span style="color: #007788; font-weight: bold;"></span><span style="color: #555555;"></span>uniqZero <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>make_unique<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span>();      <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    <span style="color: #006699; font-weight: bold;">auto</span> uniqEleven <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>make_unique<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span>(<span style="color: #ff6600;">2011</span>);                <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    <span style="color: #006699; font-weight: bold;">auto</span> uniqTwenty <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>make_unique<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span>(lvalue);              <span style="color: #0099ff; font-style: italic;">// (3)</span>
+    <span style="color: #006699; font-weight: bold;">auto</span> uniqType <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>make_unique<span style="color: #555555;">&lt;</span>MyType<span style="color: #555555;">&gt;</span>(lvalue, <span style="color: #ff6600;">3.14</span>, <span style="color: #336666;">true</span>); <span style="color: #0099ff; font-style: italic;">// (4)</span>
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Based on this use-case, what are the requirements of <span style="font-family: courier new, courier;">std::make_unique</span>?</p>
+<ol>
+<li>It should deal with an arbitrary number of arguments. The<span style="font-family: courier new, courier;"> std::make_unique</span> calls gets 0, 1, and 3 arguments.</li>
+<li>It should deal with lvalues and rvalues. The<span style="font-family: courier new, courier;"> std::make_unique call</span> in line (2) gets an rvalue and in line (3) an lvalue. The last one even gets an rvalue und an lvalue.</li>
+<li>It should forward it arguments unchanged to the underlying constructor. This means, the constructor of <span style="font-family: courier new, courier;">std::unique_ptr</span> should get an lvalue/rvalue if <span style="font-family: courier new, courier;">std::make_unique</span> gets an lvalue/rvalue.</li>
+</ol>
+<p>This requirements are typically for factory functions such as <span style="font-family: courier new, courier;">std::make_unique, std::make_shared, std::make_tupl</span>e, but also <span style="font-family: courier new, courier;">std::thread. </span>Both rely on two powerful features of C++11:</p>
+<ol>
+<li>Variadic templates</li>
+<li>Perfect forwarding</li>
+</ol>
+<p>Now, I want to create my factory function<span style="font-family: courier new, courier;"> createT.</span> Let me start with perfect forwarding.</p>
+<h2>Perfect Forwarding</h2>
+<p>First of all: What is perfect forwarding?</p>
+<ul>
+<li><strong>Perfect forwarding</strong> allows you to preserve an argument’s value category (lvalue/rvalue) and <code>const</code>/<code>volatile</code> modifiers.</li>
+</ul>
+<p>Perfect forwarding follows a typical pattern, consisting of a universal reference and <span style="font-family: courier new, courier;">std::forward.</span></p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> <span style="color: #00aa88; font-weight: bold;">T</span><span style="color: #555555;">&gt;</span>        <span style="color: #0099ff; font-style: italic;">// (1)</span>
+<span style="color: #007788; font-weight: bold;">void</span> create(T<span style="color: #555555;">&amp;&amp;</span> t){         <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    std<span style="color: #555555;">::</span>forward<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span>(t);     <span style="color: #0099ff; font-style: italic;">// (3)</span>
+}
+</pre>
+</div>
+<p></p>
+<p>The three parts of the pattern to get perfect forwarding are:</p>
+<ol>
+<li>You need a template parameter T: <span style="font-family: courier new, courier;">typename T</span></li>
+<li>Bind T by universal reference, also known as perfect forwarding reference: <span style="font-family: courier new, courier;">T&amp;&amp; t</span></li>
+<li>Invoke <span style="font-family: courier new, courier;">std::forward</span> on the argument: <span style="font-family: courier new, courier;">std::forward&lt;T&gt;(t)</span></li>
+</ol>
+<p>The key observation is that T&amp;&amp; (line 2) can bind an lvalue or an rvalue and that <span style="font-family: courier new, courier;">std::forward</span> (line 3) does the perfect forwarding.</p>
+<p>It's time to create the prototype of the <span style="font-family: courier new, courier;">createT</span> factory function which should behave at the end such as <span><span style="font-family: courier new, courier;">makeUnique.cpp</span>. I just replaced <span style="font-family: courier new, courier;">std::make_unique</span> with the <span style="font-family: courier new, courier;">createT</span> call, added the <span style="font-family: courier new, courier;">createT</span> factory function, and commented the lines (1) and (4) out. Additionally, I removed the header <span style="font-family: courier new, courier;">&lt;memory&gt;</span> (<span style="font-family: courier new, courier;">std::make_unique</span>) and added the header <span style="font-family: courier new, courier;">&lt;utility&gt;</span>(<span style="font-family: courier new, courier;">std::foward</span>).<br /></span></p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// createT1.cpp</span>
+
+<span style="color: #009999;">#include &lt;utility&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">struct</span> MyType{
+    MyType(<span style="color: #007788; font-weight: bold;">int</span>, <span style="color: #007788; font-weight: bold;">double</span>, <span style="color: #007788; font-weight: bold;">bool</span>){};
+};
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T, <span style="color: #006699; font-weight: bold;">typename</span> Arg<span style="color: #555555;">&gt;</span>
+T createT(Arg<span style="color: #555555;">&amp;&amp;</span> arg){
+    <span style="color: #006699; font-weight: bold;">return</span> T(std<span style="color: #555555;">::</span>forward<span style="color: #555555;">&lt;</span>Arg<span style="color: #555555;">&gt;</span>(arg));
+}
+    
+<span style="color: #007788; font-weight: bold;">int</span> main(){
+    
+    <span style="color: #007788; font-weight: bold;">int</span> lvalue{<span style="color: #ff6600;">2020</span>};
+    
+    <span style="color: #0099ff; font-style: italic;">//std::unique_ptr&lt;int&gt; uniqZero = std::make_unique&lt;int&gt;();      // (1)</span>
+    <span style="color: #006699; font-weight: bold;">auto</span> uniqEleven <span style="color: #555555;">=</span> createT<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span>(<span style="color: #ff6600;">2011</span>);                <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    <span style="color: #006699; font-weight: bold;">auto</span> uniqTwenty <span style="color: #555555;">=</span> createT<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span>(lvalue);              <span style="color: #0099ff; font-style: italic;">// (3)</span>
+    <span style="color: #0099ff; font-style: italic;">//auto uniqType = std::make_unique&lt;MyType&gt;(lvalue, 3.14, true); // (4)</span>
+    
+}
+</pre>
+</div>
+<p></p>
+<p>Fine. An rvalue (line 2) and an lvalue (line 3) pass my test.</p>
+<h2>Variadic Templates</h2>
+<p>Sometimes dots are important. Putting exactly nine dots at the right place and line (1) and line (4) work.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// createT2.cpp</span>
+
+<span style="color: #009999;">#include &lt;utility&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">struct</span> MyType{
+    MyType(<span style="color: #007788; font-weight: bold;">int</span>, <span style="color: #007788; font-weight: bold;">double</span>, <span style="color: #007788; font-weight: bold;">bool</span>){};
+};
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T, <span style="color: #006699; font-weight: bold;">typename</span> ... Args<span style="color: #555555;">&gt;</span>
+T createT(Args<span style="color: #555555;">&amp;&amp;</span> ... args){
+    <span style="color: #006699; font-weight: bold;">return</span> T(std<span style="color: #555555;">::</span>forward<span style="color: #555555;">&lt;</span>Args<span style="color: #555555;">&gt;</span>(args) ... );
+}
+    
+<span style="color: #007788; font-weight: bold;">int</span> main(){
+    
+    <span style="color: #007788; font-weight: bold;">int</span> lvalue{<span style="color: #ff6600;">2020</span>};
+    
+    <span style="color: #007788; font-weight: bold;">int</span> uniqZero <span style="color: #555555;">=</span> createT<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span>();                       <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    <span style="color: #006699; font-weight: bold;">auto</span> uniqEleven <span style="color: #555555;">=</span> createT<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span>(<span style="color: #ff6600;">2011</span>);                <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    <span style="color: #006699; font-weight: bold;">auto</span> uniqTwenty <span style="color: #555555;">=</span> createT<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span>(lvalue);              <span style="color: #0099ff; font-style: italic;">// (3)</span>
+    <span style="color: #006699; font-weight: bold;">auto</span> uniqType <span style="color: #555555;">=</span> createT<span style="color: #555555;">&lt;</span>MyType<span style="color: #555555;">&gt;</span>(lvalue, <span style="color: #ff6600;">3.14</span>, <span style="color: #336666;">true</span>); <span style="color: #0099ff; font-style: italic;">// (4)</span>
+    
+}
+</pre>
+</div>
+<p></p>
+<p>How does the magic work? The three dots stand for a ellipse. By using them <span style="font-family: courier new, courier;">Args,</span> or <span style="font-family: courier new, courier;">args</span> becomes a parameter pack. To be more precise, <span style="font-family: courier new, courier;">Args i</span>s a template parameter pack and<span style="font-family: courier new, courier;"> args</span> is a function parameter pack. You can only apply two operations to a parameter pack: you can pack or unpack it. If the ellipse is left of <span style="font-family: courier new, courier;">Args</span> the parameter pack is packed; if the ellipse is right of <span style="font-family: courier new, courier;">Args</span> the parameter pack is unpacked. In case of the expression<span style="font-family: courier new, courier;"> (std::forward&lt;Args&gt;(args)...</span>) this means the expression is unpacked until the parameter pack is consumed and a comma is just place between the unpacked components. This was all.</p>
+<p><a href="https://cppinsights.io/">CppInsight</a> helps you to look under the curtain.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesVariadicTemplates/createT2_1.png" alt="createT2 1" width="300" height="233" /></p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesVariadicTemplates/createT2_2.png" alt="createT2 2" width="600" height="244" /></p>
+<p>Now, I'm nearly done. Here is my <span style="font-family: courier new, courier;">createT</span> factory function.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T, <span style="color: #006699; font-weight: bold;">typename</span> ... Args<span style="color: #555555;">&gt;</span>
+T createT(Args<span style="color: #555555;">&amp;&amp;</span> ... args){
+    <span style="color: #006699; font-weight: bold;">return</span> T(std<span style="color: #555555;">::</span>forward<span style="color: #555555;">&lt;</span>Args<span style="color: #555555;">&gt;</span>(args) ... );
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The two missing steps are.</p>
+<ol>
+<li>Create a <span style="font-family: courier new, courier;">std::unique_ptr&lt;T&gt;</span> instead of a plain<span style="font-family: courier new, courier;"> T</span></li>
+<li>Rename my function <span style="font-family: courier new, courier;">make_unique. </span></li>
+</ol>
+<p>I'm done.</p>
+<h2>std::make_unique</h2>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T, <span style="color: #006699; font-weight: bold;">typename</span> ... Args<span style="color: #555555;">&gt;</span>
+std<span style="color: #555555;">::</span>unique_ptr<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span> make_unique(Args<span style="color: #555555;">&amp;&amp;</span> ... args){
+    <span style="color: #006699; font-weight: bold;">return</span> std<span style="color: #555555;">::</span>unique_ptr<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span>(<span style="color: #006699; font-weight: bold;">new</span> T(std<span style="color: #555555;">::</span>forward<span style="color: #555555;">&lt;</span>Args<span style="color: #555555;">&gt;</span>(args) ... ));
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>I forget to scare you. Here is the scaring part of my post.</p>
+<h2>printf</h2>
+<p>Of course, you know the C function <span style="font-family: courier new, courier;">printf.</span> This is its signature: <span class="mw-geshi cpp source-cpp"><span style="font-family: courier new, courier;"><span class="kw4">int</span> printf<span class="br0">(</span> <span class="kw4">const</span> <span class="kw4">char</span><span class="sy2">*</span> format, ... <span class="br0">)</span></span><span class="sy4"><span style="font-family: courier new, courier;">;. printf</span> is a function which can get an arbitraty number of arguments. Its power is based on the macro <a href="https://en.cppreference.com/w/cpp/utility/variadic/va_arg">va_arg </a>and is, therefore, not typesafe. <br /></span></span></p>
+<p>Thanks to variadic templates, <span style="font-family: courier new, courier;">printf</span> can be rewritten in a typesafe way.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// myPrintf.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+ 
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">myPrintf</span>(<span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">char</span><span style="color: #555555;">*</span> format){                           <span style="color: #0099ff; font-style: italic;">// (3)</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> format;
+}
+ 
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T, <span style="color: #006699; font-weight: bold;">typename</span> ... Args<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">void</span> myPrintf(<span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">char</span><span style="color: #555555;">*</span> format, T value, Args ... args){   <span style="color: #0099ff; font-style: italic;">// (4)</span>
+    <span style="color: #006699; font-weight: bold;">for</span> ( ; <span style="color: #555555;">*</span>format <span style="color: #555555;">!=</span> <span style="color: #cc3300;">'\0'</span>; format<span style="color: #555555;">++</span> ) {                    <span style="color: #0099ff; font-style: italic;">// (5)</span>
+        <span style="color: #006699; font-weight: bold;">if</span> ( <span style="color: #555555;">*</span>format <span style="color: #555555;">==</span> <span style="color: #cc3300;">'%'</span> ) {                              <span style="color: #0099ff; font-style: italic;">// (6) </span>
+           std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> value;
+           myPrintf(format <span style="color: #555555;">+</span> <span style="color: #ff6600;">1</span>, args ... );                  <span style="color: #0099ff; font-style: italic;">// (7)</span>
+           <span style="color: #006699; font-weight: bold;">return</span>;
+        }
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #555555;">*</span>format;                                <span style="color: #0099ff; font-style: italic;">// (8)</span>
+    }
+}
+ 
+<span style="color: #007788; font-weight: bold;">int</span> main(){
+    
+    myPrintf(<span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>);                                          <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    
+    myPrintf(<span style="color: #cc3300;">"% world% %</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>, <span style="color: #cc3300;">"Hello"</span>, <span style="color: #cc3300;">'!'</span>, <span style="color: #ff6600;">2011</span>);            <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    
+    myPrintf(<span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>);                                          
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>How does the code work? If <span style="font-family: courier new, courier;">myPrintf</span> is invoked with only a format string (line 1), line (3) is used. In case of line (2), the function template (line 4) is applied. The function templates loops (line 5) as long as the format symbol is not equal to <span style="font-family: courier new, courier;">`\0`</span>. If the format symbol is not equal to <span style="font-family: courier new, courier;">`\0`</span> , two control flows are possible. First, if the format start with '<span style="font-family: courier new, courier;">%</span>'&nbsp; (line 6), the first argument <span style="font-family: courier new, courier;">value</span> is displayed<span style="font-family: courier new, courier;"> </span>and <span style="font-family: courier new, courier;">myPrintf</span> is once more invoked but this time with a new format symbol and an argument less (line 7). Second, if the format string does not start with&nbsp;'<span style="font-family: courier new, courier;">%</span>', the format symbol is just displayed (line 8). The function <span style="font-family: courier new, courier;">myPrintf</span> (line 3) is the end condition for the recursive calls.</p>
+<p>The output of the program is as expected.</p>
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesVariadicTemplates/myPrintf.png" alt="myPrintf" width="250" height="156" /></p>
+<h3>What's next?</h3>
+<p>One rule to variadic templates is left. Afterwards, the guidelines continue with template metaprogramming. I'm not sure how deep I should dive into template metaprogramming in my next post.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Eric Pederson, Paul Baxter,&nbsp; Meeting C++, Matt Braun, Avi Lachmish, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Dilettant, Marko, Ramesh Jangama, and </strong><span class="sc-kpOJdX fDWXFa" title="Emyr Williams"><strong>Emyr Williams.</strong> <br /></span></p>
+<p><strong>&nbsp;</strong></p>
+<p><strong>Thanks in particular to:&nbsp; <a href="https://www.takeupcode.com"><img style="vertical-align: top;" src="images/patreon/TakeUpCode-450-60.png" alt="TakeUpCode 450 60" width="150" height="20" /> </a></strong></p>
+<p>&nbsp;</p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at Leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 600 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
+<p></p>
+<table style="width: 800px;">
+<tbody>
+<tr>
+<td colspan="2">
+<h2>Get your interactive course</h2>
+&nbsp;</td>
+</tr>
+<tr>
+<td>
+<h4 class="_3fBEwsM053hx2mPd0uV0nT" style="text-align: center;">Modern C++ Concurrency in Practice</h4>
+</td>
+<td>
+<h4>C++ Standard Library including C++14 &amp; C++17</h4>
+</td>
+</tr>
+<tr>
+<td><a href="https://goo.gl/2qWUkK"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseConcurrency/educative.png" alt="educative" width="300" height="152" /></a></td>
+<td><a href="https://www.educative.io/collection/10370001/5712008708096000?authorName=Rainer%20Grimm"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseLibrary/CLibrary.png" alt="CLibrary" width="300" height="150" /></a></td>
+</tr>
+<tr>
+<td>
+<p>Based on my book "Concurrency with Modern C++" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>140 lessons</li>
+<li>110 code playgrounds =&gt; Runs in the browser</li>
+<li>78 code snippets</li>
+<li>55 illustrations</li>
+</ul>
+</td>
+<td>
+<p>Based on my book "The C++ Standard Library" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>149 lessons</li>
+<li>111 code playgrounds =&gt; Runs in the browser</li>
+<li>164 code snippets</li>
+<li>25 illustrations</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
