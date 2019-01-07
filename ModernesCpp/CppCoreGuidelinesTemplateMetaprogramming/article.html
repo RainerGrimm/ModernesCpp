@@ -1,0 +1,218 @@
+<p>Yes, you read it correctly. Today, I write about template metaprogramming which is programming with types and not values.&nbsp;</p>
+<hr id="system-readmore" />
+<p></p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesTemplateMetaprogramming/dinosaur-966869_1280.jpg" alt="dinosaur 966869 1280" width="400" height="534" /></p>
+<p>The introduction to template metaprogramming in the guidelines ends uniquely: "The syntax and techniques needed are pretty horrendous.". In accordance, the rules are mostly about don' ts and provide not much content:</p>
+<ul>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-metameta">T.120: Use template metaprogramming only when you really need to</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-emulate">T.121: Use template metaprogramming primarily to emulate concepts</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-tmp">T.122: Use templates (usually template aliases) to compute types at compile time</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-fct">T.123: Use <code class="highlighter-rouge no-highlight">constexpr</code> functions to compute values at compile time</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-std-tmp">T.124: Prefer to use standard-library TMP facilities</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-lib">T.125: If you need to go beyond the standard-library TMP facilities, use an existing library</a></li>
+</ul>
+<p>Honestly, I don't think template metaprogramming is so horrendous but the syntax has still a lot of potentials.</p>
+<p>Let me try to demystify template metaprogramming and write about programming at compile time in general. During this introduction to programming at compile time, I explicitly write about type-traits (<a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-std-tmp">T.124: Prefer to use standard-library TMP facilities) </a>and <span style="font-family: courier new, courier;">constexpr</span> functions (<a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-fct">T.123: Use <code class="highlighter-rouge no-highlight">constexpr</code> functions to compute values at compile time</a>) and implicitly refer to the other rules. Here is my plan:</p>
+<p>I give an introduction to template metaprogramming, show how the type-traits library allows you the use template metaprogramming in a well structured and a portable way, and how you can use <span style="font-family: courier new, courier;">constexpr</span> functions to replace template metaprogramming magic with ordinary functions.</p>
+<h2>Template Metaprogramming</h2>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesTemplateMetaprogramming/OverviewTemplateMetaprogramming.png" alt="OverviewTemplateMetaprogramming" width="300" height="234" /></p>
+<h3>How it all started</h3>
+<p>1994 presented <a href="http://www.erwin-unruh.de/primorig.html">Erwin Unruh</a> at a C++ committee meeting a program which didn't compile. Here is probably the most famous program that never compiled.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// Prime number computation by Erwin Unruh</span>
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span> i<span style="color: #555555;">&gt;</span> <span style="color: #006699; font-weight: bold;">struct</span> D { D(<span style="color: #007788; font-weight: bold;">void</span><span style="color: #555555;">*</span>); <span style="color: #006699; font-weight: bold;">operator</span> <span style="color: #cc00ff;">int</span>(); };
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span> p, <span style="color: #007788; font-weight: bold;">int</span> i<span style="color: #555555;">&gt;</span> <span style="color: #006699; font-weight: bold;">struct</span> is_prime {
+    <span style="color: #006699; font-weight: bold;">enum</span> { prim <span style="color: #555555;">=</span> (p<span style="color: #555555;">%</span>i) <span style="color: #555555;">&amp;&amp;</span> is_prime<span style="color: #555555;">&lt;</span>(i <span style="color: #555555;">&gt;</span> <span style="color: #ff6600;">2</span> <span style="color: #555555;">?</span> p <span style="color: #555555;">:</span> <span style="color: #ff6600;">0</span>), i <span style="color: #555555;">-</span><span style="color: #ff6600;">1</span><span style="color: #555555;">&gt;</span> <span style="color: #555555;">::</span> prim };
+    };
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span> <span style="color: #007788; font-weight: bold;">int</span> i <span style="color: #555555;">&gt;</span> <span style="color: #006699; font-weight: bold;">struct</span> Prime_print {
+    Prime_print<span style="color: #555555;">&lt;</span>i<span style="color: #555555;">-</span><span style="color: #ff6600;">1</span><span style="color: #555555;">&gt;</span> a;
+    <span style="color: #006699; font-weight: bold;">enum</span> { prim <span style="color: #555555;">=</span> is_prime<span style="color: #555555;">&lt;</span>i, i<span style="color: #555555;">-</span><span style="color: #ff6600;">1</span><span style="color: #555555;">&gt;::</span>prim };
+    <span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">f</span>() { D<span style="color: #555555;">&lt;</span>i<span style="color: #555555;">&gt;</span> d <span style="color: #555555;">=</span> prim; }
+    };
+
+<span style="color: #006699; font-weight: bold;">struct</span> is_prime<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">0</span>,<span style="color: #ff6600;">0</span><span style="color: #555555;">&gt;</span> { <span style="color: #006699; font-weight: bold;">enum</span> {prim<span style="color: #555555;">=</span><span style="color: #ff6600;">1</span>}; };
+<span style="color: #006699; font-weight: bold;">struct</span> is_prime<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">0</span>,<span style="color: #ff6600;">1</span><span style="color: #555555;">&gt;</span> { <span style="color: #006699; font-weight: bold;">enum</span> {prim<span style="color: #555555;">=</span><span style="color: #ff6600;">1</span>}; };
+<span style="color: #006699; font-weight: bold;">struct</span> Prime_print<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">2</span><span style="color: #555555;">&gt;</span> { <span style="color: #006699; font-weight: bold;">enum</span> {prim <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span>}; <span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">f</span>() { D<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">2</span><span style="color: #555555;">&gt;</span> d <span style="color: #555555;">=</span> prim; } };
+<span style="color: #009999;">#ifndef LAST</span>
+<span style="color: #009999;">#define LAST 10</span>
+<span style="color: #009999;">#endif</span>
+main () {
+    Prime_print<span style="color: #555555;">&lt;</span>LAST<span style="color: #555555;">&gt;</span> a;
+    } 
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Erwin Unruh used the Metaware Compilers, but the program is not valid C++ anymore. A newer variant from the author is <a href="http://www.erwin-unruh.de/prim.html">here</a>. Okay, why is this program so famous? Let's have a look at the error messages.</p>
+<p>&nbsp;<img src="images/blog/ModernCpp/CppCoreGuidelinesTemplateMetaprogramming/prim.PNG" alt="prim" width="500" height="182" /></p>
+<p>I highlighted the important parts in red. I think, you see the pattern. The program calculates at compile time the first 30 prime numbers. This means template instantiation can be used to do math at compile time. It is even better. Template metaprogramming is <a href="https://en.wikipedia.org/wiki/Turing_completeness">Turing-complete</a>, and can, therefore, be used to solve any computational problem. (Of course, Turing-completeness holds only in theory for template metaprogramming because the recursion depth (at least 1024 with C++11) and the length of the names which are generated during template instantiation provide some limitations.)</p>
+<h3>How does the magic work?</h3>
+<p>Let me start traditionell.</p>
+<h4>Calculating at Compile Time</h4>
+<p>Calculating the factorial of a number is the "Hello World" of template metaprogramming.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// factorial.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span> N<span style="color: #555555;">&gt;</span>                                                                 <span style="color: #0099ff; font-style: italic;">// (2)</span>
+<span style="color: #006699; font-weight: bold;">struct</span> Factorial{
+    <span style="color: #006699; font-weight: bold;">static</span> <span style="color: #007788; font-weight: bold;">int</span> <span style="color: #006699; font-weight: bold;">const</span> value <span style="color: #555555;">=</span> N <span style="color: #555555;">*</span> Factorial<span style="color: #555555;">&lt;</span>N<span style="color: #555555;">-</span><span style="color: #ff6600;">1</span><span style="color: #555555;">&gt;::</span>value;
+};
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;&gt;</span>                                                                      <span style="color: #0099ff; font-style: italic;">// (3)</span>
+<span style="color: #006699; font-weight: bold;">struct</span> Factorial<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">1</span><span style="color: #555555;">&gt;</span>{
+    <span style="color: #006699; font-weight: bold;">static</span> <span style="color: #007788; font-weight: bold;">int</span> <span style="color: #006699; font-weight: bold;">const</span> value <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span>;
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Factorial&lt;5&gt;::value: "</span> <span style="color: #555555;">&lt;&lt;</span> Factorial<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">5</span><span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;    <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Factorial&lt;10&gt;::value: "</span> <span style="color: #555555;">&lt;&lt;</span> Factorial<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">10</span><span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The call <span style="font-family: courier new, courier;">factorial&lt;5&gt;:</span>:<span style="font-family: 'courier new', courier;">value</span> in line (1) causes the instantiation of the primary or general template in line (2). During this instantiation, <span style="font-family: courier new, courier;">Factorial&lt;4&gt;:</span>:value will be instantiated. This recursion will end if the fully specialised class template <span style="font-family: courier new, courier;">Factorial&lt;1&gt;</span> kicks in in line (3).&nbsp; Maybe, you like it more pictorial.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesTemplateMetaprogramming/factorial5.PNG" alt="factorial5" width="500" height="119" /></p>
+<p>Here is the output of the program:</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesTemplateMetaprogramming/factorial.png" alt="factorial" width="300" height="172" /></p>
+<p><span class="tlid-translation translation"><span class="" title="">Damn, I almost forgot to prove that the values were calculated at compile time.</span></span> Here we are with the <a href="https://godbolt.org/">Compiler Explorer</a>. For simplicity reasons, I only provide a screenshot of the main program and the corresponding assembler instructions.</p>
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesTemplateMetaprogramming/goldboltSource.png" alt="goldboltSource" width="500" height="131" /></p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesTemplateMetaprogramming/goldboltAssem.png" alt="goldboltAssem" width="400" height="155" /></p>
+<p>&nbsp;</p>
+<p>The first yellow line and the first purple line shows it. The factorials of 5 and 10 are just constants and were calculated during compile time.&nbsp;</p>
+<p>Honestly, the factorial program is a nice program but is not idiomatic for template metaprogramming.</p>
+<h4>Manipulating Types at Compile Time</h4>
+<p>Manipulating types at compile time is typically for template metaprogramming. If you don't believe me, study<span style="font-family: courier new, courier;">&nbsp;<a href="https://en.cppreference.com/w/cpp/utility/move">std::move</a>. </span>Here is, what <span style="font-family: courier new, courier;">std:</span>:move is conceptionally doing:<span style="font-family: courier new, courier;"></span></p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">static_cast</span><span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>remove_reference<span style="color: #555555;">&lt;</span>decltype(arg)<span style="color: #555555;">&gt;::</span>type<span style="color: #555555;">&amp;&amp;&gt;</span>(arg);
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Okay. <span style="font-family: courier new, courier;">std::move</span> takes an argument<span style="font-family: courier new, courier;"> arg</span>, deduces the type (decltype<span style="font-family: courier new, courier;">(arg))</span> from it, removes the reference (<span style="font-family: courier new, courier;">remove_reverence</span>), and casts it to an rvalue reference (<span style="font-family: courier new, courier;">static_cast&lt;...&gt;::type&amp;&amp;&gt;</span>). In essence, this means that <span style="font-family: courier new, courier;">std:</span>:move returns always an rvalue reference type and, therefore, move semantic can kick it.</p>
+<p>How does<span style="font-family: courier new, courier;"> std::remove_reference</span> from the <a href="https://en.cppreference.com/w/cpp/header/type_traits">type-traits library </a>work? Here is a code snippet removing constness from its argument.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T <span style="color: #555555;">&gt;</span> 
+<span style="color: #006699; font-weight: bold;">struct</span> removeConst{ 
+    <span style="color: #006699; font-weight: bold;">typedef</span> T type;               <span style="color: #0099ff; font-style: italic;">// (1)</span>
+};
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T <span style="color: #555555;">&gt;</span> 
+<span style="color: #006699; font-weight: bold;">struct</span> removeConst<span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">const</span> T<span style="color: #555555;">&gt;</span> { 
+    <span style="color: #006699; font-weight: bold;">typedef</span> T type;               <span style="color: #0099ff; font-style: italic;">// (1)</span>
+};
+
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+    
+    std<span style="color: #555555;">::</span>is_same<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>, removeConst<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;::</span>type<span style="color: #555555;">&gt;::</span>value;        <span style="color: #0099ff; font-style: italic;">// true</span>
+    std<span style="color: #555555;">::</span>is_same<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>, removeConst<span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;::</span>type<span style="color: #555555;">&gt;::</span>value;  <span style="color: #0099ff; font-style: italic;">// true</span>
+  
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>I implemented <span style="font-family: courier new, courier;">removeConst t</span>he way <span style="font-family: courier new, courier;">std::remove_const</span> is probably implemented in the type-traits library. <span style="font-family: courier new, courier;">std::is_same</span> from the type-traits library helps me to decide at compile-time if both types are the same. In case of <span style="font-family: courier new, courier;">removeConst&lt;int&gt;</span> the first or general class template kicks in; in case of<span style="font-family: courier new, courier;"> removeConst&lt;const int</span>&gt;, the partial specialisation for <span style="font-family: courier new, courier;">const T</span> applies. The key observation is that both class templates return the underlying type in line (1) and, therefore, the constness is removed.</p>
+<h2>What's next?</h2>
+<p>In the next post, I continue my introduction to programming at compile time. This means in particular that I'm going to compare functions and metafunctions before I come to the type-traits library.</p>
+<p>&nbsp;</p>
+<p></p>
+<p></p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Eric Pederson, Paul Baxter,&nbsp; Meeting C++, Matt Braun, Avi Lachmish, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Dilettant, Marko, Ramesh Jangama, and </strong><span class="sc-kpOJdX fDWXFa" title="Emyr Williams"><strong>Emyr Williams.</strong> <br /></span></p>
+<p><strong>&nbsp;</strong></p>
+<p><strong>Thanks in particular to:&nbsp; <a href="https://www.takeupcode.com"><img style="vertical-align: top;" src="images/patreon/TakeUpCode-450-60.png" alt="TakeUpCode 450 60" width="150" height="20" /> </a></strong></p>
+<p>&nbsp;</p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at Leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 600 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
+<p></p>
+<table style="width: 800px;">
+<tbody>
+<tr>
+<td colspan="2">
+<h2>Get your interactive course</h2>
+&nbsp;</td>
+</tr>
+<tr>
+<td>
+<h4 class="_3fBEwsM053hx2mPd0uV0nT" style="text-align: center;">Modern C++ Concurrency in Practice</h4>
+</td>
+<td>
+<h4>C++ Standard Library including C++14 &amp; C++17</h4>
+</td>
+</tr>
+<tr>
+<td><a href="https://goo.gl/2qWUkK"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseConcurrency/educative.png" alt="educative" width="300" height="152" /></a></td>
+<td><a href="https://www.educative.io/collection/10370001/5712008708096000?authorName=Rainer%20Grimm"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseLibrary/CLibrary.png" alt="CLibrary" width="300" height="150" /></a></td>
+</tr>
+<tr>
+<td>
+<p>Based on my book "Concurrency with Modern C++" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>140 lessons</li>
+<li>110 code playgrounds =&gt; Runs in the browser</li>
+<li>78 code snippets</li>
+<li>55 illustrations</li>
+</ul>
+</td>
+<td>
+<p>Based on my book "The C++ Standard Library" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>149 lessons</li>
+<li>111 code playgrounds =&gt; Runs in the browser</li>
+<li>164 code snippets</li>
+<li>25 illustrations</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>

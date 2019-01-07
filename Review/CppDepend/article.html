@@ -1,0 +1,352 @@
+<p>In my concurrency class, I use more than 60 programs. Most of the programs consist of a single source file. I'm quite curious if the static code analysis tool <a href="https://www.cppdepend.com/">CppDepend</a> can find any issues in my sources. Let me try it out.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Review/CppDepend/cppDepend.png" alt="cppDepend" width="400" height="90" /></p>
+<h2>My Special Use-Case</h2>
+<p>My use-case is unique for two reasons. First, I don't expect too many issues with my examples for one reason: I give quite often concurrency classes and use these examples in my classes; therefore, I had many code reviewer. Second, my programs are most of the times not really sophisticated and quite short. They should only serve one purpose: show the particular concurrency features in isolation.</p>
+<h2>My Strategy</h2>
+<p>Due to my unique circumstances, here are my steps to get the static code analysis with CppDepend.</p>
+<ol>
+<li>Generate a CMake file for Visual Studio, GCC, and Clang</li>
+<li>Generate a Visual Studio Project from CMake</li>
+<li>Import the Visual Studio Project project into CppDepend</li>
+<li>Make the code analysis in CppDepend</li>
+</ol>
+<p>Here we go.</p>
+<h3>1. Generate a CMake file for Visual Studio, GCC, and Clang</h3>
+<p>My customers work with Visual Studio, GCC, or Clang. To provide a way to compile all C++ sources to executables automatically, I use <a href="https://cmake.org/">CMake.</a> In sum, I have more than 300 C++ sources files in various directories. Each source file should become an executable. Writing a <span style="font-family: courier new, courier;">CMakeList.txt</span> manually for each directory would be a boring step. Additionally, I would have to adapt it each time, if I modified the file names. Terrible!. To automate the boring stuff, I wrote a small python script <span style="font-family: courier new, courier;">generateCMakeFile.py</span>. <span style="font-family: courier new, courier;">generateCMakeFile.py</span> generates a <span style="font-family: courier new, courier;">CMakeList.txt</span> file for the directory, in which I invoke it.</p>
+<p>Here it is.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;"># generateCMakeFile.py</span>
+
+<span style="color: #006699; font-weight: bold;">import</span> <span style="color: #00ccff; font-weight: bold;">fnmatch</span>
+<span style="color: #006699; font-weight: bold;">import</span> <span style="color: #00ccff; font-weight: bold;">os</span>
+
+<span style="color: #0099ff; font-style: italic;"># A few constants</span>
+SUFFIX <span style="color: #555555;">=</span> <span style="color: #cc3300;">"*.cpp"</span>
+OUTPUT <span style="color: #555555;">=</span> <span style="color: #cc3300;">"CMakeLists.txt"</span>
+
+<span style="color: #0099ff; font-style: italic;"># The output file</span>
+outputFile <span style="color: #555555;">=</span> <span style="color: #336666;">open</span>(OUTPUT, <span style="color: #cc3300;">"w"</span>)
+
+<span style="color: #0099ff; font-style: italic;"># Return the full path to all files respecting the pattern</span>
+<span style="color: #006699; font-weight: bold;">def</span> <span style="color: #cc00ff;">getFiles</span>(dir_, patterns<span style="color: #555555;">=</span><span style="color: #cc3300;">"*"</span>, recursive<span style="color: #555555;">=</span><span style="color: #336666;">True</span>):
+    patterns <span style="color: #555555;">=</span> patterns<span style="color: #555555;">.</span>split()
+    retValue <span style="color: #555555;">=</span> []
+    <span style="color: #006699; font-weight: bold;">for</span> path, dirs, files <span style="color: #000000; font-weight: bold;">in</span> os<span style="color: #555555;">.</span>walk(dir_):
+        <span style="color: #006699; font-weight: bold;">for</span> file_ <span style="color: #000000; font-weight: bold;">in</span> files:
+            <span style="color: #006699; font-weight: bold;">for</span> pattern <span style="color: #000000; font-weight: bold;">in</span> patterns:
+                <span style="color: #006699; font-weight: bold;">if</span> fnmatch<span style="color: #555555;">.</span>fnmatch(file_, pattern):
+                    retValue<span style="color: #555555;">.</span>append(os<span style="color: #555555;">.</span>path<span style="color: #555555;">.</span>join(path, file_))
+                    <span style="color: #006699; font-weight: bold;">break</span>
+        <span style="color: #006699; font-weight: bold;">if</span> <span style="color: #000000; font-weight: bold;">not</span> recursive: <span style="color: #006699; font-weight: bold;">break</span>
+    <span style="color: #006699; font-weight: bold;">return</span> retValue
+
+
+<span style="color: #0099ff; font-style: italic;"># Get all files of the current working directory ending with *.cpp</span>
+<span style="color: #006699; font-weight: bold;">def</span> <span style="color: #cc00ff;">getAllFilenames</span>():
+    allFiles <span style="color: #555555;">=</span> getFiles(os<span style="color: #555555;">.</span>getcwd(), SUFFIX , <span style="color: #336666;">False</span>) 
+    <span style="color: #006699; font-weight: bold;">return</span> [ os<span style="color: #555555;">.</span>path<span style="color: #555555;">.</span>basename(file_)[:<span style="color: #555555;">-</span><span style="color: #336666;">len</span>(SUFFIX)<span style="color: #555555;">+</span><span style="color: #ff6600;">1</span>] <span style="color: #006699; font-weight: bold;">for</span> file_ <span style="color: #000000; font-weight: bold;">in</span> allFiles ]
+
+<span style="color: #0099ff; font-style: italic;"># Create the CMakeLists.txt header for GCC, Clang, and MSVC</span>
+<span style="color: #006699; font-weight: bold;">def</span> <span style="color: #cc00ff;">getHeader</span>():
+    <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc3300;">"""# Require a recent version of cmake</span>
+<span style="color: #cc3300;">cmake_minimum_required(VERSION 2.8.4 FATAL_ERROR)</span>
+
+<span style="color: #cc3300;"># This project is C++ based.</span>
+<span style="color: #cc3300;">project(seminar)</span>
+
+<span style="color: #cc3300;">if(${CMAKE_CXX_COMPILER_ID} STREQUAL GNU)</span>
+<span style="color: #cc3300;">    set(CMAKE_CXX_FLAGS "-O3 -std=c++14 -pthread")</span>
+<span style="color: #cc3300;">    if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 5.0)</span>
+<span style="color: #cc3300;">	    message(WARNING "!!!! GCC versions must be at least 5.0 !!!!")</span>
+<span style="color: #cc3300;">        message(WARNING "!!!! Adust the makefile to build with a different compiler. !!!!")</span>
+<span style="color: #cc3300;">    endif()</span>
+<span style="color: #cc3300;">elseif (${CMAKE_CXX_COMPILER_ID} STREQUAL Clang)</span>
+<span style="color: #cc3300;">    set(CMAKE_CXX_FLAGS "-O3 -std=c++14 -pthread")</span>
+<span style="color: #cc3300;">    if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 3.5)</span>
+<span style="color: #cc3300;">        message(WARNING "!!!! Clang version must be at least 3.5 !!!!")</span>
+<span style="color: #cc3300;">		message(WARNING "!!!! Adust the makefile to build with a different compiler. !!!!")</span>
+<span style="color: #cc3300;">    endif()</span>
+<span style="color: #cc3300;">elseif (${CMAKE_CXX_COMPILER_ID} STREQUAL MSVC)</span>
+<span style="color: #cc3300;">    set(CMAKE_CXX_FLAGS "/Ox /EHsc")</span>
+<span style="color: #cc3300;">    if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 19.10)    </span>
+<span style="color: #cc3300;">        message(WARNING "!!!! MSVC version must be at least 19.10 !!!!")</span>
+<span style="color: #cc3300;">    endif()	</span>
+<span style="color: #cc3300;">else()</span>
+<span style="color: #cc3300;">    message(WARNING "!!! You are using an unsupported compiler! Compilation has only been tested with GCC &gt;= 5.0, Clang &gt;= 3.5, or MSVC &gt;= 19.10. !!!")</span>
+<span style="color: #cc3300;">endif()</span>
+<span style="color: #cc3300;">    </span>
+
+<span style="color: #cc3300;">set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "bin/")</span>
+
+<span style="color: #cc3300;">set(CMAKE_VERBOSE_MAKEFILE on)</span>
+
+<span style="color: #cc3300;">"""</span>
+    
+<span style="color: #0099ff; font-style: italic;"># Create the list of all source files    </span>
+<span style="color: #006699; font-weight: bold;">def</span> <span style="color: #cc00ff;">getAllNames</span>(allNames):    
+    outNames <span style="color: #555555;">=</span> <span style="color: #cc3300;">"set(example_programs"</span> 
+    <span style="color: #006699; font-weight: bold;">for</span> entry <span style="color: #000000; font-weight: bold;">in</span> allNames:
+        outNames <span style="color: #555555;">+=</span> <span style="color: #cc3300;">"    "</span> <span style="color: #555555;">+</span> entry <span style="color: #555555;">+</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>
+    outNames <span style="color: #555555;">+=</span> <span style="color: #cc3300;">"   )"</span>
+    outNames <span style="color: #555555;">+=</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>
+    
+    <span style="color: #006699; font-weight: bold;">return</span> outNames
+
+<span style="color: #0099ff; font-style: italic;"># Create an executable from the source file</span>
+<span style="color: #006699; font-weight: bold;">def</span> <span style="color: #cc00ff;">getTail</span>():
+    tail <span style="color: #555555;">=</span> <span style="color: #cc3300;">"""foreach(example_program ${example_programs})</span>
+<span style="color: #cc3300;">  set(sources ${example_program}.cpp)</span>
+<span style="color: #cc3300;">  source_group("Source Files" FILES{sources})</span>
+<span style="color: #cc3300;">  add_executable(${example_program} ${sources})</span>
+<span style="color: #cc3300;">endforeach()"""</span>
+    <span style="color: #006699; font-weight: bold;">return</span> tail
+
+
+<span style="color: #0099ff; font-style: italic;"># Create the CMakeLists.txt</span>
+allNames <span style="color: #555555;">=</span> getAllFilenames()
+
+<span style="color: #006699; font-weight: bold;">print</span> <span style="color: #555555;">&gt;&gt;</span> outputFile, getHeader()
+
+<span style="color: #006699; font-weight: bold;">print</span> <span style="color: #555555;">&gt;&gt;</span> outputFile, getAllNames(allNames)
+
+<span style="color: #006699; font-weight: bold;">print</span> <span style="color: #555555;">&gt;&gt;</span> outputFile, getTail()
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>To understand the program, you should start with the three print statements add the end. The brown font goes directly into <span style="font-family: courier new, courier;">CMakeList.txt.</span></p>
+<p>Using the <span style="font-family: courier new, courier;">generateCMakeFile.py</span> <span style="font-family: courier new, courier;"></span>is straightforward. I copied the&nbsp; <span style="font-family: courier new, courier;">generateCMakeFile.py </span>to the directory, I wanted to use it. This step is not necessary but make the commandline easier to write.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Review/CppDepend/GenerateCmakeFile.png" alt="GenerateCmakeFile" width="600" height="150" /></p>
+<p>Finally, this is the autogenerate <span style="font-family: courier new, courier;">CMakeList.txt.</span></p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;"># Require a recent version of cmake</span>
+<span style="color: #336666;">cmake_minimum_required</span>(<span style="color: #cc3300;">VERSION</span> <span style="color: #cc3300;">2.8.4</span> <span style="color: #cc3300;">FATAL_ERROR</span>)
+
+<span style="color: #0099ff; font-style: italic;"># This project is C++ based.</span>
+<span style="color: #336666;">project</span>(<span style="color: #cc3300;">seminar</span>)
+
+<span style="color: #336666;">if</span>(<span style="color: #555555;">${</span><span style="color: #003333;">CMAKE_CXX_COMPILER_ID</span><span style="color: #555555;">}</span> <span style="color: #cc3300;">STREQUAL</span> <span style="color: #cc3300;">GNU</span>)
+    <span style="color: #336666;">set</span>(<span style="color: #cc3300;">CMAKE_CXX_FLAGS</span> <span style="color: #cc3300;">"-O3 -std=c++14 -pthread"</span>)
+    <span style="color: #336666;">if</span> (<span style="color: #cc3300;">CMAKE_CXX_COMPILER_VERSION</span> <span style="color: #cc3300;">VERSION_LESS</span> <span style="color: #cc3300;">5.0</span>)
+	    <span style="color: #336666;">message</span>(<span style="color: #cc3300;">WARNING</span> <span style="color: #cc3300;">"!!!! GCC versions must be at least 5.0 !!!!"</span>)
+        <span style="color: #336666;">message</span>(<span style="color: #cc3300;">WARNING</span> <span style="color: #cc3300;">"!!!! Adust the makefile to build with a different compiler. !!!!"</span>)
+    <span style="color: #336666;">endif</span>()
+<span style="color: #336666;">elseif</span> (<span style="color: #555555;">${</span><span style="color: #003333;">CMAKE_CXX_COMPILER_ID</span><span style="color: #555555;">}</span> <span style="color: #cc3300;">STREQUAL</span> <span style="color: #cc3300;">Clang</span>)
+    <span style="color: #336666;">set</span>(<span style="color: #cc3300;">CMAKE_CXX_FLAGS</span> <span style="color: #cc3300;">"-O3 -std=c++14 -pthread"</span>)
+    <span style="color: #336666;">if</span> (<span style="color: #cc3300;">CMAKE_CXX_COMPILER_VERSION</span> <span style="color: #cc3300;">VERSION_LESS</span> <span style="color: #cc3300;">3.5</span>)
+        <span style="color: #336666;">message</span>(<span style="color: #cc3300;">WARNING</span> <span style="color: #cc3300;">"!!!! Clang version must be at least 3.5 !!!!"</span>)
+		<span style="color: #336666;">message</span>(<span style="color: #cc3300;">WARNING</span> <span style="color: #cc3300;">"!!!! Adust the makefile to build with a different compiler. !!!!"</span>)
+    <span style="color: #336666;">endif</span>()
+<span style="color: #336666;">elseif</span> (<span style="color: #555555;">${</span><span style="color: #003333;">CMAKE_CXX_COMPILER_ID</span><span style="color: #555555;">}</span> <span style="color: #cc3300;">STREQUAL</span> <span style="color: #cc3300;">MSVC</span>)
+    <span style="color: #336666;">set</span>(<span style="color: #cc3300;">CMAKE_CXX_FLAGS</span> <span style="color: #cc3300;">"/Ox /EHsc"</span>)
+    <span style="color: #336666;">if</span> (<span style="color: #cc3300;">CMAKE_CXX_COMPILER_VERSION</span> <span style="color: #cc3300;">VERSION_LESS</span> <span style="color: #cc3300;">19.10</span>)    
+        <span style="color: #336666;">message</span>(<span style="color: #cc3300;">WARNING</span> <span style="color: #cc3300;">"!!!! MSVC version must be at least 19.10 !!!!"</span>)
+    <span style="color: #336666;">endif</span>()	
+<span style="color: #336666;">else</span>()
+    <span style="color: #336666;">message</span>(<span style="color: #cc3300;">WARNING</span> <span style="color: #cc3300;">"!!! You are using an unsupported compiler! Compilation has only been tested with GCC &gt;= 5.0, Clang &gt;= 3.5, or MSVC &gt;= 19.10. !!!"</span>)
+<span style="color: #336666;">endif</span>()
+    
+
+<span style="color: #336666;">set</span>(<span style="color: #cc3300;">CMAKE_RUNTIME_OUTPUT_DIRECTORY</span> <span style="color: #cc3300;">"bin/"</span>)
+
+<span style="color: #336666;">set</span>(<span style="color: #cc3300;">CMAKE_VERBOSE_MAKEFILE</span> <span style="color: #cc3300;">on</span>)
+
+
+<span style="color: #336666;">set</span>(<span style="color: #cc3300;">example_programs</span>    <span style="color: #cc3300;">acquireConsume</span>
+    <span style="color: #cc3300;">acquireRelease</span>
+    <span style="color: #cc3300;">asyncLazyEager</span>
+    <span style="color: #cc3300;">atomicCondition</span>
+    <span style="color: #cc3300;">atomic</span>
+    <span style="color: #cc3300;">blockingAsync</span>
+    <span style="color: #cc3300;">conditionVariable</span>
+    <span style="color: #cc3300;">dataRaceOnX</span>
+    <span style="color: #cc3300;">dotProduct</span>
+    <span style="color: #cc3300;">fetch_mult</span>
+    <span style="color: #cc3300;">lockGuard</span>
+    <span style="color: #cc3300;">mutex</span>
+    <span style="color: #cc3300;">newAlgorithm</span>
+    <span style="color: #cc3300;">packagedTask</span>
+    <span style="color: #cc3300;">packagedTaskReuse</span>
+    <span style="color: #cc3300;">promiseFuture</span>
+    <span style="color: #cc3300;">promiseFutureSynchronize</span>
+    <span style="color: #cc3300;">readerWriterLock</span>
+    <span style="color: #cc3300;">relaxed</span>
+    <span style="color: #cc3300;">safeInitializationCallOnce</span>
+    <span style="color: #cc3300;">safeInitializationStatic</span>
+    <span style="color: #cc3300;">singleton</span>
+    <span style="color: #cc3300;">spinlockAcquireRelease</span>
+    <span style="color: #cc3300;">spinLock</span>
+    <span style="color: #cc3300;">threadArguments</span>
+    <span style="color: #cc3300;">threadCreate</span>
+    <span style="color: #cc3300;">threadLifetime</span>
+    <span style="color: #cc3300;">threadLocal</span>
+    <span style="color: #cc3300;">threadMethods</span>
+    <span style="color: #cc3300;">time</span>
+    <span style="color: #cc3300;">timeDuration</span>
+    <span style="color: #cc3300;">transitivity</span>
+    <span style="color: #cc3300;">uniqueLock</span>
+   )
+
+<span style="color: #336666;">foreach</span>(<span style="color: #cc3300;">example_program</span> <span style="color: #555555;">${</span><span style="color: #003333;">example_programs</span><span style="color: #555555;">}</span>)
+  <span style="color: #336666;">set</span>(<span style="color: #cc3300;">sources</span> <span style="color: #555555;">${</span><span style="color: #003333;">example_program</span><span style="color: #555555;">}</span><span style="color: #cc3300;">.cpp</span>)
+  <span style="color: #336666;">source_group</span>(<span style="color: #cc3300;">"Source Files"</span> <span style="color: #cc3300;">FILES{sources}</span>)
+  <span style="color: #336666;">add_executable</span>(<span style="color: #555555;">${</span><span style="color: #003333;">example_program</span><span style="color: #555555;">}</span> <span style="color: #555555;">${</span><span style="color: #003333;">sources</span><span style="color: #555555;">}</span>)
+<span style="color: #336666;">endforeach</span>()
+</pre>
+</div>
+<p>&nbsp;</p>
+<h3>2. Generate a Visual Studio Project from CMake</h3>
+<p>To make my CppDepend life more comfortable, I switch from Linux to Windows and continue with Visual Studio.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Review/CppDepend/MakeVisualProject.PNG" alt="MakeVisualProject" width="700" height="217" /></p>
+<p>This step creates a 64-bit Visual Studio Project in the directory "<span style="font-family: courier new, courier;">C:\Users\raine\build</span>".&nbsp;</p>
+<h3>3. Import the Visual Studio Project project into CppDepend</h3>
+<p>Now, it's time to start CppDepend and create a new project Concurrency:</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Review/CppDepend/NewProject.PNG" alt="NewProject" width="600" height="534" />Next, I add the Visual Studio to my new project.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Review/CppDepend/solution.PNG" alt="solution" width="450" height="343" /></p>
+<p>One step is still missing. I have to press the analyse button. It took my eight cores a few second to analyse the source files.</p>
+<h3>4. Make the code analysis in CppDepend</h3>
+<p>As I already assumed it, the most checks are green:</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Review/CppDepend/analysis.PNG" alt="analysis" width="700" height="376" /></p>
+<p>Of course, I'm only interested in the red (Error) and yellow (Warning) ones.</p>
+<h4>Error:</h4>
+<ul>
+<li>Quality Gates:
+<ul>
+<li>This issue boils down to mainly one function: The method is to big, has too many local variables, and is poorly documented. What I liked about CppDepend was that it shows me the metric I violated.&nbsp;</li>
+</ul>
+<div></div>
+</li>
+</ul>
+<h4><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Review/CppDepend/QualityGates.PNG" alt="QualityGates" width="400" height="531" /></h4>
+<h4>Warnings:</h4>
+<ul>
+<li>Code Smells:
+<ul>
+<li>The previous break of the Quality Gates was also a Code Smell; therefore, I can ignore this warning.</li>
+</ul>
+</li>
+<li>Object Oriented Design:
+<ul>
+<li>Only one of the thirty rules was violated: three of my constructors taking one argument were not explicit. Honestly, this is a rule I often preach in my seminars. Shame on me.&nbsp;</li>
+</ul>
+<div></div>
+</li>
+</ul>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Review/CppDepend/ExplicitConstructor.PNG" alt="ExplicitConstructor" width="500" height="93" /></p>
+<p>&nbsp;</p>
+<ul>
+<li>&nbsp;Misc: <br />
+<ul>
+<li>This is also an issue I should fix. I passed a std<span style="font-family: courier new, courier;">:</span>:string by copy.</li>
+</ul>
+<div></div>
+</li>
+</ul>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Review/CppDepend/passByReference.PNG" alt="passByReference" width="500" height="72" /></p>
+<ul>
+<li>Dead Code:
+<ul>
+<li>This violation was funny. The violation was that the destructor of the singleton was never called. To my excuse, I only used a singleton to explain the thread-safe initialisation of a variable.</li>
+</ul>
+</li>
+<li>Naming Conventions:
+<ul>
+<li>I'm not a big fan of Hungarian notation. Therefore, I wouldn't prefix an instance variable with a m_ or a static with a s_.</li>
+</ul>
+</li>
+</ul>
+<h2>My Resumee</h2>
+<p>Here is my short resume. I put not too much effort in the analysis of CppDepend but more in establishing an automated process to create the Visual Studio solution as input for CppDepend. Regardless, I found immediately a few big issues which I'm going to fix. It's quite comfortable to fix these issues because a double-click on the Error/Warning in CppDepend opens the source file in Visual Studio.</p>
+<p>Although I only scratched at the surface of CppDepend, the analysis of my concurrency source files impressed me. I will, therefore, invest in the future more time to better understand the various metrics of CppDepend and apply them to my other source files. My gut feeling is that I can draw many benefits from CppDepend.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Eric Pederson, Paul Baxter,&nbsp; Meeting C++, Matt Braun, Avi Lachmish, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Dilettant, Marko, Ramesh Jangama, and </strong><span class="sc-kpOJdX fDWXFa" title="Emyr Williams"><strong>Emyr Williams.</strong> <br /></span></p>
+<p><strong>&nbsp;</strong></p>
+<p><strong>Thanks in particular to:&nbsp; <a href="https://www.takeupcode.com"><img style="vertical-align: top;" src="images/patreon/TakeUpCode-450-60.png" alt="TakeUpCode 450 60" width="150" height="20" /> </a></strong></p>
+<p>&nbsp;</p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at Leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 600 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
+<p></p>
+<table style="width: 800px;">
+<tbody>
+<tr>
+<td colspan="2">
+<h2>Get your interactive course</h2>
+&nbsp;</td>
+</tr>
+<tr>
+<td>
+<h4 class="_3fBEwsM053hx2mPd0uV0nT" style="text-align: center;">Modern C++ Concurrency in Practice</h4>
+</td>
+<td>
+<h4>C++ Standard Library including C++14 &amp; C++17</h4>
+</td>
+</tr>
+<tr>
+<td><a href="https://goo.gl/2qWUkK"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseConcurrency/educative.png" alt="educative" width="300" height="152" /></a></td>
+<td><a href="https://www.educative.io/collection/10370001/5712008708096000?authorName=Rainer%20Grimm"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseLibrary/CLibrary.png" alt="CLibrary" width="300" height="150" /></a></td>
+</tr>
+<tr>
+<td>
+<p>Based on my book "Concurrency with Modern C++" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>140 lessons</li>
+<li>110 code playgrounds =&gt; Runs in the browser</li>
+<li>78 code snippets</li>
+<li>55 illustrations</li>
+</ul>
+</td>
+<td>
+<p>Based on my book "The C++ Standard Library" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>149 lessons</li>
+<li>111 code playgrounds =&gt; Runs in the browser</li>
+<li>164 code snippets</li>
+<li>25 illustrations</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
