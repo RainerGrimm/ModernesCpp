@@ -1,0 +1,294 @@
+<p>The type-traits library supports type checks, type comparisons, and type modifications at compile time. Right! Today, I write about type modifications at compile time.</p>
+<hr id="system-readmore" />
+<h2><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesTypeTraitsII/TypeTraits.PNG" alt="TypeTraits" width="600" height="460" /></h2>
+<h2>The Type-Traits Library</h2>
+<p>It may sound strange, but type modification is the domain of <a href="https://www.modernescpp.com/index.php/c-core-guidelines-rules-for-template-metaprogramming">template metaprogramming </a>and, therefore, for the type-traits library.</p>
+<h3>Type Modifications</h3>
+<p>Maybe, you are curious about what is possible at compile time. A lot! Here are the most exciting metafunctions:</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// const-volatile modifications:</span>
+remove_const;
+remove_volatile;
+remove_cv;
+add_const;
+add_volatile;
+add_cv;
+   
+<span style="color: #0099ff; font-style: italic;">// reference modifications:</span>
+remove_reference;
+add_lvalue_reference;
+add_rvalue_reference;
+
+<span style="color: #0099ff; font-style: italic;">// sign modifications:</span>
+make_signed;
+make_unsigned;
+ 
+<span style="color: #0099ff; font-style: italic;">// pointer modifications:</span>
+remove_pointer;
+add_pointer;
+ 
+<span style="color: #0099ff; font-style: italic;">// other transformations:</span>
+decay;
+enable_if;
+conditional;
+common_type;
+underlying_type;
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>To get an <span style="font-family: courier new, courier;">int</span> from <span style="font-family: courier new, courier;">int</span> or <span style="font-family: courier new, courier;">const int</span>, you have to ask for the type with ::type.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+    
+    std<span style="color: #555555;">::</span>is_same<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>, std<span style="color: #555555;">::</span>remove_const<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;::</span>type<span style="color: #555555;">&gt;::</span>value;        <span style="color: #0099ff; font-style: italic;">// true</span>
+    std<span style="color: #555555;">::</span>is_same<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>, std<span style="color: #555555;">::</span>remove_const<span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;::</span>type<span style="color: #555555;">&gt;::</span>value;  <span style="color: #0099ff; font-style: italic;">// true</span>
+  
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Since C++14, you can just use <span style="font-family: 'courier new', courier;">_t</span>&nbsp;to get the type such as for&nbsp;<span style="font-family: courier new, courier;">std::remove_const_t:</span></p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+    
+    std<span style="color: #555555;">::</span>is_same<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>, std<span style="color: #555555;">::</span><span style="color: #007788; font-weight: bold;">remove_const_t</span><span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;&gt;::</span>value;        <span style="color: #0099ff; font-style: italic;">// true</span>
+    std<span style="color: #555555;">::</span>is_same<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>, std<span style="color: #555555;">::</span><span style="color: #007788; font-weight: bold;">remove_const_t</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;&gt;::</span>value;  <span style="color: #0099ff; font-style: italic;">// true</span>
+}
+</pre>
+</div>
+<p></p>
+<p>To get an idea of how useful this metafunctions from the type-traits library are, here a few use-cases. Here is <span style="font-family: courier new, courier;">std::move</span> in one line.</p>
+<ul>
+<li><span style="font-family: courier new, courier;"><strong>remove_reference</strong>:</span> <span style="font-family: courier new, courier;">std::move</span> and <span style="font-family: courier new, courier;">std::forward</span> uses this function to remove the reference from its argument. <br />
+<ul>
+<li>
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #006699; font-weight: bold;">static_cast</span><span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>remove_reference<span style="color: #555555;">&lt;</span>decltype(arg)<span style="color: #555555;">&gt;::</span>type<span style="color: #555555;">&amp;&amp;&gt;</span>(arg);</pre>
+</li>
+</ul>
+</li>
+<li><strong><span style="font-family: courier new, courier;">decay</span>:</strong> <span style="font-family: courier new, courier;">std::thread </span>applies<span style="font-family: courier new, courier;"> std::decay</span> to its arguments. Their usage includes the function<span style="font-family: courier new, courier;"> f</span> which a thread executes on its arguments <span style="font-family: courier new, courier;">args</span>. Decay means that implicit conversions from array-to-pointer, function-to-pointer is performed and const/volatile qualifiers and references are removed.<code></code><span style="font-family: courier new, courier;"> </span>
+<ul>
+<li>
+<div class="mw-geshi" dir="ltr" style="text-align: left;">
+<div class="cpp source-cpp">
+<pre class="de1"><a href="http://en.cppreference.com/w/cpp/utility/functional/invoke"><span class="kw1057">std::<span class="me2">invoke</span></span></a><span class="br0">(</span>decay_copy<span class="br0">(</span><a href="http://en.cppreference.com/w/cpp/utility/forward"><span class="kw1114">std::<span class="me2">forward</span></span></a><span class="sy1">&lt;</span>Function<span class="sy1">&gt;</span><span class="br0">(</span>f<span class="br0">)</span><span class="br0">)</span>, 
+            decay_copy<span class="br0">(</span><a href="http://en.cppreference.com/w/cpp/utility/forward"><span class="kw1114">std::<span class="me2">forward</span></span></a><span class="sy1">&lt;</span>Args<span class="sy1">&gt;</span><span class="br0">(</span>args<span class="br0">)</span><span class="br0">)</span>...<span class="br0">)</span><span class="sy4">;</span></pre>
+</div>
+</div>
+</li>
+</ul>
+</li>
+<li><span style="font-family: courier new, courier;"><strong>enable_if</strong>: std::enable_if </span>is a convenient way to use SFINAE. SFINAE stands for <strong>S</strong>ubstitution<strong> F</strong>ailure <strong>I</strong>s <strong>N</strong>ot <strong>A</strong>n <strong>E</strong>rror and applies during overload resolution of a function template. It means when substituting the template parameter fails, the specialisation is discarded from the overload set but cause no compiler error. <span style="font-family: courier new, courier;">std::enable_if</span> is heavily used in <span style="font-family: courier new, courier;">std::tuple</span>.</li>
+<li><span style="font-family: courier new, courier;"><strong>conditional</strong>: std::conditional </span>is the ternary operator at compile time.<span style="font-family: courier new, courier;"><br /></span></li>
+<li><strong><span style="font-family: courier new, courier;">common_type: </span></strong><span style="font-family: courier new, courier;">std::common_type </span>determines the common type of a group of types.</li>
+<li><strong><span style="font-family: courier new, courier;">underlying_type: </span></strong><span style="font-family: courier new, courier;">std::underlying_type </span>determines the type of an<span style="font-family: courier new, courier;"> enum.</span></li>
+</ul>
+<p>Maybe, you are not convinced about the benefit of the type traits library. Let me end my story to the type-traits with there main goals: correctness and optimisation.</p>
+<h3>Correctness</h3>
+<p>Correctness means on one hand that you can use the type-traits libraries to implement concepts such as <span style="font-family: courier new, courier;">Integral, SignedIntegral</span>, and <span style="font-family: courier new, courier;">UnsignedIntegral.</span></p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">T</span><span style="color: #555555;">&gt;</span>
+concept <span style="color: #007788; font-weight: bold;">bool</span> Integral() {
+    <span style="color: #006699; font-weight: bold;">return</span> is_integral<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value;
+}
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">T</span><span style="color: #555555;">&gt;</span>
+concept <span style="color: #007788; font-weight: bold;">bool</span> SignedIntegral() {
+    <span style="color: #006699; font-weight: bold;">return</span> Integral<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span>() <span style="color: #555555;">&amp;&amp;</span> is_signed<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value;
+}
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">T</span><span style="color: #555555;">&gt;</span>
+concept <span style="color: #007788; font-weight: bold;">bool</span> UnsignedIntegral() {
+    <span style="color: #006699; font-weight: bold;">return</span> Integral<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span>() <span style="color: #555555;">&amp;&amp;</span> <span style="color: #555555;">!</span>SignedIntegral<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span>();
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>But it also means, that you can use them to make your algorithm safer. I used in my previous post <a href="https://www.modernescpp.com/index.php/more-and-more-save">More and More Safe </a>the functions <span style="font-family: courier new, courier;">std::is_integral, std::conditional, std::common_type,</span> and <span style="font-family: courier new, courier;">std::enable_if</span> from the type-traits library to make the generic <span style="font-family: courier new, courier;">gcd</span> algorithm successively safer.</p>
+<p>To get a better idea of the post <a href="https://www.modernescpp.com/index.php/more-and-more-save">More and More Safe </a>, here is the starting point of my generic <span style="font-family: courier new, courier;">gcd</span> algorithm.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// gcd.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+T gcd(T a, T b){
+  <span style="color: #006699; font-weight: bold;">if</span>( b <span style="color: #555555;">==</span> <span style="color: #ff6600;">0</span> ){ <span style="color: #006699; font-weight: bold;">return</span> a; }
+  <span style="color: #006699; font-weight: bold;">else</span>{
+    <span style="color: #006699; font-weight: bold;">return</span> gcd(b, a <span style="color: #555555;">%</span> b);
+  }
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main(){
+
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"gcd(100, 10)= "</span> <span style="color: #555555;">&lt;&lt;</span>  gcd(<span style="color: #ff6600;">100</span>, <span style="color: #ff6600;">10</span>)  <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"gcd(100, 33)= "</span> <span style="color: #555555;">&lt;&lt;</span> gcd(<span style="color: #ff6600;">100</span>, <span style="color: #ff6600;">33</span>) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"gcd(100, 0)= "</span> <span style="color: #555555;">&lt;&lt;</span> gcd(<span style="color: #ff6600;">100</span>, <span style="color: #ff6600;">0</span>)  <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> gcd(<span style="color: #ff6600;">3.5</span>, <span style="color: #ff6600;">4.0</span>)<span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;         <span style="color: #0099ff; font-style: italic;">// (1)</span>
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> gcd(<span style="color: #cc3300;">"100"</span>, <span style="color: #cc3300;">"10"</span>) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;     <span style="color: #0099ff; font-style: italic;">// (2)</span>
+
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> gcd(<span style="color: #ff6600;">100</span>, <span style="color: #ff6600;">10L</span>) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;        <span style="color: #0099ff; font-style: italic;">// (3)</span>
+
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The output of the program shows two issues.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesTypeTraitsII/gcd.png" alt="gcd" width="600" height="415" /></p>
+<p>First, the usage of double (line 1) and the C-String (line 2) fails in the modulo operator. Second, the usage of an integer and a long (line 3) should work. Both issues can be elegantly solved with the type-traits library.</p>
+<p>The type-traits is not only about correctness it's also about optimisation.</p>
+<h3>Optimisation</h3>
+<p>The key idea of the type-traits library is quite straightforward. The compiler analysis the used types and makes based on this analysis decision which code should run. In case of the algorithm <span style="font-family: courier new, courier;">std::copy, std::fill,</span> or <span style="font-family: courier new, courier;">std::equal</span> of the standard template library this means that the algorithm is applied to each element of the range one-by-one or on the entire memory. In the second case, C functions such as<span style="font-family: courier new, courier;"> <a href="http://en.cppreference.com/w/cpp/string/byte/memcmp">memcmp</a>, <a href="http://en.cppreference.com/w/cpp/string/byte/memset">memset</a>, </span><a href="http://en.cppreference.com/w/cpp/string/byte/memcpy"><span style="font-family: courier new, courier;">memcpy,</span> </a>or <a href="http://en.cppreference.com/w/cpp/string/byte/memmove"><span style="font-family: courier new, courier;">memmove</span></a> are used which makes the algorithm faster. The small difference between <span style="font-family: courier new, courier;">memcpy</span> and <span style="font-family: courier new, courier;">memmove</span> is that <span style="font-family: courier new, courier;">memmove</span> can deal with overlapping memory areas. <span style="font-family: courier new, courier;"><br /></span></p>
+<p>The following three code snippets from the GCC 6 implementation make one point clear: The checks of the type-traits library help to generate more optimised code.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// fill  </span>
+<span style="color: #0099ff; font-style: italic;">// Specialization: for char types we can use memset.                   </span>
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> _Tp<span style="color: #555555;">&gt;</span>
+  <span style="color: #006699; font-weight: bold;">inline</span> <span style="color: #006699; font-weight: bold;">typename</span>
+  __gnu_cxx<span style="color: #555555;">::</span>__enable_if<span style="color: #555555;">&lt;</span>__is_byte<span style="color: #555555;">&lt;</span>_Tp<span style="color: #555555;">&gt;::</span>__value, <span style="color: #007788; font-weight: bold;">void</span><span style="color: #555555;">&gt;::</span>__type         <span style="color: #0099ff; font-style: italic;">// (1)</span>
+  __fill_a(_Tp<span style="color: #555555;">*</span> __first, _Tp<span style="color: #555555;">*</span> __last, <span style="color: #006699; font-weight: bold;">const</span> _Tp<span style="color: #555555;">&amp;</span> __c)
+  {
+    <span style="color: #006699; font-weight: bold;">const</span> _Tp __tmp <span style="color: #555555;">=</span> __c;
+    <span style="color: #006699; font-weight: bold;">if</span> (<span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">size_t</span> __len <span style="color: #555555;">=</span> __last <span style="color: #555555;">-</span> __first)
+    __builtin_memset(__first, <span style="color: #006699; font-weight: bold;">static_cast</span><span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">unsigned</span> <span style="color: #007788; font-weight: bold;">char</span><span style="color: #555555;">&gt;</span>(__tmp), __len);
+  }
+
+<span style="color: #0099ff; font-style: italic;">// copy</span>
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">bool</span> _IsMove, <span style="color: #006699; font-weight: bold;">typename</span> _II, <span style="color: #006699; font-weight: bold;">typename</span> _OI<span style="color: #555555;">&gt;</span>
+  <span style="color: #006699; font-weight: bold;">inline</span> _OI
+  __copy_move_a(_II __first, _II __last, _OI __result)
+  {
+    <span style="color: #006699; font-weight: bold;">typedef</span> <span style="color: #006699; font-weight: bold;">typename</span> iterator_traits<span style="color: #555555;">&lt;</span>_II<span style="color: #555555;">&gt;::</span>value_type _ValueTypeI;
+    <span style="color: #006699; font-weight: bold;">typedef</span> <span style="color: #006699; font-weight: bold;">typename</span> iterator_traits<span style="color: #555555;">&lt;</span>_OI<span style="color: #555555;">&gt;::</span>value_type _ValueTypeO;
+    <span style="color: #006699; font-weight: bold;">typedef</span> <span style="color: #006699; font-weight: bold;">typename</span> iterator_traits<span style="color: #555555;">&lt;</span>_II<span style="color: #555555;">&gt;::</span>iterator_category _Category;
+    <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">bool</span> __simple <span style="color: #555555;">=</span> (__is_trivial(_ValueTypeI)                   <span style="color: #0099ff; font-style: italic;">// (2)</span>
+                           <span style="color: #555555;">&amp;&amp;</span> __is_pointer<span style="color: #555555;">&lt;</span>_II<span style="color: #555555;">&gt;::</span>__value
+                           <span style="color: #555555;">&amp;&amp;</span> __is_pointer<span style="color: #555555;">&lt;</span>_OI<span style="color: #555555;">&gt;::</span>__value
+                           <span style="color: #555555;">&amp;&amp;</span> __are_same<span style="color: #555555;">&lt;</span>_ValueTypeI, _ValueTypeO<span style="color: #555555;">&gt;::</span>__value);
+
+    <span style="color: #006699; font-weight: bold;">return</span> std<span style="color: #555555;">::</span>__copy_move<span style="color: #555555;">&lt;</span>_IsMove, __simple,
+  }
+
+<span style="color: #0099ff; font-style: italic;">// lexicographical_compare</span>
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> _II1, <span style="color: #006699; font-weight: bold;">typename</span> _II2<span style="color: #555555;">&gt;</span>
+  <span style="color: #006699; font-weight: bold;">inline</span> <span style="color: #007788; font-weight: bold;">bool</span>
+  __lexicographical_compare_aux(_II1 __first1, _II1 __last1,
+				  _II2 __first2, _II2 __last2)
+  {
+    <span style="color: #006699; font-weight: bold;">typedef</span> <span style="color: #006699; font-weight: bold;">typename</span> iterator_traits<span style="color: #555555;">&lt;</span>_II1<span style="color: #555555;">&gt;::</span>value_type _ValueType1;
+    <span style="color: #006699; font-weight: bold;">typedef</span> <span style="color: #006699; font-weight: bold;">typename</span> iterator_traits<span style="color: #555555;">&lt;</span>_II2<span style="color: #555555;">&gt;::</span>value_type _ValueType2;
+    <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">bool</span> __simple <span style="color: #555555;">=</span>                                              <span style="color: #0099ff; font-style: italic;">// (3)</span>
+      (__is_byte<span style="color: #555555;">&lt;</span>_ValueType1<span style="color: #555555;">&gt;::</span>__value <span style="color: #555555;">&amp;&amp;</span> __is_byte<span style="color: #555555;">&lt;</span>_ValueType2<span style="color: #555555;">&gt;::</span>__value
+       <span style="color: #555555;">&amp;&amp;</span> <span style="color: #555555;">!</span>__gnu_cxx<span style="color: #555555;">::</span>__numeric_traits<span style="color: #555555;">&lt;</span>_ValueType1<span style="color: #555555;">&gt;::</span>__is_signed
+       <span style="color: #555555;">&amp;&amp;</span> <span style="color: #555555;">!</span>__gnu_cxx<span style="color: #555555;">::</span>__numeric_traits<span style="color: #555555;">&lt;</span>_ValueType2<span style="color: #555555;">&gt;::</span>__is_signed
+       <span style="color: #555555;">&amp;&amp;</span> __is_pointer<span style="color: #555555;">&lt;</span>_II1<span style="color: #555555;">&gt;::</span>__value
+       <span style="color: #555555;">&amp;&amp;</span> __is_pointer<span style="color: #555555;">&lt;</span>_II2<span style="color: #555555;">&gt;::</span>__value);
+
+  <span style="color: #006699; font-weight: bold;">return</span> std<span style="color: #555555;">::</span>__lexicographical_compare<span style="color: #555555;">&lt;</span>__simple<span style="color: #555555;">&gt;::</span>__lc(__first1, __last1,
+                                                        __first2, __last2);
+  }
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The lines 1, 2, and 3 show that the type-traits library is used to generate more optimised code. My post <a href="https://www.modernescpp.com/index.php/type-traits-performance-matters">Type-Traits: Performance Matters </a>gives you more insight and has performance numbers with GCC and MSVC.</p>
+<h2>What's next?</h2>
+<p>With <span style="font-family: courier new, courier;">constexpr</span> programming at compile time escapes its expert niche and becomes a mainstream technique. <span style="font-family: courier new, courier;">constexpr</span> is programming at compile time with the typical C++-Syntax.</p>
+<p></p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Eric Pederson, Paul Baxter,&nbsp; Meeting C++, Matt Braun, Avi Lachmish, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Dilettant, Marko, Ramesh Jangama, </strong><span class="sc-kpOJdX fDWXFa" title="Emyr Williams"><strong>and G Prvulovic.&nbsp; </strong></span><strong><br /></strong></p>
+<p><strong>Thanks in particular to:&nbsp; <a href="https://www.takeupcode.com"><img style="vertical-align: top;" src="images/patreon/TakeUpCode-450-60.png" alt="TakeUpCode 450 60" width="150" height="20" /> </a></strong></p>
+<p>&nbsp;</p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at Leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 600 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
+<p></p>
+<table style="width: 800px;">
+<tbody>
+<tr>
+<td colspan="2">
+<h2>Get your interactive course</h2>
+&nbsp;</td>
+</tr>
+<tr>
+<td>
+<h4 class="_3fBEwsM053hx2mPd0uV0nT" style="text-align: center;">Modern C++ Concurrency in Practice</h4>
+</td>
+<td>
+<h4>C++ Standard Library including C++14 &amp; C++17</h4>
+</td>
+</tr>
+<tr>
+<td><a href="https://goo.gl/2qWUkK"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseConcurrency/educative.png" alt="educative" width="300" height="152" /></a></td>
+<td><a href="https://www.educative.io/collection/10370001/5712008708096000?authorName=Rainer%20Grimm"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseLibrary/CLibrary.png" alt="CLibrary" width="300" height="150" /></a></td>
+</tr>
+<tr>
+<td>
+<p>Based on my book "Concurrency with Modern C++" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>140 lessons</li>
+<li>110 code playgrounds =&gt; Runs in the browser</li>
+<li>78 code snippets</li>
+<li>55 illustrations</li>
+</ul>
+</td>
+<td>
+<p>Based on my book "The C++ Standard Library" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>149 lessons</li>
+<li>111 code playgrounds =&gt; Runs in the browser</li>
+<li>164 code snippets</li>
+<li>25 illustrations</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
