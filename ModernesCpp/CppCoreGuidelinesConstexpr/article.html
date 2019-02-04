@@ -1,0 +1,240 @@
+<p>My mini-series about programming at compile time started with template metaprogramming, continued with the <a href="https://www.modernescpp.com/index.php/c-core-guidelines-programming-at-compile-time-with-the-type-traits">type-traits library</a>, and ends today with constant expressions (<span style="font-family: courier new, courier;">constexpr</span>).</p>
+<hr id="system-readmore" />
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesConstexpr/constexpr.PNG" alt="constexpr" width="500" height="383" /></p>
+<p><span style="font-family: courier new, courier;"></span></p>
+<p>Finally, we are at the peak. This is more than a picture.</p>
+<h2><span style="font-family: courier new, courier;">constexpr</span></h2>
+<p><span style="font-family: courier new, courier;">constexpr</span> allow you to explicitly program<span style="font-family: courier new, courier;"> </span>at compile time with the typical C++-Syntax. The focus of this post is not, to provide you with all details to <span style="font-family: courier new, courier;">constexpr</span> but to compare template metaprogramming with <span style="font-family: courier new, courier;">constexpr </span>functions. Before I compare both techniques, I will give you a short overview of constexpr. If this is too short, read my previous posts about <span style="font-family: courier new, courier;"><a href="https://www.modernescpp.com/index.php/tag/constexpr">constexpr</a>.</span> What are the advantages of constant expressions?</p>
+<h3>Advantages</h3>
+<p>A constant expression</p>
+<ul>
+<li>can be evaluated at compile time.</li>
+<li>give the compiler deep insight into the code.</li>
+<li>are implicitly thread-safe.</li>
+<li>can be constructed in the read-only memory (ROM-able).</li>
+</ul>
+<p>Constant expressions with <span style="font-family: courier new, courier;">constexpr</span> can have three forms.</p>
+<h3>Three Forms</h3>
+<h4>Variables</h4>
+<ul>
+<ul>
+<li>are implicit <span style="font-family: courier new, courier;">const.</span></li>
+<li style="margin: 0; line-height: 125%;">have to be initialized by a constant expression.</li>
+</ul>
+</ul>
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">           constexpr <span style="color: #00aaaa;">double</span> pi = <span style="color: #009999;">3.14</span>;
+</pre>
+</div>
+<h4>Functions</h4>
+<p>constexpr functions in C++14 are quite comfortable. They can</p>
+<ul>
+<li>invoke other <span style="font-family: courier new, courier;">constexpr</span> functions.</li>
+<li>can have variables which have to be initialised by a constant expression.</li>
+<li>can can conditional expressions or loops.</li>
+<li>are implicit <span style="font-family: courier new, courier;">inline.</span></li>
+<li>cannot have <span style="font-family: courier new, courier;">static</span> or <span style="font-family: courier new, courier;">thread_local</span> data.</li>
+</ul>
+<h4>User-defined types</h4>
+<ul>
+<li>has to have a constructor which is a constant expression.<span style="font-family: courier new, courier;"></span></li>
+<li>cannot have virtual functions<i>.</i></li>
+<li>cannot have a virtual base class.</li>
+</ul>
+<p>The rules for <span style="font-family: courier new, courier;">constexpr</span> functions or methods are quite simple. For short, I call both functions.</p>
+<p><span style="font-family: courier new, courier;">constexpr</span> functions can only depend on functionality which is a constant expression. Being a <span style="font-family: courier new, courier;">constexpr</span> function does not mean that the function is executed at compile time. It says, that the function has the potential to run at compile time. A <span style="font-family: courier new, courier;">constexpr</span> function can also run a runtime. It's often a question of the compiler and the optimisation level if a constexpr functions runs at compile time or runtime. There are two contexts in which a <span style="font-family: courier new, courier;">constexpr</span> function <span style="font-family: courier new, courier;">func</span> has to run at compile time.</p>
+<ol>
+<li>The <span style="font-family: courier new, courier;">constexpr</span> function is executed in a context which is evaluated at compile time. This can be a <span style="font-family: courier new, courier;">static_assert</span> expression such as with the type-traits library or the initialisation of a C-array.</li>
+<li>The value of a <span style="font-family: courier new, courier;">constexpr</span> function is requested during compile time with constexpr: <span style="font-family: courier new, courier;">constexpr auto res = func(5)</span>;</li>
+</ol>
+<p>Here is a small example of the theory. The program <span style="font-family: courier new, courier;">constexpr14.cpp</span> calculates the greates common divisor of two numbers.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// constexpr14.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+constexpr <span style="color: #006699; font-weight: bold;">auto</span> <span style="color: #cc00ff;">gcd</span>(<span style="color: #007788; font-weight: bold;">int</span> a, <span style="color: #007788; font-weight: bold;">int</span> b){
+  <span style="color: #006699; font-weight: bold;">while</span> (b <span style="color: #555555;">!=</span> <span style="color: #ff6600;">0</span>){
+    <span style="color: #006699; font-weight: bold;">auto</span> t<span style="color: #555555;">=</span> b;
+    b<span style="color: #555555;">=</span> a <span style="color: #555555;">%</span> b;
+    a<span style="color: #555555;">=</span> t;
+  }
+  <span style="color: #006699; font-weight: bold;">return</span> a;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+  
+ std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  
+  constexpr <span style="color: #007788; font-weight: bold;">int</span> i<span style="color: #555555;">=</span> gcd(<span style="color: #ff6600;">11</span>,<span style="color: #ff6600;">121</span>);     <span style="color: #0099ff; font-style: italic;">// (1)</span>
+  
+  <span style="color: #007788; font-weight: bold;">int</span> a<span style="color: #555555;">=</span> <span style="color: #ff6600;">11</span>;
+  <span style="color: #007788; font-weight: bold;">int</span> b<span style="color: #555555;">=</span> <span style="color: #ff6600;">121</span>;
+  <span style="color: #007788; font-weight: bold;">int</span> j<span style="color: #555555;">=</span> gcd(a,b);                  <span style="color: #0099ff; font-style: italic;">// (2)</span>
+
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"gcd(11,121): "</span> <span style="color: #555555;">&lt;&lt;</span> i <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"gcd(a,b): "</span> <span style="color: #555555;">&lt;&lt;</span> j <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+ 
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Line (1) calculates the result<span style="font-family: courier new, courier;"> i</span> at compile time, and line (2) <span style="font-family: courier new, courier;">j</span> at runtime. The compiler would complain when I declare j as constexpr: <span style="font-family: courier new, courier;">constexpr int j = gcd(a, b)</span>. The problem would be that <span style="font-family: courier new, courier;">int'</span>s <span style="font-family: courier new, courier;">a</span>, and <span style="font-family: courier new, courier;">b</span> are not constant expressions.</p>
+<p>The output of the program should not surprise you.</p>
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesConstexpr/constexpr14.png" alt="constexpr14" width="250" height="151" /></p>
+<p>The surprise may start now. Let me show you the magic with the <a href="https://godbolt.org/">Compiler Explorer.</a></p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesConstexpr/godbolt.png" alt="godbolt" /></p>
+<p></p>
+<p>Line (1) in the program <span style="font-family: courier new, courier;">constexpr14.cpp</span> boils down to the constant 11 in the following expression: <span style="font-family: courier new, courier;">mov DWORD PTR[rbp-4], 11</span> (line 33 in screenshot). In contrast, line (2) is a function call: <span style="font-family: courier new, courier;">call gcd(int, int)</span> (line 41 in the screenshot.</p>
+<p>Finally, I come to my main point.</p>
+<h2>Template Metaprogramming versus constexpr Functions</h2>
+<p>Here is the big picture.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesConstexpr/TemplateMetaprogrammingVersusConstexprOld.png" alt="TemplateMetaprogrammingVersusConstexprOld" width="600" height="189" />I want to add a few remarks to my table.</p>
+<ul>
+<li>A template metaprogram runs at compile, but a constexpr functions (see the <span style="font-family: courier new, courier;">constexpr14.cpp</span> example) can run at compile time or runtime.</li>
+<li>Arguments of a template (template metaprogram) can be types and values. To be more specific a template can take types (<span style="font-family: courier new, courier;">std::vector&lt;int&gt;</span>), values (<span style="font-family: courier new, courier;">std::array&lt;int, 5&gt;</span>), and even templates (<span style="font-family: courier new, courier;">std::stack&lt;int, std::vector&lt;int&gt;&gt;). constexpr </span>functions are just functions which have the potential to run at compile time. Therefore, they can only accept values.</li>
+<li>There is not state at compile time and, therefore, no modification. This means template metaprogramming is programming in a pure functional style. What? If you want to know what pure functional means, you can have the first <a href="https://www.modernescpp.com/index.php/the-definition-of-functional-programming">Defintion of Functional Programming&nbsp; </a>or more details <a href="https://www.modernescpp.com/index.php/category/functional">Functional</a>. Here are the bullet points:<br />
+<ul>
+<li>Instead of modifying a value you return each time a new value in template metaprogramming.</li>
+<li>Controlling a for-loop by incrementing a variable such as <span style="font-family: courier new, courier;">i</span> is not possible at compile time: <span style="font-family: courier new, courier;">for (int i; i &lt;= 10; ++i). </span>Template metaprogramming, therefore, replaces loops with recursion.</li>
+<li>You replace conditional execution with template specialisation.</li>
+</ul>
+</li>
+</ul>
+<p>Admittedly, this comparison was quite concise. A pictural comparison of a <a href="https://www.modernescpp.com/index.php/c-core-guidelines-programming-at-compile-time">metafunction</a> and a <span style="font-family: courier new, courier;">constexpr</span> function should answer the open questions. Both functions calculate the factorial of a number.</p>
+<ul>
+<li>The function arguments of a<span style="font-family: courier new, courier;"> constexpr</span> functions correspond to template arguments of a metafunction.</li>
+</ul>
+<p>&nbsp;</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesConstexpr/comparison1.png" alt="comparison1" width="600" height="283" /></p>
+<p>&nbsp;</p>
+<ul>
+<li>&nbsp;A <span style="font-family: courier new, courier;">constexpr</span> function can have variables and modify them. A metafunction generates a new value.</li>
+</ul>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesConstexpr/comparison2.png" alt="comparison2" width="600" height="260" /></p>
+<ul>
+<li>&nbsp;A metafunction uses recursion to simulate a loop.</li>
+</ul>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesConstexpr/comparison3.png" alt="comparison3" width="600" height="262" /></p>
+<ul>
+<li>Instead of an end condition, a metafunction uses a full specialisation of a template to end a loop. Additionally, a metafunction uses partial or full specialisation to perform conditional execution such as if statements.</li>
+</ul>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesConstexpr/comparison4.png" alt="comparison4" width="600" height="267" /></p>
+<ul>
+<li>&nbsp;Instead of an updated value <span style="font-family: courier new, courier;">res,</span> the metafunction generates in each iteration a new <span style="font-family: courier new, courier;">value.</span>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesConstexpr/comparison5.png" alt="comparison5" width="500" height="226" /></li>
+</ul>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<ul>
+<li>A metafunction has no return statement. It uses value as return value.</li>
+</ul>
+<h3><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesConstexpr/comparison6.png" alt="comparison6" width="600" height="261" /></h3>
+<h3>Advantages of <span style="font-family: courier new, courier;">constexpr</span> functions</h3>
+<p>Besides the advantages that constexpr functions are more comfortable to write and to maintain and can run at compile time and runtime, they have an additional advantage. Here it is:</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">constexpr <span style="color: #007788; font-weight: bold;">double</span> <span style="color: #cc00ff;">average</span>(<span style="color: #007788; font-weight: bold;">double</span> fir , <span style="color: #007788; font-weight: bold;">double</span> sec){
+    <span style="color: #006699; font-weight: bold;">return</span> (fir <span style="color: #555555;">+</span> sec) <span style="color: #555555;">/</span> <span style="color: #ff6600;">2</span>;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+    constexpr <span style="color: #007788; font-weight: bold;">double</span> res <span style="color: #555555;">=</span> average(<span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>);
+}
+</pre>
+</div>
+<p></p>
+<p>constexpr functions can deal with floating point numbers. Template metaprogramming accepts only integral numbers.</p>
+<h2>What's next?</h2>
+<p>This post ends my detour to programming at compile time. Next time, I write about the few remaining rules to templates.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Paul Baxter,&nbsp; Meeting C++, Matt Braun, Avi Lachmish, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Dilettant, Marko, Ramesh Jangama, </strong><span class="sc-kpOJdX fDWXFa" title="Emyr Williams"><strong>and G Prvulovic.&nbsp; </strong></span><strong><br /></strong></p>
+<p><strong>Thanks in particular to:&nbsp; <a href="https://www.takeupcode.com"><img style="vertical-align: top;" src="images/patreon/TakeUpCode-450-60.png" alt="TakeUpCode 450 60" width="150" height="20" /> </a></strong></p>
+<p>&nbsp;</p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at Leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 600 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
+<p></p>
+<table style="width: 800px;">
+<tbody>
+<tr>
+<td colspan="2">
+<h2>Get your interactive course</h2>
+&nbsp;</td>
+</tr>
+<tr>
+<td>
+<h4 class="_3fBEwsM053hx2mPd0uV0nT" style="text-align: center;">Modern C++ Concurrency in Practice</h4>
+</td>
+<td>
+<h4>C++ Standard Library including C++14 &amp; C++17</h4>
+</td>
+</tr>
+<tr>
+<td><a href="https://goo.gl/2qWUkK"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseConcurrency/educative.png" alt="educative" width="300" height="152" /></a></td>
+<td><a href="https://www.educative.io/collection/10370001/5712008708096000?authorName=Rainer%20Grimm"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseLibrary/CLibrary.png" alt="CLibrary" width="300" height="150" /></a></td>
+</tr>
+<tr>
+<td>
+<p>Based on my book "Concurrency with Modern C++" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>140 lessons</li>
+<li>110 code playgrounds =&gt; Runs in the browser</li>
+<li>78 code snippets</li>
+<li>55 illustrations</li>
+</ul>
+</td>
+<td>
+<p>Based on my book "The C++ Standard Library" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>149 lessons</li>
+<li>111 code playgrounds =&gt; Runs in the browser</li>
+<li>164 code snippets</li>
+<li>25 illustrations</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
