@@ -1,0 +1,249 @@
+<p>Today, I write about the few remaining rules to templates. Because a collective name is missing, they put the heterogenous rules to templates in the section other. The rules are about best practices but also about surprises.&nbsp;</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesOtherTemplates/maki-3295891_1280.jpg" alt="maki 3295891 1280" width="600" height="383" /></p>
+<p>Here are the rules for this post.</p>
+<ul>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-name">T.140: Name all operations with potential for reuse</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-lambda">T.141: Use an unnamed lambda if you need a simple function object in one place only</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-nongeneric">T.143: Don’t write unintentionally nongeneric code</a></li>
+</ul>
+<p>&nbsp;The first rule is about best practices.</p>
+<h2><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-name">T.140: Name all operations with potential for reuse</a></h2>
+<p>Honestly, I'm not so sure why this rule belongs to templates. Maybe templates are about reuse or the example in the guidelines uses the <span style="font-family: courier new, courier;">std::find_if</span> algorithm of the Standard Template Library. Anyway, the rule is fundamental from the code quality perspective.</p>
+<p>Imagine you have a vector of records. Each record consists of a name, an address, and an id. Quite often, you want to find a record with a specific name; but to make it more challenging, you ignore the case-sensitivity of the names.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// records.cpp</span>
+
+<span style="color: #009999;">#include &lt;algorithm&gt;</span>
+<span style="color: #009999;">#include &lt;cctype&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;string&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">struct</span> Rec {                                                     <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    std<span style="color: #555555;">::</span>string name;
+    std<span style="color: #555555;">::</span>string addr;
+    <span style="color: #007788; font-weight: bold;">int</span> id;         
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span>Rec<span style="color: #555555;">&gt;</span> vr{ {<span style="color: #cc3300;">"Grimm"</span>, <span style="color: #cc3300;">"Munich"</span>, <span style="color: #ff6600;">1</span>},                 <span style="color: #0099ff; font-style: italic;">// (2)</span>
+                         {<span style="color: #cc3300;">"huber"</span>, <span style="color: #cc3300;">"Stuttgart"</span>, <span style="color: #ff6600;">2</span>},
+                         {<span style="color: #cc3300;">"Smith"</span>, <span style="color: #cc3300;">"Rottenburg"</span>, <span style="color: #ff6600;">3</span>},
+                         {<span style="color: #cc3300;">"black"</span>, <span style="color: #cc3300;">"Hanover"</span>, <span style="color: #ff6600;">4</span>} };
+                         
+    std<span style="color: #555555;">::</span>string name <span style="color: #555555;">=</span> <span style="color: #cc3300;">"smith"</span>;
+    
+    <span style="color: #006699; font-weight: bold;">auto</span> rec <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>find_if(vr.begin(), vr.end(), [<span style="color: #555555;">&amp;</span>](Rec<span style="color: #555555;">&amp;</span> r) {  <span style="color: #0099ff; font-style: italic;">// (3)</span>
+        <span style="color: #006699; font-weight: bold;">if</span> (r.name.size() <span style="color: #555555;">!=</span> name.size()) <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #336666;">false</span>;            
+        <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #007788; font-weight: bold;">int</span> i <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>; i <span style="color: #555555;">&lt;</span> r.name.size(); <span style="color: #555555;">++</span>i){                   
+            <span style="color: #006699; font-weight: bold;">if</span> (std<span style="color: #555555;">::</span>tolower(r.name[i]) <span style="color: #555555;">!=</span> std<span style="color: #555555;">::</span>tolower(name[i])) <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #336666;">false</span>;
+        }
+        <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #336666;">true</span>;                                               
+    });
+    
+    <span style="color: #006699; font-weight: bold;">if</span> (rec <span style="color: #555555;">!=</span> vr.end()){
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> rec<span style="color: #555555;">-&gt;</span>name <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">",  "</span> <span style="color: #555555;">&lt;&lt;</span> rec<span style="color: #555555;">-&gt;</span>addr <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">", "</span> <span style="color: #555555;">&lt;&lt;</span> rec<span style="color: #555555;">-&gt;</span>id <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    }
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The struct <span style="font-family: courier new, courier;">Rec</span> (line 1) has only public members; therefore, I can use <a href="https://en.cppreference.com/w/cpp/language/aggregate_initialization">aggregate initialisation</a> and initialise all members directly in line (2). In line (3) I use a lambda function to search for the record with the name <span style="font-family: courier new, courier;">"</span>smith<span style="font-family: courier new, courier;">".</span> First, I check if both names have the same size and second if the characters are identical when compared case-insensitive. &nbsp;</p>
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesOtherTemplates/records.png" alt="records" width="250" height="160" /></p>
+<p>What's the problem with the code? The requirement of the case-insensitive comparison of strings is too common, and we should, therefore, put the solution in an object, give it a name and reuse it.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">bool</span> <span style="color: #cc00ff;">compare_insensitive</span>(<span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span>string<span style="color: #555555;">&amp;</span> a, <span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span>string<span style="color: #555555;">&amp;</span> b)    <span style="color: #0099ff; font-style: italic;">// (1)</span>
+{
+    <span style="color: #006699; font-weight: bold;">if</span> (a.size() <span style="color: #555555;">!=</span> b.size()) <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #336666;">false</span>;
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #007788; font-weight: bold;">int</span> i <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>; i <span style="color: #555555;">&lt;</span> a.size(); <span style="color: #555555;">++</span>i){
+        <span style="color: #006699; font-weight: bold;">if</span> (std<span style="color: #555555;">::</span>tolower(a[i]) <span style="color: #555555;">!=</span> std<span style="color: #555555;">::</span>tolower(b[i])) <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #336666;">false</span>;
+    }
+    <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #336666;">true</span>;
+}
+
+std<span style="color: #555555;">::</span>string name <span style="color: #555555;">=</span> <span style="color: #cc3300;">"smith"</span>;
+
+<span style="color: #006699; font-weight: bold;">auto</span> res <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>find_if(vr.begin(), vr.end(),         
+    [<span style="color: #555555;">&amp;</span>](Rec<span style="color: #555555;">&amp;</span> r) { compare_insensitive(r.name, name); }
+);
+
+std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>string<span style="color: #555555;">&gt;</span> vs{<span style="color: #cc3300;">"Grimm"</span>, <span style="color: #cc3300;">"huber"</span>, <span style="color: #cc3300;">"Smith"</span>, <span style="color: #cc3300;">"black"</span>};        <span style="color: #0099ff; font-style: italic;">// (2)</span>
+
+<span style="color: #006699; font-weight: bold;">auto</span> res2 <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>find_if(vs.begin(), vs.end(),
+    [<span style="color: #555555;">&amp;</span>](std<span style="color: #555555;">::</span>string<span style="color: #555555;">&amp;</span> r) { compare_insensitive(r, name); }
+);
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The function <span style="font-family: courier new, courier;">compare_insensitive</span> (line 1) gives the general concept a name. Now,&nbsp; I can use it for a vector of strings (line 2).</p>
+<h2><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-lambda">T.141: Use an unnamed lambda if you need a simple function object in one place only</a></h2>
+<p>Admittely, I have often this discussion in my classes: When should I use a function (function object) or a lambda function? Honstly, I have no easy answer. Here, two meta-rules of code quality contradict:</p>
+<ol>
+<li>Don't repeat yourself. (<a href="https://en.wikipedia.org/wiki/Don%27t_repeat_yourself">DRY</a>)</li>
+<li>Explicit is better than implicit. (<a href="https://www.python.org/dev/peps/pep-0020/">The Zen of Python</a>)</li>
+</ol>
+<p>Sorry, I borrowed the second point form Python. But what does that mean. Imagine, you have an old-fashioned Fortran programmer in your team and he says to you: "Each name must have three characters." So, you end with the following code.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">auto</span> eUE <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>remove_if(use.begin(), use.end(), igh);           
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>What does the name <span style="font-family: courier new, courier;">igh</span> stand for? igh stands for a id greater hundred. Now, you are forced to document the usage of the predicate.</p>
+<p>But If you use a lambda function the code documents itself.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">auto</span> earlyUsersEnd <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>remove_if(users.begin(), users.end(),
+                                    [](<span style="color: #006699; font-weight: bold;">const</span> User <span style="color: #555555;">&amp;user</span>) { <span style="color: #006699; font-weight: bold;">return</span> user.id <span style="color: #555555;">&gt;</span> <span style="color: #ff6600;">100</span>; });                    
+</pre>
+</div>
+<p></p>
+<p>Believe me; I had discussions with Fortran programmers about names. Admittedly, more arguments such as code locality versus code size speaks for or againts lambda functions but "Don't repeat yourself" versus "Explicit is better than implicit" are my key arguments.</p>
+<h2><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-nongeneric">T.143: Don’t write unintentionally nongeneric code</a></h2>
+<p>A short example says more than a long explanation. In the following example, I iterate through a <span style="font-family: courier new, courier;">std::vector</span>, a <span style="font-family: courier new, courier;">std::deque</span>, and a <span style="font-family: courier new, courier;">std::list</span>.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// notGeneric.cpp</span>
+
+<span style="color: #009999;">#include &lt;deque&gt;</span>
+<span style="color: #009999;">#include &lt;list&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> Cont<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">void</span> justIterate(<span style="color: #006699; font-weight: bold;">const</span> Cont<span style="color: #555555;">&amp;</span> cont){
+    <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #006699; font-weight: bold;">auto</span> itEnd <span style="color: #555555;">=</span> cont.end();
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> it <span style="color: #555555;">=</span> cont.begin(); it <span style="color: #555555;">&lt;</span> itEnd; <span style="color: #555555;">++</span>it) {    <span style="color: #0099ff; font-style: italic;">// (1)</span>
+        <span style="color: #0099ff; font-style: italic;">// do something</span>
+    }
+}
+    
+<span style="color: #007788; font-weight: bold;">int</span> main(){
+    
+    std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> vecInt{<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">5</span>};
+    justIterate(vecInt);                                <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    
+    std<span style="color: #555555;">::</span>deque<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> deqInt{<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">5</span>};
+    justIterate(deqInt);                                <span style="color: #0099ff; font-style: italic;">// (3)</span>
+    
+    std<span style="color: #555555;">::</span>list<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> listInt{<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">5</span>};
+    justIterate(listInt);                               <span style="color: #0099ff; font-style: italic;">// (4)</span>
+    
+}                   
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The code looks innocent but when I want to compile the program, the compilation breaks. I get about 100 lines of error messages.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesOtherTemplates/notGeneric.png" alt="notGeneric" width="550" height="163" /></p>
+<p>The beginning of the error message you see that it is quite precise: "<span style="font-family: courier new, courier;">notGeneric.cpp:10:37: error: no match for ‘operator&lt;’ (operand types are ‘std::_List_const_iterator</span>".</p>
+<p>What is the issue? The issue is in line (1). The iterator comparison (&lt;) works for the <span style="font-family: courier new, courier;">std::vector</span> (line 2) and the <span style="font-family: courier new, courier;">std::deque</span> (line 3) but breaks for the <span style="font-family: courier new, courier;">std::list</span> (line 4). Each container returns an iterator representing it structure. This is in case for a <span style="font-family: courier new, courier;">std::vector</span> and a <span style="font-family: courier new, courier;">std::deque</span> a random access iterator and in case of the <span style="font-family: courier new, courier;">std::list</span> a bidirectional iterator. A look at the iterator categories helps a lot.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesOtherTemplates/IteratorCategories.png" alt="IteratorCategories" width="600" height="362" /></p>
+<p>The random access iterator category is a superset of the bidirectional iterator category and the bidirectional iterator category is a superset of the forward iterator category. Now, the issue is obvious. An iterator given by a list does not support the smaller comparison. Fixing the bug is quite easy. Iterators of each iterator category support the != comparison. Here is the fixed <span style="font-family: courier new, courier;">justIterate</span> function template.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> Cont<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">void</span> justIterate(<span style="color: #006699; font-weight: bold;">const</span> Cont<span style="color: #555555;">&amp;</span> cont){
+    <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #006699; font-weight: bold;">auto</span> itEnd <span style="color: #555555;">=</span> cont.end();
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> it <span style="color: #555555;">=</span> cont.begin(); it <span style="color: #555555;">!=</span> itEnd; <span style="color: #555555;">++</span>it) {   <span style="color: #0099ff; font-style: italic;">// (1)</span>
+        <span style="color: #0099ff; font-style: italic;">// do something</span>
+    }
+}           
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>By the way, it is typically a bad idea to loop through a container such as I do it in the function <span style="font-family: courier new, courier;">justIterate.</span> This is a job for an appropriate algorithm of the standard template library.</p>
+<h2>What's next?</h2>
+<p>My original plan was it to write today also about the rule <a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-specialize-function">T.144: Don’t specialize function templates.</a> This rule holds a big surprise potential. You will see what I mean in the next post.</p>
+<p></p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Paul Baxter,&nbsp; Meeting C++, Matt Braun, Avi Lachmish, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Dilettant, Marko, Ramesh Jangama, </strong><span class="sc-kpOJdX fDWXFa" title="Emyr Williams"><strong>G Prvulovic, Reiner Eiteljörge.</strong></span><strong><br /></strong></p>
+<p><strong>Thanks in particular to:&nbsp; <a href="https://www.takeupcode.com"><img style="vertical-align: top;" src="images/patreon/TakeUpCode-450-60.png" alt="TakeUpCode 450 60" width="150" height="20" /> </a></strong></p>
+<p>&nbsp;</p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at Leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 600 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
+<p></p>
+<table style="width: 800px;">
+<tbody>
+<tr>
+<td colspan="2">
+<h2>Get your interactive course</h2>
+&nbsp;</td>
+</tr>
+<tr>
+<td>
+<h4 class="_3fBEwsM053hx2mPd0uV0nT" style="text-align: center;">Modern C++ Concurrency in Practice</h4>
+</td>
+<td>
+<h4>C++ Standard Library including C++14 &amp; C++17</h4>
+</td>
+</tr>
+<tr>
+<td><a href="https://goo.gl/2qWUkK"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseConcurrency/educative.png" alt="educative" width="300" height="152" /></a></td>
+<td><a href="https://www.educative.io/collection/10370001/5712008708096000?authorName=Rainer%20Grimm"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseLibrary/CLibrary.png" alt="CLibrary" width="300" height="150" /></a></td>
+</tr>
+<tr>
+<td>
+<p>Based on my book "Concurrency with Modern C++" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>140 lessons</li>
+<li>110 code playgrounds =&gt; Runs in the browser</li>
+<li>78 code snippets</li>
+<li>55 illustrations</li>
+</ul>
+</td>
+<td>
+<p>Based on my book "The C++ Standard Library" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>149 lessons</li>
+<li>111 code playgrounds =&gt; Runs in the browser</li>
+<li>164 code snippets</li>
+<li>25 illustrations</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
