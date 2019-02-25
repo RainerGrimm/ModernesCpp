@@ -1,0 +1,315 @@
+<p>I often teach the basics to templates. Templates are special. Therefore, I encounter many misconceptions which cause surprises. Here are a few of them.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/TemplatesMisconceptionsAndSurprises/santa-claus-2927962_1280.png" alt="santa claus 2927962 1280" width="400" height="446" /></p>
+<p>My first misconception is presumably obvious for many but not for all C++ developers.</p>
+<h2>Templates of Related Types are not Related</h2>
+<p>First of all, what does related type mean? This is my informal term which stands for types which can be <a href="https://en.cppreference.com/w/cpp/language/implicit_conversion">implicitly converted</a>. Here is the starting point.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// genericAssignment.cpp</span>
+
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T, <span style="color: #007788; font-weight: bold;">int</span> N<span style="color: #555555;">&gt;</span>             <span style="color: #0099ff; font-style: italic;">// (1)</span>
+<span style="color: #006699; font-weight: bold;">struct</span> Point{
+    Point(std<span style="color: #555555;">::</span>initializer_list<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span> initList)<span style="color: #555555;">:</span> coord(initList){}
+
+    std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span> coord;    
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+
+    Point<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>, <span style="color: #ff6600;">3</span><span style="color: #555555;">&gt;</span> point1{<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>};
+    Point<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>, <span style="color: #ff6600;">3</span><span style="color: #555555;">&gt;</span> point2{<span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">5</span>, <span style="color: #ff6600;">6</span>};
+  
+    point1 <span style="color: #555555;">=</span> point2;                    <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    
+    <span style="color: #006699; font-weight: bold;">auto</span> doubleValue <span style="color: #555555;">=</span> <span style="color: #ff6600;">2.2</span>;             
+    <span style="color: #006699; font-weight: bold;">auto</span> intValue <span style="color: #555555;">=</span> <span style="color: #ff6600;">2</span>;
+    doubleValue <span style="color: #555555;">=</span> intValue;             <span style="color: #0099ff; font-style: italic;">// (3)</span>
+    
+    Point<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">double</span>, <span style="color: #ff6600;">3</span><span style="color: #555555;">&gt;</span> point3{<span style="color: #ff6600;">1.1</span>, <span style="color: #ff6600;">2.2</span>, <span style="color: #ff6600;">3.3</span>};
+    point3 <span style="color: #555555;">=</span> point2;                    <span style="color: #0099ff; font-style: italic;">// (4)</span>
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The class template <span style="font-family: courier new, courier;">Point</span> stands for a point in an n-dimensional space. The type of the coordinates and the dimension can be adjusted (line 1). The coordinates are stored in a <span style="font-family: courier new, courier;">std::vector&lt;T&gt;</span>. When I create two points with the same coordinate type and dimension, I can assign them.</p>
+<p>Now the misconception begins. You can assign an <span style="font-family: courier new, courier;">int</span> to a <span style="font-family: courier new, courier;">double </span>(line 3). Therefore, it should be possible to assign a <span style="font-family: courier new, courier;">Point</span> of ints to a <span style="font-family: courier new, courier;">Point</span> of doubles. The C++ compiler is quite specific about line 4. Both class templates are not related and cannot be assigned. They are different types.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/TemplatesMisconceptionsAndSurprises/genericAssignment.png" alt="genericAssignment" width="700" height="199" /></p>
+<p>The error message gives the first hint. I need an assignment operator that support the conversion from <span style="font-family: courier new, courier;">Point&lt;int, 3&gt;</span> to <span style="font-family: courier new, courier;">Point&lt;double, 3&gt;</span>. The class template has now a generic copy assignment operator.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// genericAssignment2.cpp</span>
+
+<span style="color: #009999;">#include &lt;algorithm&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;string&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T, <span style="color: #007788; font-weight: bold;">int</span> N<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">struct</span> Point{
+
+    Point(std<span style="color: #555555;">::</span>initializer_list<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span> initList)<span style="color: #555555;">:</span> coord(initList){}
+
+    <span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T2<span style="color: #555555;">&gt;</span>                        
+    Point<span style="color: #555555;">&lt;</span>T, N<span style="color: #555555;">&gt;&amp;</span> <span style="color: #006699; font-weight: bold;">operator</span><span style="color: #555555;">=</span>(<span style="color: #006699; font-weight: bold;">const</span> Point<span style="color: #555555;">&lt;</span>T2, N<span style="color: #555555;">&gt;&amp;</span> point){     <span style="color: #0099ff; font-style: italic;">// (1)</span>
+        static_assert(std<span style="color: #555555;">::</span>is_convertible<span style="color: #555555;">&lt;</span>T2, T<span style="color: #555555;">&gt;::</span>value, 
+                      <span style="color: #cc3300;">"Cannot convert source type to destination type!"</span>);
+        coord.clear();
+        coord.insert(coord.begin(), point.coord.begin(), point.coord.end());
+        <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">this</span>;
+    }
+    
+    std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span> coord;
+    
+};
+
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+
+  Point<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">double</span>, <span style="color: #ff6600;">3</span><span style="color: #555555;">&gt;</span> point1{<span style="color: #ff6600;">1.1</span>, <span style="color: #ff6600;">2.2</span>, <span style="color: #ff6600;">3.3</span>};
+  Point<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>, <span style="color: #ff6600;">3</span><span style="color: #555555;">&gt;</span> point2{<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>};
+  
+  Point<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>, <span style="color: #ff6600;">2</span><span style="color: #555555;">&gt;</span> point3{<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>};
+  Point<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>string, <span style="color: #ff6600;">3</span><span style="color: #555555;">&gt;</span> point4{<span style="color: #cc3300;">"Only"</span>, <span style="color: #cc3300;">"a"</span>, <span style="color: #cc3300;">"test"</span>};
+
+  point1 <span style="color: #555555;">=</span> point2;<span style="color: #0099ff; font-style: italic;">                                        // (3)</span>
+  
+  <span style="color: #0099ff; font-style: italic;">// point2 = point3;                                     // (4)</span>
+  <span style="color: #0099ff; font-style: italic;">// point2 = point4;                                     // (5)</span>
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Due to the line (1), the copy assignment in line (3) works. Let's have a closer look at the class template <span style="font-family: courier new, courier;">Point:</span>&nbsp;</p>
+<ul>
+<li><span style="font-family: courier new, courier; color: #000000;">Point&lt;T, N&gt;&amp; operator=(const Point&lt;T2, N&gt;&amp; point): </span><span style="color: #000000;">The assigned to <span style="font-family: courier new, courier;">Point</span> is of type <span style="font-family: courier new, courier;">Point&lt;T, N&gt;</span> and accepts only the <span style="font-family: courier new, courier;">Point,</span> which has the same dimension but the type could vary:<span style="font-family: courier new, courier;"> Point&lt;T2, N&gt;</span>.</span><span style="font-family: courier new, courier; color: #000000;"> </span></li>
+<li><span style="font-family: courier new, courier; color: #000000;">static_assert(std::is_convertible&lt;T2, T&gt;::value, "Cannot convert source type to destination type!"): </span><span style="color: #000000;">This expression checks with the help of the function <span style="font-family: courier new, courier;">std::is_convertible</span> from the type-traits library, if T2 can be converted to T.</span></li>
+</ul>
+<p>When I use the lines (4) and (5) the compilation fails:</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/TemplatesMisconceptionsAndSurprises/genericAssignment2.png" alt="genericAssignment2" width="700" height="251" /></p>
+<p>Line (3) gives an error because both points have a a&nbsp;different dimension. Line (4) triggers the <span style="font-family: courier new, courier;">static_assert</span> in the assignment operator, because a <span style="font-family: courier new, courier;">std::string</span> is not convertible to an <span style="font-family: courier new, courier;">int.</span></p>
+<p>I assume the next misconception has more surprise potential.</p>
+<h2>Methods inherited from Class Templates are per se not available</h2>
+<p>Let's start simple.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// inheritance.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Base</span>{
+<span style="color: #9999ff;">public:</span>
+    <span style="color: #007788; font-weight: bold;">void</span> func(){                    <span style="color: #0099ff; font-style: italic;">// (1)</span>
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"func"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    }
+};
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Derived</span><span style="color: #555555;">:</span> <span style="color: #006699; font-weight: bold;">public</span> Base{
+<span style="color: #9999ff;">public:</span>
+    <span style="color: #007788; font-weight: bold;">void</span> callBase(){
+        func();                      <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    }
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+    Derived derived;
+    derived.callBase();              
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}
+</pre>
+</div>
+<p></p>
+<p>I implemented a class <span style="font-family: courier new, courier;">Base</span> and <span style="font-family: courier new, courier;">Derived</span>. Derived is public derived from <span style="font-family: courier new, courier;">Base</span> and can, therefore, use in its method <span style="font-family: courier new, courier;">callBase</span> (line 2) the method <span style="font-family: courier new, courier;">func</span> from class <span style="font-family: courier new, courier;">Base</span>. Okay, I have nothing to add to the output of the program.<span style="font-family: courier new, courier;"></span></p>
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/TemplatesMisconceptionsAndSurprises/inheritance.png" alt="inheritance" width="300" height="147" /></p>
+<p>Making <span style="font-family: courier new, courier;">Base</span> a class template totally changes the behaviour.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// templateInheritance.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Base</span>{
+<span style="color: #9999ff;">public:</span>
+    <span style="color: #007788; font-weight: bold;">void</span> func(){                    <span style="color: #0099ff; font-style: italic;">// (1)</span>
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"func"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    }
+};
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Derived</span><span style="color: #555555;">:</span> <span style="color: #006699; font-weight: bold;">public</span> Base<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span>{
+<span style="color: #9999ff;">public:</span>
+    <span style="color: #007788; font-weight: bold;">void</span> callBase(){
+        func();                      <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    }
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+    Derived<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> derived;
+    derived.callBase();              
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>&nbsp;I assume the compiler error may surprise you.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/TemplatesMisconceptionsAndSurprises/templateInheritance1.png" alt="templateInheritance1" width="600" height="193" /></p>
+<p>The line "<span style="font-family: courier new, courier;">there are no arguments to 'func' that depend on a template parameter, so a declaration of 'func' must be available</span>" from the error message gives the first hint. <span style="font-family: courier new, courier;">func</span> is a so-called non-dependent name because it's name does not depend on the template parameter T. The consequence is that the compiler does not look in the from T dependent base class <span style="font-family: courier new, courier;">Base&lt;T&gt;</span> and there is no name <span style="font-family: courier new, courier;">func</span> available outside the class template.</p>
+<p>There are three workarounds to extend the name lookup to the dependent base class. The following example uses all three.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// templateInheritance2.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Base</span>{
+<span style="color: #9999ff;">public:</span>
+  <span style="color: #007788; font-weight: bold;">void</span> func1() <span style="color: #006699; font-weight: bold;">const</span> {
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"func1()"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  }
+  <span style="color: #007788; font-weight: bold;">void</span> func2() <span style="color: #006699; font-weight: bold;">const</span> {
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"func2()"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  }
+  <span style="color: #007788; font-weight: bold;">void</span> func3() <span style="color: #006699; font-weight: bold;">const</span> {
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"func3()"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  }
+};
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Derived</span><span style="color: #555555;">:</span> <span style="color: #006699; font-weight: bold;">public</span> Base<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span>{
+<span style="color: #9999ff;">public:</span>
+  <span style="color: #006699; font-weight: bold;">using</span> Base<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>func2;              <span style="color: #0099ff; font-style: italic;">// (2)</span>
+  <span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">callAllBaseFunctions</span>(){
+
+    <span style="color: #006699; font-weight: bold;">this</span><span style="color: #555555;">-&gt;</span>func1();                   <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    func2();                         <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    Base<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>func3();                <span style="color: #0099ff; font-style: italic;">// (3)</span>
+
+  }
+};
+
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+  Derived<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> derived;
+  derived.callAllBaseFunctions();
+
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<ul>
+<li><strong>Make the name&nbsp;dependent</strong>: The call <span style="font-family: courier new, courier;">this-&gt;func1</span> in line 1 is dependent because <span style="font-family: courier new, courier;">this</span> is implicit dependent. The name lookup will consider in this case all base classes.</li>
+<li><strong>Introduce the name&nbsp;into the current scope:</strong> The expression <span style="font-family: courier new, courier;">using Base&lt;T&gt;::func2</span> (line 2) introduces <span style="font-family: courier new, courier;">func2</span> into the current scope.</li>
+<li><strong>Call the name&nbsp;fully qualified</strong>: Calling <span style="font-family: courier new, courier;">func3</span> fully qualified (line 3) will break a virtual dispatch and may cause new surprises.</li>
+</ul>
+<p>At the end, here is the output of the program.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/TemplatesMisconceptionsAndSurprises/templateInheritance2.png" alt="templateInheritance2" width="300" height="161" /></p>
+<h2>What's next?</h2>
+<p>I have more to write about dependent names in my next post. Sometimes you have to disambiguate depenent names with <span style="font-family: courier new, courier;">typename</span> or <span style="font-family: courier new, courier;">template.</span> <span class="tlid-translation translation"><span class="" title="">If you are seeing this for the first time, you are probably as surprised as me.</span></span></p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Paul Baxter,&nbsp; Meeting C++, Matt Braun, Avi Lachmish, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Dilettant, Marko, Ramesh Jangama,</strong><span class="sc-kpOJdX fDWXFa" title="Emyr Williams"><strong> G Prvulovic, and Reiner Eiteljörge.</strong></span><strong><br /></strong></p>
+<p><strong>Thanks in particular to:&nbsp; <a href="https://www.takeupcode.com"><img style="vertical-align: top;" src="images/patreon/TakeUpCode-450-60.png" alt="TakeUpCode 450 60" width="150" height="20" /> </a></strong></p>
+<p>&nbsp;</p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at Leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 600 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
+<p></p>
+<table style="width: 800px;">
+<tbody>
+<tr>
+<td colspan="2">
+<h2>Get your interactive course</h2>
+&nbsp;</td>
+</tr>
+<tr>
+<td>
+<h4 class="_3fBEwsM053hx2mPd0uV0nT" style="text-align: center;">Modern C++ Concurrency in Practice</h4>
+</td>
+<td>
+<h4>C++ Standard Library including C++14 &amp; C++17</h4>
+</td>
+</tr>
+<tr>
+<td><a href="https://goo.gl/2qWUkK"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseConcurrency/educative.png" alt="educative" width="300" height="152" /></a></td>
+<td><a href="https://www.educative.io/collection/10370001/5712008708096000?authorName=Rainer%20Grimm"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseLibrary/CLibrary.png" alt="CLibrary" width="300" height="150" /></a></td>
+</tr>
+<tr>
+<td>
+<p>Based on my book "Concurrency with Modern C++" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>140 lessons</li>
+<li>110 code playgrounds =&gt; Runs in the browser</li>
+<li>78 code snippets</li>
+<li>55 illustrations</li>
+</ul>
+</td>
+<td>
+<p>Based on my book "The C++ Standard Library" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>149 lessons</li>
+<li>111 code playgrounds =&gt; Runs in the browser</li>
+<li>164 code snippets</li>
+<li>25 illustrations</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
