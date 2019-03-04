@@ -1,0 +1,277 @@
+<p>I assume you saw the additional keywords typename or template used before a name in a template. Me too. Honestly, I was quite surprised. Today's post is about dependent names and various template parameters.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/TemplateDependentNames/optical-illusion-311130_1280.png" alt="optical illusion 311130 1280" width="400" height="350" /></p>
+<p>Before I write about dependent names, I should write about template parameters.</p>
+<h2>Template Parameter</h2>
+<p>Template parameters can be types, non-types, and templates.</p>
+<h3>Types</h3>
+<p>Okay, types are the most often used template parameters. Here are a few examples:</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> myVec;
+std<span style="color: #555555;">::</span>map<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>string, <span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> myMap;
+std<span style="color: #555555;">::</span>lock_guard<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span> myLockGuard;
+</pre>
+</div>
+<h3>Non-Types</h3>
+<p>Non-types can be a</p>
+<ul>
+<li>lvalue reference</li>
+<li><span style="font-family: 'courier new', courier;">nullptr</span></li>
+<li>pointer</li>
+<li>enumerator</li>
+<li>integral</li>
+</ul>
+<p>Integrals are the most used non-types. <span style="font-family: courier new, courier;">std::array</span> is the typical example because you have to specify at compile time the size of a <span style="font-family: courier new, courier;">std::array:<br /></span></p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">std<span style="color: #555555;">::</span>array<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>, <span style="color: #ff6600;">3</span><span style="color: #555555;">&gt;</span> myArray{<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>};
+</pre>
+</div>
+<h3>Templates</h3>
+<p>Templates can be template parameters. In this case, they are called template template parameters. The container adaptors <span style="font-family: courier new, courier;">std::stack</span>, <span style="font-family: courier new, courier;">std::queue</span>, and<span style="font-family: courier new, courier;"> std::priority_queue</span> use per default a <span style="font-family: courier new, courier;">std::deque</span> to hold their arguments, but you can use a different container. Their usage is straightforward.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">std<span style="color: #555555;">::</span>stack<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> stack1;
+stack1.push(<span style="color: #ff6600;">5</span>);
+    
+std<span style="color: #555555;">::</span>stack<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">double</span>, std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">double</span><span style="color: #555555;">&gt;&gt;</span> stack2;
+stack2.push(<span style="color: #ff6600;">10.5</span>);
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Their definition may look a little bit weird.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// templateTemplateParameters.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;list&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+<span style="color: #009999;">#include &lt;string&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T, <span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span>, <span style="color: #006699; font-weight: bold;">typename</span><span style="color: #555555;">&gt;</span> <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Cont</span> <span style="color: #555555;">&gt;</span>   <span style="color: #0099ff; font-style: italic;">// (1)</span>
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Matrix</span>{
+<span style="color: #9999ff;">public:</span>
+  <span style="color: #006699; font-weight: bold;">explicit</span> Matrix(std<span style="color: #555555;">::</span>initializer_list<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span> inList)<span style="color: #555555;">:</span> data(inList){  <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> d<span style="color: #555555;">:</span> data) std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> d <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span>;
+  }
+  <span style="color: #007788; font-weight: bold;">int</span> getSize() <span style="color: #006699; font-weight: bold;">const</span>{
+    <span style="color: #006699; font-weight: bold;">return</span> data.size();
+  }
+
+<span style="color: #9999ff;">private:</span>
+  Cont<span style="color: #555555;">&lt;</span>T, std<span style="color: #555555;">::</span>allocator<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;&gt;</span> data;                                 <span style="color: #0099ff; font-style: italic;">// (3)                               </span>
+
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+                                                                    <span style="color: #0099ff; font-style: italic;">// (4)</span>
+  Matrix<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>, std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&gt;</span> myIntVec{<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">5</span>, <span style="color: #ff6600;">6</span>, <span style="color: #ff6600;">7</span>, <span style="color: #ff6600;">8</span>, <span style="color: #ff6600;">9</span>, <span style="color: #ff6600;">10</span>}; 
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"myIntVec.getSize(): "</span> <span style="color: #555555;">&lt;&lt;</span> myIntVec.getSize() <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+  Matrix<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">double</span>, std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&gt;</span> myDoubleVec{<span style="color: #ff6600;">1.1</span>, <span style="color: #ff6600;">2.2</span>, <span style="color: #ff6600;">3.3</span>, <span style="color: #ff6600;">4.4</span>, <span style="color: #ff6600;">5.5</span>}; <span style="color: #0099ff; font-style: italic;">// (5)</span>
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"myDoubleVec.getSize(): "</span>  <span style="color: #555555;">&lt;&lt;</span> myDoubleVec.getSize() <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+                                                                    <span style="color: #0099ff; font-style: italic;">// (6)</span>
+  Matrix<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>string, std<span style="color: #555555;">::</span>list<span style="color: #555555;">&gt;</span> myStringList{<span style="color: #cc3300;">"one"</span>, <span style="color: #cc3300;">"two"</span>, <span style="color: #cc3300;">"three"</span>, <span style="color: #cc3300;">"four"</span>};  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"myStringList.getSize(): "</span> <span style="color: #555555;">&lt;&lt;</span> myStringList.getSize() <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Matrix is a simple class template, that can be initialised by a<span style="font-family: courier new, courier;"> std::initializer_list</span> (line 2). A <span style="font-family: courier new, courier;">Matrix</span> can be used with a <span style="font-family: courier new, courier;">std::vector</span> (line 4 and line 5), or a<span style="font-family: courier new, courier;"> std::lis</span>t (line 6) to hold its values. So far, nothing special.&nbsp;</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/TemplateDependentNames/templateTemplateParameters.png" alt="templateTemplateParameters" width="400" height="241" /></p>
+<p>But hold, I forget to mention line 1 and line 3. Line 1 declares a class template which has two template parameters. Okay, the first parameter is the type of the elements and the second parameter stands for the container. Let's have a closer look at the second parameter:<span style="font-family: courier new, courier;"> template &lt;typename, typename&gt; class Cont &gt;. </span>This means the second template argument should be a template requiring two template parameters. The first template parameter is the type of the elements the container stores and the second template parameter is the defaulted allocator a container of the standard template library has. Even the allocator has a default value such as in case of a <a href="https://en.cppreference.com/w/cpp/container/vector">std::vector</a>. The allocator depend on the type of the elements.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span>
+    <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">T</span>,
+    <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Allocator</span> <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>allocator<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span>
+<span style="color: #555555;">&gt;</span> <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">vector</span>;
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Line 3 shows the usage of the allocator in this internally used container. Matrix can use all containers, which are of the kind: <span style="font-family: courier new, courier;">container&lt; type of the elements, allocator of the elements&gt;</span>. This is true for the <a href="https://en.cppreference.com/w/cpp/container">sequence containers</a> such as <span style="font-family: courier new, courier;">std::vector</span>, <span style="font-family: courier new, courier;">std::deque</span>, or<span style="font-family: courier new, courier;"> std::list</span>.&nbsp; <span style="font-family: courier new, courier;">std::array</span> and <span style="font-family: courier new, courier;">std::forward_list</span> would fail, because<span style="font-family: courier new, courier;"> std::array</span> needs an additional non-type for specifying its size at compiletime and <span style="font-family: courier new, courier;">std::forward_list</span> does not support the <span style="font-family: courier new, courier;">size</span> method.</p>
+<p>Preperation done. Now, I can write about dependent names.</p>
+<h2>Dependent Names</h2>
+<p>First of all. What is a dependent name? A dependent name is essentially a name that depends on a template parameter. Let me show what that means. Here are a few examples based on <a href="https://en.cppreference.com/w/cpp/language/dependent_name">cppreference.com</a>:</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">struct</span> X <span style="color: #555555;">:</span> B<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span> <span style="color: #0099ff; font-style: italic;">// "B&lt;T&gt;" is dependent on T</span>
+{
+    <span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">::</span>A<span style="color: #555555;">*</span> pa; <span style="color: #0099ff; font-style: italic;">// "T::A" is dependent on T</span>
+    <span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">f</span>(B<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;*</span> pb) {
+        <span style="color: #006699; font-weight: bold;">static</span> <span style="color: #007788; font-weight: bold;">int</span> i <span style="color: #555555;">=</span> B<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>i; <span style="color: #0099ff; font-style: italic;">// "B&lt;T&gt;::i" is dependent on T</span>
+        pb<span style="color: #555555;">-&gt;</span>j<span style="color: #555555;">++</span>; <span style="color: #0099ff; font-style: italic;">// "pb-&gt;j" is dependent on T</span>
+    }
+};
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Now, the fun starts. A dependent name can be a type, a non-type, or a template template parameter. The name lookup is the first difference between non-dependent and dependent names.</p>
+<ul>
+<li><strong>Non-dependent names</strong> are looked up at the point of the template definition.</li>
+<li><strong>Dependent names</strong> are lookup up when the template arguments are known. This means at the point of template instantiation.</li>
+</ul>
+<p>If you use a dependent name in a template declaration or template definition, the compiler has no idea, whether this name refers to a type, a non-type, or a template template parameter. In this case, the compiler assumes that the dependent name refers to a non-type, which may be wrong. This is the case in which you have to help the compiler.</p>
+<p>Before I show you two examples, I have to add an exception to this rule. You can skip my next few words if you want to get the general idea and jump directly to the next subsection. The exception is: if the name referers in the template definition to the current instantiation the compiler can deduce the name at the point of the template definition. Here are a few examples:</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">T</span><span style="color: #555555;">&gt;</span> <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">A</span> {
+    A<span style="color: #555555;">*</span> p1;    <span style="color: #0099ff; font-style: italic;">// A is the current instantiation</span>
+    A<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;*</span> p2; <span style="color: #0099ff; font-style: italic;">// A&lt;T&gt; is the current instantiation</span>
+    <span style="color: #555555;">::</span>A<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;*</span> p4; <span style="color: #0099ff; font-style: italic;">// ::A&lt;T&gt; is the current instantiation</span>
+    A<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">*&gt;</span> p3; <span style="color: #0099ff; font-style: italic;">// A&lt;T*&gt; is not the current instantiation</span>
+};
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">T</span><span style="color: #555555;">&gt;</span> <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">A</span><span style="color: #555555;">&lt;</span>T<span style="color: #555555;">*&gt;</span> {
+    A<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">*&gt;*</span> p1;  <span style="color: #0099ff; font-style: italic;">// A&lt;T*&gt; is the current instantiation</span>
+    A<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;*</span> p2;   <span style="color: #0099ff; font-style: italic;">// A&lt;T&gt; is not the current instantiation</span>
+};
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span> I<span style="color: #555555;">&gt;</span> <span style="color: #006699; font-weight: bold;">struct</span> B {
+    <span style="color: #006699; font-weight: bold;">static</span> <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">int</span> my_I <span style="color: #555555;">=</span> I;
+    <span style="color: #006699; font-weight: bold;">static</span> <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">int</span> my_I2 <span style="color: #555555;">=</span> I<span style="color: #555555;">+</span><span style="color: #ff6600;">0</span>;
+    <span style="color: #006699; font-weight: bold;">static</span> <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">int</span> my_I3 <span style="color: #555555;">=</span> my_I;
+    B<span style="color: #555555;">&lt;</span>my_I<span style="color: #555555;">&gt;*</span> b3;  <span style="color: #0099ff; font-style: italic;">// B&lt;my_I&gt; is the current instantiation</span>
+    B<span style="color: #555555;">&lt;</span>my_I2<span style="color: #555555;">&gt;*</span> b4; <span style="color: #0099ff; font-style: italic;">// B&lt;my_I2&gt; is not the current instantiation</span>
+    B<span style="color: #555555;">&lt;</span>my_I3<span style="color: #555555;">&gt;*</span> b5; <span style="color: #0099ff; font-style: italic;">// B&lt;my_I3&gt; is the current instantiation</span>
+};
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Finally, I come to the critical idea of my post. If a dependent name could be a type, a non-type, or a template, you have to give the compiler a hint.</p>
+<h3>Use <span style="font-family: courier new, courier;">typename</span> if the Dependent Name is a Type</h3>
+<p>After such a long introduction the next program snippet makes it pretty clear.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">void</span> test(){
+    std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>const_iterator<span style="color: #555555;">*</span> p1;          <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    <span style="color: #006699; font-weight: bold;">typename</span> std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>const_iterator<span style="color: #555555;">*</span> p2; <span style="color: #0099ff; font-style: italic;">// (2)</span>
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Without the <span style="font-family: courier new, courier;">typename</span> keyword in line 2, the name<span style="font-family: courier new, courier;"> std::vector&lt;T&gt;::const_iterator</span> in line 2 would be interpreted as a non-type and, consequently, the * stands in this case for multiplication and not for a pointer declaration. Exactly this is happening in line (1).</p>
+<p>Similar, if your dependent name should be a template, you have to give the compiler a hint.</p>
+<h3>Use <span style="font-family: courier new, courier;">.template</span> if the Dependent Name is a Template</h3>
+<p>Honestly, this syntax looks a little bit weird.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">struct</span> S{
+    <span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> U<span style="color: #555555;">&gt;</span> <span style="color: #007788; font-weight: bold;">void</span> func(){}
+}
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">void</span> func2(){
+    S<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span> s;
+    s.func<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span>();             <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    s.<span style="color: #006699; font-weight: bold;">template</span> func<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span>();    <span style="color: #0099ff; font-style: italic;">// (2)</span>
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Same story as before. Compare the lines 1 and 2. When the compiler reads the name <span style="font-family: courier new, courier;">s.func</span>&nbsp;(line 1) it decides to interpret it as non-type. This means the <span style="font-family: courier new, courier;">&lt;</span> sign stands for the comparison operator but not opening square bracket of the template argument of the generic method <span style="font-family: courier new, courier;">func</span>. In this case, you have to specify that <span style="font-family: courier new, courier;">s.func</span> is template such as in line 2:<span style="font-family: courier new, courier;"> s.template func</span>.&nbsp;</p>
+<p>Here is the essence of this post in one sentence:<strong> When you have a dependent name, use <span style="font-family: courier new, courier;">typename</span> to specifiy that it is a type or <span style="font-family: courier new, courier;">.template</span> to specifiy that it is a template.</strong></p>
+<h2>What's next?</h2>
+<p>The next rules in the C++ Core Guidlinees are about C-style programming and source files. Let's see in my next post what this means.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Paul Baxter,&nbsp; Meeting C++, Matt Braun, Avi Lachmish, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Dilettant, Marko, Ramesh Jangama,</strong><span class="sc-kpOJdX fDWXFa" title="Emyr Williams"><strong> G Prvulovic, and Reiner Eiteljörge.</strong></span><strong><br /></strong></p>
+<p><strong>Thanks in particular to:&nbsp; <a href="https://www.takeupcode.com"><img style="vertical-align: top;" src="images/patreon/TakeUpCode-450-60.png" alt="TakeUpCode 450 60" width="150" height="20" /> </a></strong></p>
+<p>&nbsp;</p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at Leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 600 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
+<p></p>
+<table style="width: 800px;">
+<tbody>
+<tr>
+<td colspan="2">
+<h2>Get your interactive course</h2>
+&nbsp;</td>
+</tr>
+<tr>
+<td>
+<h4 class="_3fBEwsM053hx2mPd0uV0nT" style="text-align: center;">Modern C++ Concurrency in Practice</h4>
+</td>
+<td>
+<h4>C++ Standard Library including C++14 &amp; C++17</h4>
+</td>
+</tr>
+<tr>
+<td><a href="https://goo.gl/2qWUkK"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseConcurrency/educative.png" alt="educative" width="300" height="152" /></a></td>
+<td><a href="https://www.educative.io/collection/10370001/5712008708096000?authorName=Rainer%20Grimm"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseLibrary/CLibrary.png" alt="CLibrary" width="300" height="150" /></a></td>
+</tr>
+<tr>
+<td>
+<p>Based on my book "Concurrency with Modern C++" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>140 lessons</li>
+<li>110 code playgrounds =&gt; Runs in the browser</li>
+<li>78 code snippets</li>
+<li>55 illustrations</li>
+</ul>
+</td>
+<td>
+<p>Based on my book "The C++ Standard Library" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>149 lessons</li>
+<li>111 code playgrounds =&gt; Runs in the browser</li>
+<li>164 code snippets</li>
+<li>25 illustrations</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
