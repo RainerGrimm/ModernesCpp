@@ -1,0 +1,226 @@
+<p>Due to the same history of C and C++, both languages are closely related. Because neither of them is a subset of the other, you have to know a few rules to mix them.</p>
+<hr id="system-readmore" />
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesCStyle/blender-10935_1280.jpg" alt="blender 10935 1280" width="400" height="400" /></p>
+<p>The chapter in the C++ core guidelines is called: C-style programming. Honestly, my first thought was to skip it, but after more thoughts I decided to write about it. My reason is twofold:</p>
+<ol>
+<li>This are the typical issues we have when dealing with legacy code.</li>
+<li>One reader wanted that I write more about the challenges of legacy code.</li>
+</ol>
+<p>Here are the three rules for today:</p>
+<ul>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rcpl-C">CPL.1: Prefer C++ to C</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rcpl-subset">CPL.2: If you must use C, use the common subset of C and C++, and compile the C code as C++</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rcpl-interface">CPL.3: If you must use C for interfaces, use C++ in the calling code using such interfaces</a></li>
+</ul>
+<p>The first rules is obvious because I write about the C++ core guidelines.</p>
+<h2><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rcpl-C">CPL.1: Prefer C++ to C</a></h2>
+<p>&nbsp;Without further ado, the reason from the C++ core guidelines: "C++ provides better type checking and more notational support. It provides better support for high-level programming and often generates faster code."</p>
+<h2><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rcpl-subset">CPL.2: If you must use C, use the common subset of C and C++, and compile the C code as C++</a></h2>
+<p>The first question you have to answer is: Can you compile the entire code with a C++ compiler?</p>
+<h3>Entire source code available</h3>
+<p>Fine, you are almost done. Almost, because C is not a subset of C++. Here is a small and bad C program which will break with a C++ compiler.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// cStyle.c</span>
+
+<span style="color: #009999;">#include &lt;stdio.h&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+
+    <span style="color: #007788; font-weight: bold;">double</span> sq2 <span style="color: #555555;">=</span> sqrt(<span style="color: #ff6600;">2</span>);                           <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    
+    printf(<span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">sizeof(</span><span style="color: #cc3300; font-weight: bold;">\'</span><span style="color: #cc3300;">a</span><span style="color: #cc3300; font-weight: bold;">\'</span><span style="color: #cc3300;">): %d</span><span style="color: #cc3300; font-weight: bold;">\n\n</span><span style="color: #cc3300;">"</span>, <span style="color: #006699; font-weight: bold;">sizeof</span>(<span style="color: #cc3300;">'a'</span>)); <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    
+    <span style="color: #007788; font-weight: bold;">char</span> c;
+    <span style="color: #007788; font-weight: bold;">void</span><span style="color: #555555;">*</span> pv <span style="color: #555555;">=</span> <span style="color: #555555;">&amp;</span>c;
+    <span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">*</span> pi <span style="color: #555555;">=</span> pv;                                   <span style="color: #0099ff; font-style: italic;">// (3)</span>
+    
+    <span style="color: #007788; font-weight: bold;">int</span> class <span style="color: #555555;">=</span> <span style="color: #ff6600;">5</span>;                                  <span style="color: #0099ff; font-style: italic;">// (4)</span>
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>First, let me compile and execute it with the C90 standard.</p>
+<p>The compilation succeeds with a few warnings.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesCStyle/cStyleC2.png" alt="cStyleC2" width="700" height="229" /></p>
+<p>The program<span style="font-family: courier new, courier;"> cStyle.c</span> has a few issues. There is not declaration for the <span style="font-family: 'courier new', courier;">sqrt</span> function (line 2), line (3) performs an implicit conversion from a <span style="font-family: 'courier new', courier;">void</span> pointer to an <span style="font-family: courier new, courier;">int</span> pointer, and line (4) uses the keyword <span style="font-family: courier new, courier;">class.</span></p>
+<p>Let's see what the C++ compiler is saying.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesCStyle/cStyleCpp.png" alt="cStyleCpp" width="700" height="231" /></p>
+<p>I get what I deserve: three compiler errors. The program <span style="font-family: courier new, courier;">cStyle.c</span> shows are more subtile difference between a C and a C++ compiler.&nbsp; I reduced the program to the line (2): <span style="font-family: courier new, courier;">printf("\nsizeof(\'a\'): %d\n\n", sizeof('a'));.</span>&nbsp;Here ist the output.<span style="font-family: courier new, courier;"></span></p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesCStyle/cStyleCppSizeof.png" alt="cStyleCppSizeof" width="400" height="179" /></p>
+<p>Instead of 4 such as for the C compiler, sizeof<span style="font-family: courier new, courier;">('a')</span> is 1 with the C++ compiler.<strong> <span style="font-family: courier new, courier;">'c'</span> is an<span style="font-family: 'courier new', courier;"> int</span> in C.</strong></p>
+<p>Now, to the more challenging job.</p>
+<h3>Entire source code not available</h3>
+<p>This are the important points.</p>
+<ol>
+<li><strong>Use your C++ compiler to compile your <span style="font-family: 'courier new', courier;">main</span> function.</strong> In contrast to a C compiler, a C++ compiler generates additional startup code which is executed before the <span style="font-family: courier new, courier;">main</span> function. For example, this startup code calls constructors of global (static) objects.&nbsp;&nbsp;</li>
+<li><strong>Use your C++ compiler to link your program.</strong> The C<span style="font-family: courier new, courier;">++</span> compiler, when used for linking the program, will automatically link in the standard C++ libraries.</li>
+<li><strong>Use a C and C++ compiler from the same vendor which should have the same calling conventions.</strong> A calling convention specifies the method that a compiler sets up to access a function. This includes in which order parameters are allocated, how parameters are passed, or whether the caller of the callee prepares the stack. Read the full details of x86's calling conventions on <a href="https://en.wikipedia.org/wiki/X86_calling_conventions">Wikipedia.</a></li>
+</ol>
+<h2><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rcpl-interface">CPL.3: If you must use C for interfaces, use C++ in the calling code using such interfaces</a></h2>
+<p>In contrast to C, C++ supports function overloading. This means that you can define a function having the same name but different parameters. The compiler picks the right function when a function is invoked.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// functionOverloading.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;  </span>
+  
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">print</span>(<span style="color: #007788; font-weight: bold;">int</span>) { 
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"int"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl; 
+} 
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">print</span>(<span style="color: #007788; font-weight: bold;">double</span>) { 
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"double"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl; 
+} 
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">print</span>(<span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">char</span><span style="color: #555555;">*</span>) { 
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"const char* "</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl; 
+} 
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">print</span>(<span style="color: #007788; font-weight: bold;">int</span>, <span style="color: #007788; font-weight: bold;">double</span>, <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">char</span><span style="color: #555555;">*</span>) { 
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"int, double, const char* "</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl; 
+} 
+
+  
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() { 
+ 
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;   
+
+    print(<span style="color: #ff6600;">10</span>); 
+    print(<span style="color: #ff6600;">10.10</span>); 
+    print(<span style="color: #cc3300;">"ten"</span>); 
+    print(<span style="color: #ff6600;">10</span>, <span style="color: #ff6600;">10.10</span>, <span style="color: #cc3300;">"ten"</span>);
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The output is as expected.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesCStyle/functionOverloading.png" alt="functionOverloading" width="350" height="229" /></p>
+<p>The exciting question is now: How can the C++ compiler distinguish the various functions? The C++ compiler encodes additionally the&nbsp; type of the parameters into the function name. This process is called name mangeling and is specific for each C++ compiler. The process which is not standardised is often also called name decoration.</p>
+<p>With the help of the <a href="https://godbolt.org/z/gFn4NU"><span style="font-family: courier new, courier;">functionOverloading.cpp</span></a> <a href="https://godbolt.org/z/gFn4NU">on compiler explorer</a>, it is quite easy to show the mangled name. Just disable the button Demangle.</p>
+<p>Here are the names that the GCC 8.3 and the MSVC 19.16 is producing.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesCStyle/Mangling.png" alt="Mangling" width="600" height="131" /></p>
+<p>By using the extern "C" linkage specifier, you can prevent the C++ compiler from mangling the names.</p>
+<p>By declaring the function with <span style="font-family: courier new, courier;">extern "C"</span> in your code, you can call a C function from C++, or a C++ function from C.</p>
+<p>You can use <span style="font-family: courier new, courier;">extern "C"</span> for each function,</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">extern</span> <span style="color: #cc3300;">"C"</span> <span style="color: #007788; font-weight: bold;">void</span> foo(<span style="color: #007788; font-weight: bold;">int</span>);
+</pre>
+</div>
+<p>for each function in a scope,</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">extern</span> <span style="color: #cc3300;">"C"</span> {
+    <span style="color: #007788; font-weight: bold;">void</span> foo(<span style="color: #007788; font-weight: bold;">int</span>);
+    <span style="color: #007788; font-weight: bold;">double</span> <span style="color: #cc00ff;">bar</span>(<span style="color: #007788; font-weight: bold;">double</span>);
+};
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>or for the entire header file by using include guards. The macro<span style="font-family: courier new, courier;"> __cplusplus</span> is defined when the C++ compiler is used.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #009999;">#ifdef __cplusplus</span>
+<span style="color: #006699; font-weight: bold;">extern</span> <span style="color: #cc3300;">"C"</span> {
+<span style="color: #009999;">#endif</span>
+    <span style="color: #007788; font-weight: bold;">void</span> foo(<span style="color: #007788; font-weight: bold;">int</span>);
+    <span style="color: #007788; font-weight: bold;">double</span> <span style="color: #cc00ff;">bar</span>(<span style="color: #007788; font-weight: bold;">double</span>);
+    .
+    .
+    .
+<span style="color: #009999;">#ifdef __cplusplus</span>
+}
+<span style="color: #009999;">#endif</span>
+</pre>
+</div>
+<h2>What's next?</h2>
+<p>I'm totally happy to announce that with the next post begins a series to <a href="https://cppinsights.io/">CppInsight</a>. CppInsight is an awesome tool which I use heavily in my posts and in my classes to show the magic of the C++ compiler. But the tool lacks a good introduction. Who can be better equipped for writing this introduction as Andreas Fertig, the author of CppInsight?</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Paul Baxter,&nbsp; Meeting C++, Matt Braun, Avi Lachmish, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Dilettant, Marko, Ramesh Jangama,</strong><span class="sc-kpOJdX fDWXFa" title="Emyr Williams"><strong> G Prvulovic, and Reiner Eiteljörge.</strong></span><strong><br /></strong></p>
+<p><strong>Thanks in particular to:&nbsp; <a href="https://www.takeupcode.com"><img style="vertical-align: top;" src="images/patreon/TakeUpCode-450-60.png" alt="TakeUpCode 450 60" width="150" height="20" /> </a></strong></p>
+<p>&nbsp;</p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at Leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 600 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
+<p></p>
+<table style="width: 800px;">
+<tbody>
+<tr>
+<td colspan="2">
+<h2>Get your interactive course</h2>
+&nbsp;</td>
+</tr>
+<tr>
+<td>
+<h4 class="_3fBEwsM053hx2mPd0uV0nT" style="text-align: center;">Modern C++ Concurrency in Practice</h4>
+</td>
+<td>
+<h4>C++ Standard Library including C++14 &amp; C++17</h4>
+</td>
+</tr>
+<tr>
+<td><a href="https://goo.gl/2qWUkK"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseConcurrency/educative.png" alt="educative" width="300" height="152" /></a></td>
+<td><a href="https://www.educative.io/collection/10370001/5712008708096000?authorName=Rainer%20Grimm"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseLibrary/CLibrary.png" alt="CLibrary" width="300" height="150" /></a></td>
+</tr>
+<tr>
+<td>
+<p>Based on my book "Concurrency with Modern C++" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>140 lessons</li>
+<li>110 code playgrounds =&gt; Runs in the browser</li>
+<li>78 code snippets</li>
+<li>55 illustrations</li>
+</ul>
+</td>
+<td>
+<p>Based on my book "The C++ Standard Library" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>149 lessons</li>
+<li>111 code playgrounds =&gt; Runs in the browser</li>
+<li>164 code snippets</li>
+<li>25 illustrations</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
