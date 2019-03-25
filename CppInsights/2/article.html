@@ -1,0 +1,240 @@
+<p>Andreas Fertigs story with C++ Insights goes on. This weeks post is about type deduction with <code>auto</code> and <code>decltype </code>or as I often phrase it: "Use the smartness of the compiler."</p>
+<hr id="system-readmore" />
+<h2><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/CppInsights/2/02-type-deduction.png" alt="02 type deduction" width="600" height="338" /></h2>
+<h2>Type Deduction</h2>
+<p>&nbsp;</p>
+<p>With C++11 we got with <code>auto</code> and <code>decltype</code> a new form of type deduction. We are used to type deduction from templates, however, these two new variants can be tricky sometimes.</p>
+<h3><span style="font-family: courier new, courier;">auto</span></h3>
+<p></p>
+<p>Consider this example:</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>()
+{
+  <span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">*</span> ip;
+  <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">*</span> cip;
+  <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">*</span> <span style="color: #006699; font-weight: bold;">const</span> cicp <span style="color: #555555;">=</span> ip;
+
+  <span style="color: #006699; font-weight: bold;">auto</span> aip <span style="color: #555555;">=</span> ip;
+  <span style="color: #006699; font-weight: bold;">auto</span> acip <span style="color: #555555;">=</span> cip;
+  <span style="color: #006699; font-weight: bold;">auto</span> acicp <span style="color: #555555;">=</span> cicp;
+}
+</pre>
+</div>
+<p></p>
+<p>We have three different pointers, all of type <code>int</code>. They are getting more and more constified. The question is what’s the type that is deduced by <code>auto</code>? All are pointers, that’s for sure. But what happens with the <code>const</code>? <code>auto</code> removes all top-level qualifier. Hence, even the <code>const</code> disappears. Does it? Here is the output C++ Insights gives:</p>
+<p></p>
+<pre><code class="language-C++"><span style="font-family: courier new, courier;"><span class="hljs-function"><span class="hljs-keyword">int</span> <span class="hljs-title">main</span><span class="hljs-params">()</span><br /></span>{</span><br /><span style="font-family: courier new, courier;">  <span class="hljs-keyword">int</span> * ip;</span><br /><span style="font-family: courier new, courier;">  <span class="hljs-keyword">const</span> <span class="hljs-keyword">int</span> * cip;</span><br /><span style="font-family: courier new, courier;">  <span class="hljs-keyword">const</span> <span class="hljs-keyword">int</span> *<span class="hljs-keyword">const</span> cicp = ip;</span><br /><span style="font-family: courier new, courier;">  <span class="hljs-keyword">int</span> * aip = ip;</span><br /><span style="font-family: courier new, courier;">  <span class="hljs-keyword">const</span> <span class="hljs-keyword">int</span> * acip = cip;</span><br /><span style="font-family: courier new, courier;">  <span class="hljs-keyword">const</span> <span class="hljs-keyword">int</span> * acicp = cicp;</span><br /><span style="font-family: courier new, courier;">}</span><br /></code></pre>
+<p></p>
+<p>Yes, the top-level <code>const</code> is removed. A constant pointer does not matter, so this <code>const</code> is discarded, but the constness of the memory behind it sticks. Hence, this <code>const</code> is preserved. Which is why <code>acip</code> looks exactly like <code>acicp</code>. This makes sense right.</p>
+<h3><span style="font-family: courier new, courier;">decltype(auto)</span></h3>
+<p>Now, from time to time we like to preserve all qualifiers. This is when <code>decltype</code> appears. In contrast to <code>auto</code>, <code>decltype</code> does preserve all top-level qualifiers. With&nbsp; <ins>C++14 the combination of <code>decltype</code> and <code>auto</code> is possible and we can write <code>decltype(auto)</code> which makes things easier. Here is another example from C++</ins> Insights which uses C++14:</p>
+<p></p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>()
+{
+  <span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">*</span> ip;
+  <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">*</span> cip;
+  <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">*</span> <span style="color: #006699; font-weight: bold;">const</span> cicp <span style="color: #555555;">=</span> ip;
+
+ 
+
+  decltype(<span style="color: #006699; font-weight: bold;">auto</span>) aip <span style="color: #555555;">=</span> ip;
+  decltype(<span style="color: #006699; font-weight: bold;">auto</span>) acip <span style="color: #555555;">=</span> cip;
+  decltype(<span style="color: #006699; font-weight: bold;">auto</span>) acicp <span style="color: #555555;">=</span> cicp;
+}
+</pre>
+</div>
+<p></p>
+<p>From this we get the following output:</p>
+<p></p>
+<pre><code class="language-C++"><span style="font-family: courier new, courier;"><span class="hljs-function"><span class="hljs-keyword">int</span> <span class="hljs-title">main</span><span class="hljs-params">()</span><br /></span>{</span><br /><span style="font-family: courier new, courier;">  <span class="hljs-keyword">int</span> * ip;</span><br /><span style="font-family: courier new, courier;">  <span class="hljs-keyword">const</span> <span class="hljs-keyword">int</span> * cip;</span><br /><span style="font-family: courier new, courier;">  <span class="hljs-keyword">const</span> <span class="hljs-keyword">int</span> *<span class="hljs-keyword">const</span> cicp = ip;</span><br /><span style="font-family: courier new, courier;">  <span class="hljs-keyword">int</span> * aip = ip;</span><br /><span style="font-family: courier new, courier;">  <span class="hljs-keyword">const</span> <span class="hljs-keyword">int</span> * acip = cip;</span><br /><span style="font-family: courier new, courier;">  <span class="hljs-keyword">const</span> <span class="hljs-keyword">int</span> *<span class="hljs-keyword">const</span> acicp = cicp;</span><br /><span style="font-family: courier new, courier;">}</span><br /></code></pre>
+<p></p>
+<p>We can see, that <code>acicp</code> does carry the second <code>const</code> which is lost when we just use <span style="font-family: courier new, courier;"><code>auto</code></span>.</p>
+<h3><span style="font-family: courier new, courier;">decltype</span></h3>
+<p>When do we need <code>decltype</code>, or more precisely when do we like to keep all qualifiers? One popular reason is templates. Imagine a class template with some function Get. With just using <code>auto</code> as a return type we can never return a reference to something. In template code we often don’t know the exact types, which makes it desirable to provide code that just works. <code>decltype</code> can help here. However, consider <code>decltype</code> as a library writer feature. In most cases we are fine with <code>auto</code>. It is just good to know the entire toolbox.</p>
+<h3><span style="font-family: courier new, courier;">auto&amp; and auto* versus auto</span></h3>
+<p>What we‘ve seen so far is, that we need to be explicit, if it comes to <code>auto</code> and references. We must always write <code>auto&amp;</code> to get a reference. How is it with pointers? There <code>auto</code> gives us the correct type, so we can spare the star? This is in fact a question I frequently get from my students. The answer is: it depends. I recommend writing it just for consistency. However, there are scenarios where we indeed need auto* even that <code>auto</code> did deduce the correct type. Consider this <a href="https://cppinsights.io/lnk?code=c3RydWN0IEZvb3t9OwoKRm9vKiBHZXRGb28oKQp7CiAgc3RhdGljIEZvbyBmb287CiAgCiAgcmV0dXJuICZmb287Cn0KCmludCBtYWluKCkKewogIGF1dG8gZnAgPSBHZXRGb28oKTsKfQ==&amp;rev=1.0">example</a>:</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">struct</span> Foo{};
+
+Foo<span style="color: #555555;">*</span> <span style="color: #cc00ff;">GetFoo</span>()
+{
+   <span style="color: #006699; font-weight: bold;">static</span> Foo foo;
+
+   <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #555555;">&amp;</span>foo;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>()
+{
+  <span style="color: #006699; font-weight: bold;">auto</span> fp <span style="color: #555555;">=</span> GetFoo();
+}
+</pre>
+</div>
+<p></p>
+<p>We have a function returning a <code>Foo*</code> and an <code>auto</code> variable <code>auto f = GetFoo()</code> which deduces the type. Of course, the correct type. What if we’d like to make <code>f</code> const? That we cannot alter the data of <code>f</code>? Sure, we write it like this <code>const auto f = ...</code>. At least that’s what we would do, if we write it without <code>auto</code>. Here are some possibilities we can try:</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">struct</span> Foo{};
+
+Foo<span style="color: #555555;">*</span> <span style="color: #cc00ff;">GetFoo</span>()
+{
+   <span style="color: #006699; font-weight: bold;">static</span> Foo foo;
+
+   <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #555555;">&amp;</span>foo;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>()
+{
+   <span style="color: #006699; font-weight: bold;">auto</span> fp0 <span style="color: #555555;">=</span> GetFoo();
+   <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #006699; font-weight: bold;">auto</span> fp1 <span style="color: #555555;">=</span> GetFoo();
+   <span style="color: #006699; font-weight: bold;">auto</span> <span style="color: #006699; font-weight: bold;">const</span> fp2 <span style="color: #555555;">=</span> GetFoo();
+   <span style="color: #0099ff; font-style: italic;">//const auto const fp3 = GetFoo(); does not compile</span>
+   <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">*</span> fp4 <span style="color: #555555;">=</span> GetFoo();
+   <span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">*</span> <span style="color: #006699; font-weight: bold;">const</span> fp5 <span style="color: #555555;">=</span> GetFoo();
+   <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">*</span> <span style="color: #006699; font-weight: bold;">const</span> fp6 <span style="color: #555555;">=</span> GetFoo();
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>First, <code>fp1</code> produces a const pointer to mutable data. Not exactly what we intended. <code>fp2</code> probably seems pointless. <code>fp3</code> makes more sense, but this doesn’t compile. The control changes, if we start using the form <code>auto*</code>. Now, we can add the qualifiers like we can do it with a regular type. But <a href="https://cppinsights.io/lnk?code=c3RydWN0IEZvb3t9OwoKRm9vKiBHZXRGb28oKQp7CiAgc3RhdGljIEZvbyBmb287CiAgCiAgcmV0dXJuICZmb287Cn0KCmludCBtYWluKCkKewogICAgICAgIGF1dG8gICAgICAgIGZwMCA9IEdldEZvbygpOwogIGNvbnN0IGF1dG8gICAgICAgIGZwMSA9IEdldEZvbygpOwogICAgICAgIGF1dG8gIGNvbnN0IGZwMiA9IEdldEZvbygpOwogIGNvbnN0IGF1dG8qICAgICAgIGZwMyA9IEdldEZvbygpOwogICAgICAgYXV0byogIGNvbnN0IGZwNCA9IEdldEZvbygpOwp9&amp;rev=1.0">see</a> for yourself in C++ Insights what the result is:</p>
+<p></p>
+<pre><span style="font-family: courier new, courier;">struct Foo{/* public: inline constexpr Foo() noexcept; */</span><br /><span style="font-family: courier new, courier;">/* public: inline constexpr Foo(const Foo &amp;); */</span><br /><span style="font-family: courier new, courier;">/* public: inline constexpr Foo(Foo &amp;&amp;); */</span><br /><span style="font-family: courier new, courier;">};</span></pre>
+<p><span style="font-family: courier new, courier;">Foo * GetFoo()</span><br /><span style="font-family: courier new, courier;">{</span><br /><span style="font-family: courier new, courier;">&nbsp;&nbsp; static Foo foo = Foo();</span><br /><span style="font-family: courier new, courier;">&nbsp;&nbsp; return &amp;foo;</span><br /><span style="font-family: courier new, courier;">}</span></p>
+<p><span style="font-family: courier new, courier;">int main()</span><br /><span style="font-family: courier new, courier;">{</span><br /><span style="font-family: courier new, courier;">&nbsp;&nbsp; Foo * fp0 = GetFoo();</span><br /><span style="font-family: courier new, courier;">&nbsp;&nbsp; Foo *const fp1 = GetFoo();</span><br /><span style="font-family: courier new, courier;">&nbsp;&nbsp; Foo *const fp2 = GetFoo();</span><br /><span style="font-family: courier new, courier;">&nbsp;&nbsp; const Foo * fp4 = GetFoo();</span><br /><span style="font-family: courier new, courier;">&nbsp;&nbsp; Foo *const fp5 = GetFoo();</span><br /><span style="font-family: courier new, courier;">&nbsp;&nbsp; const Foo *const fp6 = GetFoo();</span><br /><span style="font-family: courier new, courier;">}</span><code class="language-C++"><br /></code></p>
+<p></p>
+<p>The simple advice is: always be explicit and use the form <code>auto&amp;</code> as well as <code>auto*</code> even if auto is able to deduce a pointer type.</p>
+<p></p>
+<p>Let’s say we are explicit and use <code>auto&amp;</code>. Look at this <a href="https://cppinsights.io/lnk?code=c3RydWN0IFNpbmdsZXRvbnt9OwoKYXV0byBHZXQoKQp7CiAgc3RhdGljIFNpbmdsZXRvbiBze307CiAgCiAgcmV0dXJuIHM7Cn0KCmludCBtYWluKCkKewogIGF1dG8mIHggPSBHZXQoKTsKfQ==&amp;std=cpp17&amp;rev=1.0">example</a>:</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">struct</span> Singleton{};
+
+<span style="color: #006699; font-weight: bold;">auto</span> <span style="color: #cc00ff;">Get</span>()
+{
+   <span style="color: #006699; font-weight: bold;">static</span> Singleton s{};
+
+   <span style="color: #006699; font-weight: bold;">return</span> s;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>()
+{
+   <span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;</span> x <span style="color: #555555;">=</span> Get();
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>We have a classical singleton which the function <code>Get</code> should return. Of course, we like a reference to it otherwise we have multiple-tons. Despite <code>auto</code> and <code>&amp;</code> this code does not compile:</p>
+<pre><code>error: non-const lvalue reference to type 'Singleton' cannot bind to a temporary of type 'Singleton'<br /></code></pre>
+<p>The reason is, the <code>Get</code> in fact return <code>Singleton</code> and not <code>Singleton&amp;</code>. Why? Because we did not apply the <code>&amp;</code> to the auto-return type of <code>Get</code>. A small change and the code compiles:</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">struct</span> Singleton{};
+
+<span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;</span> Get()
+{
+   <span style="color: #006699; font-weight: bold;">static</span> Singleton s{};
+
+   <span style="color: #006699; font-weight: bold;">return</span> s;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main()
+{
+   <span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;</span> x <span style="color: #555555;">=</span> Get();
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>I’d like to thank Rainer for the opportunity to share information about C++ Insights on his popular blog!</p>
+<p>Have fun with C++ Insights. You can support the project by becoming a <a href="https://www.patreon.com/cppinsights">Patreon</a> or of course with code <a href="https://github.com/andreasfertig/cppinsights">contributions</a>.</p>
+<p>Stay tuned for more insights about C++ Insights to template instantiation …</p>
+<p></p>
+<p><strong>Andreas</strong></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Paul Baxter,&nbsp; Meeting C++, Matt Braun, Avi Lachmish, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Dilettant, Marko, Ramesh Jangama,</strong><span class="sc-kpOJdX fDWXFa" title="Emyr Williams"><strong> G Prvulovic, and Reiner Eiteljörge.</strong></span><strong><br /></strong></p>
+<p><strong>Thanks in particular to:&nbsp; <a href="https://www.takeupcode.com"><img style="vertical-align: top;" src="images/patreon/TakeUpCode-450-60.png" alt="TakeUpCode 450 60" width="150" height="20" /> </a></strong></p>
+<p>&nbsp;</p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at Leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 600 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
+<p></p>
+<table style="width: 800px;">
+<tbody>
+<tr>
+<td colspan="2">
+<h2>Get your interactive course</h2>
+&nbsp;</td>
+</tr>
+<tr>
+<td>
+<h4 class="_3fBEwsM053hx2mPd0uV0nT" style="text-align: center;">Modern C++ Concurrency in Practice</h4>
+</td>
+<td>
+<h4>C++ Standard Library including C++14 &amp; C++17</h4>
+</td>
+</tr>
+<tr>
+<td><a href="https://goo.gl/2qWUkK"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseConcurrency/educative.png" alt="educative" width="300" height="152" /></a></td>
+<td><a href="https://www.educative.io/collection/10370001/5712008708096000?authorName=Rainer%20Grimm"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseLibrary/CLibrary.png" alt="CLibrary" width="300" height="150" /></a></td>
+</tr>
+<tr>
+<td>
+<p>Based on my book "Concurrency with Modern C++" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>140 lessons</li>
+<li>110 code playgrounds =&gt; Runs in the browser</li>
+<li>78 code snippets</li>
+<li>55 illustrations</li>
+</ul>
+</td>
+<td>
+<p>Based on my book "The C++ Standard Library" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>149 lessons</li>
+<li>111 code playgrounds =&gt; Runs in the browser</li>
+<li>164 code snippets</li>
+<li>25 illustrations</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
