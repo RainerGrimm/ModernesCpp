@@ -1,0 +1,305 @@
+<p>Today post from Andreas is about template instantiation. C++ Insights helps you a lot to get a deeper insight into this automatic process.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/CppInsights/3/03-template-instantiation.png" alt="03 template instantiation" width="600" height="338" /></p>
+<p>&nbsp;</p>
+<p></p>
+<p>The future of C++ speaks templates. It is, therefore, a good idea to get a better view of templates.</p>
+<h2>Template Instantiation</h2>
+<p>I’d like to start with a disclaimer at this point. There are other tools to do this job. I saw a preview of Visual Studio which is able to show you the instantiated template. The same applies for cevelop. It’s not a unique feature that C++ Insights provides here. Except for one difference: it shows you the transformations for all the code you type in at once. Everything! Not just templates.</p>
+<p>What I’m talking about is a situation I believe many of us had at least once. There is this function template, a bigger one. We’d like to know for which types it gets instantiated and from where. An easy thing for C++ Insights, the compiler must know this and so does C++ Insights.</p>
+<p>Being able to show the code, which effectively runs, is valuable while teaching. I experienced that it helped students a lot if they could see what is going on rather to have to believe me.</p>
+<h3>The Laziness of Template Instantiation</h3>
+<p>One nice thing C++ Insights shows you is what it doesn’t show. The compiler, at least Clang in which C++ Insights runs, is eager to give us the most efficient code. When it comes to templates, the compiler generates code only for functions or methods which are actually used. You can have a class-template with a certain method which is never called. Like here:</p>
+<pre><code class="language-C++"><span class="hljs-keyword">template</span>&lt;<span class="hljs-keyword">typename</span> T&gt;
+<span class="hljs-keyword">class</span> Apple
+{
+<span class="hljs-keyword">public</span>:
+  Apple() = <span class="hljs-keyword">default</span>;
+  
+  <span class="hljs-function"><span class="hljs-keyword">bool</span> <span class="hljs-title">IsGreen</span><span class="hljs-params">()</span> <span class="hljs-keyword">const</span> </span>{ <span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>; }
+  <span class="hljs-function"><span class="hljs-keyword">bool</span> <span class="hljs-title">IsRed</span><span class="hljs-params">()</span> <span class="hljs-keyword">const</span> </span>{ <span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>; }
+};
+
+<span class="hljs-function"><span class="hljs-keyword">int</span> <span class="hljs-title">main</span><span class="hljs-params">()</span>
+</span>{
+  Apple&lt;<span class="hljs-keyword">int</span>&gt; apple;
+  
+  <span class="hljs-keyword">if</span>( apple.IsRed()) {}
+}
+</code></pre>
+<p>In this case, the compiler doesn’t generate the method body of that instantiation (Apple&lt;int&gt;) as you can see in <a href="https://cppinsights.io/lnk?code=dGVtcGxhdGU8dHlwZW5hbWUgVD4KY2xhc3MgQXBwbGUKewpwdWJsaWM6CiAgQXBwbGUoKSA9IGRlZmF1bHQ7CiAgCiAgYm9vbCBJc0dyZWVuKCkgY29uc3QgeyByZXR1cm4gZmFsc2U7IH0KICBib29sIElzUmVkKCkgY29uc3QgeyByZXR1cm4gdHJ1ZTsgfQp9OwoKaW50IG1haW4oKQp7CiAgQXBwbGU8aW50PiBhcHBsZTsKfQ==&amp;std=cpp17&amp;rev=1.0">C++ Insights</a>:</p>
+<pre><code class="language-C++"><span class="hljs-keyword">template</span>&lt;<span class="hljs-keyword">typename</span> T&gt;
+<span class="hljs-keyword">class</span> Apple
+{
+<span class="hljs-keyword">public</span>:
+  Apple() = <span class="hljs-keyword">default</span>;
+  
+  <span class="hljs-function"><span class="hljs-keyword">bool</span> <span class="hljs-title">IsGreen</span><span class="hljs-params">()</span> <span class="hljs-keyword">const</span> </span>{ <span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>; }
+  <span class="hljs-function"><span class="hljs-keyword">bool</span> <span class="hljs-title">IsRed</span><span class="hljs-params">()</span> <span class="hljs-keyword">const</span> </span>{ <span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>; }
+};
+
+<span class="hljs-comment">/* First instantiated from: insights.cpp:13 */</span>
+<span class="hljs-preprocessor">#<span class="hljs-keyword">ifdef</span> INSIGHTS_USE_TEMPLATE</span>
+<span class="hljs-keyword">template</span>&lt;&gt;
+<span class="hljs-keyword">class</span> Apple&lt;<span class="hljs-keyword">int</span>&gt;
+{  
+  <span class="hljs-keyword">public</span>: 
+  <span class="hljs-comment">// inline constexpr Apple() noexcept = default;</span>
+  <span class="hljs-function"><span class="hljs-keyword">inline</span> <span class="hljs-keyword">bool</span> <span class="hljs-title">IsGreen</span><span class="hljs-params">()</span> <span class="hljs-keyword">const</span></span>;
+  
+  <span class="hljs-function"><span class="hljs-keyword">inline</span> <span class="hljs-keyword">bool</span> <span class="hljs-title">IsRed</span><span class="hljs-params">()</span> <span class="hljs-keyword">const</span></span>;
+  
+  <span class="hljs-comment">// inline constexpr Apple(const Apple&lt;int&gt; &amp;) = default;</span>
+  <span class="hljs-comment">// inline constexpr Apple(Apple&lt;int&gt; &amp;&amp;) = default;</span>
+};
+
+<span class="hljs-preprocessor">#<span class="hljs-keyword">endif</span></span>
+
+
+<span class="hljs-function"><span class="hljs-keyword">int</span> <span class="hljs-title">main</span><span class="hljs-params">()</span>
+</span>{
+  Apple&lt;<span class="hljs-keyword">int</span>&gt; apple = Apple&lt;<span class="hljs-keyword">int</span>&gt;();
+}
+</code></pre>
+<p>Even if the method is used with a different instantiation (<code>Apple&lt;char&gt;</code>), there will be no code for the int variant. Of course, the method is present for <code>Apple&lt;char&gt;</code>. See for yourself in <a href="https://cppinsights.io/lnk?code=dGVtcGxhdGU8dHlwZW5hbWUgVD4KY2xhc3MgQXBwbGUKewpwdWJsaWM6CiAgQXBwbGUoKSA9IGRlZmF1bHQ7CiAgCiAgYm9vbCBJc0dyZWVuKCkgY29uc3QgeyByZXR1cm4gZmFsc2U7IH0KICBib29sIElzUmVkKCkgY29uc3QgeyByZXR1cm4gdHJ1ZTsgfQp9OwoKaW50IG1haW4oKQp7CiAgQXBwbGU8aW50PiBhcHBsZTsKICBBcHBsZTxjaGFyPiBjQXBwbGU7CiAgCiAgY0FwcGxlLklzR3JlZW4oKTsKfQ==&amp;std=cpp17&amp;rev=1.0">C++ Insights</a>:</p>
+<pre><code class="language-C++"><span class="hljs-keyword">template</span>&lt;<span class="hljs-keyword">typename</span> T&gt;
+<span class="hljs-keyword">class</span> Apple
+{
+<span class="hljs-keyword">public</span>:
+  Apple() = <span class="hljs-keyword">default</span>;
+  
+  <span class="hljs-function"><span class="hljs-keyword">bool</span> <span class="hljs-title">IsGreen</span><span class="hljs-params">()</span> <span class="hljs-keyword">const</span> </span>{ <span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>; }
+  <span class="hljs-function"><span class="hljs-keyword">bool</span> <span class="hljs-title">IsRed</span><span class="hljs-params">()</span> <span class="hljs-keyword">const</span> </span>{ <span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>; }
+};
+
+<span class="hljs-comment">/* First instantiated from: insights.cpp:13 */</span>
+<span class="hljs-preprocessor">#<span class="hljs-keyword">ifdef</span> INSIGHTS_USE_TEMPLATE</span>
+<span class="hljs-keyword">template</span>&lt;&gt;
+<span class="hljs-keyword">class</span> Apple&lt;<span class="hljs-keyword">int</span>&gt;
+{  
+  <span class="hljs-keyword">public</span>: 
+  <span class="hljs-comment">// inline constexpr Apple() noexcept = default;</span>
+  <span class="hljs-function"><span class="hljs-keyword">inline</span> <span class="hljs-keyword">bool</span> <span class="hljs-title">IsGreen</span><span class="hljs-params">()</span> <span class="hljs-keyword">const</span></span>;
+  
+  <span class="hljs-function"><span class="hljs-keyword">inline</span> <span class="hljs-keyword">bool</span> <span class="hljs-title">IsRed</span><span class="hljs-params">()</span> <span class="hljs-keyword">const</span></span>;
+  
+  <span class="hljs-comment">// inline constexpr Apple(const Apple&lt;int&gt; &amp;) = default;</span>
+  <span class="hljs-comment">// inline constexpr Apple(Apple&lt;int&gt; &amp;&amp;) = default;</span>
+};
+
+<span class="hljs-preprocessor">#<span class="hljs-keyword">endif</span></span>
+
+
+<span class="hljs-comment">/* First instantiated from: insights.cpp:14 */</span>
+<span class="hljs-preprocessor">#<span class="hljs-keyword">ifdef</span> INSIGHTS_USE_TEMPLATE</span>
+<span class="hljs-keyword">template</span>&lt;&gt;
+<span class="hljs-keyword">class</span> Apple&lt;<span class="hljs-keyword">char</span>&gt;
+{  
+  <span class="hljs-keyword">public</span>: 
+  <span class="hljs-comment">// inline constexpr Apple() noexcept = default;</span>
+  <span class="hljs-function"><span class="hljs-keyword">inline</span> <span class="hljs-keyword">bool</span> <span class="hljs-title">IsGreen</span><span class="hljs-params">()</span> <span class="hljs-keyword">const</span>
+  </span>{
+    <span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>;
+  }
+  
+  <span class="hljs-function"><span class="hljs-keyword">inline</span> <span class="hljs-keyword">bool</span> <span class="hljs-title">IsRed</span><span class="hljs-params">()</span> <span class="hljs-keyword">const</span></span>;
+  
+  <span class="hljs-comment">// inline constexpr Apple(const Apple&lt;char&gt; &amp;) = default;</span>
+  <span class="hljs-comment">// inline constexpr Apple(Apple&lt;char&gt; &amp;&amp;) = default;</span>
+};
+
+<span class="hljs-preprocessor">#<span class="hljs-keyword">endif</span></span>
+
+
+<span class="hljs-function"><span class="hljs-keyword">int</span> <span class="hljs-title">main</span><span class="hljs-params">()</span>
+</span>{
+  Apple&lt;<span class="hljs-keyword">int</span>&gt; apple = Apple&lt;<span class="hljs-keyword">int</span>&gt;();
+  Apple&lt;<span class="hljs-keyword">char</span>&gt; cApple = Apple&lt;<span class="hljs-keyword">char</span>&gt;();
+  cApple.IsGreen();
+}
+</code></pre>
+<p>This is brilliant because the compiler helps us to generate small binaries. Another view is that it can help to debug, for example, which constructor is used.</p>
+<p>What we can also see with C++ Insights is which line in the original code caused the instantiation. This can be helpful if you do not expect a certain instantiation.</p>
+<h3>Class Template Argument Deduction</h3>
+<p>When using C++17 and CTAD (class template argument deduction) it can sometimes be less obvious what types you got. Assume this code (I know there it is probably easy to see):</p>
+<pre><code class="language-C++"><span class="hljs-preprocessor">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;vector&gt;</span></span>
+
+<span class="hljs-function"><span class="hljs-keyword">int</span> <span class="hljs-title">main</span><span class="hljs-params">()</span>
+</span>{
+  <span class="hljs-built_in">std</span>::<span class="hljs-built_in">vector</span> v{<span class="hljs-number">1</span>,<span class="hljs-number">2</span>,<span class="hljs-number">3</span>};
+  <span class="hljs-built_in">std</span>::<span class="hljs-built_in">vector</span> vd{<span class="hljs-number">1.0</span>,<span class="hljs-number">2.0</span>,<span class="hljs-number">3.0</span>};
+
+  <span class="hljs-comment">//v = vd; // does not compile</span>
+}
+</code></pre>
+<p>We have two std::vectors which each gets three numbers assigned. Despite the fact that these two vectors really look equal we cannot assign vd to v. It might be obvious here, v is of type int while vd is of type double. A fairly easy thing for <a href="https://cppinsights.io/lnk?code=I2luY2x1ZGUgPHZlY3Rvcj4KCmludCBtYWluKCkKewogIHN0ZDo6dmVjdG9yIHZ7MSwyLDN9OwogIHN0ZDo6dmVjdG9yIHZkezEuMCwyLjAsMy4wfTsKCiAgLy92ID0gdmQ7IC8vIGRvZXMgbm90IGNvbXBpbGUKfQ==&amp;std=cpp17&amp;rev=1.0">C++ Insights</a>:</p>
+<pre><code class="language-C++"><span class="hljs-preprocessor">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;vector&gt;</span></span>
+
+<span class="hljs-function"><span class="hljs-keyword">int</span> <span class="hljs-title">main</span><span class="hljs-params">()</span>
+</span>{
+  <span class="hljs-built_in">std</span>::<span class="hljs-built_in">vector</span>&lt;<span class="hljs-keyword">int</span>, <span class="hljs-built_in">std</span>::allocator&lt;<span class="hljs-keyword">int</span>&gt; &gt; v = <span class="hljs-built_in">std</span>::<span class="hljs-built_in">vector</span>&lt;<span class="hljs-keyword">int</span>, <span class="hljs-built_in">std</span>::allocator&lt;<span class="hljs-keyword">int</span>&gt; &gt;{<span class="hljs-built_in">std</span>::initializer_list&lt;<span class="hljs-keyword">int</span>&gt;{<span class="hljs-number">1</span>, <span class="hljs-number">2</span>, <span class="hljs-number">3</span>}, <span class="hljs-built_in">std</span>::allocator&lt;<span class="hljs-keyword">int</span>&gt;()};
+  <span class="hljs-built_in">std</span>::<span class="hljs-built_in">vector</span>&lt;<span class="hljs-keyword">double</span>, <span class="hljs-built_in">std</span>::allocator&lt;<span class="hljs-keyword">double</span>&gt; &gt; vd = <span class="hljs-built_in">std</span>::<span class="hljs-built_in">vector</span>&lt;<span class="hljs-keyword">double</span>, <span class="hljs-built_in">std</span>::allocator&lt;<span class="hljs-keyword">double</span>&gt; &gt;{<span class="hljs-built_in">std</span>::initializer_list&lt;<span class="hljs-keyword">double</span>&gt;{<span class="hljs-number">1.0</span>, <span class="hljs-number">2.0</span>, <span class="hljs-number">3.0</span>}, <span class="hljs-built_in">std</span>::allocator&lt;<span class="hljs-keyword">double</span>&gt;()};
+}
+</code></pre>
+<p>There you can see what type vector really has.</p>
+<h3><span style="font-family: courier new, courier;">constexpr if</span></h3>
+<p>While we are talking about <ins>C++17, there is another new feature: <code>constexpr if</code>. Let’s have a look at what C++</ins> Insights can do there for us. In the example below we have a <code>stringify </code>template which makes a <code>std::string</code> from the parameter passed to the <a href="https://cppinsights.io/lnk?code=I2luY2x1ZGUgPHN0cmluZz4KI2luY2x1ZGUgPHR5cGVfdHJhaXRzPgoKdGVtcGxhdGUgPHR5cGVuYW1lIFQ+CnN0ZDo6c3RyaW5nIHN0cmluZ2lmeShUJiYgdCkKewogIGlmIGNvbnN0ZXhwcihzdGQ6OmlzX3NhbWVfdjxULCBzdGQ6OnN0cmluZz4pIHsKICAgIHJldHVybiB0OwogIH0gZWxzZSB7CiAgICByZXR1cm4gc3RkOjp0b19zdHJpbmcodCk7CiAgfQp9CgppbnQgbWFpbigpCnsKICBhdXRvIHggPSBzdHJpbmdpZnkoMik7CiAgYXV0byB5ID0gc3RyaW5naWZ5KHN0ZDo6c3RyaW5neyJIZWxsbyJ9KTsKfQ==&amp;std=cpp17&amp;rev=1.0">function</a>:</p>
+<pre><code class="language-C++"><span class="hljs-preprocessor">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;string&gt;</span></span>
+<span class="hljs-preprocessor">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;type_traits&gt;</span></span>
+
+<span class="hljs-keyword">template</span> &lt;<span class="hljs-keyword">typename</span> T&gt;
+<span class="hljs-built_in">std</span>::<span class="hljs-function"><span class="hljs-built_in">string</span> <span class="hljs-title">stringify</span><span class="hljs-params">(T&amp;&amp; t)</span>
+</span>{
+  <span class="hljs-function"><span class="hljs-keyword">if</span> <span class="hljs-title">constexpr</span><span class="hljs-params">(<span class="hljs-built_in">std</span>::is_same_v&lt;T, <span class="hljs-built_in">std</span>::<span class="hljs-built_in">string</span>&gt;)</span> </span>{
+    <span class="hljs-keyword">return</span> t;
+  } <span class="hljs-keyword">else</span> {
+    <span class="hljs-keyword">return</span> <span class="hljs-built_in">std</span>::to_string(t);
+  }
+}
+
+<span class="hljs-function"><span class="hljs-keyword">int</span> <span class="hljs-title">main</span><span class="hljs-params">()</span>
+</span>{
+  <span class="hljs-keyword">auto</span> x = stringify(<span class="hljs-number">2</span>);
+  <span class="hljs-keyword">auto</span> y = stringify(<span class="hljs-built_in">std</span>::<span class="hljs-built_in">string</span>{<span class="hljs-string">"Hello"</span>});
+}
+</code></pre>
+<p>Of course, if we pass in a <code>std::string</code> it just returns this string. The <code>constexpr if</code> helps us to make this entire function template possible. Because there is no <code>to_string</code> function which takes a <code>std::string</code>. With a normal <code>if </code>this code would not compile.</p>
+<p>Now, what happens, if we pass in a c-string? Like here:</p>
+<pre><code class="language-C++"><span class="hljs-preprocessor">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;string&gt;</span></span>
+<span class="hljs-preprocessor">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;type_traits&gt;</span></span>
+
+<span class="hljs-keyword">template</span> &lt;<span class="hljs-keyword">typename</span> T&gt;
+<span class="hljs-built_in">std</span>::<span class="hljs-function"><span class="hljs-built_in">string</span> <span class="hljs-title">stringify</span><span class="hljs-params">(T&amp;&amp; t)</span>
+</span>{
+  <span class="hljs-function"><span class="hljs-keyword">if</span> <span class="hljs-title">constexpr</span><span class="hljs-params">(<span class="hljs-built_in">std</span>::is_same_v&lt;T, <span class="hljs-built_in">std</span>::<span class="hljs-built_in">string</span>&gt;)</span> </span>{
+    <span class="hljs-keyword">return</span> t;
+  } <span class="hljs-keyword">else</span> {
+    <span class="hljs-keyword">return</span> <span class="hljs-built_in">std</span>::to_string(t);
+  }
+}
+
+<span class="hljs-function"><span class="hljs-keyword">int</span> <span class="hljs-title">main</span><span class="hljs-params">()</span>
+</span>{
+  <span class="hljs-keyword">auto</span> x = stringify(<span class="hljs-number">2</span>);
+  <span class="hljs-keyword">auto</span> y = stringify(<span class="hljs-string">"hello"</span>);
+}
+</code></pre>
+<p>It will not compile. The reason is, there is also no <code>to_string</code> for a char-array. We can fix this by providing an additional <code>if</code> for this <a href="https://cppinsights.io/lnk?code=I2luY2x1ZGUgPHN0cmluZz4KI2luY2x1ZGUgPHR5cGVfdHJhaXRzPgoKdGVtcGxhdGUgPHR5cGVuYW1lIFQ+CnN0ZDo6c3RyaW5nIHN0cmluZ2lmeShUJiYgdCkKewogIGlmIGNvbnN0ZXhwcihzdGQ6OmlzX3NhbWVfdjxULCBzdGQ6OnN0cmluZz4pIHsKICAgIHJldHVybiB0OwogIH0gZWxzZSBpZiBjb25zdGV4cHIoc3RkOjppc19hcnJheV92PCBzdGQ6OnJlbW92ZV9yZWZlcmVuY2VfdDxUPiA+KSB7CiAgICByZXR1cm4gc3RkOjpzdHJpbmd7dH07CiAgfSBlbHNlIHsKICAgIHJldHVybiBzdGQ6OnRvX3N0cmluZyh0KTsKICB9Cn0KCmludCBtYWluKCkKewogIGF1dG8geCA9IHN0cmluZ2lmeSgyKTsKICBhdXRvIHkgPSBzdHJpbmdpZnkoImhlbGxvIik7Cn0=&amp;std=cpp17&amp;rev=1.0">case</a>:</p>
+<pre><code class="language-C++"><span class="hljs-preprocessor">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;string&gt;</span></span>
+<span class="hljs-preprocessor">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;type_traits&gt;</span></span>
+
+<span class="hljs-keyword">template</span> &lt;<span class="hljs-keyword">typename</span> T&gt;
+<span class="hljs-built_in">std</span>::<span class="hljs-function"><span class="hljs-built_in">string</span> <span class="hljs-title">stringify</span><span class="hljs-params">(T&amp;&amp; t)</span>
+</span>{
+  <span class="hljs-function"><span class="hljs-keyword">if</span> <span class="hljs-title">constexpr</span><span class="hljs-params">(<span class="hljs-built_in">std</span>::is_same_v&lt;T, <span class="hljs-built_in">std</span>::<span class="hljs-built_in">string</span>&gt;)</span> </span>{
+    <span class="hljs-keyword">return</span> t;
+  } <span class="hljs-keyword">else</span> <span class="hljs-function"><span class="hljs-keyword">if</span> <span class="hljs-title">constexpr</span><span class="hljs-params">(<span class="hljs-built_in">std</span>::is_array_v&lt; <span class="hljs-built_in">std</span>::remove_reference_t&lt;T&gt; &gt;)</span> </span>{
+    <span class="hljs-keyword">return</span> <span class="hljs-built_in">std</span>::<span class="hljs-built_in">string</span>{t};
+  } <span class="hljs-keyword">else</span> {
+    <span class="hljs-keyword">return</span> <span class="hljs-built_in">std</span>::to_string(t);
+  }
+}
+
+<span class="hljs-function"><span class="hljs-keyword">int</span> <span class="hljs-title">main</span><span class="hljs-params">()</span>
+</span>{
+  <span class="hljs-keyword">auto</span> x = stringify(<span class="hljs-number">2</span>);
+  <span class="hljs-keyword">auto</span> y = stringify(<span class="hljs-string">"hello"</span>);
+}
+</code></pre>
+<p>Now it compiles. What C++ Insights shows you are the template instantiations for the two types. But there is more. It also shows which <code>if</code>-branch is used in that instantiation. If you look closely you can spot something else. C++ Insights shows you also that there is no <code>else if</code> in C++. There is just an <code>if</code> and a <code>else</code>. Why is this important? Because we need to apply the <code>constexpr</code> to all <code>if</code>-branches. Otherwise, we end up with a run-time if in a <code>constexpr if</code> else-branch.</p>
+<p>I’d like to thank Rainer for the opportunity to share information about C++ Insights on his popular blog!</p>
+<p>Have fun with C++ Insights. You can support the project by becoming a <a href="https://www.patreon.com/cppinsights">Patreon</a> or<br />of course with code <a href="https://github.com/andreasfertig/cppinsights">contributions</a>.</p>
+<p>Stay tuned for more insights about C++ Insights. The next post is about Variadic Templates.</p>
+<p><strong>Andreas</strong></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Paul Baxter,&nbsp; Meeting C++, Matt Braun, Avi Lachmish, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Dilettant, Marko, Ramesh Jangama,</strong><span class="sc-kpOJdX fDWXFa" title="Emyr Williams"><strong> G Prvulovic, Reiner Eiteljörge, Benjamin Huth, and Reinhold Dröge.</strong></span><strong><br /></strong></p>
+<p><strong>Thanks in particular to:&nbsp; <a href="https://www.takeupcode.com"><img style="vertical-align: top;" src="images/patreon/TakeUpCode-450-60.png" alt="TakeUpCode 450 60" width="150" height="20" /> </a></strong></p>
+<p>&nbsp;</p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at Leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 600 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
+<p></p>
+<table style="width: 800px;">
+<tbody>
+<tr>
+<td colspan="2">
+<h2>Get your interactive course</h2>
+&nbsp;</td>
+</tr>
+<tr>
+<td>
+<h4 class="_3fBEwsM053hx2mPd0uV0nT" style="text-align: center;">Modern C++ Concurrency in Practice</h4>
+</td>
+<td>
+<h4>C++ Standard Library including C++14 &amp; C++17</h4>
+</td>
+</tr>
+<tr>
+<td><a href="https://goo.gl/2qWUkK"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseConcurrency/educative.png" alt="educative" width="300" height="152" /></a></td>
+<td><a href="https://www.educative.io/collection/10370001/5712008708096000?authorName=Rainer%20Grimm"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseLibrary/CLibrary.png" alt="CLibrary" width="300" height="150" /></a></td>
+</tr>
+<tr>
+<td>
+<p>Based on my book "Concurrency with Modern C++" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>140 lessons</li>
+<li>110 code playgrounds =&gt; Runs in the browser</li>
+<li>78 code snippets</li>
+<li>55 illustrations</li>
+</ul>
+</td>
+<td>
+<p>Based on my book "The C++ Standard Library" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>149 lessons</li>
+<li>111 code playgrounds =&gt; Runs in the browser</li>
+<li>164 code snippets</li>
+<li>25 illustrations</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
