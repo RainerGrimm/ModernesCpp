@@ -1,0 +1,113 @@
+<p>Explizites Speichermanagement in C++ besitzt eine hohe Komplexität aber auch eine mindestens so große Funktionalität. Leider ist diese spezielle Domäne von C++ weitgehend unbekannt.&nbsp;So lassen sich mit ihr Objekte direkt in einem statischen Speicher, einem vor reserviertem Bereich oder auch einem Speicherpool erzeugen. Funktionalität, die für sicherheitskritische Applikationen insbesondere in der embedded Welt einen entscheidenden Mehrwert liefert. Doch vor der Kür steht die Pflicht. Daher werde ich in diesem Blog einen Überblick geben, bevor ich in weiteren Blogs auf die Details eingehen.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p>Zur Speicherallokation kommt <span style="font-family: courier new,courier;">new</span> bzw. <span style="font-family: courier new,courier;">new[]</span> zum Einsatz, zur Speicherfreigabe <span style="font-family: courier new,courier;">delete</span> bzw. <span style="font-family: courier new,courier;">delete[].</span> Das ist natürlich noch nicht die ganze Geschichte.</p>
+<h2>Speicherallokation</h2>
+<h3>new</h3>
+<p>Mit dem Operator <span style="font-family: courier new,courier;">new</span> ist es möglich, Speicher für eine Instanz eines Typs dynamisch zu allozieren.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #2b91af;">int</span>* i= <span style="color: #0000ff;">new</span> <span style="color: #2b91af;">int</span>;
+<span style="color: #2b91af;">double</span>* x= <span style="color: #0000ff;">new</span> <span style="color: #2b91af;">double</span>(10.0);
+Circle* c= <span style="color: #0000ff;">new</span> Circle;
+Point* p= <span style="color: #0000ff;">new</span> Point(1.0, 2.0);
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Die in runden Klammern spezifizierten Argumente sind die Argumente für den Konstruktor. Das Ergebnis des <span style="font-family: courier new,courier;">new</span> Befehls ist ein Zeiger des passenden Typs. Die Initialisierung geschieht nach der Allokation des Speichers. Diese zwei Schritte macht sich placement-new zu Nutzen.</p>
+<h3>new[]</h3>
+<p>Im Gegensatz zu new legt new[] ein C-Array von Objekten an. Die Klasse der zu allozierenden Objekte benötigt einen Default-Konstruktor.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #2b91af;">double</span>* da= <span style="color: #0000ff;">new</span> <span style="color: #2b91af;">double</span>[5];
+Circle* ca= <span style="color: #0000ff;">new</span> Circle[8];
+</pre>
+</div>
+<h3>Placement-new</h3>
+<p>Placement-new wird gerne verwendet, um ein Objekt in einem vor reservierten Speicherbereich zu instanziieren. Darüber hinaus kann placement-new global und für eigene Datentypen überladen werden.&nbsp;Das ist der wichtige Mehrwert, den C++ liefert.&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;">1
+2
+3
+4
+5</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #2b91af;">char</span>* memory= <span style="color: #0000ff;">new</span> <span style="color: #2b91af;">char</span>[<span style="color: #0000ff;">sizeof</span>(Account)];
+Account* a= <span style="color: #0000ff;">new</span>(memory) Account;
+
+<span style="color: #2b91af;">char</span>* memory2= <span style="color: #0000ff;">new</span> <span style="color: #2b91af;">char</span>[5*<span style="color: #0000ff;">sizeof</span>(Account)];
+Account* b= <span style="color: #0000ff;">new</span>(memory2) Account[5];
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Placement-new benötigt ein zusätzliches Argument (Zeile 2 und 5). Die Zeile 1 und 4 führt dazu, dass <span>O</span><span style="font-family: courier new,courier;"><span>perator</span> new(sizeof(Account),memory) </span>verwendet wird. Oder anders ausgedrückt. Das Objekt <span style="font-family: courier new,courier;">a </span>wird in dem Speicherbereich <span style="font-family: courier new,courier;">memory</span> instanziiert. Entsprechende Aussage gilt natürlich auch für das C-Array <span style="font-family: courier new,courier;">b</span>.</p>
+<h3>Fehlgeschlagene Allokation</h3>
+<p>Schlägt eine Speicherallokation fehl, lösen <span style="font-family: courier new,courier;">new</span> und <span style="font-family: courier new,courier;">new[]</span> eine <span style="font-family: courier new,courier;">std::bad_alloc</span>-Ausnahme aus. Dies ist aber oft nicht das gewünschte Verhalten. Statt dessen kann placement-new mit der&nbsp;Konstante <span style="font-family: courier new,courier;">std::nothrow</span> aufgerufen werden: <span style="font-family: courier new,courier;">char* c new(std::nothrow) char[10].</span> Dieser Aufruf bewirkt, dass im Fehlerfall ein Null-Zeiger zurückgegeben wird.</p>
+<h4>New Handler</h4>
+<p>Für den Fall einer fehlgeschlagenen Speicherallokation erlaubt <span style="font-family: courier new,courier;">std::set_new_handler</span> einen eigenen Handler zu verwenden. <span style="font-family: courier new,courier;">std::set_new_handler</span> gibt dabei den alten Handler zurück und erwartet eine aufrufbare Einheit, die kein Argument annimmt und kein Wert zurückgibt. Mit <span style="font-family: courier new,courier;">std::get_new_handler</span> lässt sich der Handler zurückgeben.&nbsp;</p>
+<p>Mit eigenen Handler lassen sich individuelle Strategien für fehlgeschlagenen Speicherallokationen umsetzen:</p>
+<ul>
+<li>stelle mehr Speicher zur Verfügung</li>
+<li>beendet das Programm durch <span style="font-family: courier new,courier;">std::terminate</span></li>
+<li>löse eine Ausnahme vom Typ <span style="font-family: courier new,courier;">std::bad_alloc</span> aus</li>
+</ul>
+<h2>Speicherfreigabe</h2>
+<h3>delete</h3>
+<p>Ein zuvor mittels <span style="font-family: courier new,courier;">new</span> angeforderter Speicher wir mit <span style="font-family: courier new,courier;">delete</span> wieder freigegeben.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">Circle* c= <span style="color: #0000ff;">new</span> Circle;
+...
+<span style="color: #0000ff;">delete</span> c;
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Die jeweiligen Destruktoren des Objektes und gegebenenfalls Destruktoren der Basisklassen werden automatisch aufgerufen. Falls der Destruktor der Basisklasse virtuell ist, kann das Objekt&nbsp;mit dem Zeiger oder Referenz auf die&nbsp; Basisklasse destruiert werden.</p>
+<p>Nachdem der Speicher freigegeben worden ist, ist der Zugriff das Objekt undefiniert. Der Zeiger kann aber noch auf ein anderes Objekt umgebogen werden.</p>
+<h3>delete[]</h3>
+<p>Für die Freigabe eines C-Arrays, das mit <span style="font-family: courier new,courier;">new[]</span> alloziert wurde, ist der Operator <span style="font-family: courier new,courier;">delete[]</span> zuständig.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">Circle* ca= <span style="color: #0000ff;">new</span> Circle[8];
+...
+<span style="color: #0000ff;">delete</span>[] ca;
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Durch den Aufruf von<span style="font-family: courier new,courier;"> delete[]</span> werden alle Destruktoren aller Objekte aufgerufen.</p>
+<p>Die Freigabe eines C-Arrays mit <span style="font-family: courier new,courier;">delete</span> stellt hingegen undefiniertes Verhalten dar.</p>
+<h3>Placement-delete</h3>
+<p>In Analogie zu placement-new kann auch placement-delete implementiert werden. Die Besonderheit ist aber, dass die C++-Laufzeit nicht automatisch placement-delete aufruft. Daher liegt dies in der Verantwortung des Programmierers.</p>
+<p>Eine typische Strategie besteht darin, im ersten Schritt den Destruktor explizit aufzurufen und im zweiten Schritt den Speicher mit placement-delete freizugeben.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #2b91af;">char</span>* memory= <span style="color: #0000ff;">new</span> <span style="color: #2b91af;">char</span>[<span style="color: #0000ff;">sizeof</span>(Account)];
+Account* a= <span style="color: #0000ff;">new</span>(memory) Account;  <span style="color: #008000;">// placement new</span>
+...
+a-&gt;~Account();                    <span style="color: #008000;">// destructor</span>
+<span style="color: #0000ff;">operator</span> delete(a,memory);        <span style="color: #008000;">// placement delete<br /></span>
+</pre>
+</div>
+<p>Die entsprechenden Aussagen und Strategie gelten natürlich auch beim Einsatz von placement-delete für ein C-Array.</p>
+<h2>Wie geht's weiter?</h2>
+<p>Der Weg ist vorgezeichnet. Im <a href="index.php/blog/operator-new-und-delete-ueberladen">nächsten Artikel</a> schaue ich mir genauer die Speicherallokation mit Operator <span style="font-family: courier new,courier;">new</span> und new[] und natürlich auch placement-new an.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="166" height="212" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Hole dir dein E-Book. Unterstütze meinen Blog.</span></strong></p>
+<p>&nbsp;</p>
