@@ -1,0 +1,192 @@
+<p>C++ ist eine so altmodische Programmiersprache. Sie unterstützt kein Garbage Collection. Kein Garbage Collection? Stimmt! Altmodisch? Stimmt nicht!</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p>Was spricht gegen Garbage Collection in C++? Zuallererst erst widerspricht Garbage Collection einem der wichtigsten Prinzipien in C++: "Don't pay for something you don't use". Das heißt, wenn das Programm kein Garbage Collection benötigt, soll die C++ Laufzeit auch nicht damit beschäftigt sein, den Speicher aufzuräumen. Meine zweite Erwiderung ist schon ein wenig anspruchsvoller.</p>
+<p>Wir besitzen in C++ RAII und damit die vollkommen deterministische Ausführung der Destruktoren von Objekten. Doch was ist RAII? Genau darum dreht sich der Artikel.</p>
+<h2>Rescource Acquisition Is Initialization</h2>
+<p>RAII steht für <strong>R</strong>escource <strong>A</strong>cquisition <strong>I</strong>s <strong>I</strong>nitialization. Dies wohl wichtigste C++ Idiom besagt, das eine Ressource in Konstruktor eines Objektes angefordert und im Destruktor des Objektes wieder freigegeben wird. Das entscheidende dabei ist, dass der Destruktor genau dann automatisch aufgerufen wird, wenn das Objekt seine Gültigkeit verliert. Wenn das nicht vollkommen deterministisch ist? Die Garantie geben Destruktoren in Java oder Python (<span style="font-family: courier new,courier;">__del__</span>) nicht. Daher kann es tödlich sein, in Python einen Destruktor zu verwenden, eine&nbsp;kritische Ressource wie ein Lock wieder freizugeben. Ein klassisches Anti-Pattern für einen Deadlock. Das gilt aber nicht für C++.&nbsp;</p>
+<p>Zuerst ein Beispiel, dass das deterministische Verhalten von RAII auf den Punkt bringt.&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// raii.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;new&gt;</span>
+<span style="color: #0000ff;">#include &lt;string&gt;</span>
+
+<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">ResourceGuard</span>{
+  private:
+    <span style="color: #0000ff;">const</span> std::string resource;
+  public:
+    ResourceGuard(<span style="color: #0000ff;">const</span> std::string&amp; res):resource(res){
+      std::cout &lt;&lt; <span style="color: #a31515;">"Acquire the "</span> &lt;&lt; resource &lt;&lt; <span style="color: #a31515;">"."</span> &lt;&lt;  std::endl;
+    }
+    ~ResourceGuard(){
+      std::cout &lt;&lt; <span style="color: #a31515;">"Release the "</span>&lt;&lt; resource &lt;&lt; <span style="color: #a31515;">"."</span> &lt;&lt; std::endl;
+    }
+};
+
+<span style="color: #2b91af;">int</span> main(){
+
+  std::cout &lt;&lt; std::endl;
+
+  ResourceGuard resGuard1{<span style="color: #a31515;">"memoryBlock1"</span>};
+
+  std::cout &lt;&lt; <span style="color: #a31515;">"\nBefore local scope"</span> &lt;&lt; std::endl;
+  {
+    ResourceGuard resGuard2{<span style="color: #a31515;">"memoryBlock2"</span>};
+  }
+  std::cout &lt;&lt; <span style="color: #a31515;">"After local scope"</span> &lt;&lt; std::endl;
+  
+  std::cout &lt;&lt; std::endl;
+
+  
+  std::cout &lt;&lt; <span style="color: #a31515;">"\nBefore try-catch block"</span> &lt;&lt; std::endl;
+  try{
+      ResourceGuard resGuard3{<span style="color: #a31515;">"memoryBlock3"</span>};
+      <span style="color: #0000ff;">throw</span> std::bad_alloc();
+  }   
+  <span style="color: #0000ff;">catch</span> (std::bad_alloc&amp; e){
+      std::cout &lt;&lt; e.what();
+  }
+  std::cout &lt;&lt; <span style="color: #a31515;">"\nAfter try-catch block"</span> &lt;&lt; std::endl;
+  
+  std::cout &lt;&lt; std::endl;
+
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p><span style="font-family: courier new,courier;">ResourceGuard</span> repräsentiert einen Wächter, der auf die ihm anvertraute Ressource verwaltet. In dem konkreten Fall ist die Ressource nur als String angedeutet. ResourceGuard legt in seinem Konstruktor (Zeile 11 - 13) seine Ressource an und gibt sie in seinem Destruktor (Zeile 14 - 16). Seine Aufgabe macht er sehr zuverlässig.</p>
+<p>So wird der Destruktor von <span style="font-family: courier new,courier;">resGuard1</span> (Zeile 23) genau nach dem Ende der <span style="font-family: courier new,courier;">main</span>-Funktion (Zeile 46). Die Lebenszeit von <span style="font-family: courier new,courier;">resGuard2</span> (Zeile 27) endet schon in der Zeile 28. Dies führt automatische zum Aufruf seines Destruktors. Selbst eine Ausnahme ändert nicht an der Zuverlässigkeit von <span style="font-family: courier new,courier;">resGuard3</span> (Zeile 36). Seine Destruktor wird bei dem Verlassen des<span style="font-family: courier new,courier;"> try-</span>Blocks (Zeile 35 - 38) aufgerufen.</p>
+<p>Der Screenshot des Programms zeigt schön die Lebenszyklen der Objekte.</p>
+<p><img src="images/blog/EmbeddedProgrammierung/RAII/raii.png" alt="raii" style="margin: 15px;" /></p>
+<p>Ich will nochmals auf das Programm <span style="font-family: courier new,courier;">raii.cpp</span> zurückkommen. Was ist die entscheidende Idee des RAII-Idioms?<strong> Der Lebenszyklus einer Ressource wird an den Lebensyzklus einer lokalen Variable gebunden. C++ verwaltet automatisch den Lebenszyklus seiner lokalen Ressource.</strong></p>
+<p>Die Idee ist einfach, besitzt aber weitreichende Konsequenzen für die Programmiersprache C++. Kritische Ressourcen werden in lokale Objekte verpackt. Den Rest der Arbeit übernimmt die C++-Laufzeit.</p>
+<h3>RAII überall</h3>
+<p>Dies trifft auf die Locks <a href="index.php/blog/verklemmungen-loesen">std::lock_guard, std::unique_lock</a> und <a href="index.php/blog/reader-writer-locks">std::shared_lock,</a> die eine Mutex verwalten, zu. Dies trifft aber auch auf die Smart Pointer <a href="index.php/blog/std-unique-ptr">std::unique_ptr</a>, <a href="index.php/blog/std-shared-ptr">std::shared_ptr</a> und <a href="index.php/blog/std-weak-ptr">std::weak_ptr</a>, die in der Regel Speicher verwalten, zu.</p>
+<p>So kommt durch die Hintertür RAII doch noch Garbage Collection in der Form von automatischen, explizitem Speichermanagement in den C++-Sprachumfang.</p>
+<p>Es gibt aber zwei feine Unterschied zur allgemeinen Garbage Collection.</p>
+<ol>
+<li>Das Speichermangement mit Smart Pointer muss explizit angefordert werden.</li>
+<li>Das Speichermanagment mit<span style="font-family: courier new,courier;"> std::unique_ptr</span> besitzt keinen Overhead in Geschwindigkeit und Speicher gegenüber einem einfachen Zeiger. (siehe <a href="index.php/blog/speicher-performanz-overhead-von-smart-pointern">Speicher und Performanz Overhead von Smart Pointern</a>)</li>
+</ol>
+<p>Damit bleibt C++ seinem wichtigen Prinzip in doppelter Hinsicht treu. Don't pay for something you don't use.</p>
+<h2>Besondere Ressourcen</h2>
+<p>Dank RAII wird der Destruktor des lokalen Objektes und damit die Aufräumfunktion der Ressource absolut deterministisch aufgerufen. So weit, so gut. Kann die Aufräumfunktion aber eine Ausnahme werfen, wird RAII diese Ausnahme durch seinen Destruktoraufruf immer anstoßen. Dies ist zum Beispiel der Fall, wenn die Ressource eine Datei ist. In diesem Fall kann die <span style="font-family: courier new,courier;">close</span>-Funktion eine Ausnahme auslösen. Da stellt sich natürlich die Frage, ob es tolerierbar ist, das der Destruktor ein Ausname werfen kann oder ob in diesem Fall RAII nicht verwendet werden soll. Diese Entscheidung muss natürlich im konkreten Einzelfall getroffen werden.</p>
+<h3>Umgang mit werfenden Destruktoren (<strong>Udo Steinbach</strong>)</h3>
+<p>Das Problem der werfenden Destruktoren hat Udo Steinbach deutlich beschrieben. Daher möchte ich seine E-Mail hier zitieren. Kleine Anmerkungen habe ich in runden Klammern eingefügt.</p>
+<p>RAII ist eine nützliche Sache — solange keine Fehler auftreten können. Letzteres wird beim Frohlocken über RAII leider oft vergessen. Warum ein Destruktor nicht werfen sollte, kann man an vielen Stellen <a href="https://www.qwant.com/?q=should%20destructors%20throw">https://www.qwant.com/?q=should%20destructors%20throw</a> nachlesen. Die Folge ist, das RAII in vielen Fällen manuell ergänzt werden muß und damit doppelt gemoppelt scheint.&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">class</span> <span style="color: #2b91af;">MyFileHandle</span>
+{  <span style="color: #0000ff;">public</span>:
+      MyFileHandle(...)
+         :handle(::OpenFile(...))
+      {  <span style="color: #0000ff;">if</span> (handle == nullptr)
+            <span style="color: #0000ff;">throw</span> ...;
+      }
+      ~MyFileHandle() noexcept
+      {  ::CloseFile(handle);
+      }
+   private:
+      MySystemHandle handle;
+};
+
+
+{
+   MyFileHandle file(...);
+   ...
+}<br /><br /></pre>
+</div>
+<p>Verweigert <span style="font-family: courier new,courier;">CloseFile()</span> das Schließen, wird (eine) korrekte Funktion vorgetäuscht, das Handle ist verloren, der Benutzer muß das Programm neu starten und mitunter die Datei selbst suchen und löschen, oder andere peinliche Symptome, wie sie aus Anwendungsprogrammen allzu bekannt sind. <br />Also muß die Klasse um ein werfendes</p>
+<pre><span style="font-family: courier new,courier;">void Close();</span></pre>
+<p>ergänzt werden und der Destruktor überprüfen:</p>
+<pre><span style="font-family: courier new,courier;">{ <br />  MyFileHandle file(...)<br />  </span>... <br />  file.Close();<br />}</pre>
+<p>&nbsp;</p>
+<p>Das sieht schon weniger nach RAII aus. Um eine Symmetrie herzustellen, scheint ein manuelles Open() sinnvoll:</p>
+<pre>{<br />  MyFileHandle file;<br />  file.Open(...); <br />  ...<br /><span id="transmark"></span>  file.Close();<br />}</pre>
+<p>&nbsp;</p>
+<p>… RAII perdu. Für den Liebhaber bleibt immerhin der Trost, daß das Objekt nun wiederverwendbar ist und das sowohl für den Fehlerfall Vorkehrungen getroffen wurden und es ansonsten korrekt läuft.</p>
+<p>Unter der Maßgabe einer ordentlichen Fehlerbehandlung aus Sicht des Programm-Benutzers verzichte ich bei vielen meiner Klassen auf RAII. Modultests nach einer Idee von <a href="http://www.boost.org/community/exception_safety.html" class="moz-txt-link-freetext">http://www.boost.org/community/exception_safety.html</a> zeigen</p>
+<ul>
+<li>mindestens grundlegende Ausnahmesicherheit <a href="http://en.wikipedia.org/wiki/Exception_safety" class="moz-txt-link-freetext">http://en.wikipedia.org/wiki/Exception_safety</a> ,</li>
+<li>bei ordentlcher Fehlerbehandlung, auf die bei RAII ja verzichtet werden muß, z.B. automatisches Löschen unvollständiger Dateien und weiter werfen der Ausnahme,</li>
+<li>und dem Benutzer präsentierbare Fehlermeldungen,</li>
+</ul>
+<p>ein stets bestmögliches Verhalten des Programms: Mache Benutzer und Support glücklich durch Ersetzen von Absturz und Datenmüll durch aussagekräftige Meldungen.</p>
+<p>Ein Automatismus, hier Destruktor oder Garbage Collector, kann Fehler nur automatisch behandeln, also ignorieren oder minimalistisch. In Anwendungsprogrammen sollte das nicht akzeptabel sein, und muß es auch nicht.</p>
+<h2>Die berühmten letzten Worte von Bjarne Stroustrup</h2>
+<p><img src="images/blog/EmbeddedProgrammierung/RAII/BjarneStroustrup.jpg" alt="BjarneStroustrup" /></p>
+<p>Bjarne Stroustrup schrieb einen kurzen Kommentar zu meinen News auf <a href="https://www.facebook.com/groups/cppEnthusiasts/">C++Enthusiasts: </a></p>
+<p><em>"Things are still improving": <a href="http://www.stroustrup.com/resource-model.pdf">http://www.stroustrup.com/resource-model.pdf</a></em></p>
+<p>&nbsp;</p>
+<p>Um was geht es in dem zitieren Artikel, der von Bjarne Stroustrup, Herb Sutter und Gabriel Dos Reis verfasst wurde. Hier ist ein Screenshot. Du musst den Artikel aber schon selbst lesen.</p>
+<p><img src="images/blog/EmbeddedProgrammierung/RAII/paper.png" alt="paper" width="700" height="587" style="margin: 15px;" /></p>
+<p>&nbsp;</p>
+<h2>Wie geht's weiter?</h2>
+<p>Mit den <a href="index.php/blog/explizites-speichermanagment">nächsten Artikel </a>betreten wie ein Bereich, der den C++-Experten vorbehalten sein sollte. Dem expliziten Speichermanagement mit C++.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="166" height="212" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Hole dir dein E-Book. Unterstütze meinen Blog.</span></strong></p>
+<p>&nbsp;</p>
