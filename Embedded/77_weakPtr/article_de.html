@@ -1,0 +1,232 @@
+<p><span style="font-family: courier new,courier;"><a href="index.php/blog/std-unique-ptr">std::unique_ptr</a></span> verkörpert das Konzept des exklusiven, <span style="font-family: courier new,courier;"><a href="index.php/blog/std-shared-ptr">std::shared_ptr</a></span> des geteilten Besitzes. Bleibe ich in diesem Bild, dann verkörpert der <span style="font-family: courier new,courier;">std::weak_ptr</span> das Konzept des zeitlich eingeschränkten Besitzes, den er leiht sich die Ressource von einem<span style="font-family: courier new,courier;"> std::shared_ptr</span> aus. Der <span style="font-family: courier new,courier;">std::weak_ptr</span> besitzt insbesondere eine Existenzberechtigung: Zyklische Referenzen von<span style="font-family: courier new,courier;"> std::shared_ptr</span> zu brechen.</p>
+<hr id="system-readmore" />
+<p>Betrachte ich die Interface des Smart Pointers <span style="font-family: courier new,courier;">std::weak_ptr</span>, dann ist dieses gar nicht so smart, sondern sehr eingeschränkt.</p>
+<h2>Das Interface</h2>
+<p><span style="font-family: courier new,courier;">std::weak_ptr</span> verändert im Gegensatz zu <span style="font-family: courier new,courier;">std::shared_ptr</span> nicht den Referenzzähler auf die geteilte Ressource. Das zeigt das Beispiel.</p>
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// weakPtr.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;memory&gt;</span>
+
+<span style="color: #2b91af;">int</span> main(){
+
+  std::cout &lt;&lt; std::boolalpha &lt;&lt; std::endl;
+
+  <span style="color: #0000ff;">auto</span> sharedPtr=std::make_shared&lt;<span style="color: #2b91af;">int</span>&gt;(2011);
+  std::weak_ptr&lt;<span style="color: #2b91af;">int</span>&gt; weakPtr(sharedPtr);
+  
+  std::cout &lt;&lt; <span style="color: #a31515;">"weakPtr.use_count(): "</span> &lt;&lt; weakPtr.use_count() &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"sharedPtr.use_count(): "</span> &lt;&lt; sharedPtr.use_count() &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"weakPtr.expired(): "</span> &lt;&lt; weakPtr.expired() &lt;&lt; std::endl;
+
+  <span style="color: #0000ff;">if</span>( std::shared_ptr&lt;<span style="color: #2b91af;">int</span>&gt; sharedPtr1 = weakPtr.lock() ) {
+    std::cout &lt;&lt; <span style="color: #a31515;">"*sharedPtr: "</span> &lt;&lt; *sharedPtr &lt;&lt; std::endl;
+    std::cout &lt;&lt; <span style="color: #a31515;">"sharedPtr1.use_count(): "</span> &lt;&lt; sharedPtr1.use_count() &lt;&lt; std::endl;
+  }
+  <span style="color: #0000ff;">else</span>{
+    std::cout &lt;&lt; <span style="color: #a31515;">"Don't get the resource!"</span> &lt;&lt; std::endl;
+  }
+
+  weakPtr.reset();
+  <span style="color: #0000ff;">if</span>( std::shared_ptr&lt;<span style="color: #2b91af;">int</span>&gt; sharedPtr1 = weakPtr.lock() ) {
+    std::cout &lt;&lt; <span style="color: #a31515;">"*sharedPtr: "</span> &lt;&lt; *sharedPtr &lt;&lt; std::endl;
+    std::cout &lt;&lt; <span style="color: #a31515;">"sharedPtr1.use_count(): "</span> &lt;&lt; sharedPtr1.use_count() &lt;&lt; std::endl;
+  }
+  <span style="color: #0000ff;">else</span>{
+    std::cout &lt;&lt; <span style="color: #a31515;">"Don't get the resource!"</span> &lt;&lt; std::endl;
+  }
+
+  std::cout &lt;&lt; std::endl;
+
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>In Zeile 11 erzeuge ich einen <span style="font-family: courier new,courier;">std::weak_ptr</span>, der sich eine Ressource von dem <span style="font-family: courier new,courier;">std::shared_ptr</span> ausleiht. Die Ausgabe des Programms zeigt, das der Referenzzähler auf die Ressource jeweils 1 ist (Zeile 13 und 14). Das heißt insbesondere, dass der<span style="font-family: courier new,courier;"> std::weak_ptr </span>den Referenzzähler nicht erhöht. Der Aufruf<span style="font-family: courier new,courier;"> weakPtr.expired()</span> gibt zurück, ob die Ressource bereits gelöscht wurde. Das ist äquivalent zu <span style="font-family: courier new,courier;">weakPtr.use_count() == 0</span>. Verweist der <span style="font-family: courier new,courier;">std::weak_ptr weakPtr</span> temporär auf eine Ressource, so lässt sich durch den Aufruf <span style="font-family: courier new,courier;">weakPtr.lock()</span> in Zeile 17 ein <span style="font-family: courier new,courier;">std::shared_ptr</span> erzeugen. Damit wird natürlich auch der Referenzzähler in Zeile 18 auf 2 erhöht. Setze ich den <span style="font-family: courier new,courier;">weakPtr</span> (Zeile 25) zurück, so besitzt er keine Ressource mehr und der Aufruf <span style="font-family: courier new,courier;">weakPtr.lock()</span> schlägt fehl.</p>
+<p><img src="images/blog/EmbeddedProgrammierung/weakPtr/weakPtr.png" alt="weakPtr" style="margin: 15px;" /></p>
+<p>Das war fast schon die ganze Geschichte zum <span style="font-family: courier new,courier;">std::weak_ptr.</span> Aber nur fast, denn der <span style="font-family: courier new,courier;">std::weak_ptr</span> besitzt ein klassisches Einsatzgebiet. Er hilft zyklische Referenzen von<span style="font-family: courier new,courier;"> std::shared_ptr</span> zu brechen.</p>
+<h2>Zyklische Referenzen</h2>
+<p>Zyklische Referenzen von <span style="font-family: courier new,courier;">std::shared_ptr</span> entstehen genau dann, wenn <span style="font-family: courier new,courier;">std::shared_ptr</span> gegenseitig auf sich verweisen.</p>
+<h3>Das Problem</h3>
+<p>Besteht eine zyklische Referenz von <span style="font-family: courier new,courier;">std::shared_ptr,</span> so erreicht der Referenzzähler nie den Wert 0. Damit wird die Ressource nicht automatisch gelöscht. Dies ist aber genau die Existenzberechtigung&nbsp;des <span style="font-family: courier new,courier;">std::shared_ptr.</span> Beispiel gefällig?&nbsp;</p>
+<p>In der Graphik befinden sich zwei Zyklen. Zum einen zwischen der Mutter und ihrer Tocher, zum anderen zwischen der Mutter und ihrem Sohn. Der feine Unterschied ist aber, das die Mutter ihre Tochter mit einem <span style="font-family: courier new,courier;">std::weak_ptr</span> referenziert. Damit ist shared_ptr-Zyklus aufgebrochen.</p>
+<p><img src="images/blog/EmbeddedProgrammierung/weakPtr/cycle.jpg" alt="cycle" width="500" height="321" style="margin: 15px;" /></p>
+<p>Wer mehr am Sourcecode orientiert ist, der findet die gleiche Struktur hier nochmals wieder.</p>
+<p>&nbsp;</p>
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// cycle.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;memory&gt;</span>
+
+<span style="color: #0000ff;">struct</span> Son;
+<span style="color: #0000ff;">struct</span> Daughter;
+
+<span style="color: #0000ff;">struct</span> Mother{
+  ~Mother(){
+    std::cout &lt;&lt; <span style="color: #a31515;">"Mother gone"</span> &lt;&lt; std::endl;
+  }
+  <span style="color: #2b91af;">void</span> setSon(<span style="color: #0000ff;">const</span> std::shared_ptr&lt;Son&gt; s ){
+    mySon=s;
+  }
+  <span style="color: #2b91af;">void</span> setDaughter(<span style="color: #0000ff;">const</span> std::shared_ptr&lt;Daughter&gt; d ){
+    myDaughter=d;
+  }
+  std::shared_ptr&lt;<span style="color: #0000ff;">const</span> Son&gt; mySon;
+  std::weak_ptr&lt;<span style="color: #0000ff;">const</span> Daughter&gt; myDaughter;
+};
+
+<span style="color: #0000ff;">struct</span> Son{
+  Son(std::shared_ptr&lt;Mother&gt; m):myMother(m){}
+  ~Son(){
+    std::cout &lt;&lt; <span style="color: #a31515;">"Son gone"</span> &lt;&lt; std::endl;
+  }
+  std::shared_ptr&lt;<span style="color: #0000ff;">const</span> Mother&gt; myMother;
+};
+
+<span style="color: #0000ff;">struct</span> Daughter{
+  Daughter(std::shared_ptr&lt;Mother&gt; m):myMother(m){}
+  ~Daughter(){
+    std::cout &lt;&lt; <span style="color: #a31515;">"Daughter gone"</span> &lt;&lt; std::endl;
+  }
+  std::shared_ptr&lt;<span style="color: #0000ff;">const</span> Mother&gt; myMother;
+};
+
+<span style="color: #2b91af;">int</span> main(){
+  std::cout &lt;&lt; std::endl;
+  {
+    std::shared_ptr&lt;Mother&gt; mother= std::shared_ptr&lt;Mother&gt;( <span style="color: #0000ff;">new</span> Mother);
+    std::shared_ptr&lt;Son&gt; son= std::shared_ptr&lt;Son&gt;( <span style="color: #0000ff;">new</span> Son(mother) );
+    std::shared_ptr&lt;Daughter&gt; daughter= std::shared_ptr&lt;Daughter&gt;( <span style="color: #0000ff;">new</span> Daughter(mother) );
+    mother-&gt;setSon(son);
+    mother-&gt;setDaughter(daughter);
+  }
+  std::cout &lt;&lt; std::endl;
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Durch den künstlichen Block in Zeile 41 bis 47 wird die Lebenszeit von <span style="font-family: courier new,courier;">mother,</span> <span style="font-family: courier new,courier;">son</span> und <span style="font-family: courier new,courier;">daughter</span> eingeschränkt. Oder anders ausgedrückt.<span style="font-family: courier new,courier;"> mother</span>, <span style="font-family: courier new,courier;">son</span> und <span style="font-family: courier new,courier;">daughter</span> verlieren ihre Gültigkeit und damit sollter der Konstruktor der Klasse <span style="font-family: courier new,courier;">M</span>other (Zeile 10 - 12), <span style="font-family: courier new,courier;">Son</span> (Zeile 25 - 27) und <span style="font-family: courier new,courier;">Daughter</span> (Zeile 33 - 35) automatisch aufgerufen werden.</p>
+<p>Tatsächlich wird aber nur der Destruktor der Klasse <span style="font-family: courier new,courier;">Daughter</span> aufgerufen.</p>
+<p><img src="images/blog/EmbeddedProgrammierung/weakPtr/cycle.png" alt="cycle" style="margin: 15px;" /></p>
+<p>Die Graphik oder auch der Source bringen es auf den Punkt. Zwischen <span style="font-family: courier new,courier;">mother</span> und <span style="font-family: courier new,courier;">son</span> besteht eine zyklische Referenz von <span style="font-family: courier new,courier;">std::shared_ptr.</span>&nbsp; Damit ist Referenzzähler immer größer als 0 und der Destruktor der Ressourcen kann nicht aufgerufen werden. Das gilt aber nicht für <span style="font-family: courier new,courier;">mother</span> und <span style="font-family: comic sans ms,sans-serif;">daughter.</span> Verlässt <span style="font-family: courier new,courier;">daughter</span> ihren Gültigkeitsbereich, führt dies dazu, dass der Referenzzähler von <span style="font-family: courier new,courier;">std::shared_ptr myMother</span> (Zeile 36) den Wert 0 erhält und automatisch die Ressource freigegeben wird.</p>
+<h2>Wie geht's weiter?</h2>
+<p>Die Container der Standard Template Library (STL) legen automatische dynamischen Speicher für ihre Elemente an. Diese trifft auf die assoziativen und die sequentiellen Container zu. Besonders mächtig ist das automatische Speichermanagement der sequentiellen Container <span style="font-family: courier new,courier;">std::vector</span> und des <span style="font-family: courier new,courier;">std::string.</span> Auch wenn <span style="font-family: courier new,courier;">std::string</span> kein sequentieller Container der STL ist, ist er einem <span style="font-family: courier new,courier;">std::vector&lt;char&gt;</span> sehr ähnlich. Grund genug, sich das automatische Speichermanagement der beiden Container im <a href="index.php/blog/automatisches-speichermanagement">nächsten Artikel</a> genauer anzuschauen.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="166" height="212" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Hole dir dein E-Book. Unterstütze meinen Blog.</span></strong></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
