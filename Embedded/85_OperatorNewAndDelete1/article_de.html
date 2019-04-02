@@ -1,0 +1,440 @@
+<p>Häufig kommt es in C++ Applikationen vor, dass Speicher zwar angefordert aber nicht mehr freigegeben wird. Hier schlägt die Stunden von operator new und delete. Dank den beiden Operatoren ist es möglich, das Speichermanagement der Applikation explizit zu verwalten.&nbsp;</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p>Das ein oder andere Mal wurde ich von Kunden schon beauftragt, zu verifizieren, ob eine Applikation ihren Speicher wieder ordentlich freigibt. Gerade bei Anwendungen, die über einen längeren Zeitraum häufig Speicher anfordern und wieder freigeben, ist die richtige Speicherverwaltung eine der zentralen Herausforderungen. Die automatische Freigabe des Speichers beim Schließen der Applikation ist in diesem Fall natürlich keine Option.</p>
+<h2>Der Startpunkt</h2>
+<p>Als Startpunkt für meine Analyse verwende ich ein kleines Programm, das relativ häufig Speicher anfordert und wieder freigibt. In der Realität wird die Applikation natürlich deutlich größer sein. Das ändert aber nichts an meiner Strategie.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// overloadOperatorNewAndDelete.cpp</span>
+
+<span style="color: #008000;">// #include "myNew.hpp"</span>
+<span style="color: #008000;">// #include "myNew2.hpp"</span>
+<span style="color: #008000;">// #include "myNew3.hpp"</span>
+
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;string&gt;</span>
+
+<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">MyClass</span>{
+  <span style="color: #2b91af;">float</span>* p= <span style="color: #0000ff;">new</span> <span style="color: #2b91af;">float</span>[100];
+};
+
+<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">MyClass2</span>{
+  <span style="color: #2b91af;">int</span> five= 5;
+  std::string s= <span style="color: #a31515;">"hello"</span>;
+};
+
+
+<span style="color: #2b91af;">int</span> main(){
+    
+    <span style="color: #2b91af;">int</span>* myInt= <span style="color: #0000ff;">new</span> <span style="color: #2b91af;">int</span>(1998);
+    <span style="color: #2b91af;">double</span>* myDouble= <span style="color: #0000ff;">new</span> <span style="color: #2b91af;">double</span>(3.14);
+    <span style="color: #2b91af;">double</span>* myDoubleArray= <span style="color: #0000ff;">new</span> <span style="color: #2b91af;">double</span>[2]{1.1,1.2};
+    
+    MyClass* myClass= <span style="color: #0000ff;">new</span> MyClass;
+    MyClass2* myClass2= <span style="color: #0000ff;">new</span> MyClass2;
+    
+    <span style="color: #0000ff;">delete</span> myDouble;
+    <span style="color: #0000ff;">delete</span> [] myDoubleArray;
+    <span style="color: #0000ff;">delete</span> myClass;
+    <span style="color: #0000ff;">delete</span> myClass2;
+    
+<span style="color: #008000;">//  getInfo();</span>
+    
+}<span id="transmark"></span>
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Die Frage stellt sich mir nun natürlich. Gibt es in dem Programm zu jedem <span style="font-family: courier new,courier;">new</span> einen <span style="font-family: courier new,courier;">delete</span> Aufruf?</p>
+<h2>Ein bisschen nachlässig</h2>
+<p>Diese Frage lässt sich einfach beantworten, indem ich den globalen<span style="font-family: courier new,courier;"> operator new</span> und <span style="font-family: courier new,courier;">delete</span> überlade. Bei beiden Operatoren zähle ich mit, wie häufig sie verwendet wurden.</p>
+<h3>Operator new</h3>
+<p>Den globalen <span style="font-family: courier new,courier;">operator new</span> gibt es in vier Variationen.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #2b91af;">void</span>* <span style="color: #0000ff;">operator</span> new  ( std::<span style="color: #2b91af;">size_t</span> count );
+<span style="color: #2b91af;">void</span>* <span style="color: #0000ff;">operator</span> <span style="color: #0000ff;">new</span>[]( std::<span style="color: #2b91af;">size_t</span> count );
+<span style="color: #2b91af;">void</span>* <span style="color: #0000ff;">operator</span> new  ( std::<span style="color: #2b91af;">size_t</span> count, <span style="color: #0000ff;">const</span> std::<span style="color: #2b91af;">nothrow_t</span>&amp; tag);
+<span style="color: #2b91af;">void</span>* <span style="color: #0000ff;">operator</span> <span style="color: #0000ff;">new</span>[]( std::<span style="color: #2b91af;">size_t</span> count, <span style="color: #0000ff;">const</span> std::<span style="color: #2b91af;">nothrow_t</span>&amp; tag);
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Die ersten zwei Varianten, werfen eine<span style="font-family: courier new,courier;"> std::bad_alloc</span> Ausnahme, wenn sie den Speicher nicht bereitstellen können. Die letzten zwei Varianten geben einen Null-Zeiger zurück. Das schöne ist, dass es ausreicht die Variante 1 zu überladen, da die 2-4 Variante implizit <span style="font-family: courier new,courier;">void* operator new ( std::size_t count ) </span>aufrufen. Das gilt auch für die Variante 2 und 4, die für C-Arrays konzipiert sind. Die Details zum globalen <span style="font-family: courier new,courier;">operator new</span> sind auf <a href="http://en.cppreference.com/w/cpp/memory/new/operator_new">cppreference.com</a> schön nachzulesen.</p>
+<p>Die Aussagen lassen sich direkt auf <span style="font-family: courier new,courier;"> <span style="font-family: courier new,courier;">operator delete</span> </span>übertragen.<span style="font-family: courier new,courier;"><br /></span></p>
+<h3>Operator delete</h3>
+<p>&nbsp;Für den <span style="font-family: courier new,courier;">operator delete</span> gibt es sogar sechs Variationen.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #2b91af;">void</span> <span style="color: #0000ff;">operator</span> delete  ( <span style="color: #2b91af;">void</span>* ptr ); 	
+<span style="color: #2b91af;">void</span> <span style="color: #0000ff;">operator</span> <span style="color: #0000ff;">delete</span>[]( <span style="color: #2b91af;">void</span>* ptr );
+<span style="color: #2b91af;">void</span> <span style="color: #0000ff;">operator</span> delete  ( <span style="color: #2b91af;">void</span>* ptr, <span style="color: #0000ff;">const</span> std::<span style="color: #2b91af;">nothrow_t</span>&amp; tag );
+<span style="color: #2b91af;">void</span> <span style="color: #0000ff;">operator</span> <span style="color: #0000ff;">delete</span>[]( <span style="color: #2b91af;">void</span>* ptr, <span style="color: #0000ff;">const</span> std::<span style="color: #2b91af;">nothrow_t</span>&amp; tag );
+<span style="color: #2b91af;">void</span> <span style="color: #0000ff;">operator</span> delete  ( <span style="color: #2b91af;">void</span>* ptr, std::<span style="color: #2b91af;">size_t</span> sz );
+<span style="color: #2b91af;">void</span> <span style="color: #0000ff;">operator</span> <span style="color: #0000ff;">delete</span>[]( <span style="color: #2b91af;">void</span>* ptr, std::<span style="color: #2b91af;">size_t</span> sz );
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Wie bei <span style="font-family: courier new,courier;">operator new</span> ist es bei <span style="font-family: courier new,courier;">operator delete</span> ausreichend, nur die Variante eins zu implementieren, da alle übrigen 5 Varianten implizit &nbsp;<span style="font-family: courier new,courier;">void operator delete ( void* ptr ) </span>aufrufen. Noch ein Wort zu den letzten zwei <span style="font-family: courier new,courier;">operator delete Funktionen.</span> In ihnen steht die Länge des korrespondierenden <span style="font-family: courier new,courier;">new</span> Operators mit der Variable sz zu Verfügung. Die Details gibt wieder auf <a href="http://en.cppreference.com/w/cpp/memory/new/operator_delete">cppreference.com</a>.</p>
+<p>In dem Programm <span style="font-family: courier new,courier;">overloadOperatorNewAndDelete.cpp</span> kommentiere ich nun die Zeile 3 ein, in der die Header-Datei <span style="font-family: courier new,courier;">myNew.hpp</span> eingelesen wird. Das gleiche gilt für die Zeile 34, in der die Funktion <span style="font-family: courier new,courier;">getInfo</span> Information zum Speichermanagement ausgibt.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// myNew.hpp</span>
+
+<span style="color: #0000ff;">#ifndef MY_NEW</span>
+<span style="color: #0000ff;">#define MY_NEW</span>
+
+<span style="color: #0000ff;">#include &lt;cstdlib&gt;</span>
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;new&gt;</span>
+
+<span style="color: #0000ff;">static</span> std::<span style="color: #2b91af;">size_t</span> alloc{0};
+<span style="color: #0000ff;">static</span> std::<span style="color: #2b91af;">size_t</span> dealloc{0};
+
+<span style="color: #2b91af;">void</span>* <span style="color: #0000ff;">operator</span> new(std::<span style="color: #2b91af;">size_t</span> sz){
+    alloc+= 1;
+    <span style="color: #0000ff;">return</span> std::malloc(sz);
+}
+
+<span style="color: #2b91af;">void</span> <span style="color: #0000ff;">operator</span> <span style="color: #0000ff;">delete</span>(<span style="color: #2b91af;">void</span>* ptr) noexcept{
+    dealloc+= 1;
+    std::free(ptr);
+}
+
+<span style="color: #2b91af;">void</span> getInfo(){
+    
+    std::cout &lt;&lt; std::endl;
+ 
+    std::cout &lt;&lt; <span style="color: #a31515;">"Number of allocations: "</span> &lt;&lt; alloc &lt;&lt; std::endl;
+    std::cout &lt;&lt; <span style="color: #a31515;">"Number of deallocations: "</span> &lt;&lt; dealloc &lt;&lt; std::endl;
+    
+    std::cout &lt;&lt; std::endl;
+}
+
+<span style="color: #0000ff;">#endif </span><span style="color: #008000;">// MY_NEW</span>
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>In der Datei lege ich zwei statische Variablen <span style="font-family: courier new,courier;">alloc </span>und <span style="font-family: courier new,courier;">dealloc</span> (Zeile 10 und 11) an, die mit zählen, wie oft der überladene <span style="font-family: courier new,courier;">operator new</span> (Zeile 13) und <span style="font-family: courier new,courier;">operator delete</span> (Zeile 18) aufgerufen wird. In beiden Funktionen greife ich wiederum auf die Funktionen<span style="font-family: courier new,courier;"> std::malloc</span> bzw.<span style="font-family: courier new,courier;"> std::free</span> zu Speicherallokation als auch Speicherfreigabe zurück. Die Funktion <span style="font-family: courier new,courier;">getInfo</span> (Zeile 23 - 31) fasst die Ergebnisse zusammen und gibt sie aus.</p>
+<p>Die Frage ist nun. Habe ich den Speicher sauber aufgeräumt?</p>
+<p>&nbsp;<img src="images/blog/EmbeddedProgrammierung/OverloadOperatorNewAndDelete/myNew.png" alt="myNew" style="margin: 15px;" /></p>
+<p>Anscheinend war ich nicht so ordentlich. Jetzt weiß ich zu mindestens, das ich Speicherlecks besitze. Vielleicht hilft es mir ja weiter, wenn ich die Adresse der Objekte bestimme, die ich nicht aufgeräumt habe.</p>
+<h2>Adresse der Speicherlecks</h2>
+<p>In die Headerdatei <span style="font-family: courier new,courier;">myNew2.hpp</span> muss ich jetzt mehr Intelligenz rein stecken.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// myNew2.hpp</span>
+
+<span style="color: #0000ff;">#ifndef MY_NEW2</span>
+<span style="color: #0000ff;">#define MY_NEW2</span>
+
+<span style="color: #0000ff;">#include &lt;algorithm&gt;</span>
+<span style="color: #0000ff;">#include &lt;cstdlib&gt;</span>
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;new&gt;</span>
+<span style="color: #0000ff;">#include &lt;string&gt;</span>
+<span style="color: #0000ff;">#include &lt;array&gt;</span>
+
+<span style="color: #2b91af;">int</span> <span style="color: #0000ff;">const</span> MY_SIZE= 10;
+
+std::array&lt;<span style="color: #2b91af;">void</span>* ,MY_SIZE&gt; myAlloc{nullptr,};
+    
+<span style="color: #2b91af;">void</span>* <span style="color: #0000ff;">operator</span> new(std::<span style="color: #2b91af;">size_t</span> sz){
+    <span style="color: #0000ff;">static</span> <span style="color: #2b91af;">int</span> counter{};
+    <span style="color: #2b91af;">void</span>* ptr= std::malloc(sz);
+    myAlloc.at(counter++)= ptr;
+    <span style="color: #0000ff;">return</span> ptr;
+}
+
+<span style="color: #2b91af;">void</span> <span style="color: #0000ff;">operator</span> delete(<span style="color: #2b91af;">void</span>* ptr) noexcept{
+    <span style="color: #0000ff;">auto</span> ind= std::distance(myAlloc.begin(),std::find(myAlloc.begin(),myAlloc.end(),ptr));
+    myAlloc[ind]= nullptr;
+    std::free(ptr);
+}
+
+<span style="color: #2b91af;">void</span> getInfo(){
+    
+    std::cout &lt;&lt; std::endl;
+     
+    std::cout &lt;&lt; <span style="color: #a31515;">"Not deallocated: "</span> &lt;&lt; std::endl;
+    <span style="color: #0000ff;">for</span> (<span style="color: #0000ff;">auto</span> i: myAlloc){
+        <span style="color: #0000ff;">if</span> (i != nullptr ) std::cout &lt;&lt; <span style="color: #a31515;">" "</span> &lt;&lt; i &lt;&lt; std::endl;
+    }
+    
+    std::cout &lt;&lt; std::endl;
+    
+}
+
+<span style="color: #0000ff;">#endif </span><span style="color: #008000;">// MY_NEW2</span>
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Die zentrale Idee ist es, in dem statischen Array <span style="font-family: courier new,courier;">myAlloc</span> (Zeile 15) genau Buch zu führen, welche Adresse ich von <span style="font-family: courier new,courier;">std::malloc</span> (Zeile 19) erhalten habe und welche ich mit <span style="font-family: courier new,courier;">std::free</span> wieder (Zeile 27)&nbsp;freigegeben habe. In der Funktion operator new kann ich natürlich keine Container verwenden, der Speicher anfordert. Da dieser Container wiederum die Funktion operator new aufruft. Eine Rekursion, die zwangsläufig zum Absturz des Programms führt. Aus diesem Grunde kommt<span style="font-family: courier new,courier;"> std::array</span> in Zeile 15 zu Einsatz, da <span style="font-family: courier new,courier;">std::array</span> seinen Speicher bereits zur Compilezeit anfordert. Da es natürlich passieren kann, dass das <span style="font-family: courier new,courier;">std::array</span> für das neue Hinzufügen von Elementen zu klein ist, verwende ich in dem konkreten Fall den <span style="font-family: courier new,courier;">myAlloc.at(counter++)</span>. Dieser überprüft die Grenzen des Arrays.&nbsp;</p>
+<p>Welche Speicheradressen habe ich vergessen freizugeben? Diese Frage beantwortet die Ausgabe des Programms.</p>
+<p><img src="images/blog/EmbeddedProgrammierung/OverloadOperatorNewAndDelete/myNew2.png" alt="myNew2" style="margin: 15px;" /></p>
+<p>Eine naive Suche nach Objekten im Code, die diese Adresse besitzen, ist keine gute Idee. Den es kann durchaus sein, dass der Aufruf <span style="font-family: courier new,courier;">std::malloc</span> eine bereits vergebene Adresse nochmals zurückgibt. Dies ist möglich, wenn das ursprünglich erzeugte Objekt zwischenzeitlich gelöscht wurde.</p>
+<p>Warum sind die Adresse aber trotzdem Teil der Lösung? Wir müssen nur die Speicheradresse beim Erzeugen der Objekte mit den Adressen der nicht gelöschten Speicherbereichen vergleichen.</p>
+<h2>Vergleich der Speicheradressen</h2>
+<p>Neben der reservierten Speicherbereiche besitzen wir natürlich auch die Größe des reservierten Speichers. Die Information lasse ich zusätzlich in <span style="font-family: courier new,courier;">operator new</span> einfließen.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// myNew3.hpp</span>
+
+<span style="color: #0000ff;">#ifndef MY_NEW3</span>
+<span style="color: #0000ff;">#define MY_NEW3</span>
+
+<span style="color: #0000ff;">#include &lt;algorithm&gt;</span>
+<span style="color: #0000ff;">#include &lt;cstdlib&gt;</span>
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;new&gt;</span>
+<span style="color: #0000ff;">#include &lt;string&gt;</span>
+<span style="color: #0000ff;">#include &lt;array&gt;</span>
+
+<span style="color: #2b91af;">int</span> <span style="color: #0000ff;">const</span> MY_SIZE= 10;
+
+std::array&lt;<span style="color: #2b91af;">void</span>* ,MY_SIZE&gt; myAlloc{nullptr,};
+    
+<span style="color: #2b91af;">void</span>* <span style="color: #0000ff;">operator</span> new(std::<span style="color: #2b91af;">size_t</span> sz){
+    <span style="color: #0000ff;">static</span> <span style="color: #2b91af;">int</span> counter{};
+    <span style="color: #2b91af;">void</span>* ptr= std::malloc(sz);
+    myAlloc.at(counter++)= ptr;
+    std::cerr &lt;&lt; <span style="color: #a31515;">"Addr.: "</span> &lt;&lt; ptr &lt;&lt; <span style="color: #a31515;">" size: "</span> &lt;&lt; sz &lt;&lt; std::endl;
+    <span style="color: #0000ff;">return</span> ptr;
+}
+
+<span style="color: #2b91af;">void</span> <span style="color: #0000ff;">operator</span> delete(<span style="color: #2b91af;">void</span>* ptr) noexcept{
+    <span style="color: #0000ff;">auto</span> ind= std::distance(myAlloc.begin(),std::find(myAlloc.begin(),myAlloc.end(),ptr));
+    myAlloc[ind]= nullptr;
+    std::free(ptr);
+}
+
+<span style="color: #2b91af;">void</span> getInfo(){
+    
+    std::cout &lt;&lt; std::endl;
+     
+    std::cout &lt;&lt; <span style="color: #a31515;">"Not deallocated: "</span> &lt;&lt; std::endl;
+    <span style="color: #0000ff;">for</span> (<span style="color: #0000ff;">auto</span> i: myAlloc){
+        <span style="color: #0000ff;">if</span> (i != nullptr ) std::cout &lt;&lt; <span style="color: #a31515;">" "</span> &lt;&lt; i &lt;&lt; std::endl;
+    }
+    
+    std::cout &lt;&lt; std::endl;
+    
+}
+
+<span style="color: #0000ff;">#endif </span><span style="color: #008000;">// MY_NEW3</span>
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Damit wird die Allokation und Deallokation der Applikation deutlich transparenter.</p>
+<p><img src="images/blog/EmbeddedProgrammierung/OverloadOperatorNewAndDelete/myNew3.png" alt="myNew3" style="margin: 15px;" /></p>
+<p>Ein einfacher Vergleich zeigt. Zum einen wurde ein Objekt mit 4 Byte nicht freigegeben, zum andern ein Objekt mit 400 Byte. Darüber hinaus entspricht die Reihenfolge der Allokation im Sourcecode der der Ausgabe des Programms. Nun sollte es recht einfach sein, die vergessenen Speicherfreigaben zu identifizieren.</p>
+<h2>Wie geht's weiter?</h2>
+<p>Das Programm besitzt noch zwei Unschönheiten. Zum einen wird der Speicher für das <span style="font-family: courier new,courier;">std::array</span> statisch allokiert, zum andern möchte ich gerne direkt sehen, welcher Speicherbereich nicht freigegeben wurde. Im <a href="index.php/blog/operator-new-und-delete-ueberladen-teil-2">nächsten Artikel</a> werde ich an den Unschönheiten arbeiten.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="166" height="212" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Hole dir dein E-Book. Unterstütze meinen Blog.</span></strong></p>
+<p>&nbsp;</p>
