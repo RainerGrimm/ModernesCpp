@@ -1,0 +1,302 @@
+<p><span style="font-family: courier new,courier;">std::shared_ptr </span>teilen sich eine gemeinsame Ressource.&nbsp;Dabei zählt der gemeinsame Referenzzähler mit, wie viele Besitzer die Ressource hat. Wird der<span style="font-family: courier new,courier;"> Smart Poi</span><span style="font-family: courier new,courier;">nter</span><span style="font-family: courier new,courier;"> std::shared_ptr</span> kopiert, erhöht sich automatisch der Referenzzähler. Beim Löschen eines <span style="font-family: courier new,courier;">std::shared_prt</span> wird sein Referenzzähler hingegen automatisch erniedrigt. Erreicht der Referenzzähler den Wert 0, <span style="font-family: courier new,courier;"></span>wird die Ressource freigegeben.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p>Bevor ich auf die Details rund um den <span style="font-family: courier new,courier;">std::shared_ptr </span>genauer eingehe, möchte ich erst mal seine Basics vorstellen.</p>
+<h2>Die Basics</h2>
+<p>Wird eine <span style="font-family: courier new,courier;">std::shared_ptr</span> kopiert, erhöht sich sein Referenzzähler um 1. Beide Smart Pointer verweisen auf die gleiche Ressource. Dies Szenario stellt die folgende Graphik schematisch dar.</p>
+<p><img src="images/blog/EmbeddedProgrammierung/sharedPtr/sharedPtr.jpg" alt="sharedPtr" width="600" height="341" style="margin: 15px;" /></p>
+<p>Mit Hilfe von <span style="font-family: courier new,courier;">shared1</span> wird <span style="font-family: courier new,courier;">shared2</span> initialisiert. Danach besitzt der Referenzzähler den Wert 2 und beide Smart Pointer verweisen auf die gleiche Ressource.</p>
+<p>&nbsp;</p>
+<h3>Die Anwendung</h3>
+<p>Das Programm zeigt den typischen Umgang mit dem Smart Pointer. Damit sich der Lebenszyklus seiner Ressource besser nachvollziehen lässt, habe ich den Konstruktor und Destruktor von <span style="font-family: courier new,courier;">MyInt</span> (Zeile 8 - 16) mit Ausgaben versehen.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// sharedPtr.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;memory&gt;</span>
+
+<span style="color: #0000ff;">using</span> std::shared_ptr;
+
+<span style="color: #0000ff;">struct</span> MyInt{
+  MyInt(<span style="color: #2b91af;">int</span> v):val(v){
+    std::cout &lt;&lt; <span style="color: #a31515;">"  Hello: "</span> &lt;&lt; val &lt;&lt; std::endl;
+  }
+  ~MyInt(){
+    std::cout &lt;&lt; <span style="color: #a31515;">"  Good Bye: "</span> &lt;&lt; val &lt;&lt; std::endl;
+  }
+  <span style="color: #2b91af;">int</span> val;
+};
+
+<span style="color: #2b91af;">int</span> main(){
+
+  std::cout &lt;&lt; std::endl;
+
+  shared_ptr&lt;MyInt&gt; sharPtr(<span style="color: #0000ff;">new</span> MyInt(1998));
+  std::cout &lt;&lt; <span style="color: #a31515;">"    My value: "</span> &lt;&lt; sharPtr-&gt;val &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"sharedPtr.use_count(): "</span> &lt;&lt; sharPtr.use_count() &lt;&lt; std::endl;
+
+
+  {
+    shared_ptr&lt;MyInt&gt; locSharPtr(sharPtr);
+    std::cout &lt;&lt; <span style="color: #a31515;">"locSharPtr.use_count(): "</span> &lt;&lt; locSharPtr.use_count() &lt;&lt; std::endl;
+  }
+  std::cout &lt;&lt; <span style="color: #a31515;">"sharPtr.use_count(): "</span>&lt;&lt;  sharPtr.use_count() &lt;&lt; std::endl;
+
+  shared_ptr&lt;MyInt&gt; globSharPtr= sharPtr;
+  std::cout &lt;&lt; <span style="color: #a31515;">"sharPtr.use_count(): "</span>&lt;&lt;  sharPtr.use_count() &lt;&lt; std::endl;
+  globSharPtr.reset();
+  std::cout &lt;&lt; <span style="color: #a31515;">"sharPtr.use_count(): "</span>&lt;&lt;  sharPtr.use_count() &lt;&lt; std::endl;
+
+  sharPtr= shared_ptr&lt;MyInt&gt;(<span style="color: #0000ff;">new</span> MyInt(2011));
+
+  std::cout &lt;&lt; std::endl;
+  
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Die Ausgabe des Programms zeigt der Screenshot.</p>
+<p><img src="images/blog/EmbeddedProgrammierung/sharedPtr/sharedPtr.png" alt="sharedPtr" style="margin: 15px;" />&nbsp;</p>
+<p>In Zeile 22 wird <span style="font-family: courier new,courier;">MyInt(1998)</span> erzeugt. Dies ist die Ressource, um dessen Lebenszyklus sich der Smart Pointer <span style="font-family: courier new,courier;">shardPtr</span> kümmert. <span style="font-family: courier new,courier;">sharPtr-&gt;val</span> erlaubt es in Zeile 23, direkt auf die Ressource zuzugreifen. Die Ausgaben der Konsole zeigen schön, wie der Referenzzähler in Zeile 24 mit 1 startet, durch die lokale Kopie von <span style="font-family: courier new,courier;">sharPtr</span>&nbsp;in Zeile 28 erhöht wird und nach dem Bereich in Zeile 27 - 30 wieder den Wert 1 besitzt. Sowohl die Kopier-Zuweisung in Zeile 33 als auch das Zurücksetzen der Ressource in Zeile 35 modifizieren den Referenzzähler. Besonders interessant ist der Ausdruck <span style="font-family: comic sans ms,sans-serif;"><span style="font-family: courier new,courier;">sharPtr= shared_ptr&lt;MyInt&gt;(new MyInt(2011))</span> </span><span style="font-family: comic sans ms,sans-serif;">i</span>n Zeile 38. Im ersten Schritt wird die Ressource<span style="font-family: courier new,courier;"> MyInt(2011) </span>erzeugt und diese dem <span style="font-family: comic sans ms,sans-serif;"><span style="font-family: courier new,courier;">sharPtr</span></span> zugewiesen. Das führt dazu, dass der Destruktor von <span style="font-family: courier new,courier;">sharPtr</span> aufgerufen wird, <span style="font-family: comic sans ms,sans-serif;">den dieser war der alleinige Besitzer der Ressource <span style="font-family: courier new,courier;">new MyInt(1998)</span> </span>aus Zeile 22. Beim Verlassen der main-Funktion wird die letzte Ressource<span style="font-family: comic sans ms,sans-serif;"> <span style="font-family: courier new,courier;">new MyInt(2011)</span> </span>aufgeräumt.&nbsp;</p>
+<p>Das vorgestellte Programm hatte wenig Überraschungspotential. Auf die Suche in die Breite folgt nun die in die Tiefe.</p>
+<h3>Der Kontrollblock</h3>
+<p>Die <span style="font-family: courier new,courier;">std::shared_ptr</span> teilen sich nicht nur eine Ressource und einen Referenzzähler. Sie teilen sich eine Ressource und einen ganzen Kontrollblock. Dieser Kontrollblock enthält zwei Zähler und gegebenenfalls zusätzliche Daten. Zwei Zähler? Der Kontrollblock besitzt einen Zähler für die <span style="font-family: courier new,courier;">std::shared_ptr</span> und die <span style="font-family: courier new,courier;">std::weak_ptr,</span> die auf ihn verweisen. Jetzt kommen zum ersten Mal die <span style="font-family: courier new,courier;">std::weak_ptr</span> ins Spiel. Sie dienen dazu, zyklische Referenzen von <span style="font-family: courier new,courier;">std::shared</span>_ptr aufzulösen. Über sie und das Problem mit zyklischen Referenzen werde ich in einem weiteren Artikel schreiben. Nun nochmals alles im Überblick.</p>
+<p>Der Kontrollblock enthält</p>
+<ul>
+<li>einen Zähler für <span style="font-family: courier new,courier;">std::shared_ptr.</span></li>
+<li>einen Zähler für <span style="font-family: courier new,courier;">std::weak_ptr.</span></li>
+<li>gegebenfalls weitere Daten wie einen eigene Löschfunktion oder einen Allocator.</li>
+</ul>
+<p>Wird ein <span style="font-family: courier new,courier;">std::shared_ptr</span> zusammen mit seiner Ressource erzeugt, sind zwei teure Speicherallokationen notwendig. Eine Speicherallokation für die Ressource und eine für den Kontrollblock. Das kann <span style="font-family: courier new,courier;">std::make_shared</span> in einem Schritt. Dies ist der Grund dafür, dass <span style="font-family: courier new,courier;">std::make_shared</span> deutlich schneller ist als das explizite Erzeugen eines <span style="font-family: courier new,courier;">std::shared_ptr</span>. Wer den Zahlen mehr als meinen Worten traut, kann die Fakten in dem Artikel <a href="index.php/blog/speicher-performanz-overhead-von-smart-pointern">Speicher und Performanz Overhead von Smart Pointern </a>nachlesen.</p>
+<p>Der <span style="font-family: courier new,courier;">std::shared_ptr</span> kann mit einer speziellen Löschfunktion parametrisiert werden. Genau das passiert im nächsten Abschnitt.</p>
+<h2>Die Löschfunktion</h2>
+<p>Im Gegensatz zum Smart Pointer <a href="index.php/blog/std-unique-ptr"><span style="font-family: courier new,courier;">std::unique_ptr</span> </a>ist die Löschfunktion beim <span style="font-family: courier new,courier;">std::shared_ptr</span> nicht Bestandteil des Typs. Daher lassen sich zum Beispiel <span style="font-family: courier new,courier;">std::shared_ptr</span> mit verschiedenen Löschfunktionen auf einen <span style="font-family: courier new,courier;">std::vector&lt;std::shared_ptr&lt;int&gt;&gt;</span> schieben. Wird beim <span style="font-family: courier new,courier;">std::shared_ptr</span> eine eigene Löschfunktion verwendet, wird diese im Kontrollblock gespeichert.</p>
+<p>&nbsp;Im folgenden Beispiel verwende ich einen <span style="font-family: courier new,courier;">std::shared_ptr,</span> der für jeden Typ mitprotokolliert, wie viel Speicher er wieder freigegeben hat.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+55
+56
+57
+58
+59
+60
+61
+62
+63
+64
+65
+66
+67
+68
+69
+70
+71
+72</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// sharedPtrDeleter.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;memory&gt;</span>
+<span style="color: #0000ff;">#include &lt;random&gt;</span>
+<span style="color: #0000ff;">#include &lt;typeinfo&gt;</span>
+
+<span style="color: #0000ff;">template</span> &lt;<span style="color: #0000ff;">typename</span> T&gt;
+<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">Deleter</span>{
+public:
+  <span style="color: #2b91af;">void</span> <span style="color: #0000ff;">operator</span>()(T *ptr){
+    ++Deleter::count;
+    <span style="color: #0000ff;">delete</span> ptr;
+  }
+  <span style="color: #2b91af;">void</span> getInfo(){
+    std::string typeId{<span style="color: #0000ff;">typeid</span>(T).name()};
+    <span style="color: #2b91af;">size_t</span> sz= Deleter::count * <span style="color: #0000ff;">sizeof</span>(T);
+    std::cout &lt;&lt; <span style="color: #a31515;">"Deleted "</span> &lt;&lt; Deleter::count &lt;&lt; <span style="color: #a31515;">" objects of type: "</span> &lt;&lt; typeId &lt;&lt; std::endl;
+    std::cout &lt;&lt;<span style="color: #a31515;">"Freed size in bytes: "</span>  &lt;&lt; sz &lt;&lt; <span style="color: #a31515;">"."</span> &lt;&lt;  std::endl;
+    std::cout &lt;&lt; std::endl;
+  }
+private:
+  <span style="color: #0000ff;">static</span> <span style="color: #2b91af;">int</span> count;
+};
+
+<span style="color: #0000ff;">template</span> &lt;<span style="color: #0000ff;">typename</span> T&gt;
+<span style="color: #2b91af;">int</span> Deleter&lt;T&gt;::count=0;
+
+<span style="color: #0000ff;">typedef</span> Deleter&lt;<span style="color: #2b91af;">int</span>&gt; IntDeleter;
+<span style="color: #0000ff;">typedef</span> Deleter&lt;<span style="color: #2b91af;">double</span>&gt; DoubleDeleter;
+
+<span style="color: #2b91af;">void</span> createRandomNumbers(){
+
+  std::random_device seed;
+
+  std::mt19937 engine(seed());
+
+  std::uniform_int_distribution&lt;<span style="color: #2b91af;">int</span>&gt; thousand(1,1000);
+  <span style="color: #2b91af;">int</span> ranNumber= thousand(engine);
+  <span style="color: #0000ff;">for</span> ( <span style="color: #2b91af;">int</span> i=0 ; i &lt;= ranNumber; ++i) std::shared_ptr&lt;<span style="color: #2b91af;">int</span>&gt;(<span style="color: #0000ff;">new</span> <span style="color: #2b91af;">int</span>(i),IntDeleter());
+
+}
+
+<span style="color: #2b91af;">int</span> main(){
+
+  std::cout &lt;&lt; std::endl;
+
+  {
+    std::shared_ptr&lt;<span style="color: #2b91af;">int</span>&gt; sharedPtr1( <span style="color: #0000ff;">new</span> <span style="color: #2b91af;">int</span>,IntDeleter() );
+    std::shared_ptr&lt;<span style="color: #2b91af;">int</span>&gt; sharedPtr2( <span style="color: #0000ff;">new</span> <span style="color: #2b91af;">int</span>,IntDeleter() );
+    <span style="color: #0000ff;">auto</span> intDeleter= std::get_deleter&lt;IntDeleter&gt;(sharedPtr1);
+    intDeleter-&gt;getInfo();
+    sharedPtr2.reset();
+    intDeleter-&gt;getInfo();
+
+  }
+  createRandomNumbers();
+  IntDeleter().getInfo();
+
+  {
+    std::unique_ptr&lt;<span style="color: #2b91af;">double</span>,DoubleDeleter &gt; uniquePtr( <span style="color: #0000ff;">new</span> <span style="color: #2b91af;">double</span>, DoubleDeleter() );
+    std::unique_ptr&lt;<span style="color: #2b91af;">double</span>,DoubleDeleter &gt; uniquePtr1( <span style="color: #0000ff;">new</span> <span style="color: #2b91af;">double</span>, DoubleDeleter() );
+    std::shared_ptr&lt;<span style="color: #2b91af;">double</span>&gt; sharedPtr( <span style="color: #0000ff;">new</span> <span style="color: #2b91af;">double</span>, DoubleDeleter() );
+
+    std::shared_ptr&lt;<span style="color: #2b91af;">double</span>&gt; sharedPtr4(std::move(uniquePtr));
+    std::shared_ptr&lt;<span style="color: #2b91af;">double</span>&gt; sharedPtr5= std::move(uniquePtr1);
+    DoubleDeleter().getInfo();
+  }
+
+  DoubleDeleter().getInfo();
+
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p><span style="font-family: courier new,courier;">Deleter</span> in Zeile 8 - 27 ist die spezielle Löschfunktion. Diese ist über ihren Typ T parametrisiert. Mit Hilfe der statische Variable <span style="font-family: courier new,courier;">count</span> (Zeile 23) zählt sie mit, wie oft ihr Klammeroperator (Zeile 11 - 14) aufgerufen wurde. Mit der Methode <span style="font-family: courier new,courier;">getInfo</span> (Zeile 15 - 21) gibt sie ihre ganze Statistik aus. Weiter geht es in dem Programm mit der Funktion <span style="font-family: courier new,courier;">createRandomNumbers</span> (Zeile 32 - 42). Sie erzeugt zwischen 1 bis 1000 <span style="font-family: courier new,courier;">std::shared_ptr</span> in der Zeile 40, die mit der speziellen Löschfunktion I<span style="font-family: courier new,courier;">ntDeleter()</span> parametrisiert sind.&nbsp;</p>
+<p>Die Ausgabe zeigt, dass beim ersten Aufruf von <span style="font-family: courier new,courier;">intDeleter-&gt;getInfo()</span> noch keine Ressourcen freigegeben wurden. Das ändert sich mit dem Aufruf von <span style="font-family: courier new,courier;">sharedPtr2.reset()</span> in Zeile 53. Eine int-Variable mit 4 Bytes ist freigegeben worden. Der Aufruf von <span style="font-family: courier new,courier;">createRandomNumbers() i</span>n Zeile 57 erzeugt 74 <span style="font-family: courier new,courier;">std::shared_ptr&lt;int&gt; Smart Pointer. </span>Die Löschfunktion lässt sich natürlich auf für einen <span style="font-family: courier new,courier;">std::unique_ptr</span> (Zeile 60 - 68) in dem lokalen Bereich verwenden. Der Speicher für die <span style="font-family: courier new,courier;">double</span> Objekte wird aber erst nach dem Block in Zeile 68 freigegeben.<span style="font-family: courier new,courier;"></span></p>
+<p><img src="images/blog/EmbeddedProgrammierung/sharedPtr/sharedPtrDeleter.png" alt="sharedPtrDeleter" style="margin: 15px;" /></p>
+<h2>Wie geht's weiter?</h2>
+<p><span style="font-family: courier new,courier;">std::shared_ptr h</span>at noch einiges zu bieten. So lässt sich ein <span style="font-family: courier new,courier;">std::shared_ptr</span> auf ein existierendes Objekt erzeugen und bietet&nbsp;<span style="font-family: courier new,courier;"></span>minimale Multithreading Garantien. Eine Frage steht aber vor allem im Raum. Soll ein <span style="font-family: courier new,courier;">std::shared_ptr</span> von einer Funktion per Copy oder per Referenz angenommen werden? Die Auflösung folgt im <a href="index.php/blog/besonderheiten-des-std-shared-ptr">nächsten Artikel</a>.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="166" height="212" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Hole dir dein E-Book. Unterstütze meinen Blog.</span></strong></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
