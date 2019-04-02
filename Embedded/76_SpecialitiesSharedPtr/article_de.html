@@ -1,0 +1,306 @@
+<p>Nachdem ich im <a href="index.php/blog/std-shared-ptr">letzten Artikel</a> das große Bild zu <span style="font-family: courier new,courier;">std::shared_ptr</span> beschrieben habe, komme ich heute zu zwei besonderen Aspekten der Smart Pointer. Zum einen zeige ich mit <span style="font-family: courier new,courier;">std::shared_from_this</span>, wie sich ein <span style="font-family: courier new,courier;">std::shared_ptr</span> von einem Objekt erzeugen lässt, zum anderen beschäftigt mich die Frage: Soll ein <span style="font-family: courier new,courier;">std::shared_ptr</span> per Copy oder per Referenz übergeben werden. Insbesondere der zweite Punkt besitzt einiges an Überraschungspotential.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<h2>std::shared_ptr von this</h2>
+<p>Mit Hilfe der Klasse <span style="font-family: courier new,courier;">std::enable_shared_from_this</span> lassen sich Objekte erzeugen, die einen <span style="font-family: courier new,courier;">std::shared_ptr</span> auf sich zurückgeben. Dazu muss die Klasse der zu teilenden Objekte öffentlich von <span style="font-family: courier new,courier;">std::enable_shared_from_this</span> abgeleitet werden. Somit steht in der Klasse die Methode <span style="font-family: courier new,courier;">shared_from_this</span> zur Verfügung, mit der sich <span style="font-family: courier new,courier;">std::shared_ptr</span> auf sich erzeugen lassen.</p>
+<p>Das Beispiel zeigt die Theorie in der Anwendung.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// enableShared.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;memory&gt;</span>
+
+<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">ShareMe</span>: <span style="color: #0000ff;">public</span> std::enable_shared_from_this&lt;ShareMe&gt;{
+public:
+  std::shared_ptr&lt;ShareMe&gt; getShared(){
+    <span style="color: #0000ff;">return</span> shared_from_this();
+  }
+};
+
+<span style="color: #2b91af;">int</span> main(){
+
+  std::cout &lt;&lt; std::endl;
+
+  std::shared_ptr&lt;ShareMe&gt; shareMe(<span style="color: #0000ff;">new</span> ShareMe);
+  std::shared_ptr&lt;ShareMe&gt; shareMe1= shareMe-&gt;getShared();
+  {
+    <span style="color: #0000ff;">auto</span> shareMe2(shareMe1);
+    std::cout &lt;&lt; <span style="color: #a31515;">"shareMe.use_count(): "</span>  &lt;&lt; shareMe.use_count() &lt;&lt; std::endl;
+  }
+  std::cout &lt;&lt; <span style="color: #a31515;">"shareMe.use_count(): "</span>  &lt;&lt; shareMe.use_count() &lt;&lt; std::endl;
+  
+  shareMe1.reset();
+  
+  std::cout &lt;&lt; <span style="color: #a31515;">"shareMe.use_count(): "</span>  &lt;&lt; shareMe.use_count() &lt;&lt; std::endl;
+
+  std::cout &lt;&lt; std::endl;
+
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Der Smart Pointer <span style="font-family: courier new,courier;">shareMe</span> (Zeile 17) und seine Kopien <span style="font-family: courier new,courier;">shareMe1</span> (Zeile 18) und&nbsp; <span style="font-family: courier new,courier;">shareMe2</span> (Zeile 20) verweisen auf die gleiche Ressource und in- und dekrementieren den Referenzzähler.</p>
+<p>&nbsp;<img src="images/blog/EmbeddedProgrammierung/BesonderheitenSharedPtr/enabledShared.png" alt="enabledShared" style="margin: 15px;" /></p>
+<p>Durch den Aufruf <span style="font-family: courier new,courier;">shareMe-&gt;getShared()</span> in Zeile 18 wird ein neuer Smart Pointer erzeugt. Die Methode verwendet dabei die Funktion <span style="font-family: courier new,courier;">shared_from_this</span> in Zeile 9.</p>
+<p>Eine Besonderheit besitzt die Klasse <span style="font-family: courier new,courier;">ShareMe.</span></p>
+<h3>Curiously recurring template pattern&nbsp;</h3>
+<p><span style="font-family: courier new,courier;">&nbsp;ShareMe</span> ist die abgeleitete Klasse als auch Typargument (Zeile 6) der Basisklasse<span style="font-family: courier new,courier;"> std::enabled_shared_from_this</span>. Diese vermeintliche Rekursion ist unter dem Namen <a href="https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern">CRTP</a> bekannt und steht für <strong>c</strong>uriously <strong>r</strong>ecurring <strong>t</strong>emplate <strong>p</strong>attern. Tatsächlich findet keine Rekursion statt, da die Methoden der Klasse, die von sich selber ableitet (in dem konkreten Fall <span style="font-family: courier new,courier;">ShareMe</span>), erst dann instanziiert werden, wenn sie aufgerufen werden. CRTP ist ein beliebtes Idiom in C++, um statischen Polymorphismus umzusetzen. Im Gegensatz zum dynamischen Polymorphismus mit der Hilfe von virtuellen Methoden, findet beim statischen Polymorphismus der Dispatch des Methodenaufrufs zur Compilezeit statt.&nbsp;</p>
+<p>Nun ab zurück zu den <span style="font-family: courier new,courier;">std::shared_ptr.</span></p>
+<h2>std::shared_ptr als Funktionsargument</h2>
+<p>Damit kommen wir zu einer sehr interessanten Fragen. Soll eine Funktion einen <span style="font-family: courier new,courier;">std::shared_ptr</span> per Referenz oder per Copy annehmen?&nbsp;Warum soll ich mir überhaupt dazu Gedanken machen. Ist es nicht egal, ob meine Funktion einen <span style="font-family: courier new,courier;">std::shared_ptr</span> per Referenz oder per Copy annimmt? Unter der Decke ist alles eine Referenz. Die eindeutige Antwort ist jein. Semantisch macht es keinen Unterschied. Aus Performanzsicht aber unter Umständen schon.</p>
+<p>Zuerst ein kleines Beispiel, auf der meine Performanzbetrachtung basieren.</p>
+<!-- HTML generated using hilite.me -->
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// refVersusCopySharedPtr.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;memory&gt;</span>
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+
+<span style="color: #2b91af;">void</span> byReference(std::shared_ptr&lt;<span style="color: #2b91af;">int</span>&gt;&amp; refPtr){
+  std::cout &lt;&lt; <span style="color: #a31515;">"refPtr.use_count(): "</span> &lt;&lt; refPtr.use_count() &lt;&lt; std::endl;
+}
+
+<span style="color: #2b91af;">void</span> byCopy(std::shared_ptr&lt;<span style="color: #2b91af;">int</span>&gt; cpyPtr){
+  std::cout &lt;&lt; <span style="color: #a31515;">"cpyPtr.use_count(): "</span> &lt;&lt; cpyPtr.use_count() &lt;&lt; std::endl;
+}
+
+
+<span style="color: #2b91af;">int</span> main(){
+
+    std::cout &lt;&lt;  std::endl;
+
+    <span style="color: #0000ff;">auto</span> shrPtr= std::make_shared&lt;<span style="color: #2b91af;">int</span>&gt;(2011);
+
+    std::cout &lt;&lt; <span style="color: #a31515;">"shrPtr.use_count(): "</span> &lt;&lt; shrPtr.use_count() &lt;&lt; std::endl;
+
+    byReference(shrPtr);
+    byCopy(shrPtr);
+    
+    std::cout &lt;&lt; <span style="color: #a31515;">"shrPtr.use_count(): "</span> &lt;&lt; shrPtr.use_count() &lt;&lt; std::endl;
+    
+    std::cout &lt;&lt; std::endl;
+    
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Die Funktionen <span style="font-family: courier new,courier;"> by</span>Reference (Zeile 6 - 8)&nbsp; und <span style="font-family: courier new,courier;">byCopy</span> (Zeile 10 - 12) nehmen ihren <span style="font-family: courier new,courier;">std::shared_ptr</span> per Referenz und per Copy an. Die Ausgabe des Programms bringt die entscheidende Beobachtung auf den Punkt.</p>
+<p>&nbsp;<img src="images/blog/EmbeddedProgrammierung/BesonderheitenSharedPtr/refVersusCopySharedPtr.png" alt="refVersusCopySharedPtr" style="margin: 15px;" /></p>
+<p>Da die Funktion <span style="font-family: courier new,courier;">byCopy</span> ihren <span style="font-family: courier new,courier;">std::shared_ptr</span> kopiert, wird der Referenzzähler im Funktionskörper auf 2 erhöht. Die Frage ist nun natürlich. Wie teuer ist das In- und Dekrementieren des Referenzzählers. Da der C++-Standard zusichert, dass das Ändern des Referenzzählers eine atomare Operation ist, erwarte ich einen messbaren Unterschied. Was sagen die Zahlen?</p>
+<h3>Performanzvergleich&nbsp;</h3>
+<p>Wer meine Performanzvergleiche kennt, weiß, dass mein Linux PC deutlich leistungsfähiger ist als mein Windows PC. Daher sind die absoluten Zahlen mit Vorsicht zu genießen. Bei meinem Test kommt der GCC 4.8 und Microsoft Visual Studio 15 zum Einsatz. Darüber hinaus übersetze ich die Programme ohne und mit maximaler Optimierung. Zuerst zu meinem kleinen Testprogramm.</p>
+<p>In dem Testprogramm übergebe ich einen <span style="font-family: courier new,courier;">std::shared_ptr</span> per Referenz und per Copy einer Funktion und verwende diesen in der Funktion, um einen lokalen <span style="font-family: courier new,courier;">std::shared_ptr</span> zu initialisieren. Dies war das einfachste Szenario, mit dem ich den Optimierer überlisten konnte. Ach ja. Jede Funktionen rufe ich jeweils 100 Millionen Mal auf.</p>
+<h4>Das Programm</h4>
+<!-- HTML generated using hilite.me -->
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// performanceRefCopyShared.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;chrono&gt;</span>
+<span style="color: #0000ff;">#include &lt;memory&gt;</span>
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+
+constexpr <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span> mill= 100000000;
+
+<span style="color: #2b91af;">void</span> byReference(std::shared_ptr&lt;<span style="color: #2b91af;">int</span>&gt;&amp; refPtr){
+  <span style="color: #0000ff;">volatile</span> <span style="color: #0000ff;">auto</span> tmpPtr(refPtr);
+}
+
+<span style="color: #2b91af;">void</span> byCopy(std::shared_ptr&lt;<span style="color: #2b91af;">int</span>&gt; cpyPtr){
+  <span style="color: #0000ff;">volatile</span> <span style="color: #0000ff;">auto</span> tmpPtr(cpyPtr);
+}
+
+
+<span style="color: #2b91af;">int</span> main(){
+
+    std::cout &lt;&lt;  std::endl;
+    
+    <span style="color: #0000ff;">auto</span> shrPtr= std::make_shared&lt;<span style="color: #2b91af;">int</span>&gt;(2011);
+   
+    <span style="color: #0000ff;">auto</span> start = std::chrono::steady_clock::now();
+  
+    <span style="color: #0000ff;">for</span> (<span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span> i= 0; i &lt;= mill; ++i) byReference(shrPtr);    
+    
+    std::chrono::duration&lt;<span style="color: #2b91af;">double</span>&gt; dur= std::chrono::steady_clock::now() - start;
+    std::cout &lt;&lt; <span style="color: #a31515;">"by reference: "</span> &lt;&lt; dur.count() &lt;&lt; <span style="color: #a31515;">" seconds"</span> &lt;&lt; std::endl;
+    
+    start = std::chrono::steady_clock::now();
+    
+    <span style="color: #0000ff;">for</span> (<span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span> i= 0; i&lt;= mill; ++i){
+        byCopy(shrPtr);
+    }
+    
+    dur= std::chrono::steady_clock::now() - start;
+    std::cout &lt;&lt; <span style="color: #a31515;">"by copy: "</span> &lt;&lt; dur.count() &lt;&lt; <span style="color: #a31515;">" seconds"</span> &lt;&lt; std::endl;
+    
+    std::cout &lt;&lt; std::endl;
+    
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Zuerst zu der Variante ohne Optimierung.</p>
+<h4>Ohne Optimierung</h4>
+<p>&nbsp;<img src="images/blog/EmbeddedProgrammierung/BesonderheitenSharedPtr/performance.png" alt="performance" width="350" height="178" style="margin: 15px;" /><img src="images/blog/EmbeddedProgrammierung/BesonderheitenSharedPtr/performanceWindows.PNG" alt="performanceWindows" width="350" height="115" /></p>
+<p>Und nun zur optimierten Variante.</p>
+<h4>Mit maximaler Optimierung</h4>
+<p><img src="images/blog/EmbeddedProgrammierung/BesonderheitenSharedPtr/performanceOptimization.png" alt="performanceOptimization" width="350" height="145" style="margin: 15px;" /><img src="images/blog/EmbeddedProgrammierung/BesonderheitenSharedPtr/performanceOptimizationWindows.PNG" alt="performanceOptimizationWindows" width="350" height="97" /></p>
+<h3>Fazit</h3>
+<p><img src="images/blog/EmbeddedProgrammierung/BesonderheitenSharedPtr/comparison.png" alt="comparison" width="400" height="165" style="margin: 15px;" /></p>
+<p>Die nackten Zahlen des Programms <span style="font-family: courier new,courier;">performanceCopyShared.cpp</span> sprechen eine eindeutige Sprache.</p>
+<ul>
+<li>Die <span style="font-family: courier new,courier;">perReference</span> Funktion ist ca. um den Faktor 2 schneller als ihr <span style="font-family: courier new,courier;">perCopy</span> Pendant. Im Falle der maximalen Optimierung unter Linux sogar um den Faktor 5.</li>
+<li>Maximale Optimierung bringt unter Windows ein Performanzboost um den Faktor 3, unter Linux ca. um den Faktor 30 - 80.&nbsp;</li>
+<li>Ohne Optimierung ist die Windows Applikation für beide Funktionsaufrufe schneller. Bei maximaler Optimierung aber deutlich langsamer als Linux.</li>
+</ul>
+<h2>Wie geht's weiter?</h2>
+<p>Das klassische Problem von Smart Pointer, die ihre Ressourcen mittels Referenzzähler verwalten, sind zyklische Referenzen. Hier springt <span style="font-family: courier new,courier;">std::weak_ptr</span> in die Bresche. Im <a href="index.php/blog/std-weak-ptr">nächsten Artikel</a> werde ich mir den besonderen Smart Pointer <span style="font-family: courier new,courier;">std::weak_ptr</span> genauer anschauen und mit seiner Hilfe zyklische Referenzen brechen.&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="166" height="212" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Hole dir dein E-Book. Unterstütze meinen Blog.</span></strong></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
