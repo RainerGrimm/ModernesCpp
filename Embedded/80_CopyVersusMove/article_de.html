@@ -1,0 +1,295 @@
+<p>Viel wurde über die Vorteile der Move- gegenüber der Copy-Semantik schon geschrieben. Anstelle einer teuren copy-Operation kommt eine billige move-Operation zum Einsatz. Doch was heißt das? In diesem Artikel vergleiche ich die Performanz der Copy- mit der Move-Semantik bei den Containern der Standard Template Library (STL).</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p>Bevor ich aber auf die Zahlen eingehe, möchte ich noch ein bisschen Hintergrundwissen vermitteln.</p>
+<h2>Copy- versus Move-Semantik</h2>
+<p>Der feine Unterschied der Copy- der Move-Semantik zur Erzeugung eines neuen Objekts ist es, dass bei der Copy-Semantik die Elemente der Ressource teuer kopiert, dass bei der Move-Semantik die Elemente der Ressource billig verschoben werden. Das hat zwei weitreichende Konsequenzen.</p>
+<ol>
+<li>Bei der Copy-Semantik besteht die Gefahr, dass eine <span style="font-family: courier new,courier;"><a href="http://en.cppreference.com/w/cpp/memory/new/bad_alloc">std::bad_alloc</a></span> Ausnahme geworfen wird, falls kein Speicher mehr für das neue Objekt vorhanden ist.</li>
+<li>Bei der Move-Semantik ist nach der Operation die Quelle der Move-Operation in einem gültigen, aber nicht genauer spezifizierten Zustand ("valid but unspecified state").</li>
+</ol>
+<p>Gerade der zweite Punkt lässt sich schön an einem Beispiel mit<span style="font-family: courier new,courier;"> std::string</span> verdeutlichen.</p>
+<p>Zuerst zur klassischen Copy-Semantik.</p>
+<h3>Copy-Semantik</h3>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">std::string1(<span style="color: #a31515;">"ABCDEF"</span>);
+std::string str2;
+str2= str1;
+</pre>
+</div>
+<p><img src="images/blog/EmbeddedProgrammierung/move/copy.jpg" alt="copy" width="400" height="153" style="margin: 15px;" /></p>
+<p>Nach der copy-Operation besitzen beide Strings <span style="font-family: courier new,courier;">str1</span> und <span style="font-family: courier new,courier;">str2</span> den gleichen Inhalt <span style="font-family: courier new,courier;">"ABCDEF".</span> Worin besteht der Unterschied zur Move-Semantik?</p>
+<h3>Move-Semantik</h3>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">std::string1<span id="transmark"></span>(<span style="color: #a31515;">"ABCDEF"</span>);
+std::string str3;
+str2= std::move(str1);
+</pre>
+</div>
+<p><img src="images/blog/EmbeddedProgrammierung/move/move.jpg" alt="move" width="400" height="137" style="margin: 15px;" /></p>
+<p>Im Gegensatz zur Copy-Semantik besitzt bei der Move-Semantik die Quelle der Operation <span style="font-family: courier new,courier;">str1 </span>einen<span style="font-family: courier new,courier;"> </span>leeren String der Form <span style="font-family: courier new,courier;"></span>"". In dem kleinen Codebeispiel habe ich die Move-Semantik explizit mit der Funktion&nbsp;<span style="font-family: courier new,courier;"><a href="http://en.cppreference.com/w/cpp/utility/move">std::move</a></span> angefordert. Der Compiler wendet die Move-Semantik aber dann automatisch an, wenn er sicher ist, dass die Quelle seiner move-Operation nicht mehr benötigt wird.</p>
+<p>Im meiner Performanzbetrachtung werde ich die Move-Semantik mit <span style="font-family: courier new,courier;">std::move</span> explizit vom Compiler anfordern.&nbsp;</p>
+<h2>Der Performanzunterschied</h2>
+<p>In diesem Artikel will ich eine naive Position einnehmen und vergleichen, welche Performanzunterschiede zwischen der Copy- und Move-Semantik bei den Containern der STL bestehen. Meine Betrachtung schließt&nbsp;den <span style="font-family: courier new,courier;">std::string</span> mit ein. Die assoziativen Container, die mehrere gleiche Schlüssel erlauben, werde ich ignorieren. Darüber hinaus interessiert mich das Performanzverhältnis der vorgestellten Container zwischen der Copy- und Move-Semantik.</p>
+<h3>Die Randbedingungen</h3>
+<p>Da in diesem konkreten Unterschied die Performanzunterschiede nicht so drastisch bzgl. der maximal optimierten und nicht optimierten Programmausführung waren, werde ich mich der Einfachheit und Übersichtlichkeit halber auf das maximal optimierte Executable zurückziehen. Zum Einsatz kommt in bekannter Manier der GCC 4.9.2 und der cl.exe, der Bestandteil von Microsoft Visual Studio 2015 ist. Sowohl die Linux als auch die Windows Plattform sind 64bit. Darüber hinaus erzeuge ich 64bit Executables.</p>
+<h3>Das Programm&nbsp;</h3>
+<p>Durch die vielen Container der STL wird das Programm recht länglich.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;">  1
+  2
+  3
+  4
+  5
+  6
+  7
+  8
+  9
+ 10
+ 11
+ 12
+ 13
+ 14
+ 15
+ 16
+ 17
+ 18
+ 19
+ 20
+ 21
+ 22
+ 23
+ 24
+ 25
+ 26
+ 27
+ 28
+ 29
+ 30
+ 31
+ 32
+ 33
+ 34
+ 35
+ 36
+ 37
+ 38
+ 39
+ 40
+ 41
+ 42
+ 43
+ 44
+ 45
+ 46
+ 47
+ 48
+ 49
+ 50
+ 51
+ 52
+ 53
+ 54
+ 55
+ 56
+ 57
+ 58
+ 59
+ 60
+ 61
+ 62
+ 63
+ 64
+ 65
+ 66
+ 67
+ 68
+ 69
+ 70
+ 71
+ 72
+ 73
+ 74
+ 75
+ 76
+ 77
+ 78
+ 79
+ 80
+ 81
+ 82
+ 83
+ 84
+ 85
+ 86
+ 87
+ 88
+ 89
+ 90
+ 91
+ 92
+ 93
+ 94
+ 95
+ 96
+ 97
+ 98
+ 99
+100
+101
+102
+103
+104
+105</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// movePerformance.cpp</span>
+ 
+<span style="color: #0000ff;">#include &lt;array&gt;</span>
+<span style="color: #0000ff;">#include &lt;forward_list&gt;</span>
+<span style="color: #0000ff;">#include &lt;chrono&gt;</span>
+<span style="color: #0000ff;">#include &lt;deque&gt;</span>
+<span style="color: #0000ff;">#include &lt;iomanip&gt;</span>
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;list&gt;</span>
+<span style="color: #0000ff;">#include &lt;map&gt;</span>
+<span style="color: #0000ff;">#include &lt;numeric&gt;</span>
+<span style="color: #0000ff;">#include &lt;set&gt;</span>
+<span style="color: #0000ff;">#include &lt;string&gt;</span>
+<span style="color: #0000ff;">#include &lt;unordered_map&gt;</span>
+<span style="color: #0000ff;">#include &lt;unordered_set&gt;</span>
+<span style="color: #0000ff;">#include &lt;utility&gt;</span>
+<span style="color: #0000ff;">#include &lt;vector&gt;</span>
+
+<span style="color: #0000ff;">const</span> <span style="color: #2b91af;">int</span> SIZE = 10000000; 
+
+<span style="color: #0000ff;">template</span> &lt;<span style="color: #0000ff;">typename</span> T&gt;
+<span style="color: #2b91af;">void</span> measurePerformance(T&amp; t, <span style="color: #0000ff;">const</span> std::string&amp; cont){
+  
+  std::cout &lt;&lt; std::fixed &lt;&lt; std::setprecision(10);
+
+  <span style="color: #0000ff;">auto</span> begin= std::chrono::system_clock::now();
+  T t1(t);
+  <span style="color: #0000ff;">auto</span> last=  std::chrono::system_clock::now() - begin;
+  std::cout &lt;&lt; cont &lt;&lt; std::endl;
+  <span style="color: #0000ff;">auto</span> copyTime=  std::chrono::duration&lt;<span style="color: #2b91af;">double</span>&gt;(last).count();
+  std::cout &lt;&lt;  <span style="color: #a31515;">"    Copy: "</span> &lt;&lt; copyTime &lt;&lt; <span style="color: #a31515;">" sec"</span> &lt;&lt; std::endl;
+
+  begin= std::chrono::system_clock::now();
+  T t2(std::move(t));
+  last=  std::chrono::system_clock::now() - begin;
+  <span style="color: #0000ff;">auto</span> moveTime= std::chrono::duration&lt;<span style="color: #2b91af;">double</span>&gt;(last).count();
+  std::cout &lt;&lt;  <span style="color: #a31515;">"    Move: "</span> &lt;&lt; moveTime &lt;&lt; <span style="color: #a31515;">" sec"</span> &lt;&lt; std::endl;
+  
+  std::cout &lt;&lt; std::setprecision(2);
+  std::cout &lt;&lt; <span style="color: #a31515;">"    Ratio (copy time/move time): "</span> &lt;&lt; (copyTime/moveTime) &lt;&lt; std::endl;
+  
+  std::cout &lt;&lt; std::endl;
+     
+}
+
+<span style="color: #2b91af;">int</span> main(){
+    
+    std::cout &lt;&lt; std::endl;
+    
+    {
+      std::array&lt;<span style="color: #2b91af;">int</span>,SIZE/1000&gt; myArray;
+      measurePerformance(myArray,<span style="color: #a31515;">"std::array&lt;int,SIZE/1000&gt;"</span>);   
+    }
+    
+    {
+      std::vector&lt;<span style="color: #2b91af;">int</span>&gt; myVec(SIZE);
+      measurePerformance(myVec,<span style="color: #a31515;">"std::vector&lt;int&gt;(SIZE)"</span>);
+    }
+
+    {
+      std::deque&lt;<span style="color: #2b91af;">int</span>&gt;myDec(SIZE);
+      measurePerformance(myDec,<span style="color: #a31515;">"std::deque&lt;int&gt;(SIZE)"</span>);
+    }
+    
+    {
+      std::list&lt;<span style="color: #2b91af;">int</span>&gt;myList(SIZE);
+      measurePerformance(myList,<span style="color: #a31515;">"std::list&lt;int&gt;(SIZE)"</span>);
+    }
+    
+    {
+      std::forward_list&lt;<span style="color: #2b91af;">int</span>&gt;myForwardList(SIZE);
+      measurePerformance(myForwardList,<span style="color: #a31515;">"std::forward_list&lt;int&gt;(SIZE)"</span>);
+    } 
+       
+    {
+      std::string myString(SIZE,<span style="color: #a31515;">' '</span>);
+      measurePerformance(myString,<span style="color: #a31515;">"std::string(SIZE,' ')"</span>);
+    }
+    
+    std::vector&lt;<span style="color: #2b91af;">int</span>&gt; tmpVec(SIZE);
+    std::iota(tmpVec.begin(),tmpVec.end(),0);
+    
+    {
+      std::set&lt;<span style="color: #2b91af;">int</span>&gt;mySet(tmpVec.begin(),tmpVec.end());
+      measurePerformance(mySet,<span style="color: #a31515;">"std::set&lt;int&gt;"</span>);
+    }
+    
+    {
+      std::unordered_set&lt;<span style="color: #2b91af;">int</span>&gt;myUnorderedSet(tmpVec.begin(),tmpVec.end());
+      measurePerformance(myUnorderedSet,<span style="color: #a31515;">"std::unordered_set&lt;int&gt;"</span>);
+    }
+    
+    {
+      std::map&lt;<span style="color: #2b91af;">int</span>,<span style="color: #2b91af;">int</span>&gt;myMap;
+      <span style="color: #0000ff;">for</span> (<span style="color: #0000ff;">auto</span> i= 0; i &lt;= SIZE; ++i) myMap[i]= i;
+      measurePerformance(myMap,<span style="color: #a31515;">"std::map&lt;int,int&gt;"</span>);
+    }
+    
+    {
+      std::unordered_map&lt;<span style="color: #2b91af;">int</span>,<span style="color: #2b91af;">int</span>&gt;myUnorderedMap;
+      <span style="color: #0000ff;">for</span> (<span style="color: #0000ff;">auto</span> i= 0; i &lt;= SIZE; ++i) myUnorderedMap[i]= i;
+      measurePerformance(myUnorderedMap,<span style="color: #a31515;">"std::unordered_map&lt;int,int&gt;"</span>);
+    }  
+    
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Das Ziel&nbsp;des Programms ist es, die Container mit 10 Millionen Elementen per Copy- bzw. Move-Semantik zu initialisieren. Die Performanzmessung findet in dem Funktions-Template <span style="font-family: courier new,courier;">measurePerformance</span> (Zeile 21 - 44). Diese Funktion ist über den Typ des Containers und seinen Namen parametrisiert. Mit Hilfe der chrono-Bibliothek messe ich, wie lange die copy-Initialisierung (Zeile 27) und move-Initialisierung (Zeile 34) benötigt. Zum Schluss interessiert mich noch das Zeitverhältnis zwischen der Copy- und Move-Semantik (Zeile 40).</p>
+<p>Was passiert in der<span style="font-family: courier new,courier;"> main</span>-Funktion? Jeden Container lege ich einem lokalen Gültigkeitsbereich an, so dass er automatisch wieder freigegeben wird. So wird <span style="font-family: courier new,courier;">myArray</span> (Zeile 51) am Ende seines Gültigkeitsbereichs in Zeile 53 wieder aufgeräumt. Das ist bei der Größe der Container absolut notwendig. Ich habe behauptet, jede Container besitzt 10 Millionen Elemente. Dies trifft auf alle Container bis auf myArray zu. Da <span style="font-family: courier new,courier;">myArray</span> auf dem Stack und nicht auf dem Heap angelegt wird, muss ich seine Größe deutlich reduzieren. Nun aber zu den restlichen Containern. Mit <span style="font-family: courier new,courier;">std::vector,</span> <span style="font-family: courier new,courier;">std::deque,</span> <span style="font-family: courier new,courier;">std::list</span> und <span style="font-family: courier new,courier;">std::forward_list</span> folgen in den Zeilen 55 - 73 die restlichen sequentiellen Container.&nbsp;<span style="font-family: courier new,courier;">std::string</span> kommt in Zeile 75 - 78 zum Einsatz. Die verbleibenden Container sind die geordneten und ungeordneten assoziativen Container der STL. Eine Besonderheit muss ich natürlich bei den assoziativen Container beachten. Damit sie alle verschiedene Schlüssel und damit die Länge 10 Millionen besitzen, verwende ich als Schlüssel die Zahlen von 0 bis 9999999. Diese erzeugt mit die <span style="font-family: courier new,courier;">std::iota</span> Funktion.</p>
+<h3>Die Zahlen</h3>
+<p><img src="images/blog/EmbeddedProgrammierung/move/move.png" alt="move" width="300" height="545" style="margin: 15px;" /><img src="images/blog/EmbeddedProgrammierung/move/moveWin.PNG" alt="moveWin" width="300" height="564" /></p>
+<p>&nbsp;</p>
+<p>Die Ergebnis für <span style="font-family: courier new,courier;">std::array</span> sind nicht besonders aussagekräftig. Dies gilt zum einen, da das <span style="font-family: courier new,courier;">std::array</span> deutlich kleiner ist, dies gilt zum anderen, da die Zeitdifferenz unter Windows unter der Genauigkeit der Uhr <span style="font-family: courier new,courier;">std::system_clock</span> liegt. Die gleiche Aussage gilt für <span style="font-family: courier new,courier;">std::forward_list</span> unter Windows.</p>
+<p>Welche Erkenntnisse lassen sich aus den Zahlenkolonnen ableiten?</p>
+<ul>
+<li><strong>Sequentielle Container</strong>: <span style="font-family: courier new,courier;">std::vector</span> ist erfahrungsgemäß der schnellste Container, wenn es um das kopieren oder verschieben geht.</li>
+<li><strong>Sequentielle versus assoziative Container</strong>: Die sequentiellen Container lassen sich sowohl unter Linux als auch insbesondere unter Windows schneller kopieren.&nbsp;</li>
+<li><strong>Copy- versus Move-Semantik</strong>: Die Performanzunterschiede zwischne der Copy- und Move-Semantik sind enorm. Dies trifft vor allem auf die assoziativen Container zu.</li>
+<li><span style="font-family: courier new,courier;"><strong>std::string</strong>:</span> Der <span style="font-family: courier new,courier;">std::string</span> unter Linux besitzt ein sehr seltsames Verhalten. Zum einen lässt er sich enorm performant kopieren, zum anderen ist die Move-Semantik nur um den Faktor 16 schneller. Diese Beobachtung wird noch verstärkt, wenn ich das Programm ohne Optimierung ausführe. In diesem Fall schlägt auf meiner Plattform die Move-Semantik die Copy-Semantik nur um den Faktor 1.5. Das steht im starken Gegensatz zu <span style="font-family: courier new,courier;">std::string</span> unter Windows. Dort ist die Move-Semantik um den Faktor 15000 schneller als die Copy-Semantik.</li>
+</ul>
+<h3>Das Rätsel um std::string</h3>
+<p>Der Unterschied zwischen dem Performanzunterschied der Copy- und Move-Semantik zwischen Linux und Windows ist schnell erklärt. Mein GCC impementiert den <span style="font-family: courier new,courier;">std::string</span> nach dem <a href="http://stackoverflow.com/questions/12199710/legality-of-cow-stdstring-implementation-in-c11">copy-on-write</a> (cow) Prinzip. Das ist aber nicht C++11 standardkonform. Hier folgt wohl schon der cl.exe dem C++11-Standard. Übersetze ich das Programm daher mit dem sehr aktuellen GCC 6.1 und C++11-Standard mit dem Onliner-Compiler auf <a href="http://en.cppreference.com/w/">en.cppreference.com,</a> so verändert sich das Performanzverhalten den <span style="font-family: courier new,courier;">std::string</span> deutlich.</p>
+<p>&nbsp;<img src="images/blog/EmbeddedProgrammierung/move/string.png" alt="string" style="margin: 15px;" /></p>
+<p>Jetzt schlägt die Move-Semantik die Copy-Semantik deutlich.</p>
+<h2>Wie geht's weiter?</h2>
+<p>Das war der Motivationsschub für die Move-Semantik. Im <a href="index.php/blog/move-semantik-zwei-nette-feature">nächsten Artikel</a> gehe ich auf die Move-Semantik genauer ein.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="166" height="212" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Hole dir dein E-Book. Unterstütze meinen Blog.</span></strong></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
