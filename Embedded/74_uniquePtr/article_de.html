@@ -1,0 +1,332 @@
+<p>Ein <span style="font-family: courier new,courier;">std::unique_ptr</span> verwaltet exklusiv den Lebenszyklus seiner Ressource nach dem <a href="http://en.cppreference.com/w/cpp/language/raii">RAII-Idiom</a>. Er ist die erste Wahl für einen Smart Pointer, da er seine Arbeit in der Regel ohne Speicher- oder Performanz-Overhead vollzieht.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p>Bevor ich in einen <span style="font-family: courier new,courier;">std:unique_ptr</span> in Anwendung vorstelle, will ich erst die Charakteristiken eines <span style="font-family: courier new,courier;">std::unique_ptr</span> im Schnelldurchlauf vorstellen.</p>
+<p><span style="font-family: courier new,courier;">std::unque_ptr</span> kann&nbsp;</p>
+<ul>
+<li>mit oder ohne Ressource instanziiert werden.</li>
+<li>den Lebenszyklus eines Objektes oder eines Array von Objekten verwalten.</li>
+<li>das Interface seiner zugrundeliegenden Ressource transparent anbieten.</li>
+<li>mit einer eigenen Löschfunktion angepasst werden.</li>
+<li>nur verschoben werden (<a href="http://www.linux-magazin.de/Ausgaben/2012/12/C-11">Move-Semantik</a>).</li>
+<li>einfach mit der Hilfsfunktion <span style="font-family: courier new,courier;">std::make_unique</span> erzeugt werden.</li>
+</ul>
+<h2>Die Anwendung</h2>
+<p>Die entscheidende Frage für einen std::unque_ptr ist es, wann er seine zugrundeliegende Ressource löscht. Dies tritt genau dann auf, wenn&nbsp;der<span style="font-family: courier new,courier;"> std::unique_ptr</span> seinen Gültigkeitsbereich verlässt oder eine neue Ressource zugewiesen bekommt. Beide Anwendungsfälle zeigt das Beispiel.</p>
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+55
+56
+57
+58
+59
+60
+61</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// uniquePtr.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;memory&gt;</span>
+<span style="color: #0000ff;">#include &lt;utility&gt;</span>
+
+<span style="color: #0000ff;">struct</span> MyInt{
+
+  MyInt(<span style="color: #2b91af;">int</span> i):i_(i){}
+
+  ~MyInt(){
+    std::cout &lt;&lt; <span style="color: #a31515;">"Good bye from "</span> &lt;&lt; i_ &lt;&lt; std::endl;
+  }
+
+  <span style="color: #2b91af;">int</span> i_;
+
+};
+
+
+<span style="color: #2b91af;">int</span> main(){
+
+  std::cout &lt;&lt; std::endl;
+
+  std::unique_ptr&lt;MyInt&gt; uniquePtr1{ <span style="color: #0000ff;">new</span> MyInt(1998) };
+
+  std::cout &lt;&lt; <span style="color: #a31515;">"uniquePtr1.get(): "</span> &lt;&lt; uniquePtr1.get() &lt;&lt; std::endl;
+
+  std::unique_ptr&lt;MyInt&gt; uniquePtr2;
+  uniquePtr2= std::move(uniquePtr1);
+  std::cout &lt;&lt; <span style="color: #a31515;">"uniquePtr1.get(): "</span> &lt;&lt; uniquePtr1.get() &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"uniquePtr2.get(): "</span> &lt;&lt; uniquePtr2.get() &lt;&lt; std::endl;
+
+  std::cout &lt;&lt; std::endl;
+
+
+  {
+    std::unique_ptr&lt;MyInt&gt; localPtr{ <span style="color: #0000ff;">new</span> MyInt(2003) };
+  }
+
+  std::cout &lt;&lt; std::endl;
+
+  uniquePtr2.reset(<span style="color: #0000ff;">new</span> MyInt(2011));
+  MyInt* myInt= uniquePtr2.release();
+  <span style="color: #0000ff;">delete</span> myInt;
+
+  std::cout &lt;&lt; std::endl;
+
+  std::unique_ptr&lt;MyInt&gt; uniquePtr3{ <span style="color: #0000ff;">new</span> MyInt(2017) };
+  std::unique_ptr&lt;MyInt&gt; uniquePtr4{ <span style="color: #0000ff;">new</span> MyInt(2022) };
+
+  std::cout &lt;&lt; <span style="color: #a31515;">"uniquePtr3.get(): "</span> &lt;&lt; uniquePtr3.get() &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"uniquePtr4.get(): "</span> &lt;&lt; uniquePtr4.get() &lt;&lt; std::endl;
+
+  std::swap(uniquePtr3, uniquePtr4);
+
+  std::cout &lt;&lt; <span style="color: #a31515;">"uniquePtr3.get(): "</span> &lt;&lt; uniquePtr3.get() &lt;&lt; std::endl;
+  std::cout &lt;&lt; <span style="color: #a31515;">"uniquePtr4.get(): "</span> &lt;&lt; uniquePtr4.get() &lt;&lt; std::endl;
+
+  std::cout &lt;&lt; std::endl;
+
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Die Klasse MyInt (Zeile 7 - 17) ist ein einfacher Wrapper für eine ganze Zahl. Dabei habe ich den Destruktor in Zeile 11 - 13 instrumentalisiert, damit sich der Lebenszyklus von Instanzen vom Typ <span style="font-family: courier new,courier;">MyInt</span> leichter nachvollziehen lassen.</p>
+<p>In Zeile 24 lege ich einen <span style="font-family: courier new,courier;">std::unique_ptr</span> an und gebe in der Zeile 26 die Adresse seiner Ressource (<span style="font-family: courier new,courier;">new MyInt(1998)</span>) aus. Anschließend verschiebe ich den <span style="font-family: courier new,courier;">uniquePtr1</span> in <span style="font-family: courier new,courier;">uniquePtr2</span> (Zeile 29). Damit ist <span style="font-family: courier new,courier;">uniquePtr2</span> der Besitzer der Ressource. Das zeigen schön die Ausgaben in Zeile 30 und 31. Der lokale <span style="font-family: courier new,courier;">std::unique_ptr</span> in Zeile 37 verlässt mit dem Ende des Bereiches (Zeile 38) seinen Gültigkeitsbereich. Damit wird der Destruktor des <span style="font-family: courier new,courier;">localPtr</span> und damit der Destruktor der Ressource (<span style="font-family: courier new,courier;">new MyInt(2003)</span>) ausgeführt. Die ganze Erläuterung des&nbsp;Programms bringt die Ausgabe auf den Punkt.</p>
+<p><img src="images/blog/EmbeddedProgrammierung/uniquePtr/uniquePtr.png" alt="uniquePtr" style="margin: 15px;" /></p>
+<p>Besonders interessant sind die Zeilen 42 - 44. Zuerst weise ich dem uniquePtr2 eine neue Ressource zu. Das führt dazu, dass der Destruktor von <span style="font-family: courier new,courier;">MyInt(1998)</span> ausgeführt wird. Gebe ich die Ressource in Zeile 43 explizit frei, so kann ich auf der Ressource direkt den Destruktor aufrufen.</p>
+<p>Der Rest des Programms ist einfache Hausmannskost. In den Zeilen 48 - 57 erzeuge ich zwei neue <span style="font-family: courier new,courier;">std::unique_ptr</span> und tausche deren Ressourcen. <span style="font-family: courier new,courier;">std::swap i</span>n Zeile 54 wendet unter der Decke Move-Semantik an, da <span style="font-family: courier new,courier;">std::unique_ptr</span> keine Copy-Semantik untersützen. Mit dem Ende der <span style="font-family: courier new,courier;">main</span>-Funktion verlassen <span style="font-family: courier new,courier;">uniquePtr3</span> und <span style="font-family: courier new,courier;">uniquePtr4</span> ihren Gültigkeitsbereich und ihre Destruktoren werden erwartungsgemäß aufgerufen.</p>
+<p>Auf das große Bild, gehe folgen jetzt die weiteren Details zu <span style="font-family: courier new,courier;">std::unique_ptr.</span></p>
+<h3>Lebenszyklus von Arrays transparent verwalten</h3>
+<p><span style="font-family: courier new,courier;">std::unique_ptr</span> besitzte eine Spezialisierung für Arrays. Dabei ist der Zugriff aufihn vollkommen transparent. Das heißt, verwaltet der <span style="font-family: courier new,courier;">std::unique_ptr</span> ein einzelnes Objekt, sind die Operatoren für den Zeigerzugriff (<span style="font-family: courier new,courier;">operator*</span> und <span style="font-family: courier new,courier;">operator-&gt;</span>) überladen, verwaltet er ein Arrary, ist der Indexoperator <span style="font-family: courier new,courier;">operator[]</span> überladen. Die entsprechenden Operatoren werden damit vollkommen transparent an die zugrundeliegende Ressource delegiert.</p>
+<p>&nbsp;</p>
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// uniquePtrArray.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;iomanip&gt;</span>
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;memory&gt;</span>
+
+<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">MyStruct</span>{
+public:
+  MyStruct(){
+    std::cout &lt;&lt; std::setw(15) &lt;&lt; std::left &lt;&lt; (<span style="color: #2b91af;">void</span>*) <span style="color: #0000ff;">this</span> &lt;&lt; <span style="color: #a31515;">" Hello "</span>  &lt;&lt; std::endl;
+  }
+  ~MyStruct(){
+    std::cout &lt;&lt; std::setw(15) &lt;&lt; std::left &lt;&lt; (<span style="color: #2b91af;">void</span>*)<span style="color: #0000ff;">this</span> &lt;&lt; <span style="color: #a31515;">" Good Bye "</span> &lt;&lt; std::endl;
+  }
+};
+
+<span style="color: #2b91af;">int</span> main(){
+    
+  std::cout &lt;&lt; std::endl;
+    
+  std::unique_ptr&lt;<span style="color: #2b91af;">int</span>&gt; uniqInt(<span style="color: #0000ff;">new</span> <span style="color: #2b91af;">int</span>(2011));
+  std::cout &lt;&lt; <span style="color: #a31515;">"*uniqInt: "</span> &lt;&lt; *uniqInt &lt;&lt; std::endl;
+
+  std::cout &lt;&lt; std::endl;
+
+  {
+    std::unique_ptr&lt;MyStruct[]&gt; myUniqueArray{<span style="color: #0000ff;">new</span> MyStruct[5]};
+  }
+
+  std::cout &lt;&lt; std::endl;
+
+  {
+    std::unique_ptr&lt;MyStruct[]&gt; myUniqueArray{<span style="color: #0000ff;">new</span> MyStruct[1]};
+    MyStruct myStruct;
+    myUniqueArray[0]=myStruct;
+  }
+
+  std::cout &lt;&lt; std::endl;
+
+  {
+    std::unique_ptr&lt;MyStruct[]&gt; myUniqueArray{<span style="color: #0000ff;">new</span> MyStruct[1]};
+    MyStruct myStruct;
+    myStruct= myUniqueArray[0];
+  }
+
+  std::cout &lt;&lt; std::endl;
+
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>&nbsp;In der Zeile 22 dereferenziere ich den<span style="font-family: courier new,courier;"> std::unique_ptr uniqInt</span> und erhalten den Wert seiner Ressource.</p>
+<p>MyStruct in Zeile 7 - 15 ist die Grundlage für das Array von <span style="font-family: courier new,courier;">std::unique_ptr</span>. Wird ein <span style="font-family: courier new,courier;">MyStruct</span> Objekt instanziiert, gibt es seine Adresse<span style="font-family: courier new,courier;"> </span>aus. Die entsprechende Ausgabe produziert der Destruktor. Damit lässt sich der Lebenszyklus der Objekte gut nachvollziehen.</p>
+<p>&nbsp;<img src="images/blog/EmbeddedProgrammierung/uniquePtr/uniquePtrArray.png" alt="uniquePtrArray" style="margin: 15px;" /></p>
+<p>In den Zeilen 26 - 28 werden fünf Instanzen vom Typ <span style="font-family: courier new,courier;">MyStruct</span> erzeugt und destruiert. Deutlich interessanter ist da schon der Bereich in den Zeilen 32 - 36. In ihr wird eine <span style="font-family: courier new,courier;">MyStruct</span> Instanz auf dem Heap (Zeile 33) und auf dem Stack (Zeile 34) erzeugt. Entsprechende besitzen beide Objekte verschiedene Adresse. Anschließend weise ich das lokale Objekt dem <span style="font-family: courier new,courier;">std::unique_ptr</span> zu (Zeile 35).&nbsp; Ähnlich gehe ich in den Zeilen 40 - 54 vor. In diesem Fall weise ich der lokalen Instanz <span style="font-family: courier new,courier;">myStruct</span> das erste Element von <span style="font-family: courier new,courier;">myUniqueArray</span> zu. Der Indexzugriff die Elemente des std::unique_ptr-Arrays in den Zeilen 35 und 43 fühlt sie wie ein gewöhnlicher Indexzugriff auf ein Array an.</p>
+<h3>Eigene Löschfunktion</h3>
+<p><span style="font-family: courier new,courier;">std::unique_ptr</span> können mit einer eigenen Löschfunktion parametrisiert werden: <span style="font-family: courier new,courier;">std::unique_ptr&lt;int,MyDeleter&gt; uniqPtr(new int(2011), intDeleter).</span> Die Löschfunktion ist Teil des Typs. Als Löschfunktion lassen sich <a href="index.php?option=com_content&amp;view=article&amp;id=67:threads&amp;catid=35:c&amp;Itemid=101#AufrufbareEinheit">aufrufbare Einheiten </a>wie Funktionen, Funktionsobjekte oder auch Lambda Funktionen verwenden. Falls die Löschfunktion <span style="font-family: courier new,courier;">intDeleter </span>keinen Zustand besitzt, änderte sie nichts an der Größe des <span style="font-family: courier new,courier;">std::unique_ptr</span>. Ist die Löschfunktion ein Funktionsobjekt und besitzt eigenen Zustand oder eine Lambda-Funktion, die ein Teil des Aufrufkontextes bindet, dann gilt das <a href="index.php/blog/speicher-performanz-overhead-von-smart-pointern">Null-Overhead Prinzip</a> nicht mehr. Auf die Details zu der Löschfunktion gehe ich beim <span style="font-family: courier new,courier;">std::shared_ptr</span> noch genauer ein.</p>
+<h3>Ersatz für std::auto_ptr</h3>
+<p>Klassisches C++ kennt bereits den <span style="font-family: courier new,courier;">std::auto_ptr</span>. Dieser hat ein ähnliches Aufgabengebiet wie der <span style="font-family: courier new,courier;">std::unique_ptr.</span> Er soll den Lebenszyklus seiner Ressource automatisch verwalten. <span style="font-family: courier new,courier;">std::auto_ptr</span> besitzt aber ein sehr eigentümliches Verhalten. Wird ein <span style="font-family: courier new,courier;">std::auto_ptr</span> kopiert, wird die Ressource verschoben. Das heißt, eine Operation mit Copy-Semantik verhält sich unter der Decke wie Move-Semantik. Aufgrund dieses Verhaltens ist der <span style="font-family: courier new,courier;">std::auto_ptr</span> <em>deprecated</em> und statt ihm sollte der <span style="font-family: courier new,courier;">std::unique_ptr</span> verwendet werden. <span style="font-family: courier new,courier;">std::unique_ptr</span> kann nur verschoben, aber nicht kopiert werden. Dazu muss explizit <a href="http://www.linux-magazin.de/Ausgaben/2012/12/C-11"><span style="font-family: courier new,courier;">std::move</span></a> auf ihn angewandt werden.</p>
+<p>Gut lässt sich das Verhalten von <span style="font-family: courier new,courier;">std::auto_ptr</span> und <span style="font-family: courier new,courier;">std::unique_ptr</span> in einem Bild vergleichen.</p>
+<p>Wird der kleine Codeschnipsel ausgeführt,</p>
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">std::auto_ptr&lt;<span style="color: #2b91af;">int</span>&gt; auto1(<span style="color: #0000ff;">new</span> <span style="color: #2b91af;">int</span>(5));
+std::auto_ptr&lt;<span style="color: #2b91af;">int</span>&gt; auto2(auto1);<span>&nbsp;</span></pre>
+</div>
+<p><img src="images/blog/EmbeddedProgrammierung/uniquePtr/autoPtrCopy.jpg" alt="autoPtrCopy" width="400" height="174" style="margin: 15px;" /></p>
+<p>führt dies dazu, das der <span style="font-family: courier new,courier;">std::auto_ptr auto1</span> danach keine Ressource mehr besitzt.</p>
+<p>Da verhält sich <span style="font-family: courier new,courier;">std::unique_ptr</span> deutlich berechenbarer. Für ihn muss explizit die Move-Semantik angefordert werden.</p>
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">std::unique_ptr&lt;<span style="color: #2b91af;">int</span>&gt; uniqueo1(<span style="color: #0000ff;">new</span> <span style="color: #2b91af;">int</span>(5));
+std::unique_ptr&lt;<span style="color: #2b91af;">int</span>&gt; unique2(std::move(unique1));
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>&nbsp;<img src="images/blog/EmbeddedProgrammierung/uniquePtr/uniquePtrCopy.jpg" alt="uniquePtrCopy" width="400" height="159" style="margin: 15px;" /></p>
+<p><span style="font-family: courier new,courier;">std::unique_ptr</span> kann&nbsp;in den Algorithmen oder Container der STL verwendet werden, wenn diese unter der Decke keine Copy-Semantik verwenden.&nbsp;</p>
+<h3>Die Hilfsfunktion std::make_unique</h3>
+<p>Bei der Standardisierung von C++11 wurde die Hilfsfunktion std::make_unique leider vergessen, so dass sie erst mit C++14 zur Verfügung steht. Zu meiner Verwunderung hat sie aber bereits MIscrosoft Visual 2015 umgesetzt, obwohl der Compiler erst C++11 unterstützt. Dank <span style="font-family: courier new,courier;">std::make_unique</span> muss <span style="font-family: courier new,courier;">new</span> nicht mehr direkt angefasst werden, denn die Funktion erledigt alles selber.</p>
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">std::unique_ptr&lt;<span style="color: #2b91af;">int</span>&gt; uniqPtr1= std::make_unique&lt;<span style="color: #2b91af;">int</span>&gt;(2011);
+<span style="color: #0000ff;">auto</span> uniqPtr2= std::make_unique&lt;<span style="color: #2b91af;">int</span>&gt;(2014);
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Wird <span style="font-family: courier new,courier;">std::make_unique</span> in Kombination mit automatischer Typableitung verwendet, reduziert sich der Schreibaufwand auf das nötigste. Das zeigt der <span style="font-family: courier new,courier;">std::unique_ptr uniqPtr2</span>.</p>
+<h4>Always use std::make_unique</h4>
+<p>Es gibt einen weiteren, subtilen Grund <span style="font-family: courier new,courier;">std::make_unique</span> zu verwenden. <span style="font-family: courier new,courier;">std::make_unique</span> räumt immer seine Ressource auf.<span style="font-family: courier new,courier;"></span></p>
+<p>Falls du</p>
+<div style="background: #ffffff none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<pre style="margin: 0px; line-height: 125%;">func(std::make_unique&lt;<span style="color: #2b91af;">int</span>&gt;(2014), functionMayThrow());
+func(std::unique_ptr&lt;<span style="color: #2b91af;">int</span>&gt;(<span style="color: #0000ff;">new</span> <span style="color: #2b91af;">int</span>(2011)), functionMayThrow());
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>aurufst und <span style="font-family: courier new,courier;">functionMayThrow</span> wirfst eine Ausnahme, hast du bei ein Speicherleck für <span style="font-family: courier new,courier;">new int(2011), </span>falls die folgenden mögliche Sequenz von Befehlen ausgeführt wird.<span style="font-family: courier new,courier;"> </span></p>
+<div style="background: #ffffff none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0000ff;">new</span> <span style="color: #2b91af;">int</span>(2011)
+functionMayThrow()
+std::unique_ptr&lt;<span style="color: #2b91af;">int</span>&gt;(...)
+</pre>
+</div>
+<h2>Wie geht's weiter?</h2>
+<p>Weiter geht es mit dem Smart Pointer <span style="font-family: courier new,courier;">std::shared_ptr</span>. Auf die exklusiven Besitzverhältnisse mit <span style="font-family: courier new,courier;">std::unique_ptr</span> folgen im <a href="index.php/blog/std-shared-ptr">nächsten Artikel</a> der geteilten Besitzverhältnisse mit <span style="font-family: courier new,courier;">std::shared_ptr.</span></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="166" height="212" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Hole dir dein E-Book. Unterstütze meinen Blog.</span></strong></p>
