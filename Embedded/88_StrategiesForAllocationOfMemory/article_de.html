@@ -1,0 +1,57 @@
+<p>Es gibt viele Strategien, Speicher anzufordern. Programmiersprachen wie Python oder Java fordern ihren Speicher auf dem Heap zur Laufzeit des Programms an. C und C++ kennt natürlich auch den Heap, benutzt aber bevorzugt den Stack. Doch diese Strategie sind bei weitem noch nicht alle. Speicher lässt sich natürlich auch zur Startzeit des Programms als fester Block oder Pool von Blöcken vorallokieren und zur Laufzeit verwenden. Da stellt sich mir natürlich die Frage. Was sind die Vorteile dieser verschiedenen Strategien Speicher anzufordern?</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p>Zuerst will ich vier typische Speicherstrategien vorstellen.</p>
+<h2>Strategien für das Anfordern von Speicher</h2>
+<h3>Dynamische Allokation</h3>
+<p>Dynamische Allokation oder auch <em>variable allocation</em> ist natürlich jedem Programmierer wohl bekannt.&nbsp;Operationen wie <span style="font-family: courier new,courier;">new</span> in C++ oder <span style="font-family: courier new,courier;">malloc</span> in C fordern den Speicher genau dann an, wenn er benötigt wird. Hingegen geben Aufrufe wie <span style="font-family: courier new,courier;">delete</span> in C++ oder <span style="font-family: courier new,courier;">free</span> in C den Speicher wieder frei, wenn er nicht mehr benötigt wird.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"> <span style="color: #2b91af;">int</span>* myHeapInt= <span style="color: #0000ff;">new</span> <span style="color: #2b91af;">int</span>(5);
+ <span style="color: #0000ff;">delete</span> myHeapInt;
+<br /><br /></pre>
+</div>
+<p>Der feine Unterschied in der Implementierung besteht darin, ob der Speicher automatisch freigegeben wird oder explizit freigegeben werden muss. Sprachen wie Java oder Python kennen Garbage Collection, Sprachen wie C++ und C nicht.</p>
+<p>Dynamische Speicherallokation besitzt einige Vorteile. So ist die Allokation dynamisch und lässt sich automatisch an die Bedürfnisse des Programms anpassen. Natürlich besteht bei der dynamischen Speicherallokation immer die Gefahr der Speicher Fragmentierung. Darüber hinaus kann eine dynamische Speicheranforderung fehlschlagen oder auch viel zu lange benötigen. Gerade die letzten zwei Punkte sprechen gegen die dynamische Speicherallokation in hoch sicherheitskritischer Software, die ein genaues Timing fordert.</p>
+<p>Bei den Smart Pointern in C++<span style="font-family: courier new,courier;"> </span>wird der dynamisch angeforderte Speicher durch Objekte auf dem Stack automatisch verwaltet.</p>
+<h3>Stack Allokation</h3>
+<p>Stack Allokation ist auch unter dem Namen <em>memory discard</em> bekannt. Die zentrale Idee der Stack Allokation ist, dass die Objekte in einem temporären Bereich angelegt und automatisch wieder freigegeben werden, wenn der temporäre Bereich verlassen wird. Damit kümmert sich die C++-Laufzeit automatisch um den Lebenszyklus seiner Objekte. Das sind typischerweise Bereiche wie Funktionen, Objekte oder Programmschleifen, können aber auch künstliche Bereiche sein, die mit zwei geschweiften Klammern definiert werden.&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">{
+  <span style="color: #2b91af;">int</span> myStackInt(5);
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Ein besonderes schönes Beispiel für Stack Allokation sind die Smart Pointer <a href="index.php/blog/std-unique-ptr">std::unique_ptr</a> und <a href="index.php/blog/std-shared-ptr">std::shared_ptr</a>. Diese werden auf dem Stack angelegt um Objekte, die auf dem Heap angelegt sind, automatisch zu verwalten.</p>
+<p>Was sind nun die Vorteile der Stack Allokation. Zuerst einmal ist die Speicherverwaltung sehr einfach, da die C++-Laufzeit die ganze Arbeit übernimmt. Weiter steht auf der Habenseite, dass das zeitliche Verhalten der Speicheranforderung vollkommen deterministisch ist. Es gibt aber auch große Nachteile. Zum einen ist In der Regel der Stack kleiner als der Heap, zum anderen benötigt das Objekt eine längere Lebenszeit als der Bereich, in dem sie erzeugt wurde. Darüber hinaus unterstützt der C++ Standard keine dynamische Allokation auf dem Stack.</p>
+<h3>Statische Allokation</h3>
+<p>Für die statische Allokation hat sich auch der Name <em>fixed allocation</em> eingebürgert. Die zentrale Idee ist es, dass zur Laufzeit benötigt Speicher bereits beim Starten des Programms angefordert und in der Regel nicht mehr freigegeben wird. Das setzt natürlich voraus, dass&nbsp;der Speicherbedarf des Programms vorausberechnet werden kann.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #2b91af;">char</span>* memory= <span style="color: #0000ff;">new</span> <span style="color: #2b91af;">char</span>[<span style="color: #0000ff;">sizeof</span>(Account)];
+Account* a= <span style="color: #0000ff;">new</span>(memory) Account;
+
+<span style="color: #2b91af;">char</span>* memory2= <span style="color: #0000ff;">new</span> <span style="color: #2b91af;">char</span>[5*<span style="color: #0000ff;">sizeof</span>(Account)];
+Account* b= <span style="color: #0000ff;">new</span>(memory2) Account[5];
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>So werden in dem kleinen Beispiel, die Objekte a und b direkt in dem Speicher konstruiert, den <span style="font-family: courier new,courier;">memory</span> und <span style="font-family: courier new,courier;">memory2</span> bereits allokiert haben.</p>
+<p>Was sind die Vor- und Nachteile der statischen Speicherallokation? In harten Echtzeitanwendungen, in denen die zeitliche Variation von dynamischer Speicheranforderung keine Option ist, wird die statische Allokation, die&nbsp;exakt vorhersagbar ist, sehr gern eingesetzt.&nbsp;Weiter spricht für die statische Allokation, dass die Fragmentation des Speichers sehr gering ist. Natürlich gibt es auch Nachteile. Zum einen ist es oft nicht möglich, die Speicheranforderungen der Applikation vorherzusagen oder auch auf besondere Speicheranforderungen dynamisch einzugehen, darüber hinaus kann sich die Startzeit&nbsp;des Programms verlängern.</p>
+<h3>Memory Pool</h3>
+<p>Memory pool oder auch <em>pooled allocation</em> verbindet die Vorhersagbarkeit der statischen Allokation mit der Flexibilität der dynamischen Allokation. Ähnlich wie bei der statischen Allokation wird bei dem memory pool der Speicher zu Startzeit des Programms schon angefordert. Im Gegensatz dazu wird aber typischerweise ein<em> pool of objects</em> angefordert und verwendet. Zur Laufzeit bedient sich die Applikation aus diesem pool und gibt die Objekte auch wieder an den pool zurück. Gibt es nicht nur eine, sondern mehrere typische Größen von Objekten, liegt es natürlich auf der Hand, auch mehrere memory pools anzulegen.</p>
+<p>Was sind die Vor- und Nachteile? Die Vorteile sind denen der statischen Allokation sehr ähnlich. Zum einen wird die Fragmentierung des Speichers unterbunden, zum anderen ist das zeitliche Verhalten der Speicherallokation und -deallokation vorhersagbar. Gegenüber der statischen Allokation zeichnet die memory pool Allokation aus, dass sie deutlich mehr Flexibilität und Komfort bietet. Zum einen, da pools verschiedener Größe verwendet werden können, zum andern, da der Speicher in den Pool zurückgegeben wird. Natürlich ist memory pool die anspruchsvollste aller der hier vorgestellten Techniken.</p>
+<h2>Wie geht's weiter?</h2>
+<p>Manchmal könnte man Python oder Java beneiden. Sie verwenden die dynamische Speicherallokation im Zusammenhang mit einem Garbage Collector und alles ist gut. Alles ist gut? Alle vier hier vorgestellten Techniken sind natürlich in C oder C++ im Einsatz und besitzen ihre besonderen Vorteile. Im<a href="index.php/blog/vor-und-nachteile-der-verschiedenen-speicherstrategien"> nächsten Artike</a>l dieser Serie will ich mir genauer anschauen, worin sich die vorgestellten Techniken unterscheiden. Mich interessieren vor allem die Punkte Vorhersagbarkeit, Skalierung, interne und externe Fragmentation und memory exhaustion.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="166" height="212" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Hole dir dein E-Book. Unterstütze meinen Blog.</span></strong></p>
+<p>&nbsp;</p>
