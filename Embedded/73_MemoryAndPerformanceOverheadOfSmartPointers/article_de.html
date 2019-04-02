@@ -1,0 +1,106 @@
+<p>C++ bietet vier verschiedene Smart Pointer an. Zwei davon will ich mir in diesem Artikel unter dem Aspekt Overhead in puncto Speicher und Performanz genauer anschauen.&nbsp;Während mein erster Kandidat <span style="font-family: courier new,courier;">std::unique_ptr</span> den Lebenszyklus genau einer Ressource verwaltet, teilt sich mein zweiter Kandidat <span style="font-family: courier new,courier;">std::shared_ptr</span> typischerweise seine Ressource mit anderen<span style="font-family: courier new,courier;"> std::shared_ptr</span>. Ich nehme das Ergebnis meines Tests gerne vorweg, bevor die nackten Zahlen kommen. <strong>Es gibt wenige Gründe in modernem C++, das Speichermanagment mit <span style="font-family: courier new,courier;">new</span> und <span style="font-family: courier new,courier;">delete</span> explizit in die Hand zu nehmen.&nbsp;</strong></p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p>Warum? Jetzt kommen die Fakten.</p>
+<h2>Speicher Overhead</h2>
+<h3>std::unique_ptr</h3>
+<p><span style="font-family: courier new,courier;">std::unique_ptr</span> benötigt in der Regel keinen zusätzlichen Speicher. Das heißt,&nbsp;ein <span style="font-family: courier new,courier;">std::unique_ptr</span> ist nicht größer ist als der Zeiger auf den Speicher, den er verwaltet. Warum sage ich in der Regel? Da ein <span style="font-family: courier new,courier;">std::unique_ptr</span> mit einer Löschfunktion parametrisiert werden kann, benötigt diese natürlich Speicher. Das ist aber nicht der Standardfall.</p>
+<p>Im Gegensatz dazu besitzt der <span style="font-family: courier new,courier;">std::shared_ptr</span> einen kleinen Overhead.</p>
+<h3>std::shared_ptr</h3>
+<p>Mehrere std::shared_ptr teilen sich zusammen eine gemeinsame Variable. Dabei führen sie intern einen Referenzzähler mit. Das heißt, jedes Mal wenn der<span style="font-family: courier new,courier;"> std::shared_ptr</span> kopiert wird, wird der Referenzzähler erhöht, bzw. erniedrigt, wenn ein<span style="font-family: courier new,courier;"> std::shared_ptr</span> seinen Gültigkeitsbereich verlässt. Daher benötigt ein <span style="font-family: courier new,courier;">std::shared_ptr</span> zusätzlichen Speicher für den Referenzzähler. Das ist auch schon der minimale Overhead, den ein <span style="font-family: courier new,courier;">std::shared_ptr</span> gegenüber einem rohen Zeiger besitzt.</p>
+<h2>Performanz Overhead</h2>
+<p>Die Geschichte zur Performanz ist ein wenig komplizierter. Dazu lasse ich die Zahlen sprechen. Ein einfacher Performanztest soll Klarheit schaffen.</p>
+<h3>Der Performanztest</h3>
+<p>In dem Test fordere ich 100000000 Mal Speicher an und gib ihn wieder frei. Genau die Zeit für all diese Operationen interessiert mich.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// all.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;chrono&gt;</span>
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+
+<span style="color: #0000ff;">static</span> <span style="color: #0000ff;">const</span> <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span> numInt= 100000000;
+
+<span style="color: #2b91af;">int</span> main(){
+
+  <span style="color: #0000ff;">auto</span> start = std::chrono::system_clock::now();
+
+  <span style="color: #0000ff;">for</span> ( <span style="color: #2b91af;">long</span> <span style="color: #2b91af;">long</span> i=0 ; i &lt; numInt; ++i){
+    <span style="color: #2b91af;">int</span>* tmp(<span style="color: #0000ff;">new</span> <span style="color: #2b91af;">int</span>(i));
+    <span style="color: #0000ff;">delete</span> tmp;
+    <span style="color: #008000;">// std::shared_ptr&lt;int&gt; tmp(new int(i));</span>
+    <span style="color: #008000;">// std::shared_ptr&lt;int&gt; tmp(std::make_shared&lt;int&gt;(i));</span>
+    <span style="color: #008000;">// std::unique_ptr&lt;int&gt; tmp(new int(i));</span>
+    <span style="color: #008000;">// std::unique_ptr&lt;int&gt; tmp(std::make_unique&lt;int&gt;(i));</span>
+  }
+
+  std::chrono::duration&lt;<span style="color: #2b91af;">double</span>&gt; dur= std::chrono::system_clock::now() - start;
+  std::cout &lt;&lt; <span style="color: #a31515;">"time native: "</span> &lt;&lt; dur.count() &lt;&lt; <span style="color: #a31515;">" seconds"</span> &lt;&lt; std::endl;
+
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>In meinem Test stelle ich den expliziten Umgang mit <span style="font-family: courier new,courier;">new</span> und <span style="font-family: courier new,courier;">delete </span>(Zeile 13 und 14)&nbsp; dem Einsatz von <span style="font-family: courier new,courier;">std::shared_ptr</span> (Zeile 15), <span style="font-family: courier new,courier;">std::make_shared</span> (Zeile 16), <span style="font-family: courier new,courier;">std::unique_ptr</span> (Zeile 17) und <span style="font-family: courier new,courier;">std::make_unique</span> (Zeile 18) gegenüber. Selbst in dem kleinen Programm ist Umgang mit den Smart Pointern in Zeile 15 - Zeile 18 deutlich einfacher, da die Smart Pointer in Zeile 19 ihren Gültigkeitsbereich verlassen und somit automatisch der Speicher der dynamische angelegten <span style="font-family: courier new,courier;">int</span> Variable freigegeben wird.</p>
+<p>Die zwei Funktionen <span style="font-family: courier new,courier;">std::make_shared</span> (Zeile 16) und <span style="font-family: courier new,courier;">std::make_unique</span> (Zeile 18) sind praktische Hilfsfunktionen, die ein entsprechenden Smart Pointer direkt erzeugen. Besonders interessant ist std::make_shared. Beim Anlegen eines <span style="font-family: courier new,courier;">std::shared_ptr</span> sind zwei Speicherallokationen notwendig. Zum einen wird Speicher für die verwaltete Variable angefordert, zum anderen für den Referenzzähler. Aus diesen zwei teuren Speicheranforderungen macht <span style="font-family: courier new,courier;">std::make_shared</span> eine. Die Performanz dankt es. <span style="font-family: courier new,courier;">std::make_unique</span> gibt es erst seit C++14. Die ganze andere Funktionalität steht schon seit C++11 zur Verfügung.</p>
+<p>Für meine Tests verwende ich einen den GCC 4.9.2 und den cl.exe, der Bestandteil von Microsoft Visual Studio 2015 ist. Obwohl dieser Compiler nur C++11 unterstützt, bietet er <span style="font-family: courier new,courier;">std::make_unique</span> schon an. Damit kann ich alle Tests mit maximaler und ohne Optimierung auf Linux und Windows durchführen. Zur Ehrenrettung von cl.exe muss ich sagen, dass mein Windows PC deutlich schwächer ist als meine Linux PC. Daher liegt der Schwerpunkt meiner Analyse darauf, die Performanz des expliziten Speichermangements mit der der Smart Pointer zu vergleichen. Ich vergleiche nicht Windows mit Linux.</p>
+<p>Hier kommen die nackten Zahlen in Sekunden.</p>
+<h3>Die nackten Zahlen</h3>
+<p>Der Einfachheit halber verzichte ich auf die Screenshots und habe die Ergebnisse bereits in einer Tabelle zusammengefasst.</p>
+<p><img src="images/blog/EmbeddedProgrammierung/EinfacherPerformanzvergleichVonSmartPointern/comparison.png" alt="comparison" width="700" height="174" style="margin: 15px;" /></p>
+<p>Ein paar sehr interessante Erkenntnisse lassen sich aus der Tabelle ableiten.</p>
+<ol>
+<li>Optimierung zahlt sich aus. Im Falle von <span style="font-family: courier new,courier;">std::make_shared</span> ist der Performanzunterschied nahezu 10 fach unter Linux. Aber auch im Falle der anderen Variationen ist die optimierte Variante um den Faktor 2 bis 3 schneller. Das gilt für Linux als auch für Windows. Wird hingegen <span style="font-family: courier new,courier;">new</span> und <span style="font-family: comic sans ms,sans-serif;">delete</span> verwendet, gibt es kein großes Optimierungspotential mehr für den Compiler.</li>
+<li><span style="font-family: courier new,courier;">std::unique_ptr</span>, <span style="font-family: courier new,courier;">std::make_unique</span> und mit kleinen Abstrichen <span style="font-family: courier new,courier;">std::make_shared</span> spielen in der gleichen Liga wie <span style="font-family: courier new,courier;">new</span> und <span style="font-family: courier new,courier;">delete.</span></li>
+<li><span style="font-family: courier new,courier;">std::shared_ptr</span> und <span style="font-family: courier new,courier;">std::make_shared</span> sollten nicht ohne Optimierung verwendet werden. <span style="font-family: courier new,courier;">std::shared_ptr</span> ist selbst mit Optimierung um dem Faktor zwei langsamer als <span style="font-family: courier new,courier;">new</span> und <span style="font-family: courier new,courier;">delete.</span></li>
+</ol>
+<h2>Mein Fazit</h2>
+<ul>
+<li><span style="font-family: courier new,courier;">std::unique_ptr</span> besitz keine Speicher und Performanz Overhead gegenüber dem expliziten Speichermanagement mit <span style="font-family: courier new,courier;">new</span> und <span style="font-family: courier new,courier;">delete.</span> Das ist großartig. Bietet <span style="font-family: courier new,courier;">std::unique_ptr</span> doch einen deutlichen Mehrwert an, indem er automatisch den Lebenszyklus seiner Ressource verwaltet und dies, <strong>ohne irgendwelche zusätzliche Kosten zu verursachen.</strong><span id="transmark"></span></li>
+<li>Für <span style="font-family: courier new,courier;">std::shared_ptr</span> ist mein Fazit schon ein bisschen schwieriger. Ja, ich gebe zu, dass <span style="font-family: courier new,courier;">std::shared_ptr</span> ca. um den Faktor zwei langsamer ist als <span style="font-family: courier new,courier;">ne</span>w und delete. Aber, diese Rechnung ist falsch, denn <span style="font-family: courier new,courier;">std::shared_ptr</span> teilen sich ihre Objekte. Das heißt insbesondere, dass der erste<span style="font-family: courier new,courier;"> std::shared_ptr</span> zwar Speicher für das Objekt und den Referenzzähler einmalig anfordern muss, das heißt aber auch, dass jeder weitere <span style="font-family: courier new,courier;">std::shared_ptr</span> die Verwaltungsstruktur für die geteilte Variable mit nutzen kann.</li>
+</ul>
+<p>Daher will ich mich gerne wiederholen. <strong>Es gibt wenige Gründe in modernem C++, das Speichermanagment mit <span style="font-family: courier new,courier;">new</span> und <span style="font-family: courier new,courier;">delete</span> explizit in die Hand zu nehmen. </strong></p>
+<h2>Wie geht's weiter?</h2>
+<p>Nach diesem Plädoyer für Smart Pointer folgen im <a href="index.php/blog/std-unique-ptr">nächsten Artikel </a>die Details zu dem <span style="font-family: courier new,courier;">std::unique_ptr</span>.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="166" height="212" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Hole dir dein E-Book. Unterstütze meinen Blog.</span></strong></p>
+<p>&nbsp;</p>
