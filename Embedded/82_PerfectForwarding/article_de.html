@@ -1,0 +1,417 @@
+<p>Heute lösen wir ein bisher ungelöstes Problem in klassischem C++: " ... a herefore unsolved problem in C++" (Bjarne Stroustrup). Um es kurz zu machen, es geht um Perfect Forwarding.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p>Doch was ist<strong> Perfect Forwarding</strong>.</p>
+<p style="padding-left: 30px;">Reicht ein Funktion-Template seine Argumente identisch weiter, ohne deren Lvalue oder Rvalue Charakteristik zu ändern, wird dies&nbsp;Perfect Forwarding genannt.</p>
+<p>Super. Und was sind Lvalues und Rvalues? Da muss ich ein wenig ausholen.</p>
+<h2>Lvalues und Rvalues</h2>
+<p>Ich will in dieser Erläuterung nicht auf die Details zu Lvalues und Rvalues eingehen und darüber hinaus auch <em>glvalue,</em> <em>xvalue</em> und <em>prvalue</em> erklären. Das ist zu verwirrend und kontraproduktiv. Falls du neugierig bist, verweise ich gerne auf den Artikel von Anthony Williams: <a href="https://www.justsoftwaresolutions.co.uk/cplusplus/core-c++-lvalues-and-rvalues.html">Core C++ - lvalues and rvalues. </a>Ich werde statt dessen eine tragfähige Intuition aufbauen.</p>
+<p><strong>Rvalues</strong> sind:</p>
+<ul>
+<li>temporäre Objekte</li>
+<li>Objekte ohne Namen</li>
+<li>Objekte, deren Adresse sich nicht bestimmen lässt</li>
+</ul>
+<p>Trifft auf Objekte eines dieser Charakteristika zu, liegt ein Rvalue vor. Im Umkehrschluss bedeutet dies, dass Lvalues einen Namen und eine Adresse besitzen. Ein paar Beispiele für Rvalues:</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #2b91af;">int</span> five= 5;
+std::string a= std::string(<span style="color: #a31515;">"Rvalue"</span>);
+std::string b= std::string(<span style="color: #a31515;">"R"</span>) +  std::string(<span style="color: #a31515;">"value"</span>);
+std::string c= a + b;
+std::string d= std::move(b);<br />
+</pre>
+</div>
+<p>Rvalues stehen auf der rechten Seite einer Zuweisung. So sind in den Beispielen der Wert 5 und der Konstruktoraufruf<span style="font-family: courier new,courier;"> std::string("Rvalue")</span> Rvalues, denn weder lässt sich für den Wert 5 die Adresse bestimmen, noch besitzt der Konstruktoraufruf einen Namen. Gleiches gilt für die Addition der Rvalues in dem Ausdruck<span style="font-family: courier new,courier;">&nbsp;std::string("R") + std::string("value").</span></p>
+<p>Interessant ist die String-Addition zweier Lvalues in&nbsp;<span style="font-family: courier new,courier;">a + b</span>. Dieser Ausdruck wird zum R<span style="font-family: courier new,courier;">value,</span> da die Addition zweier <span style="font-family: comic sans ms,sans-serif;">Lvalues</span> ein temporäres Objekt erzeugt. Ein besonderer Anwendungsfall ist&nbsp;<span style="font-family: courier new,courier;"> std::move(b).</span> Die neue C++11-Funktion konvertiert den Lvalue<span style="font-family: courier new,courier;"> b </span>in eine Rvalue-Referenz.</p>
+<p>Rvalues stehen auf der rechten Seite einer Zuweisung, Lvalues können auch auf der linken Seite einer Zuweisung stehen. Dies gilt aber nicht immer.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">const</span> <span style="color: #2b91af;">int</span> five= 5;
+five= 6;
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Zwar ist die Variable <span style="font-family: courier new,courier;">five</span> ein Lvalue. Da sie konstant ist, kann sie aber nicht auf der linken Seite einer Zuweisung stehen.</p>
+<p>&nbsp;</p>
+<p>Nun aber zu der eigentlichen Herausforderung: Perfect Forwarding. Um das bisher ungelöste Problem intuitiv zu erfassen, werde ich sukzessive eine perfekte Fabrikmethode entwickeln.&nbsp;</p>
+<h2>Eine perfekte Fabrikfunktion</h2>
+<p>Zuerst ein kleiner Disclaimer. Der Ausdruck perfekte Fabrikfunktion ist kein formal definierter Ausdruck.</p>
+<p>Unter einer<strong> perfekten Fabrikfunktion</strong> verstehe ich eine vollkommen generische Fabrikfunktion. Das heißt insbesondere, das die Funktion die folgenden Eigenschafte besitzen soll:</p>
+<ul>
+<li>Ein beliebige Anzahl von Argumenten annehmen&nbsp;</li>
+<li>Sowohl Lvalues als auch Rvalues als Argumente akzeptieren</li>
+<li>Die Funktionsargumente identisch an das zu erzeugende Objekte weiterreichen</li>
+</ul>
+<p>Das ganze geht auch weniger formal. Eine perfekte Fabrikfunktion soll jedes beliebige Objekt erzeugen können. Und los geht es mit der ersten Iteration.</p>
+<h3>Erste Iteration</h3>
+<p>Aus Effizienzgründe übergebe ich das Funktionsargument als Referenz. Genau gesprochen, als nicht konstante Lvalue-Referenz. Das Funktions-Template <span style="font-family: courier new,courier;">create</span> in der ersten Iteration.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// perfectForwarding1.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+
+<span style="color: #0000ff;">template</span> &lt;<span style="color: #0000ff;">typename</span> T,<span style="color: #0000ff;">typename</span> Arg&gt;
+T create(Arg&amp; a){
+  <span style="color: #0000ff;">return</span> T(a);
+}
+
+
+<span style="color: #2b91af;">int</span> main(){
+    
+  std::cout &lt;&lt; std::endl;
+
+  <span style="color: #008000;">// Lvalues</span>
+  <span style="color: #2b91af;">int</span> five=5;
+  <span style="color: #2b91af;">int</span> myFive= create&lt;<span style="color: #2b91af;">int</span>&gt;(five);
+  std::cout &lt;&lt; <span style="color: #a31515;">"myFive: "</span>  &lt;&lt; myFive &lt;&lt; std::endl;
+
+  <span style="color: #008000;">// Rvalues</span>
+  <span style="color: #2b91af;">int</span> myFive2= create&lt;<span style="color: #2b91af;">int</span>&gt;(5);
+  std::cout &lt;&lt; <span style="color: #a31515;">"myFive2: "</span> &lt;&lt; myFive2 &lt;&lt; std::endl;
+
+  std::cout &lt;&lt; std::endl;
+
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Übersetze ich das Programm, moniert der Compiler, das er den Rvalue (Zeile 21) nicht an eine nicht konstante Lvalue-Referenz binden kann.</p>
+<p><img src="images/blog/EmbeddedProgrammierung/PerfectForwarding/perfectForwarding1.png" alt="perfectForwarding1" width="600" height="135" style="margin: 15px;" /></p>
+<p>Jetzt bieten sich zwei Lösungsmöglichkeiten an.</p>
+<ol>
+<li>Ändere die <strong>nicht konstante Lvalue Referenz</strong> (Zeile 6) in eine <strong>konstante Lvalue Referenz.</strong> An eine konstante Lvalue Referenz kann auch eine Rvalue gebunden werden. Das ist aber alles andere als perfekt, denn nun kann das Funktionsargument nicht mehr verändert werden.<span style="font-family: courier new,courier;"></span></li>
+<li>Überlade das Funktions-Template für eine<strong> konstante Lvalue-Referenz</strong> und eine <strong>nicht konstante Lvalue-Referenz. </strong>Das ist einfach.</li>
+</ol>
+<h3>Zweite Iteration</h3>
+<p>Die Fabrikfunktion <span style="font-family: courier new,courier;">create</span> für eine konstante Lvalue-Referenz und eine nicht konstante Lvalue-Referenz überladen.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// perfectForwarding2.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+
+<span style="color: #0000ff;">template</span> &lt;<span style="color: #0000ff;">typename</span> T,<span style="color: #0000ff;">typename</span> Arg&gt;
+T create(Arg&amp; a){
+  <span style="color: #0000ff;">return</span> T(a);
+}
+
+<span style="color: #0000ff;">template</span> &lt;<span style="color: #0000ff;">typename</span> T,<span style="color: #0000ff;">typename</span> Arg&gt;
+T create(<span style="color: #0000ff;">const</span> Arg&amp; a){
+  <span style="color: #0000ff;">return</span> T(a);
+}
+
+<span style="color: #2b91af;">int</span> main(){
+    
+  std::cout &lt;&lt; std::endl;
+
+  <span style="color: #008000;">// Lvalues</span>
+  <span style="color: #2b91af;">int</span> five=5;
+  <span style="color: #2b91af;">int</span> myFive= create&lt;<span style="color: #2b91af;">int</span>&gt;(five);
+  std::cout &lt;&lt; <span style="color: #a31515;">"myFive: "</span>  &lt;&lt; myFive &lt;&lt; std::endl;
+
+  <span style="color: #008000;">// Rvalues</span>
+  <span style="color: #2b91af;">int</span> myFive2= create&lt;<span style="color: #2b91af;">int</span>&gt;(5);
+  std::cout &lt;&lt; <span style="color: #a31515;">"myFive2: "</span> &lt;&lt; myFive2 &lt;&lt; std::endl;
+
+  std::cout &lt;&lt; std::endl;
+
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Das Programm liefert das erwartete Ergebnis.</p>
+<p><img src="images/blog/EmbeddedProgrammierung/PerfectForwarding/perfectForwarding2.png" alt="perfectForwarding2" style="margin: 15px;" /></p>
+<p>Das war einfach. Zu einfach. Die Lösung besitzt zwei konzeptionelle Probleme.</p>
+<ol>
+<li>Um n verschiedene Argumente zu unterstützen, müssen 2^n +1&nbsp;Variationen der Funktions-Templates <span style="font-family: courier new,courier;">create</span> implementiert werden. 2^n +1, da zu einer perfekten Lösung auch das Funktions-Template ohne Argumente gehört.</li>
+<li>Das Funktionsargument ist im Funktionskörper von <span style="font-family: courier new,courier;">create</span> zum Lvalue mutiert, denn <span style="font-family: courier new,courier;">a </span>besitzt einen Namen.&nbsp;Stört das? Ja! Jetzt muss teuer kopiert werden was billig verschoben werden könnte.&nbsp;</li>
+</ol>
+<p>Nun naht aber die Lösung in Form der neuen C++-Funktion <span style="font-family: courier new,courier;">std::forward.</span></p>
+<h3>Dritte Iteration</h3>
+<p>Mit <span style="font-family: courier new,courier;">std::forward</span> wird die Lösung deutlich eleganter.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// perfectForwarding3.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+
+<span style="color: #0000ff;">template</span> &lt;<span style="color: #0000ff;">typename</span> T,<span style="color: #0000ff;">typename</span> Arg&gt;
+T create(Arg&amp;&amp; a){
+  <span style="color: #0000ff;">return</span> T(std::forward&lt;Arg&gt;(a));
+}
+
+<span style="color: #2b91af;">int</span> main(){
+    
+  std::cout &lt;&lt; std::endl;
+
+  <span style="color: #008000;">// Lvalues</span>
+  <span style="color: #2b91af;">int</span> five=5;
+  <span style="color: #2b91af;">int</span> myFive= create&lt;<span style="color: #2b91af;">int</span>&gt;(five);
+  std::cout &lt;&lt; <span style="color: #a31515;">"myFive: "</span>  &lt;&lt; myFive &lt;&lt; std::endl;
+
+  <span style="color: #008000;">// Rvalues</span>
+  <span style="color: #2b91af;">int</span> myFive2= create&lt;<span style="color: #2b91af;">int</span>&gt;(5);
+  std::cout &lt;&lt; <span style="color: #a31515;">"myFive2: "</span> &lt;&lt; myFive2 &lt;&lt; std::endl;
+
+  std::cout &lt;&lt; std::endl;
+
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Bevor ich das Rezept aus <a href="http://en.cppreference.com/w/cpp/utility/forward">cppreference.com </a>bescheibe, um Perfect Forwarding zu erhalten, möchte ich kurz noch den Namen Universelle-Referenz vorstellen.</p>
+<p>Der Begriff<strong> Universelle-Referenz</strong> geht auf Scott Meyers.</p>
+<p style="padding-left: 30px;">Die Universelle-Referenz (Arg&amp;&amp; a)&nbsp;in Zeile 7 ist eine besonderes mächtige Referenz, die sowohl Lvalues als auch Rvalues binden kann. Sie entsteht genau dann, wenn eine Variable <span style="font-family: courier new,courier;"><strong>Arg<code>&amp;&amp;</code> a</strong></span> für einen abgeleiteten Typ <span style="font-family: courier new,courier;"><strong><code>Arg </code></strong></span>erklärt wird. <code></code><em></em></p>
+<p>Um nun Perfect Forwarding zu erhalten, benötigt es das Zusammenspiel einer Universellen-Referenz mit <span style="font-family: courier new,courier;">std::forward. std::forward&lt;Arg&gt;(a)</span> gibt den zugrundeliegenden Typ von a weiter, da a eine Universelle Referenz ist. Damit bleibt ein Rvalue ein Rvalue.</p>
+<p>Nun zum Muster.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0000ff;">template</span>&lt;<span style="color: #0000ff;">class</span> <span style="color: #ff0000;"><strong>T</strong></span>&gt;
+<span style="color: #2b91af;">void</span> wrapper(<strong><span style="color: #ff0000;">T&amp;&amp;</span></strong> a){
+    func(<strong><span style="color: #ff0000;">std::forward&lt;T&gt;(a)</span></strong>); 
+}<br />&nbsp;</pre>
+</div>
+<p>Die entscheidenden Bestandteile des Musters habe ich rot hinterlegt. Genau das Muster kommt in dem Funktions-Template <span style="font-family: courier new,courier;">create</span> zum Einsatz. Lediglich der Typename ändert sich von T auf Arg.</p>
+<p>Ist das Funktions-Template create nun perfekt? Leider nicht. <span style="font-family: courier new,courier;">create</span> benötigt genau ein Argument, das sie an den Konstruktor des Objektes <em>perfekt</em> weiterleitet (Zeile 7). Nun ist es in der letzten Iteration noch notwendig, das Funktions-Template zum Variadic Template zu erweitern.</p>
+<h3>Vierte Iteration - Die perfekte Fabrikfunktion</h3>
+<p><a href="http://en.cppreference.com/w/cpp/language/parameter_pack">Variadic Templates</a> sind Templates, die beliebig viele Argumente annehmen können. Genau diese Eigenschaft fehlt der perfekten Fabrikfunktion.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// perfectForwarding4.cpp</span>
+
+<span style="color: #0000ff;">#include &lt;iostream&gt;</span>
+<span style="color: #0000ff;">#include &lt;string&gt;</span>
+<span style="color: #0000ff;">#include &lt;utility&gt;</span>
+
+<span style="color: #0000ff;">template</span> &lt;<span style="color: #0000ff;">typename</span> T, <span style="color: #0000ff;">typename</span> ... Args&gt;
+T create(Args&amp;&amp; ... args){
+  <span style="color: #0000ff;">return</span> T(std::forward&lt;Args&gt;(args)...);
+}
+
+<span style="color: #0000ff;">struct</span> MyStruct{
+  MyStruct(<span style="color: #2b91af;">int</span> i,<span style="color: #2b91af;">double</span> d,std::string s){}
+};
+
+<span style="color: #2b91af;">int</span> main(){
+    
+    std::cout &lt;&lt; std::endl;
+
+  <span style="color: #008000;">// Lvalues</span>
+  <span style="color: #2b91af;">int</span> five=5;
+  <span style="color: #2b91af;">int</span> myFive= create&lt;<span style="color: #2b91af;">int</span>&gt;(five);
+  std::cout &lt;&lt; <span style="color: #a31515;">"myFive: "</span>  &lt;&lt; myFive &lt;&lt; std::endl;
+
+  std::string str{<span style="color: #a31515;">"Lvalue"</span>};
+  std::string str2= create&lt;std::string&gt;(str);
+  std::cout &lt;&lt; <span style="color: #a31515;">"str2: "</span> &lt;&lt; str2 &lt;&lt; std::endl;
+
+  <span style="color: #008000;">// Rvalues</span>
+  <span style="color: #2b91af;">int</span> myFive2= create&lt;<span style="color: #2b91af;">int</span>&gt;(5);
+  std::cout &lt;&lt; <span style="color: #a31515;">"myFive2: "</span> &lt;&lt; myFive2 &lt;&lt; std::endl;
+
+  std::string str3= create&lt;std::string&gt;(std::string(<span style="color: #a31515;">"Rvalue"</span>));
+  std::cout &lt;&lt; <span style="color: #a31515;">"str3: "</span> &lt;&lt; str3 &lt;&lt; std::endl;
+
+  std::string str4= create&lt;std::string&gt;(std::move(str3));
+  std::cout &lt;&lt; <span style="color: #a31515;">"str4: "</span> &lt;&lt; str4 &lt;&lt; std::endl;
+  
+  <span style="color: #008000;">// Arbitrary number of arguments</span>
+  <span style="color: #2b91af;">double</span> doub= create&lt;<span style="color: #2b91af;">double</span>&gt;();
+  std::cout &lt;&lt; <span style="color: #a31515;">"doub: "</span> &lt;&lt; doub &lt;&lt; std::endl;
+  
+  MyStruct myStr= create&lt;MyStruct&gt;(2011,3.14,str4);
+
+
+  std::cout &lt;&lt; std::endl;
+
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Die drei Punkte in den Zeilen 7 - 9 sind ein sogenanntes Parameter Pack. Stehen die drei Punkte oder auch Ellipse links von Args, wird das Parameter Pack gepackt, recht davon, wird es entpackt. Insbesondere bewirken die drei Punkte in Zeile 9 std::forward&lt;Args&gt;(args)..., dass auf jedes der Konstruktorargumente Perfect Forwarding angewandt wird. Das Ergebnis ist beeindruckend. Nun kann die perfekte Fabrikfunktion <span style="font-family: courier new,courier;">create</span> zusätzlich noch mit keinem (Zeile 40) oder drei Argumenten (Zeile 43) aufgerufen werden.</p>
+<p>&nbsp;<img src="images/blog/EmbeddedProgrammierung/PerfectForwarding/perfectForwarding4.png" alt="perfectForwarding4" style="margin: 15px;" /></p>
+<h2>Wie geht's weiter?</h2>
+<p>&nbsp;RAII oder auch Resource Acquisition Is Initialization ist sicher nicht das schönste aller Akronyme in C++. Was dahinter steckt, zeige ich im <a href="index.php/blog/garbage-collection-nein-danke">nächsten Artikel</a>.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="166" height="212" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Hole dir dein E-Book. Unterstütze meinen Blog.</span></strong></p>
+<p>&nbsp;</p>
