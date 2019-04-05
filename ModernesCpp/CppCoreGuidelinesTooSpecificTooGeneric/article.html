@@ -1,0 +1,202 @@
+<p>Concepts revolutionise the way we think about and use generic programming. They didn't make it in C++11, or C++17 but with C++20 we will get them with high probability.</p>
+<hr id="system-readmore" />
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesBetterSpecificOrGeneric/roads-320371_1280.jpg" alt="roads 320371 1280" width="500" height="375" /></p>
+<p>Before I write about the use of concepts, I want to make a general remark.</p>
+<h2>Too Specific versus Too Generic</h2>
+<p>Until C++20 we have in C++ two diametral ways to think about functions or user-defined types (classes). Functions or classes can be defined on specific types or on generic types. In the second case, we call them function or class templates. What are the downsides of each way?</p>
+<h3>Too Specific</h3>
+<p>It's quite a job to define for each specific type a function or a class. To avoid that burden, type conversion comes often to our rescue but is also part of the problem. Let's see what I mean.</p>
+<h4>Narrowing Conversion</h4>
+<p>You have a function <code>getInt(int a)</code>&nbsp;which you can invoke with a <code>double</code>. Now, narrowing conversion takes places.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// narrowingConversion.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">needInt</span>(<span style="color: #007788; font-weight: bold;">int</span> i){
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"int: "</span> <span style="color: #555555;">&lt;&lt;</span> i <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+	
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+	
+	<span style="color: #007788; font-weight: bold;">double</span> d{<span style="color: #ff6600;">1.234</span>};
+	std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"double: "</span> <span style="color: #555555;">&lt;&lt;</span> d <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+	
+	needInt(d);
+	
+	std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+	
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>I assume that is not the behaviour you wanted. You started with a <code>double</code> and ended with an <code>int</code>.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesBetterSpecificOrGeneric/narrowingConversion.PNG" alt="narrowingConversion" width="300" height="139" /></p>
+<p>But conversion works also the other way around.</p>
+<h4>Integral Promotion</h4>
+<p>You have a user-defined type <code>MyHouse</code><span style="font-family: Courier New, Courier, monospace;">. </span>An instance of <code>MyHouse</code> can be constructed in two ways. When invoked without an argument (1), it's attribute <code>family</code> is set to an empty string. This means the house is still empty.&nbsp; To easily check if the house is empty or full, I implemented a conversion operator to <code>bool </code>(2). Fine or? No!</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// conversionOperator.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;string&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">struct</span> MyHouse{
+    MyHouse() <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">default</span>;                            <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    MyHouse(<span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span>string<span style="color: #555555;">&amp;</span> fam)<span style="color: #555555;">:</span> family(fam){}
+	
+    <span style="color: #006699; font-weight: bold;">operator</span> <span style="color: #007788; font-weight: bold;">bool</span>(){ <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #555555;">!</span>family.empty(); }      <span style="color: #0099ff; font-style: italic;">// (2)                         </span>
+	
+    std<span style="color: #555555;">::</span>string family <span style="color: #555555;">=</span> <span style="color: #cc3300;">""</span>;
+};
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">needInt</span>(<span style="color: #007788; font-weight: bold;">int</span> i){
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"int: "</span> <span style="color: #555555;">&lt;&lt;</span> i <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+	
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>boolalpha <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+	
+    MyHouse firstHouse;
+    <span style="color: #006699; font-weight: bold;">if</span> (<span style="color: #555555;">!</span>firstHouse){                                        
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"The firstHouse is still empty."</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    };
+	
+    MyHouse secondHouse(<span style="color: #cc3300;">"grimm"</span>);                               
+    <span style="color: #006699; font-weight: bold;">if</span> (secondHouse){
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Family grimm lives in secondHouse."</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    }
+	
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+	
+    needInt(firstHouse);              <span style="color: #0099ff; font-style: italic;">// (3)                </span>
+    needInt(secondHouse);             <span style="color: #0099ff; font-style: italic;">// (3)</span>
+	
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+	
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Now, instances of <code>MyHouse</code> can be used, when an <code>int</code> is required. Strange!&nbsp;</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesBetterSpecificOrGeneric/conversionOperator.PNG" alt="conversionOperator" width="300" height="139" /></p>
+<p>Due to the overloaded operator bool (2), instances of <code>MyHouse</code> can be used as an <code>int</code> and can, therefore, be used in arithmetic expressions: <code>auto res = MyHouse() + 5</code>. This was not my intention! Just for completeness. With C++11 you can declare conversion operators as <code>explicit</code>. Therefore implicit conversions are not allowed.</p>
+<p><strong>My strong belief is that we need for convenience reasons the entire magic of conversions in C/C++ to deal with the fact that functions only accept specific arguments.</strong></p>
+<p>Are templates the cure? No!</p>
+<h3>Too Generic</h3>
+<p>Generic functions or classes can be invoked with arbitrary values. If the values do not satisfy the requirements of the function or class, no problem. You will get a compile time error. Fine!</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// gcd.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+T gcd(T a, T b){
+  <span style="color: #006699; font-weight: bold;">if</span>( b <span style="color: #555555;">==</span> <span style="color: #ff6600;">0</span> ){ <span style="color: #006699; font-weight: bold;">return</span> a; }
+  <span style="color: #006699; font-weight: bold;">else</span>{
+    <span style="color: #006699; font-weight: bold;">return</span> gcd(b, a <span style="color: #555555;">%</span> b);
+  }
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main(){
+
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;"></span><span style="color: #555555;"></span>gcd(<span style="color: #ff6600;">100</span>, <span style="color: #ff6600;">10</span>)  <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+ 
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> gcd(<span style="color: #ff6600;">3.5</span>, <span style="color: #ff6600;">4.0</span>)<span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> gcd(<span style="color: #cc3300;">"100"</span>, <span style="color: #cc3300;">"10"</span>) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>What is the problem with this error message?</p>
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesBetterSpecificOrGeneric/genericGCD.PNG" alt="genericGCD" width="600" height="326" /></p>
+<p>Of course, it is quite long and quite difficult to understand but my crucial concern is a different one. The compilation&nbsp;fails because neither <code>double</code> nor the C-strings supports the % operator. This means the error is due to the failed template instantiation for <code>double </code>and C-string. This is too late and, therefore, really bad. No template instantiation for type <code>double</code> or C-strings should be possible. The requirements for the arguments should be part of the function declaration and not a side-effect of an erroneous template instantiation.</p>
+<p>Now concepts come to our rescue.</p>
+<h3>The Third Way</h3>
+<p>With concepts, we get something in between. With them, we can define functions or classes which act on semantic categories. Meaning the arguments of functions or classes are either too specific nor too generic but named sets of requirements such as <em><code>Integral</code></em>.</p>
+<h2>What's next?</h2>
+<p>Sorry for this short post but one week before my multithreading workshop at the CppCon I had neither the time nor in particular the resources (no connectivity in the national parks in Washington state) to write a full post. My <a href="index.php/c-core-guidelines-rules-for-the-usage-of-concepts-2">next post</a> will be special because I will write about the CppCon. Afterwards, I continue my story about generics and in particular about concepts.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Eric Pederson, Paul Baxter,&nbsp; Meeting C++, Matt Braun, Avi Lachmish, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Mielo, and Dilettant.<br /></strong></p>
+<p>&nbsp;</p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at Leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 600 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
+<p></p>
+<table>
+<tbody>
+<tr>
+<td>
+<h2>&nbsp;Get your interactive course at educative</h2>
+</td>
+</tr>
+<tr>
+<td>
+<h4 class="_3fBEwsM053hx2mPd0uV0nT" style="text-align: center;">Modern C++ Concurrency in Practice: Get the most out of any machine</h4>
+</td>
+</tr>
+<tr>
+<td><a href="https://goo.gl/2qWUkK"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseConcurrency/educative.png" alt="educative" width="500" height="253" /></a></td>
+</tr>
+<tr>
+<td>
+<p>Based on my book "Concurrency with Modern C++" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>140 lessons</li>
+<li>110 code playgrounds =&gt; Run in browser</li>
+<li>78 code snippets</li>
+<li>55 illustrations</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
