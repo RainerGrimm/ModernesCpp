@@ -1,9 +1,8 @@
-<p>Today, I will continue my introduction to programming at compile time. The last post started with template metaprogramming. Here is where a pick-up today and finish.</p>
+<p>Yes, you read it correctly. Today, I write about template metaprogramming which is programming with types and not values.&nbsp;</p>
 <hr id="system-readmore" />
-<p>Here is the big picture, before I dive in.</p>
-<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesProgrammingAtCompileTime/Overview.png" alt="Overview" width="500" height="392" /></p>
-<p>&nbsp;</p>
-<p>&nbsp;Only to remind you, the rules of the C++ Core Guidelines were my starting point:</p>
+<p></p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesTemplateMetaprogramming/dinosaur-966869_1280.jpg" alt="dinosaur 966869 1280" width="400" height="534" /></p>
+<p>The introduction to template metaprogramming in the guidelines ends uniquely: "The syntax and techniques needed are pretty horrendous.". In accordance, the rules are mostly about don' ts and provide not much content:</p>
 <ul>
 <li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-metameta">T.120: Use template metaprogramming only when you really need to</a></li>
 <li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-emulate">T.121: Use template metaprogramming primarily to emulate concepts</a></li>
@@ -12,165 +11,121 @@
 <li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-std-tmp">T.124: Prefer to use standard-library TMP facilities</a></li>
 <li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-lib">T.125: If you need to go beyond the standard-library TMP facilities, use an existing library</a></li>
 </ul>
-<p>We are just at the bottom of the triangle.</p>
+<p>Honestly, I don't think template metaprogramming is so horrendous but the syntax has still a lot of potentials.</p>
+<p>Let me try to demystify template metaprogramming and write about programming at compile time in general. During this introduction to programming at compile time, I explicitly write about type-traits (<a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-std-tmp">T.124: Prefer to use standard-library TMP facilities) </a>and <span style="font-family: courier new, courier;">constexpr</span> functions (<a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-fct">T.123: Use <code class="highlighter-rouge no-highlight">constexpr</code> functions to compute values at compile time</a>) and implicitly refer to the other rules. Here is my plan:</p>
+<p>I give an introduction to template metaprogramming, show how the type-traits library allows you the use template metaprogramming in a well structured and a portable way, and how you can use <span style="font-family: courier new, courier;">constexpr</span> functions to replace template metaprogramming magic with ordinary functions.</p>
 <h2>Template Metaprogramming</h2>
-<p>In the last post <a href="https://www.modernescpp.com/index.php/c-core-guidelines-rules-for-template-metaprogramming">C++ Core Guidelines: Rules for Template Metaprogramming</a>, I present a short template metaprogram which removed the constness from it's arguments.</p>
-<p>&nbsp;</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesTemplateMetaprogramming/OverviewTemplateMetaprogramming.png" alt="OverviewTemplateMetaprogramming" width="300" height="234" /></p>
+<h3>How it all started</h3>
+<p>1994 presented <a href="http://www.erwin-unruh.de/primorig.html">Erwin Unruh</a> at a C++ committee meeting a program which didn't compile. Here is probably the most famous program that never compiled.</p>
 <div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
-<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>              <span style="color: #0099ff; font-style: italic;">// (2)</span>
-<span style="color: #006699; font-weight: bold;">struct</span> removeConst{ 
-    <span style="color: #006699; font-weight: bold;">typedef</span> T type;               <span style="color: #0099ff; font-style: italic;">// (5)</span>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// Prime number computation by Erwin Unruh</span>
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span> i<span style="color: #555555;">&gt;</span> <span style="color: #006699; font-weight: bold;">struct</span> D { D(<span style="color: #007788; font-weight: bold;">void</span><span style="color: #555555;">*</span>); <span style="color: #006699; font-weight: bold;">operator</span> <span style="color: #cc00ff;">int</span>(); };
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span> p, <span style="color: #007788; font-weight: bold;">int</span> i<span style="color: #555555;">&gt;</span> <span style="color: #006699; font-weight: bold;">struct</span> is_prime {
+    <span style="color: #006699; font-weight: bold;">enum</span> { prim <span style="color: #555555;">=</span> (p<span style="color: #555555;">%</span>i) <span style="color: #555555;">&amp;&amp;</span> is_prime<span style="color: #555555;">&lt;</span>(i <span style="color: #555555;">&gt;</span> <span style="color: #ff6600;">2</span> <span style="color: #555555;">?</span> p <span style="color: #555555;">:</span> <span style="color: #ff6600;">0</span>), i <span style="color: #555555;">-</span><span style="color: #ff6600;">1</span><span style="color: #555555;">&gt;</span> <span style="color: #555555;">::</span> prim };
+    };
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span> <span style="color: #007788; font-weight: bold;">int</span> i <span style="color: #555555;">&gt;</span> <span style="color: #006699; font-weight: bold;">struct</span> Prime_print {
+    Prime_print<span style="color: #555555;">&lt;</span>i<span style="color: #555555;">-</span><span style="color: #ff6600;">1</span><span style="color: #555555;">&gt;</span> a;
+    <span style="color: #006699; font-weight: bold;">enum</span> { prim <span style="color: #555555;">=</span> is_prime<span style="color: #555555;">&lt;</span>i, i<span style="color: #555555;">-</span><span style="color: #ff6600;">1</span><span style="color: #555555;">&gt;::</span>prim };
+    <span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">f</span>() { D<span style="color: #555555;">&lt;</span>i<span style="color: #555555;">&gt;</span> d <span style="color: #555555;">=</span> prim; }
+    };
+
+<span style="color: #006699; font-weight: bold;">struct</span> is_prime<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">0</span>,<span style="color: #ff6600;">0</span><span style="color: #555555;">&gt;</span> { <span style="color: #006699; font-weight: bold;">enum</span> {prim<span style="color: #555555;">=</span><span style="color: #ff6600;">1</span>}; };
+<span style="color: #006699; font-weight: bold;">struct</span> is_prime<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">0</span>,<span style="color: #ff6600;">1</span><span style="color: #555555;">&gt;</span> { <span style="color: #006699; font-weight: bold;">enum</span> {prim<span style="color: #555555;">=</span><span style="color: #ff6600;">1</span>}; };
+<span style="color: #006699; font-weight: bold;">struct</span> Prime_print<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">2</span><span style="color: #555555;">&gt;</span> { <span style="color: #006699; font-weight: bold;">enum</span> {prim <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span>}; <span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">f</span>() { D<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">2</span><span style="color: #555555;">&gt;</span> d <span style="color: #555555;">=</span> prim; } };
+<span style="color: #009999;">#ifndef LAST</span>
+<span style="color: #009999;">#define LAST 10</span>
+<span style="color: #009999;">#endif</span>
+main () {
+    Prime_print<span style="color: #555555;">&lt;</span>LAST<span style="color: #555555;">&gt;</span> a;
+    } 
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Erwin Unruh used the Metaware Compilers, but the program is not valid for C++ anymore. A newer variant from the author is <a href="http://www.erwin-unruh.de/prim.html">here</a>. Okay, why is this program so famous? Let's have a look at the error messages.</p>
+<p>&nbsp;<img src="images/blog/ModernCpp/CppCoreGuidelinesTemplateMetaprogramming/prim.PNG" alt="prim" width="500" height="182" /></p>
+<p>I highlighted the important parts in red. I think, you see the pattern. The program calculates at compile time the first 30 prime numbers. This means template instantiation can be used to do math at compile time. It is even better. Template metaprogramming is <a href="https://en.wikipedia.org/wiki/Turing_completeness">Turing-complete</a>, and can, therefore, be used to solve any computational problem. (Of course, Turing-completeness holds only in theory for template metaprogramming because the recursion depth (at least 1024 with C++11) and the length of the names which are generated during template instantiation provide some limitations.)</p>
+<h3>How does the magic work?</h3>
+<p>Let me start traditional.</p>
+<h4>Calculating at Compile Time</h4>
+<p>Calculating the factorial of a number is the "Hello World" of template metaprogramming.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// factorial.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span> N<span style="color: #555555;">&gt;</span>                                                                 <span style="color: #0099ff; font-style: italic;">// (2)</span>
+<span style="color: #006699; font-weight: bold;">struct</span> Factorial{
+    <span style="color: #006699; font-weight: bold;">static</span> <span style="color: #007788; font-weight: bold;">int</span> <span style="color: #006699; font-weight: bold;">const</span> value <span style="color: #555555;">=</span> N <span style="color: #555555;">*</span> Factorial<span style="color: #555555;">&lt;</span>N<span style="color: #555555;">-</span><span style="color: #ff6600;">1</span><span style="color: #555555;">&gt;::</span>value;
 };
 
-<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>              <span style="color: #0099ff; font-style: italic;">// (4)</span>
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;&gt;</span>                                                                      <span style="color: #0099ff; font-style: italic;">// (3)</span>
+<span style="color: #006699; font-weight: bold;">struct</span> Factorial<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">1</span><span style="color: #555555;">&gt;</span>{
+    <span style="color: #006699; font-weight: bold;">static</span> <span style="color: #007788; font-weight: bold;">int</span> <span style="color: #006699; font-weight: bold;">const</span> value <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span>;
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Factorial&lt;5&gt;::value: "</span> <span style="color: #555555;">&lt;&lt;</span> Factorial<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">5</span><span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;    <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Factorial&lt;10&gt;::value: "</span> <span style="color: #555555;">&lt;&lt;</span> Factorial<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">10</span><span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The call <span style="font-family: courier new, courier;">factorial&lt;5&gt;:</span>:<span style="font-family: 'courier new', courier;">value</span> in line (1) causes the instantiation of the primary or general template in line (2). During this instantiation, <span style="font-family: courier new, courier;">Factorial&lt;4&gt;:</span>:value will be instantiated. This recursion will end if the fully specialised class template <span style="font-family: courier new, courier;">Factorial&lt;1&gt;</span> kicks in in line (3).&nbsp; Maybe, you like it more pictorial.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesTemplateMetaprogramming/factorial5.PNG" alt="factorial5" width="500" height="119" /></p>
+<p>Here is the output of the program:</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesTemplateMetaprogramming/factorial.png" alt="factorial" width="300" height="172" /></p>
+<p><span class="tlid-translation translation"><span class="" title="">Damn, I almost forgot to prove that the values were calculated at compile time.</span></span> Here we are with the <a href="https://godbolt.org/">Compiler Explorer</a>. For simplicity reasons, I only provide a screenshot of the main program and the corresponding assembler instructions.</p>
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesTemplateMetaprogramming/goldboltSource.png" alt="goldboltSource" width="500" height="131" /></p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesTemplateMetaprogramming/goldboltAssem.png" alt="goldboltAssem" width="400" height="155" /></p>
+<p>&nbsp;</p>
+<p>The first yellow line and the first purple line shows it. The factorials of 5 and 10 are just constants and were calculated during compile time.&nbsp;</p>
+<p>Honestly, the factorial program is a nice program but is not idiomatic for template metaprogramming.</p>
+<h4>Manipulating Types at Compile Time</h4>
+<p>Manipulating types at compile time is typically for template metaprogramming. If you don't believe me, study<span style="font-family: courier new, courier;">&nbsp;<a href="https://en.cppreference.com/w/cpp/utility/move">std::move</a>. </span>Here is, what <span style="font-family: courier new, courier;">std:</span>:move is conceptionally doing:<span style="font-family: courier new, courier;"></span></p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">static_cast</span><span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>remove_reference<span style="color: #555555;">&lt;</span>decltype(arg)<span style="color: #555555;">&gt;::</span>type<span style="color: #555555;">&amp;&amp;&gt;</span>(arg);
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Okay. <span style="font-family: courier new, courier;">std::move</span> takes an argument<span style="font-family: courier new, courier;"> arg</span>, deduces the type (decltype<span style="font-family: courier new, courier;">(arg))</span> from it, removes the reference (<span style="font-family: courier new, courier;">remove_reverence</span>), and casts it to a rvalue reference (<span style="font-family: courier new, courier;">static_cast&lt;...&gt;::type&amp;&amp;&gt;</span>). In essence, this means that <span style="font-family: courier new, courier;">std:</span>:move returns always a rvalue reference type and, therefore, move semantic can kick it.</p>
+<p>How does<span style="font-family: courier new, courier;"> std::remove_reference</span> from the <a href="https://en.cppreference.com/w/cpp/header/type_traits">type-traits library </a>work? Here is a code snippet removing constness from its argument.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T <span style="color: #555555;">&gt;</span> 
+<span style="color: #006699; font-weight: bold;">struct</span> removeConst{ 
+    <span style="color: #006699; font-weight: bold;">typedef</span> T type;               <span style="color: #0099ff; font-style: italic;">// (1)</span>
+};
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T <span style="color: #555555;">&gt;</span> 
 <span style="color: #006699; font-weight: bold;">struct</span> removeConst<span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">const</span> T<span style="color: #555555;">&gt;</span> { 
-    <span style="color: #006699; font-weight: bold;">typedef</span> T type;               <span style="color: #0099ff; font-style: italic;">// (5)</span>
+    <span style="color: #006699; font-weight: bold;">typedef</span> T type;               <span style="color: #0099ff; font-style: italic;">// (1)</span>
 };
 
 
 <span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
     
-    std<span style="color: #555555;">::</span>is_same<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>, removeConst<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;::</span>type<span style="color: #555555;">&gt;::</span>value;        <span style="color: #0099ff; font-style: italic;">// true (1)</span>
-    std<span style="color: #555555;">::</span>is_same<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>, removeConst<span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;::</span>type<span style="color: #555555;">&gt;::</span>value;  <span style="color: #0099ff; font-style: italic;">// true (3)</span>
+    std<span style="color: #555555;">::</span>is_same<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>, removeConst<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;::</span>type<span style="color: #555555;">&gt;::</span>value;        <span style="color: #0099ff; font-style: italic;">// true</span>
+    std<span style="color: #555555;">::</span>is_same<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>, removeConst<span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;::</span>type<span style="color: #555555;">&gt;::</span>value;  <span style="color: #0099ff; font-style: italic;">// true</span>
   
 }
 </pre>
 </div>
 <p>&nbsp;</p>
-<p>What can we learn from this example?</p>
-<ol>
-<li>Template specialisaton (partial or full) is a compile time if.&nbsp; Let me be more specific: When I use <span style="font-family: courier new, courier;">removeConst</span> with an non-constant <span style="font-family: courier new, courier;">int</span> (line 1), the compiler chooses the primary or general template (line 2).&nbsp; When I use a constant <span style="font-family: courier new, courier;">int</span> (line 3), the compiler chooses the partial specialisation for <span style="font-family: courier new, courier;">const T</span> (line 4).&nbsp;</li>
-<li>The expression <span style="font-family: courier new, courier;">typedef T type</span> serves as an return&nbsp;value which is in this case a type.</li>
-</ol>
-<p>Now, it becomes funny.</p>
-<h3>More Meta</h3>
-<p>At runtime we use data and functions. At compile time we use metadata and metafunctions. Quite easy, it's called meta because we do metaprogramming, but what is metadata or a metafunction? Here is a first definition.</p>
-<ul>
-<li><strong>Metadata</strong>: Types and integral values that as used in metafunctions.</li>
-<li><strong>Metafunction</strong>: Functions that are executed a compile time.</li>
-</ul>
-<p>Let me elaborate more on the terms metadata and metafunction.</p>
-<h4>Metadata</h4>
-<p>Metadata includes three entities:</p>
-<ol>
-<li>Types such as <span style="font-family: courier new, courier;">int, </span>or <span style="font-family: courier new, courier;">double.</span></li>
-<li>Non-types such as integrals, enumerators, pointers, or references</li>
-<li>Templats such as <a href="https://en.cppreference.com/w/cpp/container/stack"><span style="font-family: courier new, courier;">std::stack</span></a></li>
-</ol>
-<p>As I already mentioned, I use only types and integrals in my examples to Template Metaprogramming.</p>
-<h4>Metafunction</h4>
-<p>Of course, this sounds strange. Types are used in template metaprogramming to simulate functions. Base on my definition of metafunctions, <span style="font-family: courier new, courier;">constexpr</span> functions which can be executed at compile time, are also metafunctions, but this is my topic for a later post.</p>
-<p>Here are two types, you already know from my last post&nbsp;<a href="https://www.modernescpp.com/index.php/c-core-guidelines-rules-for-template-metaprogramming">C++ Core Guidelines: Rules for Template Metaprogramming</a>: <span style="font-family: courier new, courier;">Factorial</span> and <span style="font-family: courier new, courier;">RemoveConst.</span></p>
-<p>&nbsp;</p>
-<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
-<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;&gt;</span> 
-<span style="color: #006699; font-weight: bold;">struct</span> Factorial<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">1</span><span style="color: #555555;">&gt;</span>{ 
-    <span style="color: #006699; font-weight: bold;">static</span> <span style="color: #007788; font-weight: bold;">int</span> <span style="color: #006699; font-weight: bold;">const</span> value <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span>; 
-};
-
-<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T <span style="color: #555555;">&gt;</span> 
-<span style="color: #006699; font-weight: bold;">struct</span> removeConst<span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">const</span> T<span style="color: #555555;">&gt;</span> { 
-    <span style="color: #006699; font-weight: bold;">typedef</span> T type;  
-};
-</pre>
-</div>
-<p>&nbsp;</p>
-<p>The first metafunction returns a value and the second a type. The name <span style="font-family: courier new, courier;">value</span> and <span style="font-family: courier new, courier;">type </span>are just naming conventions for the return values. If a metafunction returns a <span style="font-family: courier new, courier;">value,</span> it is called value; if it returns a type, it is called type. The <a href="https://en.cppreference.com/w/cpp/header/type_traits">type traits library</a> to which I come in my next post, follows exactly this naming convention</p>
-<p>I thinks it is quite enlighting to compare functions with metafunctions.</p>
-<h3>Functions versus Metafunctions</h3>
-<p>The following function <span style="font-family: courier new, courier;">power</span> and the meta function <span style="font-family: courier new, courier;">Power</span> calculate pow(2, 10) at runtime and compile time.</p>
-<p>&nbsp;</p>
-<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
-<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// power.cpp</span>
-
-<span style="color: #009999;">#include &lt;iostream&gt;</span>
-
-<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">power</span>(<span style="color: #007788; font-weight: bold;">int</span> m, <span style="color: #007788; font-weight: bold;">int</span> n){                                <span style="color: #0099ff; font-style: italic;">// (1)</span>
-    <span style="color: #007788; font-weight: bold;">int</span> r <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span>;
-    <span style="color: #006699; font-weight: bold;">for</span>(<span style="color: #007788; font-weight: bold;">int</span> k<span style="color: #555555;">=</span><span style="color: #ff6600;">1</span>; k<span style="color: #555555;">&lt;=</span>n; <span style="color: #555555;">++</span>k) r<span style="color: #555555;">*=</span> m;
-    <span style="color: #006699; font-weight: bold;">return</span> r;                                           <span style="color: #0099ff; font-style: italic;">// (3)</span>
-}
-
-<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span> m, <span style="color: #007788; font-weight: bold;">int</span> n<span style="color: #555555;">&gt;</span>                                  <span style="color: #0099ff; font-style: italic;">// (2)</span>
-<span style="color: #006699; font-weight: bold;">struct</span> Power{
-    <span style="color: #006699; font-weight: bold;">static</span> <span style="color: #007788; font-weight: bold;">int</span> <span style="color: #006699; font-weight: bold;">const</span> value <span style="color: #555555;">=</span> m <span style="color: #555555;">*</span> Power<span style="color: #555555;">&lt;</span>m, n<span style="color: #555555;">-</span><span style="color: #ff6600;">1</span><span style="color: #555555;">&gt;::</span>value;  <span style="color: #0099ff; font-style: italic;">// (4)</span>
-};
-                          
-<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span> m<span style="color: #555555;">&gt;</span>                                         <span style="color: #0099ff; font-style: italic;">// (2) </span>
-<span style="color: #006699; font-weight: bold;">struct</span> Power<span style="color: #555555;">&lt;</span>m, <span style="color: #ff6600;">0</span><span style="color: #555555;">&gt;</span>{                                     <span style="color: #0099ff; font-style: italic;">// (2)  </span>
-    <span style="color: #006699; font-weight: bold;">static</span> <span style="color: #007788; font-weight: bold;">int</span> <span style="color: #006699; font-weight: bold;">const</span> value <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span>;                         <span style="color: #0099ff; font-style: italic;">// (4)</span>
-};
-
-<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
-	
-    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;	
-	
-    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"power(2, 10)= "</span> <span style="color: #555555;">&lt;&lt;</span> power(<span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">10</span>) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;              <span style="color: #0099ff; font-style: italic;">// (A)</span>
-    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Power&lt;2,10&gt;::value= "</span> <span style="color: #555555;">&lt;&lt;</span> Power<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">10</span><span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl; <span style="color: #0099ff; font-style: italic;">// (B)</span>
-	
-    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
-}
-</pre>
-</div>
-<p>&nbsp;</p>
-<p>Here are the first differences:</p>
-<ul>
-<li>Arguments: The function arguments go into the round brackets ("( ... )"&nbsp; in line A)) and the metafunction arguments goes into the sharp brackets ("&lt; ...&gt;" in line B). This also holds for the definition of the function and the metafunction. The function uses round brackets and the metafunction sharp brackets.</li>
-<li>Return value: The function uses a return statement (line 3), and the metafunction the static integral constant <span style="font-family: courier new, courier;">value</span>.</li>
-</ul>
-<p>I will continue this comparison, when I come to <span style="font-family: courier new, courier;">constexpr</span> functions. Anyway, here is the output of the program.</p>
-<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesProgrammingAtCompileTime/power.png" alt="power" width="300" height="160" /></p>
-<p>This was easy! Right? power is executed at runtime and Power at compile time, but what is happening here?</p>
-<p>&nbsp;</p>
-<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
-<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// powerHybrid.cpp</span>
-
-<span style="color: #009999;">#include &lt;iostream&gt;</span>
-
-<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span> n<span style="color: #555555;">&gt;</span>
-<span style="color: #007788; font-weight: bold;">int</span> power(<span style="color: #007788; font-weight: bold;">int</span> m){
-    <span style="color: #006699; font-weight: bold;">return</span> m <span style="color: #555555;">*</span> power<span style="color: #555555;">&lt;</span>n<span style="color: #555555;">-</span><span style="color: #ff6600;">1</span><span style="color: #555555;">&gt;</span>(m);
-}
-
-<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;&gt;</span>
-<span style="color: #007788; font-weight: bold;">int</span> power<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">1</span><span style="color: #555555;">&gt;</span>(<span style="color: #007788; font-weight: bold;">int</span> m){
-    <span style="color: #006699; font-weight: bold;">return</span> m;
-}
-
-<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;&gt;</span>
-<span style="color: #007788; font-weight: bold;">int</span> power<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">0</span><span style="color: #555555;">&gt;</span>(<span style="color: #007788; font-weight: bold;">int</span> m){
-    <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #ff6600;">1</span>;
-}
-
-<span style="color: #007788; font-weight: bold;">int</span> main(){
-    
-    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
-    
-    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"power&lt;10&gt;(2): "</span> <span style="color: #555555;">&lt;&lt;</span> power<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">10</span><span style="color: #555555;">&gt;</span>(<span style="color: #ff6600;">2</span>) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;     <span style="color: #0099ff; font-style: italic;">// (1)</span>
-    
-    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
-    
-    <span style="color: #006699; font-weight: bold;">auto</span> power2 <span style="color: #555555;">=</span> power<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">2</span><span style="color: #555555;">&gt;</span>;                                         <span style="color: #0099ff; font-style: italic;">// (2)</span>
-    
-    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #007788; font-weight: bold;">int</span> i <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>; i <span style="color: #555555;">&lt;=</span> <span style="color: #ff6600;">10</span>; <span style="color: #555555;">++</span>i){
-        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"power2("</span> <span style="color: #555555;">&lt;&lt;</span> i <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">")= "</span> 
-                  <span style="color: #555555;">&lt;&lt;</span> power2(i) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;                        <span style="color: #0099ff; font-style: italic;">// (3)</span>
-    }
-    
-    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
-    
-}
-</pre>
-</div>
-<p>&nbsp;</p>
-<p>The call <span style="font-family: courier new, courier;">power&lt;10&gt;(2</span>)&nbsp; in line (1) uses sharp and round brackets and calculates 2 to the power of 10. This mean, 10 is the compile time and 2 the runtime argument. To say in differently: <span style="font-family: courier new, courier;">power</span> is a function and a metafunction. Now, I can instantiate the class template for 2 and give it the name <span style="font-family: courier new, courier;">power2</span> (line 2). <a href="https://cppinsights.io/">CppInsight</a> shows me that the compiler is instantiating <span style="font-family: courier new, courier;">power</span> for 2. Just the function argument is not bound.</p>
-<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesProgrammingAtCompileTime/power2.png" alt="power2" width="250" height="98" /></p>
-<p>The function argument is a runtime argument and can, therefore, be used in a for loop (line 3).</p>
-<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesProgrammingAtCompileTime/powerHybrid.png" alt="powerHybrid" width="400" height="327" /></p>
+<p>I implemented <span style="font-family: courier new, courier;">removeConst </span>the way <span style="font-family: courier new, courier;">std::remove_const</span> is probably implemented in the type-traits library. <span style="font-family: courier new, courier;">std::is_same</span> from the type-traits library helps me to decide at compile-time if both types are the same. In case of <span style="font-family: courier new, courier;">removeConst&lt;int&gt;</span> the first or general class template kicks in; in case of<span style="font-family: courier new, courier;"> removeConst&lt;const int</span>&gt;, the partial specialisation for <span style="font-family: courier new, courier;">const T</span> applies. The key observation is that both class templates return the underlying type in line (1) and, therefore, the constness is removed.</p>
 <h2>What's next?</h2>
-<p>In the next post, I make a jump to next level of the triangle and write about the type-traits library. Template metaprogramming is available in C++ since C++98, but the type-traits since C++11. You may already assume it. The type-traits library is just a cultivated form of template metaprogramming.</p>
+<p>In the next post, I continue my introduction to programming at compile time. This means in particular that I'm going to compare functions and metafunctions before I come to the type-traits library.</p>
 <p>&nbsp;</p>
-<p>&nbsp;</p>
+<p></p>
+<p></p>
 <p>&nbsp;</p>
 <p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Eric Pederson, Paul Baxter,&nbsp; Meeting C++, Matt Braun, Avi Lachmish, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Dilettant, Marko, Ramesh Jangama, and </strong><span class="sc-kpOJdX fDWXFa" title="Emyr Williams"><strong>Emyr Williams.</strong> <br /></span></p>
 <p><strong>&nbsp;</strong></p>
