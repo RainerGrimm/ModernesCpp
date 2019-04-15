@@ -1,0 +1,256 @@
+<p>Honestly, many programmers in my classes have issues with the syntactic sugar of lambdas. Desugaring lambdas with C++ Insights helps quite often.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/CppInsights/5/05-lambdas.png" alt="05 lambdas" width="700" height="394" /></p>
+<h2>Lambdas</h2>
+<p>Lambdas in C++ seems to be the most interesting new language feature. My opinion is based on all the issue reports and emails I got for C++ Insights so far.</p>
+<p>They allow us to capture variables in different ways. Due to their lightweight syntax, it’s easy to create new functions like objects. In case, you never heard of it, lambdas are essentially classes with a call operator. The lambda body we provide is then the body of the call operator. For starters that should be it. Actually lambdas are one of the reasons I created C++ Insights. It can show this transformation which, at least for me, makes it easier to explain. But see for <a href="https://cppinsights.io/lnk?code=aW50IG1haW4oKQp7CiAgY2hhciBjezF9OwogIAogIGF1dG8gbCA9IFs9XSAoKSB7IHJldHVybiBjOyB9OwoKICByZXR1cm4gbCgpOwp9&amp;std=cpp17&amp;rev=1.0">yourself</a>:</p>
+<pre><code class="language-C++"><span class="hljs-function"><span class="hljs-keyword">int</span> <span class="hljs-title">main</span><span class="hljs-params">()</span>
+</span>{
+  <span class="hljs-keyword">char</span> c{<span class="hljs-number">1</span>};
+  
+  <span class="hljs-keyword">auto</span> l = [=] () { <span class="hljs-keyword">return</span> c; };
+
+  <span class="hljs-keyword">return</span> l();
+}</code></pre>
+<h3>Capture Options</h3>
+<p>Things get more interesting if we start talking about the capture options. A variable which is captured by reference becomes a reference member of the lambdas class. Have a close look at the signature of the call operator. It says const. However, I can still modify x. It’s just a reference and not a const reference as you can see in <a href="https://cppinsights.io/lnk?code=aW50IG1haW4oKQp7CiAgY2hhciB4ezF9OwogIAogIGF1dG8gbCA9IFsmXSAoKSB7IAogICAgeCA9IDE7CiAgfTsKfQ==&amp;std=cpp17&amp;rev=1.0">C++ Insights</a>:</p>
+<pre><code class="language-C++"><span class="hljs-function"><span class="hljs-keyword">int</span> <span class="hljs-title">main</span><span class="hljs-params">()</span>
+</span>{
+  <span class="hljs-keyword">char</span> x{<span class="hljs-number">1</span>};
+  
+  <span class="hljs-keyword">auto</span> l = [&amp;] () { 
+    x = <span class="hljs-number">1</span>;
+  };
+}
+</code></pre>
+<p>Things change if we capture by copy. Then, the captured variable is a copy. Now the const matters, we can’t modify x without adding mutable to the <a href="https://cppinsights.io/lnk?code=aW50IG1haW4oKQp7CiAgY2hhciBjezF9OwogIAogIGF1dG8gbCA9IFs9XSAoKSB7IHJldHVybiBjOyB9OwogIAogIGF1dG8gbDIgPSBbPV0gKCkgbXV0YWJsZSB7IAogICAgYyA9IDE7CiAgICAKICAgIHJldHVybiBjOwogIH07Cn0=&amp;std=cpp17&amp;rev=1.0">lambda definition</a>:</p>
+<pre><code class="language-C++"><span class="hljs-function"><span class="hljs-keyword">int</span> <span class="hljs-title">main</span><span class="hljs-params">()</span>
+</span>{
+  <span class="hljs-keyword">char</span> c{<span class="hljs-number">1</span>};
+  
+  <span class="hljs-keyword">auto</span> l = [=] () { <span class="hljs-keyword">return</span> c; };
+  
+  <span class="hljs-keyword">auto</span> l2 = [=] () <span class="hljs-keyword">mutable</span> { 
+    c = <span class="hljs-number">1</span>;
+    
+    <span class="hljs-keyword">return</span> c;
+  };
+}
+</code></pre>
+<p>Knowing that a class is behind a lambda enables us to think a bit more about things, like for example the size of a lambda. Copy captures increase the size by their size plus eventually padding. To save some bytes the ordering of the captures matters as you can see <a href="https://cppinsights.io/lnk?code=aW50IG1haW4oKQp7CiAgY2hhciBjOwogIGludCB4OwogIGNoYXIgYjsKICAKICBhdXRvIGwgPSBbPV0gKCkgbXV0YWJsZSB7IAogICAgYyA9IDEsCiAgICB4ID0gMjsKICAgIGIgPSAzOwogIH07CiAgCiAgc3RhdGljX2Fzc2VydChzaXplb2YobCkgPT0gc2l6ZW9mKGludCkqMyk7CiAgCiAgYXV0byBsMiA9IFs9XSAoKSBtdXRhYmxlIHsgCiAgICB4ID0gMjsKICAgIGMgPSAxLAogICAgYiA9IDM7CiAgfTsKICAKICBzdGF0aWNfYXNzZXJ0KHNpemVvZihsMikgPT0gc2l6ZW9mKGludCkqMik7Cn0=&amp;std=cpp17&amp;rev=1.0">here</a>:</p>
+<pre><code class="language-C++"><span class="hljs-function"><span class="hljs-keyword">int</span> <span class="hljs-title">main</span><span class="hljs-params">()</span>
+</span>{
+  <span class="hljs-keyword">char</span> c;
+  <span class="hljs-keyword">int</span> x;
+  <span class="hljs-keyword">char</span> b;
+  
+  <span class="hljs-keyword">auto</span> l = [=] () <span class="hljs-keyword">mutable</span> { 
+    c = <span class="hljs-number">1</span>,
+    x = <span class="hljs-number">2</span>;
+    b = <span class="hljs-number">3</span>;
+  };
+  
+  <span class="hljs-keyword">static_assert</span>(<span class="hljs-keyword">sizeof</span>(l) == <span class="hljs-keyword">sizeof</span>(<span class="hljs-keyword">int</span>)*<span class="hljs-number">3</span>);
+  
+  <span class="hljs-keyword">auto</span> l2 = [=] () <span class="hljs-keyword">mutable</span> { 
+    x = <span class="hljs-number">2</span>;
+    c = <span class="hljs-number">1</span>,
+    b = <span class="hljs-number">3</span>;
+  };
+  
+  <span class="hljs-keyword">static_assert</span>(<span class="hljs-keyword">sizeof</span>(l2) == <span class="hljs-keyword">sizeof</span>(<span class="hljs-keyword">int</span>)*<span class="hljs-number">2</span>);
+}
+</code></pre>
+<p>However, please note that the order of the members in the class is unspecified.</p>
+<p>Another thing to watch out is lambdas containing captures by reference. The variables these references point to, need to be valid when the lambda is invoked otherwise you end up with a dangling reference. Here is such an example:</p>
+<pre><code class="language-C++"><span class="hljs-function"><span class="hljs-keyword">auto</span> <span class="hljs-title">Lambda</span><span class="hljs-params">()</span>
+</span>{
+  <span class="hljs-keyword">int</span> x{};
+  
+  <span class="hljs-keyword">return</span> [&amp;]{ <span class="hljs-keyword">return</span> x; };
+}
+
+<span class="hljs-function"><span class="hljs-keyword">int</span> <span class="hljs-title">main</span><span class="hljs-params">()</span>
+</span>{
+  Lambda()();
+}
+</code></pre>
+<p>I think it becomes pretty clear with a look at <a href="https://cppinsights.io/lnk?code=YXV0byBMYW1iZGEoKQp7CiAgaW50IHh7fTsKICAKICByZXR1cm4gWyZdeyByZXR1cm4geDsgfTsKfQoKaW50IG1haW4oKQp7CiAgTGFtYmRhKCkoKTsKfQ==&amp;std=cpp17&amp;rev=1.0">C++ Insights</a>:</p>
+<pre><code class="language-C++">__<span class="hljs-function">lambda_5_10 <span class="hljs-title">Lambda</span><span class="hljs-params">()</span>
+</span>{
+  <span class="hljs-keyword">int</span> x = {};
+    
+  <span class="hljs-keyword">class</span> __lambda_5_10
+  {
+    <span class="hljs-keyword">int</span> &amp; x;
+    <span class="hljs-keyword">public</span>: <span class="hljs-keyword">inline</span> <span class="hljs-comment">/*constexpr */</span> <span class="hljs-function"><span class="hljs-keyword">int</span> <span class="hljs-title">operator</span><span class="hljs-params">()</span><span class="hljs-params">()</span> <span class="hljs-keyword">const</span>
+    </span>{
+      <span class="hljs-keyword">return</span> x;
+    }
+    
+    <span class="hljs-keyword">public</span>: __lambda_5_10(<span class="hljs-keyword">int</span> &amp; _x)
+    : x{_x}
+    {}
+    
+  } __lambda_5_10{x};
+  
+  <span class="hljs-keyword">return</span> __lambda_5_10;
+}
+
+
+<span class="hljs-function"><span class="hljs-keyword">int</span> <span class="hljs-title">main</span><span class="hljs-params">()</span>
+</span>{
+  Lambda().<span class="hljs-keyword">operator</span>()();
+}
+</code></pre>
+<p>You already knew that? Excellent! You are either careful or use copy captures because then you are safe? Well, let’s see.</p>
+<p>How about this nice copy capture <a href="https://cppinsights.io/lnk?code=YXV0byBMYW1iZGEoKQp7CiAgaW50ICB5e307CiAgaW50KiB4eyZ5fTsKCiAgcmV0dXJuIFs9XXsgcmV0dXJuIHg7IH07Cn0KCmludCBtYWluKCkKewogIGF1dG8geCA9IExhbWJkYSgpKCk7Cn0=&amp;std=cpp17&amp;rev=1.0">example</a>:</p>
+<pre><code class="language-C++"><span class="hljs-function"><span class="hljs-keyword">auto</span> <span class="hljs-title">Lambda</span><span class="hljs-params">()</span>
+</span>{
+  <span class="hljs-keyword">int</span>  y{};
+  <span class="hljs-keyword">int</span>* x{&amp;y};
+
+  <span class="hljs-keyword">return</span> [=]{ <span class="hljs-keyword">return</span> x; };
+}
+
+<span class="hljs-function"><span class="hljs-keyword">int</span> <span class="hljs-title">main</span><span class="hljs-params">()</span>
+</span>{
+  <span class="hljs-keyword">auto</span> x = Lambda()();
+}
+</code></pre>
+<p>Here we capture only by copy, but we still return something on the stack. The pointer we copy-capture is still a pointer pointing to something on the stack which is no longer valid after we left <code>Lambda</code>.</p>
+<h3>Deeper Insights</h3>
+<p>At this point we covered templates, variadic templates, fold expressions, constexpr if and lambdas. We have seen how C++ Insights can show us the internals or the details. How about to use them all together? Like this:</p>
+<pre><code class="language-C++"><span class="hljs-preprocessor">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;string&gt;</span></span>
+<span class="hljs-preprocessor">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;type_traits&gt;</span></span>
+
+<span class="hljs-keyword">template</span> &lt;<span class="hljs-keyword">typename</span>... Ts&gt;
+<span class="hljs-built_in">std</span>::<span class="hljs-function"><span class="hljs-built_in">string</span> <span class="hljs-title">stringify</span><span class="hljs-params">(Ts&amp;&amp;... args)</span>
+</span>{
+  <span class="hljs-keyword">auto</span> convert = [](<span class="hljs-keyword">auto</span>&amp;&amp; arg) {
+    <span class="hljs-keyword">using</span> TT = <span class="hljs-built_in">std</span>::<span class="hljs-keyword">remove_reference_t</span>&lt;<span class="hljs-keyword">decltype</span>(arg)&gt;;
+    <span class="hljs-function"><span class="hljs-keyword">if</span> <span class="hljs-title">constexpr</span><span class="hljs-params">(<span class="hljs-built_in">std</span>::is_same_v&lt;TT, <span class="hljs-built_in">std</span>::<span class="hljs-built_in">string</span>&gt;)</span> </span>{
+      <span class="hljs-keyword">return</span> arg;
+    } <span class="hljs-keyword">else</span> <span class="hljs-function"><span class="hljs-keyword">if</span> <span class="hljs-title">constexpr</span><span class="hljs-params">(<span class="hljs-built_in">std</span>::is_array_v&lt; TT &gt;)</span> </span>{
+      <span class="hljs-keyword">return</span> <span class="hljs-built_in">std</span>::<span class="hljs-built_in">string</span>{arg};
+    } <span class="hljs-keyword">else</span> {
+      <span class="hljs-keyword">return</span> <span class="hljs-built_in">std</span>::to_string(arg);
+    }
+  };
+  
+  <span class="hljs-built_in">std</span>::<span class="hljs-built_in">string</span> ret{};
+  <span class="hljs-keyword">auto</span> concat = [](<span class="hljs-built_in">std</span>::<span class="hljs-built_in">string</span>&amp; dst, <span class="hljs-keyword">auto</span>&amp;&amp; arg) {
+    dst += arg;
+  };
+  
+  (..., concat(ret, convert(args)));
+   
+  <span class="hljs-keyword">return</span> ret;
+}
+
+<span class="hljs-function"><span class="hljs-keyword">int</span> <span class="hljs-title">main</span><span class="hljs-params">()</span>
+</span>{
+  <span class="hljs-built_in">std</span>::<span class="hljs-built_in">string</span> hello{<span class="hljs-string">"hello "</span>};
+  <span class="hljs-keyword">auto</span> s = stringify(<span class="hljs-string">"A "</span>, hello, <span class="hljs-number">2</span>, <span class="hljs-string">" "</span>, <span class="hljs-string">"C++ Insights"</span>);
+
+  <span class="hljs-built_in">printf</span>(<span class="hljs-string">"%s\n"</span>, s.c_str());
+}
+</code></pre>
+<p>Here, we have a variadic template which contains two lambdas. The first one (convert) does the conversion from anything into a string. This is similar to what we had in the previous post. The second one concatenates all arguments. Then in the line <code>(..., concat(ret, convert(args)));</code> all arguments get expanded by the fold expression and with the use of the comma operator. Neat and reasonably small, at least in my opinion. How does this code look internally? Have a look at <a href="https://cppinsights.io/lnk?code=I2luY2x1ZGUgPHN0cmluZz4KI2luY2x1ZGUgPHR5cGVfdHJhaXRzPgoKdGVtcGxhdGUgPHR5cGVuYW1lLi4uIFRzPgpzdGQ6OnN0cmluZyBzdHJpbmdpZnkoVHMmJi4uLiBhcmdzKQp7CiAgYXV0byBjb252ZXJ0ID0gW10oYXV0byYmIGFyZykgewogICAgdXNpbmcgVFQgPSBzdGQ6OnJlbW92ZV9yZWZlcmVuY2VfdDxkZWNsdHlwZShhcmcpPjsKICAgIGlmIGNvbnN0ZXhwcihzdGQ6OmlzX3NhbWVfdjxUVCwgc3RkOjpzdHJpbmc+KSB7CiAgICAgIHJldHVybiBhcmc7CiAgICB9IGVsc2UgaWYgY29uc3RleHByKHN0ZDo6aXNfYXJyYXlfdjwgVFQgPikgewogICAgICByZXR1cm4gc3RkOjpzdHJpbmd7YXJnfTsKICAgIH0gZWxzZSB7CiAgICAgIHJldHVybiBzdGQ6OnRvX3N0cmluZyhhcmcpOwogICAgfQogIH07CiAgCiAgc3RkOjpzdHJpbmcgcmV0e307CiAgYXV0byBjb25jYXQgPSBbXShzdGQ6OnN0cmluZyYgZHN0LCBhdXRvJiYgYXJnKSB7CiAgICBkc3QgKz0gYXJnOwogIH07CiAgCiAgKC4uLiwgY29uY2F0KHJldCwgY29udmVydChhcmdzKSkpOwogICAKICByZXR1cm4gcmV0Owp9CgppbnQgbWFpbigpCnsKICBzdGQ6OnN0cmluZyBoZWxsb3siaGVsbG8gIn07CiAgYXV0byBzID0gc3RyaW5naWZ5KCJBICIsIGhlbGxvLCAyLCAiICIsICJDKysgSW5zaWdodHMiKTsKCiAgcHJpbnRmKCIlc1xuIiwgcy5jX3N0cigpKTsKfQ==&amp;std=cpp17&amp;rev=1.0">C++ Insights</a>. With all the templates, the code gets a little too big to show it here.</p>
+<p>I’d like to mention one caveat at this point. The two lambdas <code>convert</code> and <code>concat</code> are generic lambdas. Internally they have a call operator which is a template. This is how we can have the auto parameter. Sadly, C++ Insights does not show this part yet. It’s on the list and may be fixed soon. I think it’s worth to know this.</p>
+<p>Amazing what we can do, right? I really like the way we can write code using the latest standard. I’m also happy to offer you my training services to let you benefit from my knowledge.</p>
+<p>I’d like to thank Rainer for the opportunity to share information about C++ Insights on his popular blog!</p>
+<p>Have fun with C++ Insights. You can support the project by becoming a <a href="https://www.patreon.com/cppinsights">Patreon</a> or of course with code <a href="https://github.com/andreasfertig/cppinsights">contributions</a>.</p>
+<p>This is the last post of the series here. I hope you enjoyed reading it and took something from it. Now, its up to you to explore more about C++ Insights and the language itself.</p>
+<p><strong>I am Fertig.</strong></p>
+<p><strong>Andreas</strong></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Paul Baxter,&nbsp; Meeting C++, Matt Braun, Avi Lachmish, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Dilettant, Marko, Ramesh Jangama,</strong><span class="sc-kpOJdX fDWXFa" title="Emyr Williams"><strong> G Prvulovic, Reiner Eiteljörge, Benjamin Huth, Reinhold Dröge, Timo, and Abernitzke.</strong></span><span title="Emyr Williams"></span><strong><span title="Emyr Williams"></span><br /></strong></p>
+<p><strong>Thanks in particular to:&nbsp; <a href="https://www.takeupcode.com"><img style="vertical-align: top;" src="images/patreon/TakeUpCode-450-60.png" alt="TakeUpCode 450 60" width="150" height="20" /> </a></strong></p>
+<p>&nbsp;</p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at Leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 600 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
+<p></p>
+<table style="width: 800px;">
+<tbody>
+<tr>
+<td colspan="2">
+<h2>Get your interactive course</h2>
+&nbsp;</td>
+</tr>
+<tr>
+<td>
+<h4 class="_3fBEwsM053hx2mPd0uV0nT" style="text-align: center;">Modern C++ Concurrency in Practice</h4>
+</td>
+<td>
+<h4>C++ Standard Library including C++14 &amp; C++17</h4>
+</td>
+</tr>
+<tr>
+<td><a href="https://goo.gl/2qWUkK"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseConcurrency/educative.png" alt="educative" width="300" height="152" /></a></td>
+<td><a href="https://www.educative.io/collection/10370001/5712008708096000?authorName=Rainer%20Grimm"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseLibrary/CLibrary.png" alt="CLibrary" width="300" height="150" /></a></td>
+</tr>
+<tr>
+<td>
+<p>Based on my book "Concurrency with Modern C++" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>140 lessons</li>
+<li>110 code playgrounds =&gt; Runs in the browser</li>
+<li>78 code snippets</li>
+<li>55 illustrations</li>
+</ul>
+</td>
+<td>
+<p>Based on my book "The C++ Standard Library" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>149 lessons</li>
+<li>111 code playgrounds =&gt; Runs in the browser</li>
+<li>164 code snippets</li>
+<li>25 illustrations</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
