@@ -1,0 +1,271 @@
+<p>The organisation of source files is a topic which is quite seldom addressed in C++. With C++20 we will get modules, but until then we should distinguish between the implementation and the interface of our code.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesSourceFiles/serial-160834_1280.png" alt="serial 160834 1280" width="500" height="250" /></p>
+<p>The C++ Core Guidelines makes their point to source files quite clear: "Distinguish between declarations (used as interfaces) and definitions (used as implementations). Use header files to represent interfaces and to emphasize logical structure." Consequently, there are more than ten rules to source files. The first eleven rules deals with interface files<span style="font-family: courier new, courier;"> (*.h</span>-files<span style="font-family: courier new, courier;">)</span> and implementation files (<span style="font-family: courier new, courier;">*.cpp-</span>files) and the last three with namespaces.</p>
+<p>Let me start with the rules to the interface and implementation files. Here are the first seven:</p>
+<ul>
+<li><a href="https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rs-file-suffix">SF.1: Use a <code class="highlighter-rouge no-highlight">.cpp</code> suffix for code files and <code class="highlighter-rouge no-highlight">.h</code> for interface files if your project doesn’t already follow another convention</a></li>
+<li><a href="https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rs-inline">SF.2: A <code class="highlighter-rouge no-highlight">.h</code> file may not contain object definitions or non-inline function definitions</a></li>
+<li><a href="https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rs-declaration-header">SF.3: Use <code class="highlighter-rouge no-highlight">.h</code> files for all declarations used in multiple source files</a></li>
+<li><a href="https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rs-include-order">SF.4: Include <code class="highlighter-rouge no-highlight">.h</code> files before other declarations in a file</a></li>
+<li><a href="https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rs-consistency">SF.5: A <code class="highlighter-rouge no-highlight">.cpp</code> file must include the <code class="highlighter-rouge no-highlight">.h</code> file(s) that defines its interface</a></li>
+<li><a href="https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rs-using">SF.6: Use <code class="highlighter-rouge no-highlight">using namespace</code> directives for transition, for foundation libraries (such as <code class="highlighter-rouge no-highlight">std</code>), or within a local scope (only)</a></li>
+<li><a href="https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rs-using-directive">SF.7: Don’t write <code class="highlighter-rouge no-highlight">using namespace</code> at global scope in a header file</a></li>
+</ul>
+<p>I will not write about each rule in full depth, but I want to make a readable story out of the first rules by just quoting the rule.</p>
+<p>Okay, <a href="https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rs-file-suffix">SF.1: Use a <code class="highlighter-rouge no-highlight">.cpp</code> suffix for code files and <code class="highlighter-rouge no-highlight">.h</code> for interface files if your project doesn’t already follow another convention </a>talks about consistency. When you have a C++ project, header files should be called <span style="font-family: courier new, courier;">*.h</span> and implementation files <span style="font-family: courier new, courier;">*.cpp. </span>Convention beats this rule if you have already another policy in our project.&nbsp;</p>
+<p>Of course, I often saw other conventions for header and implementation files. Here are a few, I have in mind:</p>
+<ul>
+<li>Header files:
+<ul>
+<li><span style="font-family: courier new, courier;">*.h</span></li>
+<li><span style="font-family: courier new, courier;">*.hpp</span></li>
+</ul>
+</li>
+<li>Implementation files:
+<ul>
+<li><span style="font-family: courier new, courier;">*.cpp</span></li>
+<li><span style="font-family: courier new, courier;">*.c</span></li>
+<li><span style="font-family: courier new, courier;">*.cxx</span></li>
+</ul>
+</li>
+</ul>
+<p>I assume you know various other conventions.</p>
+<p>If your header file contains an object definition or a definition of a non-inline function, your linker may complain. This is the reason for the second rule <a href="https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rs-inline">SF.2: A <code class="highlighter-rouge no-highlight">.h</code> file may not contain object definitions or non-inline function definitions. </a>To be more specific, we have the One Definition Rule in C++:</p>
+<h3>ODR</h3>
+<p>ODR stands for the One Definition Rule and says in the case of a function.</p>
+<ul>
+<li>A function can have not more than one definition in any translation unit.</li>
+<li>A function can have not more than one definition in the program.</li>
+<li>Inline functions with external linkage can be defined in more than one translation. The definitions have to satisfy the requirement that each definition has to be the same.</li>
+</ul>
+<p>In modern compilers, the keyword <span style="font-family: courier new, courier;">inline</span> is not about inlining functions any more. Modern compilers almost completely ignore it. The more or less use-case for <span style="font-family: courier new, courier;">inline</span> is to mark functions for ODR correctness. In my opinion, the name <span style="font-family: courier new, courier;">inline</span> is nowadays quite misleading.&nbsp;</p>
+<p>Let see what my linker has to say when I try to link a program breaking the one definition rule. The following code example has one header file header.h and two implementation files. The implementations file includes the header files and, therefore, break the one definition rule, because of two definitions of <span style="font-family: courier new, courier;">func</span> exit.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// header.h</span>
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">func</span>(){}
+</pre>
+</div>
+<p></p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// impl.cpp</span>
+
+<span style="color: #009999;">#include "header.h"</span>
+</pre>
+</div>
+<p></p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// main.cpp</span>
+
+<span style="color: #009999;">#include "header.h"</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){}
+</pre>
+</div>
+<p></p>
+<p>The linker complains about the multiple definitions of <span style="font-family: courier new, courier;">func</span>:</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesSourceFiles/odr.png" alt="odr" width="450" height="145" /></p>
+<p>The next two rules are evident from the readability and maintainability point of view: <a href="https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rs-declaration-header">SF.3: Use <code class="highlighter-rouge no-highlight">.h</code> files for all declarations used in multiple source files</a> and <a href="https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rs-include-order">SF.4: Include <code class="highlighter-rouge no-highlight">.h</code> files before other declarations in a file.</a></p>
+<p>The rule 5 is more interesting: <a href="https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rs-consistency">SF.5: A <code class="highlighter-rouge no-highlight">.cpp</code> file must include the <code class="highlighter-rouge no-highlight">.h</code> file(s) that defines its interface</a>. The interesting question is: What would happen if you don't include the <span style="font-family: courier new, courier;">*.h</span> file into the *.cpp file and there is a mismatch between the interface file <span style="font-family: courier new, courier;">*.h</span> and the implementation file <span style="font-family: courier new, courier;">*.cpp</span>?.</p>
+<p>Assume I had a bad day. I defined a function <span style="font-family: courier new, courier;">func</span> which gets and <span style="font-family: courier new, courier;">int</span> and returns an <span style="font-family: courier new, courier;">int.</span></p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// impl.cpp</span>
+
+<span style="color: #0099ff; font-style: italic;">// #include "impl.h" </span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">func</span>(<span style="color: #007788; font-weight: bold;">int</span>){
+    <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #ff6600;">5</span>;
+}
+</pre>
+</div>
+<p></p>
+<p>My mistake was that I declared this function in the header file impl.h getting an <span style="font-family: courier new, courier;">int</span> but returning a <span style="font-family: courier new, courier;">std::string</span>.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// impl.h</span>
+
+<span style="color: #009999;">#include &lt;string&gt;</span>
+
+std<span style="color: #555555;">::</span>string func(<span style="color: #007788; font-weight: bold;">int</span>);
+</pre>
+</div>
+<p></p>
+<p>I include the header in the <span style="font-family: courier new, courier;">main</span> program because I want to use this function there.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// main.cpp</span>
+
+<span style="color: #009999;">#include "impl.h"</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+    
+    <span style="color: #006699; font-weight: bold;">auto</span> res <span style="color: #555555;">=</span> func(<span style="color: #ff6600;">5</span>);
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The issue is that the error may be delayed until link time when main program <span style="font-family: courier new, courier;">main.cpp </span>is compiled. This is too late.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesSourceFiles/linker.png" alt="linker" width="500" height="133" /></p>
+<p>If I include the header<span style="font-family: courier new, courier;"> impl.h</span> in my <span style="font-family: courier new, courier;">impl.cpp</span> file, I will get a compile-time error.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesSourceFiles/compiler.png" alt="compiler" width="500" height="183" /></p>
+<p>The next rules are about namespaces:&nbsp;<a href="https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rs-using">SF.6: Use <code class="highlighter-rouge no-highlight">using namespace</code> directives for transition, for foundation libraries (such as <code class="highlighter-rouge no-highlight">std</code>), or within a local scope (only)</a>. Honestly, this rule is too weak for me. I'm against using namespaces directives such as in the following example.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #009999;">#include &lt;cmath&gt;</span>
+<span style="color: #006699; font-weight: bold;">using</span> <span style="color: #006699; font-weight: bold;">namespace</span> std;
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">g</span>(<span style="color: #007788; font-weight: bold;">int</span> x)
+{
+    <span style="color: #007788; font-weight: bold;">int</span> sqrt <span style="color: #555555;">=</span> <span style="color: #ff6600;">7</span>;
+    <span style="color: #0099ff; font-style: italic;">// ...</span>
+    <span style="color: #006699; font-weight: bold;">return</span> sqrt(x); <span style="color: #0099ff; font-style: italic;">// error</span>
+}
+</pre>
+</div>
+<p></p>
+<p>The program will not compile, because there is a name clash. This is not my main argument against<span style="font-family: courier new, courier;"> using</span> directive. My main argument is that the<span style="font-family: courier new, courier;"> using</span> directive hide the origin of the name and break the readability of the code.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;chrono&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">using</span> <span style="color: #006699; font-weight: bold;">namespace</span> std;
+<span style="color: #006699; font-weight: bold;">using</span> <span style="color: #006699; font-weight: bold;">namespace</span> std<span style="color: #555555;">::</span>chrono;
+<span style="color: #006699; font-weight: bold;">using</span> <span style="color: #006699; font-weight: bold;">namespace</span> std<span style="color: #555555;">::</span>literals<span style="color: #555555;">::</span>chrono_literals;
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+  <span style="color: #006699; font-weight: bold;">auto</span> schoolHour<span style="color: #555555;">=</span> <span style="color: #ff6600;">45</span>min;
+
+  <span style="color: #006699; font-weight: bold;">auto</span> shortBreak<span style="color: #555555;">=</span> <span style="color: #ff6600;">300</span>s;
+  <span style="color: #006699; font-weight: bold;">auto</span> longBreak<span style="color: #555555;">=</span> <span style="color: #ff6600;">0.25</span>h;
+
+  <span style="color: #006699; font-weight: bold;">auto</span> schoolWay<span style="color: #555555;">=</span> <span style="color: #ff6600;">15</span>min;
+  <span style="color: #006699; font-weight: bold;">auto</span> homework<span style="color: #555555;">=</span> <span style="color: #ff6600;">2</span>h;
+
+  <span style="color: #006699; font-weight: bold;">auto</span> schoolDayInSeconds<span style="color: #555555;">=</span> <span style="color: #ff6600;">2</span> <span style="color: #555555;">*</span> schoolWay <span style="color: #555555;">+</span> <span style="color: #ff6600;">6</span> <span style="color: #555555;">*</span> schoolHour <span style="color: #555555;">+</span> <span style="color: #ff6600;">4</span> <span style="color: #555555;">*</span> shortBreak <span style="color: #555555;">+</span> longBreak <span style="color: #555555;">+</span> homework;
+
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"School day in seconds: "</span> <span style="color: #555555;">&lt;&lt;</span> schoolDayInSeconds.count() <span style="color: #555555;">&lt;&lt;</span> endl;
+
+  duration<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">double</span>, ratio<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">3600</span><span style="color: #555555;">&gt;&gt;</span> schoolDayInHours <span style="color: #555555;">=</span> schoolDayInSeconds;
+  duration<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">double</span>, ratio<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">60</span><span style="color: #555555;">&gt;&gt;</span> schoolDayInMinutes <span style="color: #555555;">=</span> schoolDayInSeconds;
+  duration<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">double</span>, ratio<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">1000</span><span style="color: #555555;">&gt;&gt;</span> schoolDayInMilliseconds <span style="color: #555555;">=</span> schoolDayInSeconds;
+
+  cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"School day in hours: "</span> <span style="color: #555555;">&lt;&lt;</span> schoolDayInHours.count() <span style="color: #555555;">&lt;&lt;</span> endl;
+  cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"School day in minutes: "</span> <span style="color: #555555;">&lt;&lt;</span> schoolDayInMinutes.count() <span style="color: #555555;">&lt;&lt;</span> endl;
+  cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"School day in milliseconds: "</span> <span style="color: #555555;">&lt;&lt;</span> schoolDayInMilliseconds.count() <span style="color: #555555;">&lt;&lt;</span> endl;
+
+  cout <span style="color: #555555;">&lt;&lt;</span> endl;
+
+}
+</pre>
+</div>
+<p></p>
+<p>Do you know by heart, which literal, function, or object was defined in which namespace? If not, looking for the definition of a name may become a challenge. This holds, in particular, true, if you are a novice.</p>
+<p>Before I end this post, there is one import rule I have to mention: <a href="https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rs-using-directive">SF.7: Don’t write <code class="highlighter-rouge no-highlight">using namespace</code> at global scope in a header file</a>. Here is the rational:</p>
+<p>A using namespace at a global scope in the header injects names into every file that includes that header. This has a few consequences:</p>
+<ul>
+<li>When you use the header, you can not undo the using directive.</li>
+<li>The danger of a name collision increases drastically.</li>
+<li>A change of the included namespace may break your build because a new name was introduced.</li>
+</ul>
+<h2>What's next?</h2>
+<p>First, a few rules to the organisation of source files are left. Additionally, we will get modules with C++20. Let's see which effect this significant features has on C++-</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Paul Baxter,&nbsp; Meeting C++, Matt Braun, Avi Lachmish, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Dilettant, Marko, Ramesh Jangama,</strong><span class="sc-kpOJdX fDWXFa" title="Emyr Williams"><strong> G Prvulovic, Reiner Eiteljörge, Benjamin Huth, Reinhold Dröge, Timo, and Abernitzke.</strong></span><span title="Emyr Williams"></span><strong><span title="Emyr Williams"></span><br /></strong></p>
+<p>&nbsp;</p>
+<p><strong>Thanks in particular to:&nbsp; <a href="https://www.takeupcode.com"><img style="vertical-align: middle;" src="images/patreon/TakeUpCode-450-60.png" alt="TakeUpCode 450 60" width="150" height="20" /> &nbsp; &nbsp;&nbsp;<img src="images/patreon/crp4.png" alt="crp4" width="150" height="96" /> </a></strong></p>
+<p>&nbsp;</p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at Leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 600 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
+<p></p>
+<table style="width: 800px;">
+<tbody>
+<tr>
+<td colspan="2">
+<h2>Get your interactive course</h2>
+&nbsp;</td>
+</tr>
+<tr>
+<td>
+<h4 class="_3fBEwsM053hx2mPd0uV0nT" style="text-align: center;">Modern C++ Concurrency in Practice</h4>
+</td>
+<td>
+<h4>C++ Standard Library including C++14 &amp; C++17</h4>
+</td>
+</tr>
+<tr>
+<td><a href="https://goo.gl/2qWUkK"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseConcurrency/educative.png" alt="educative" width="300" height="152" /></a></td>
+<td><a href="https://www.educative.io/collection/10370001/5712008708096000?authorName=Rainer%20Grimm"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseLibrary/CLibrary.png" alt="CLibrary" width="300" height="150" /></a></td>
+</tr>
+<tr>
+<td>
+<p>Based on my book "Concurrency with Modern C++" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>140 lessons</li>
+<li>110 code playgrounds =&gt; Runs in the browser</li>
+<li>78 code snippets</li>
+<li>55 illustrations</li>
+</ul>
+</td>
+<td>
+<p>Based on my book "The C++ Standard Library" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>149 lessons</li>
+<li>111 code playgrounds =&gt; Runs in the browser</li>
+<li>164 code snippets</li>
+<li>25 illustrations</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+<div id="s3gt_translate_tooltip_mini" class="s3gt_translate_tooltip_mini_box" style="background: initial !important; border: initial !important; border-radius: initial !important; border-spacing: initial !important; border-collapse: initial !important; direction: ltr !important; flex-direction: initial !important; font-weight: initial !important; height: initial !important; letter-spacing: initial !important; min-width: initial !important; max-width: initial !important; min-height: initial !important; max-height: initial !important; margin: auto !important; outline: initial !important; padding: initial !important; position: absolute; table-layout: initial !important; text-align: initial !important; text-shadow: initial !important; width: initial !important; word-break: initial !important; word-spacing: initial !important; overflow-wrap: initial !important; box-sizing: initial !important; display: initial !important; color: inherit !important; font-size: 13px !important; font-family: X-LocaleSpecific, sans-serif, Tahoma, Helvetica !important; line-height: 13px !important; vertical-align: top !important; white-space: inherit !important; left: 97px; top: 125px;">&nbsp;</div>
+<p><a href="https://cranepay.io/">Cranepay</a></p>
+<div id="s3gt_translate_tooltip_mini" class="s3gt_translate_tooltip_mini_box" style="background: initial !important; border: initial !important; border-radius: initial !important; border-spacing: initial !important; border-collapse: initial !important; direction: ltr !important; flex-direction: initial !important; font-weight: initial !important; height: initial !important; letter-spacing: initial !important; min-width: initial !important; max-width: initial !important; min-height: initial !important; max-height: initial !important; margin: auto !important; outline: initial !important; padding: initial !important; position: absolute; table-layout: initial !important; text-align: initial !important; text-shadow: initial !important; width: initial !important; word-break: initial !important; word-spacing: initial !important; overflow-wrap: initial !important; box-sizing: initial !important; display: initial !important; color: inherit !important; font-size: 13px !important; font-family: X-LocaleSpecific, sans-serif, Tahoma, Helvetica !important; line-height: 13px !important; vertical-align: top !important; white-space: inherit !important; left: 916px; top: 35px; opacity: 0.8;">&nbsp;</div>
