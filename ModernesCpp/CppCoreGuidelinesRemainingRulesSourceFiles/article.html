@@ -1,0 +1,260 @@
+<p>Today, I complete the rules of the C++ core guidelines to source files. They are about header files and namespaces.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesRemainingRulesToSourceFiles/vga-160266_1280.png" alt="vga 160266 1280" width="400" height="384" /></p>
+<p>Let's see how I can make a story out of the remaining rules because they have not much content. Anyway, here are they:</p>
+<ul>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rs-guards">SF.8: Use <code class="highlighter-rouge no-highlight">#include</code> guards for all <code class="highlighter-rouge no-highlight">.h</code> files</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rs-cycles">SF.9: Avoid cyclic dependencies among source files</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rs-implicit">SF.10: Avoid dependencies on implicitly <code class="highlighter-rouge no-highlight">#include</code>d names</a></li>
+<li>
+<p><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rs-contained">SF.11: Header files should be self-contained</a></p>
+</li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rs-namespace">SF.20: Use <code class="highlighter-rouge no-highlight">namespace</code>s to express logical structure</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rs-unnamed">SF.21: Don’t use an unnamed (anonymous) namespace in a header</a></li>
+<li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rs-unnamed2">SF.22: Use an unnamed (anonymous) namespace for all internal/nonexported entities</a></li>
+</ul>
+<p>The first rule is already best practice.</p>
+<h2><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rs-guards">SF.8: Use <code class="highlighter-rouge no-highlight">#include</code> guards for all <code class="highlighter-rouge no-highlight">.h</code> files</a></h2>
+<p>When you put an include guard around your header file, it is only be included once. Here is a small example from the guidelines.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// file foobar.h:</span>
+<span style="color: #009999;">#ifndef LIBRARY_FOOBAR_H</span>
+<span style="color: #009999;">#define LIBRARY_FOOBAR_H</span>
+<span style="color: #0099ff; font-style: italic;">// ... declarations ...</span>
+<span style="color: #009999;">#endif </span><span style="color: #0099ff; font-style: italic;">// LIBRARY_FOOBAR_H</span>
+</pre>
+</div>
+<p></p>
+<p>There are two points to keep in mind.</p>
+<ol>
+<li>Give your guard a unique name. If you use a guard name more than once, it may exclude the inclusion of a header file.</li>
+<li><a href="https://en.wikipedia.org/wiki/Pragma_once">#pragma once</a> is non-standard but widely supported preprocessor directive. This means, the following variation of the header <span style="font-family: courier new, courier;">foobar.h</span> is not portable.</li>
+</ol>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// file foobar.h:</span>
+<span style="color: #009999;">#pragma once</span>
+
+<span style="color: #0099ff; font-style: italic;">// ... declarations ...</span>
+</pre>
+</div>
+<p></p>
+<p>For example, GCC supports the preprocessor directive since 3.4. Read the details about the <a href="https://en.wikipedia.org/wiki/Pragma_once">#pragma once</a> support in the Wikipedia article.</p>
+<p>Okay, the next rule is tricky.</p>
+<h2><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rs-cycles">SF.9: Avoid cyclic dependencies among source files</a></h2>
+<p>First of all, what is a cyclic dependency of source files? Imagine, I have the following source files.</p>
+<ul>
+<li>&nbsp;<span style="font-family: courier new, courier;">a.h</span></li>
+</ul>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #009999;">#ifndef LIBRARY_A_H</span>
+<span style="color: #009999;">#define LIBRARY_A_H</span>
+<span style="color: #009999;">#include "b.h"</span>
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">A</span> {
+  B<span style="color: #555555;"></span> b;
+};
+
+<span style="color: #009999;">#endif </span><span style="color: #0099ff; font-style: italic;">// LIBRARY_A_H</span>
+</pre>
+</div>
+<ul>
+<li><span style="font-family: courier new, courier;">b.h</span></li>
+</ul>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #009999;">#ifndef LIBRARY_B_H</span>
+<span style="color: #009999;">#define LIBRARY_B_H</span>
+<span style="color: #009999;">#include "a.h"</span>
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">B</span> {
+  A a;
+};
+
+<span style="color: #009999;">#endif </span><span style="color: #0099ff; font-style: italic;">// LIBRARY_B_H</span>
+</pre>
+</div>
+<ul>
+<li><span style="font-family: courier new, courier;">main.cpp</span></li>
+</ul>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #009999;">#include "a.h"</span><span style="color: #009999;"></span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+  A a;
+}
+</pre>
+</div>
+<p></p>
+<p>When I try to compile the program, it will fail:<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesRemainingRulesToSourceFiles/dependency.png" alt="dependency" width="350" height="182" /></p>
+<p>The issue is that there is a circular dependency between the headers <span style="font-family: courier new, courier;">a.h</span> and <span style="font-family: courier new, courier;">b.h</span>. The problem manifests itself when <span style="font-family: courier new, courier;">a</span> is created in the main program. To create an A, the compiler must figure out the size of <span style="font-family: courier new, courier;">B</span>. To create a <span style="font-family: courier new, courier;">B</span>, the compiler must figure out the size of <span style="font-family: courier new, courier;">A</span>. This is not possible if <span style="font-family: courier new, courier;">a</span> or <span style="font-family: courier new, courier;">b</span> are objects. It is only possible if <span style="font-family: courier new, courier;">a</span> or <span style="font-family: courier new, courier;">b</span> are pointers or references.</p>
+<p>The easy fix is, therefore, to <a href="https://en.cppreference.com/w/cpp/language/class">forward declare</a> <span style="font-family: courier new, courier;">A</span> in <span style="font-family: courier new, courier;">b.h</span> or <span style="font-family: courier new, courier;">B</span> in <span style="font-family: courier new, courier;">a.h</span>. Depending on your platform, the size is now 32 or 64 bits.&nbsp; Here is the modified header of <span style="font-family: courier new, courier;">a.h</span>.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #009999;">#ifndef LIBRARY_A_H</span>
+<span style="color: #009999;">#define LIBRARY_A_H</span>
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">B</span>;
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">A</span> {
+  B<span style="color: #555555;">*</span> b;
+  B<span style="color: #555555;">&amp;</span> b2 <span style="color: #555555;">=</span> <span style="color: #555555;">*</span>b;
+};
+
+<span style="color: #009999;">#endif </span><span style="color: #0099ff; font-style: italic;">// LIBRARY_A_H</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>By the way, the standard library header <a href="https://en.cppreference.com/w/cpp/header/iosfwd"><span style="font-family: courier new, courier;">&lt;iosfwd&gt;</span></a> holds forward declarations of the input/output library.</p>
+<p>The next issue happens to me a few times.</p>
+<h2><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rs-implicit">SF.10: Avoid dependencies on implicitly <code class="highlighter-rouge no-highlight">#include</code>d names</a></h2>
+<p>For example, the following program will compile with GCC 5.4 but will break with the Microsoft compiler 19.00.23506.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+    
+    std<span style="color: #555555;">::</span>string s <span style="color: #555555;">=</span> <span style="color: #cc3300;">"Hello World"</span>;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> s;
+
+}
+&nbsp;</pre>
+</div>
+<p>&nbsp;</p>
+<p>I forgot to include a necessary header <span style="font-family: courier new, courier;">&lt;string&gt;</span>. GCC 5.4 includes <span style="font-family: courier new, courier;">&lt;string&gt;</span> with the header <span style="font-family: courier new, courier;">&lt;iostream&gt;.&nbsp;</span>This does not hold true for the Microsoft compiler. The error message of the Microsoft compiler is quite verbose.</p>
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesRemainingRulesToSourceFiles/forgotString.png" alt="forgotString" width="700" height="285" /></p>
+<p>The next rule is short but important.</p>
+<h2><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rs-contained">SF.11: Header files should be self-contained</a></h2>
+<p>A self-contained header file can be included <em>top-most</em> in a translation unit. This means it does not depend on other headers that are included before. If you don't follow this rule, a user of your header may be surprised by difficult to understand error messages. Sometimes the header seems to work; sometimes not. It just depends on which header was included before.</p>
+<p>The last three rules to source files are about namespaces. It starts with a no-brainer.</p>
+<h2><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rs-namespace">SF.20: Use <code class="highlighter-rouge no-highlight">namespace</code>s to express logical structure</a></h2>
+<p>Obviously, we have namespaces in the C++ standard to express logical structure. Examples? Here are a few:</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">std
+std<span style="color: #555555;">::</span>chrono
+std<span style="color: #555555;">::</span>literals<br />std::literals::chrono_literals
+std<span style="color: #555555;">::</span>filesystem<br />std::placeholders
+
+std<span style="color: #555555;">::</span>view      <span style="color: #0099ff; font-style: italic;">// C++20</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The next two rules are about unnamed (anonymous) namespaces.</p>
+<h2><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rs-unnamed">SF.21: Don’t use an unnamed (anonymous) namespace in a header </a>and <a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rs-unnamed2">SF.22: Use an unnamed (anonymous) namespace for all internal/nonexported entities</a></h2>
+<p>An unnamed namespace has internal linkage. This means, that names inside the unnamed namespace can only be referred from within the current translation unit and are not exported (<a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rs-unnamed2">SF22</a>). The same holds for namespaces, which are declared in the unnamed namespace. Okay, what does that mean?</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">namespace</span> {
+    <span style="color: #007788; font-weight: bold;">int i</span>;  <span style="color: #0099ff; font-style: italic;">// defines ::(unique_name)::i</span>
+}
+<span style="color: #007788; font-weight: bold;">void</span> inc() {
+    i<span style="color: #555555;">++</span>;  <span style="color: #0099ff; font-style: italic;">// increments ::(unique_name)::i</span>
+}
+ 
+</pre>
+</div>
+<p></p>
+<p>When you refer to i from within the translation unit, you do it by a <span style="font-family: courier new, courier;">unique_name </span>without a name clash. For example, you can define a free addition function <span style="font-family: courier new, courier;">add</span> inside the unnamed namespace, and the linker would not complain because you broke the one definition rule.</p>
+<p>And here is the problem, when you use an unnamed namespace in the header (<a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rs-unnamed">SF21</a>). Each translation unit will define its unique instance of the unnamed namespace. Unnamed namespaces in headers have a few consequences:</p>
+<ul>
+<li>The resulting executable will bloat.</li>
+<li>Any declaration in an unnamed namespace refers to a different entity in each translation unit. This may not be the expected behaviour.</li>
+</ul>
+<p>The usage of an unnamed namespace is similar to the <span style="font-family: courier new, courier;">static</span> keyword used in C.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">namespace</span> { <span style="color: #007788; font-weight: bold;">int</span> i1; }
+<span style="color: #006699; font-weight: bold;">static</span> <span style="color: #007788; font-weight: bold;">int</span> i2;
+</pre>
+</div>
+<p></p>
+<h2>What's next?</h2>
+<p>The C++ core guidelines mentioned a few times modules in the rules to source files, but they didn't write about the big C++20 feature. Let me fill the gap in my next post.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Paul Baxter,&nbsp; Meeting C++, Matt Braun, Avi Lachmish, Roman Post anciuc, Venkata Ramesh Gudpati, Tobias Zindl, Dilettant, Marko, Ramesh Jangama,</strong><span class="sc-kpOJdX fDWXFa" title="Emyr Williams"><strong> G Prvulovic, Reiner Eiteljörge, Benjamin Huth, Reinhold Dröge, Timo, Abernitzke,</strong> </span><strong><span title="Emyr Williams">Richard Ohnemus , Frank Grimm, and</span></strong><span title="Emyr Williams"> </span><strong><span title="Emyr Williams">Hasan Men.</span></strong></p>
+<p><strong>Thanks in particular to:&nbsp; <a href="https://cranepay.io/"><img style="vertical-align: middle;" src="images/patreon/TakeUpCode-450-60.png" alt="TakeUpCode 450 60" width="150" height="20" /> &nbsp; &nbsp;&nbsp;<img src="images/patreon/crp4.png" alt="crp4" width="150" height="96" /> </a></strong></p>
+<p>&nbsp;</p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at Leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 600 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
+<p></p>
+<table style="width: 800px;">
+<tbody>
+<tr>
+<td colspan="2">
+<h2>Get your interactive course</h2>
+&nbsp;</td>
+</tr>
+<tr>
+<td>
+<h4 class="_3fBEwsM053hx2mPd0uV0nT" style="text-align: center;">Modern C++ Concurrency in Practice</h4>
+</td>
+<td>
+<h4>C++ Standard Library including C++14 &amp; C++17</h4>
+</td>
+</tr>
+<tr>
+<td><a href="https://goo.gl/2qWUkK"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseConcurrency/educative.png" alt="educative" width="300" height="152" /></a></td>
+<td><a href="https://www.educative.io/collection/10370001/5712008708096000?authorName=Rainer%20Grimm"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseLibrary/CLibrary.png" alt="CLibrary" width="300" height="150" /></a></td>
+</tr>
+<tr>
+<td>
+<p>Based on my book "Concurrency with Modern C++" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>140 lessons</li>
+<li>110 code playgrounds =&gt; Runs in the browser</li>
+<li>78 code snippets</li>
+<li>55 illustrations</li>
+</ul>
+</td>
+<td>
+<p>Based on my book "The C++ Standard Library" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>149 lessons</li>
+<li>111 code playgrounds =&gt; Runs in the browser</li>
+<li>164 code snippets</li>
+<li>25 illustrations</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+<p><a href="https://cranepay.io/">Cranepay</a></p>
