@@ -1,0 +1,173 @@
+Wenn man auf ein Element außerhalb eines Containers der Standard Template Library (STL) zugreift, ist das Ergebnis ungewiss. Der Effekt kann ein Fehler oder undefiniertes Verhalten sein. Undefiniertes Verhalten bedeutet, dass keine Aussagen über das Programm mehr möglich sind.
+Was heißt, das Ergebnis ist ungewiss, wenn du auf ein Element außerhalb eines Containers zugreifst? Das Ergebnis hängt davon ab, welcher Container verwendet wird. Die C++ Core Guidelines bringt die Regel unmissverständlich auf den Punkt.
+SL.con.3: Avoid bounds errors 
+Das erste Beispiel der C++ Core Guidelines ist sehr überzeugend. In ihm werden auf unsichere Art C-Funktionen verwendet, um ein std::array zu füllen und zu vergleichen:
+std::array<int, 10> a, b;
+std::memset(a.data(), 0, 10);         // BAD, and contains a length error (length = 10 * sizeof(int))
+std::memcmp(a.data(), b.data(), 10);  // BAD, and contains a length error (length = 10 * sizeof(int))
+Die Kommentare zum Code drücken das Problem bereits aus: Die Länge des C-Arrays ist nicht 10,  sondern 10 * sizeof(int). Die Lösung liegt in diesem Fall auf der Hand. Verwende die Methoden des std::array:
+std::array<int, 10> a;
+std::array<int, 10> b;
+
+std::array<int, 10> c{};          
+
+a.fill(0);                         // (1)
+std::fill(b.begin(), b.end(), 0);  // (2) 
+
+if ( a == b ){                     // (3)
+    // ...
+}
+In diesem Fall werden die Arrays a und b nicht initialisiert. Im Gegensatz dazu werden alle Werte von c auf 0 gesetzt. Die Zeile (1) und Zeile (2) setzen all Werte von a und b auf 0. Das std::array b verwendet dazu den Algorithmus std::fill. Der Vergleich beider Container ist sehr einfach (Zeile 3).
+Die Verwendung eines Container jenseits seiner Grenzen ist im Allgemeinen undefiniertes Verhalten. Was heißt das?
+Falsche Zugriffe
+Den einfachsten sequenziellen Container, den wir in C++ besitzen, ist das C-Array.
+C-Array
+Unabhängig davon, ob du fälschlicherweise vor dem C-Array (underflow) oder nach dem C-Array (overflow) auf ein Element zugreifst, der Effekt ist derselbe: memory corruption und undefined behaviour. Hier kommt ein einfacher Test, der dies für ein int-Array demonstriert. Wie lange kann das folgende Programm ausgeführt werden, bevor es zum Absturz kommt?
+// overUnderflow.cpp
+
+#include <cstddef>
+#include <iostream>
+
+int main(){
+   
+    int a[0];
+    int n{};
+
+    while (true){
+        if (!(n % 100)){
+            std::cout << "a[" << n << "] = " << a[n] << ", a[" << -n << "] = " << a[-n] << "\n";
+        }
+        a[n] = n;
+        a[-n] = -n;
+        ++n;
+    }
+   
+}
+Viel zu lange! Das Programm gibt jedes hundertste Element des Arrays auf std::cout aus:
+[<ir_inline itemname=bilder_mvp_bild_var2:3 type=2>]
+Okay. Was passiert, wenn ich sequenzielle Container der STL einsetze? Und weiter geht's.
+Sequenzielle Container der STL
+Das std::array, der std::vector, der std::deque und der std::string erlauben den Indexzugriff. Der Einfachheit halber bezeichne ich den std::string als sequenziellen Container. Das heißt, jeder der Container unterstützt den wahlfreien Zugriff und gibt einen entsprechenden Iterator zurück. Um dich nicht zu Tode zu langweilen, werde ich mich in meinen weiteren Experimenten auf das std::array und den std::vector einschränken.
+
+    std::array
+
+Dies ist das leicht angepasste Programm für std::array.
+// overUnderflowStdArray.cpp
+
+#include <array>
+#include <iostream>
+
+int main(){
+    
+    std::array<int, 1> a;
+    int n{};
+
+    while (true){
+        if (!(n % 100)){
+            std::cout << "a[" << n << "] = " << a[n] <<
+                       ", a[" << -n << "] = " << a[-n] << "\n";
+        }
+        a[n] = n;
+        a[-n] = -n;
+        ++n;
+    }
+    
+}
+Es ist kein Unterschied, ob der Indexoperator auf C++-Array oder einem C-Array eingesetzt wird.
+[<ir_inline itemname=bilder_mvp_bild_var2:4 type=2>]
+Vielleicht heißt die Rettung ja std::vector.
+
+    std::vector
+
+// overUnderflowStdVector.cpp
+
+#include <vector>
+#include <iostream>
+
+int main(){
+   
+    std::vector<int> a{1};
+    int n{};
+
+    while (true){
+        if (!(n % 100)){
+            std::cout << "a[" << n << "] = " << a[n] <<
+                       ", a[" << -n << "] = " << a[-n] << "\n";
+        }
+        a[n] = n;
+        a[-n] = -n;
+        ++n;
+    }
+   
+}
+Da der std::vector seine Elemente auf dem Heap und nicht wie der std::array auf dem Stack erzeugt, dauert es deutlich länger, bis das Programm abbricht. Die zwei Screenshots zeigen den Anfang und das Ende des Über- und Unterlaufs.
+[<ir_inline itemname=bilder_mvp_bild_var2:5 type=2>]
+Zusätzlich bieten die assoziativen Container wie std::map und std::unordered_map den Indexoperator an.
+Assoziative Container der STL
+Was passiert, wenn du einen nichtexistierenden Schlüssel in einer std::map oder eine std::unordered_map einsetzt?
+// indexOperatorMapAndUnorderedMap.cpp
+
+#include <iostream>
+#include <map>
+#include <unordered_map>
+#include <string>
+
+int main(){
+
+    std::cout << std::boolalpha << std::endl;
+
+    std::map<std::string, int> myMap;
+    std::unordered_map<std::string, bool> myUnorderedMap;
+   
+    std::cout << "myMap[DoesNotExist]: " << myMap["DoesNotExist"] << std::endl;
+   
+    std::cout << "myUnorderedMap[DoesNotExist]: " << myUnorderedMap["DoesNotExist"] << std::endl;
+   
+}
+Im Fall der assoziativen Container ist der Wert, den du erhältst, wohldefiniert, falls der Schlüssel nicht vorhanden ist. Der Wert muss [i]DefaultConstructible[/i] sein, denn gegebenenfalls wird der Defaultkonstruktor aufgerufen. Das erzeugt im ersten Fall das Literal 0 und im zweiten Fall das Literal false.
+[<ir_inline itemname=bilder_mvp_bild_var2:6 type=2>]
+Nun werde ich die entscheidende Frage der Regel beantworten: Wie lassen sich diese ungültigen Zugriffe vermeiden?
+Vermeide ungültige Zugriffe
+Im Falle des C-Arrays gibt es keine Möglichkeit, diesen ungültigen Zugriff zu entdecken. Für die Container der STL inklusive dem std::string, gibt es die Methode at, die ungültige Zugriffe entdeckt. Im Fall eines ungültigen Zugriffs führt dies zu einer std::out_of_range-Ausnahme. Der std::string zeigt dies eindrucksvoll: 
+// stringBoundsCheck.cpp
+
+#include <stdexcept>
+#include <iostream>
+#include <string>
+ 
+int main(){
+
+    std::cout << std::endl;
+
+    std::string str("1123456789");
+ 
+    str.at(0) = '0';                                   // (1)
+   
+    std::cout << str << std::endl;
+ 
+    std::cout << "str.size(): " << str.size() << '\n';
+    std::cout << "str.capacity() = " << str.capacity() << '\n';
+ 
+    try {
+        str.at(12) = 'X';                              // (2)
+    }
+    catch (const std::out_of_range& exc) {
+        std::cout << exc.what() << std::endl;
+    }
+   
+    std::cout << std::endl;
+
+}
+Das Setzen des ersten Buchstabens des Strings str auf '0' ist okay, aber der Zugriff außerhalb der size des Strings nicht. Dies gilt sogar, wenn der Zugriff innerhalb der capacity aber außerhalb der size stattfindet.
+
+    Die size eines std::string ist die Anzahl der Elemente, die ein std::string besitzt.
+    Die capacity eines std::string ist die Anzahl der Elemente, die ein std::string besitzen kann, ohne dass zusätzliche Speicherallokation notwendig ist. 
+
+Die Fehlermeldung des Windows Compiler 19.20 ist sehr unspezifisch.
+[<ir_inline itemname=bilder_mvp_bild_var2:7 type=2>]
+Im Gegensatz dazu ist die Fehlermeldung des GCC 8.2 deutlich aussagekräftiger.
+[<ir_inline itemname=bilder_mvp_bild_var2:8 type=2>]
+Wie geht's weiter?
+Dieser Artikel war der letzte meiner Artikel zu den Containern der STL. Im nächsten Artikel geht es mit den verschieden String-Typen weiter.
+
+
