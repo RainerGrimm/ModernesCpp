@@ -1,0 +1,226 @@
+<p>The C++ core guidelines use the term string as a sequence of characters. Consequently, the guidelines are about&nbsp; C-strings, C++-strings, the C++17 <span style="font-family: courier new, courier;">std::string_view</span>'s, and <span style="font-family: courier new, courier;">std::byte</span>'s.&nbsp;</p>
+<hr id="system-readmore" />
+<div id="simple-translate">&nbsp;</div>
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesStrings/thread-2995466_1280.jpg" alt="thread 2995466 1280" width="600" height="400" /></p>
+<p>I will in this post only loosely refer to the guidelines and ignore the strings which are part of the <a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#S-gsl">guidelines support library </a>such as <span style="font-family: courier new, courier;">gsl::string_span, zstring</span>, and <span style="font-family: courier new, courier;">czstring</span>. For short, I call in this post a<span style="font-family: courier new, courier;"> std::string</span> a C++-string, and a<span style="font-family: courier new, courier;"> const char*</span> a C-string.</p>
+<p>Let me start with the first rule:</p>
+<h2><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rstr-string">SL.str.1: Use <code class="highlighter-rouge no-highlight">std::string</code> to own character sequences</a></h2>
+<p>Maybe, you know another string which owns its characters sequence: a C-string. Don't use a C-string! Why? Because you have to take care of the memory management, the string termination character, and length of the string.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// stringC.c</span>
+
+<span style="color: #009999;">#include &lt;stdio.h&gt;</span>
+<span style="color: #009999;">#include &lt;string.h&gt;</span>
+ 
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>( <span style="color: #007788; font-weight: bold;">void</span> ){
+ 
+  <span style="color: #007788; font-weight: bold;">char</span> text[<span style="color: #ff6600;">10</span>];
+ 
+  strcpy(text, <span style="color: #cc3300;">"The Text is too long for text."</span>);   <span style="color: #0099ff; font-style: italic;">// (1) text is too big</span>
+  printf(<span style="color: #cc3300;">"strlen(text): %u</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>, strlen(text));       <span style="color: #0099ff; font-style: italic;">// (2) text has no termination character '\0'</span>
+  printf(<span style="color: #cc3300;">"%s</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>, text);
+ 
+  text[<span style="color: #006699; font-weight: bold;">sizeof</span>(text)<span style="color: #555555;">-</span><span style="color: #ff6600;">1</span>] <span style="color: #555555;">=</span> <span style="color: #cc3300;">'\0'</span>;
+  printf(<span style="color: #cc3300;">"strlen(text): %u</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>, strlen(text));
+ 
+  <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #ff6600;">0</span>;
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The simple program <span style="font-family: courier new, courier;">stringC.c</span> has in line (1) and line (2) undefined behaviour. Compiling it with a rusty GCC 4.8 seems to work fine.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesStrings/stringC.png" alt="stringC" width="500" height="145" />The C++ variant does not have the same issues.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// stringCpp.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;string&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+ 
+  std<span style="color: #555555;">::</span>string text{<span style="color: #cc3300;">"The Text is not too long."</span>};  
+ 
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"text.size(): "</span> <span style="color: #555555;">&lt;&lt;</span> text.size() <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> text <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+ 
+  text <span style="color: #555555;">+=</span><span style="color: #cc3300;">" And can still grow!"</span>;
+ 
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"text.size(): "</span> <span style="color: #555555;">&lt;&lt;</span> text.size() <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> text <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+ 
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The output of the program should not surprise you.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesStrings/stringCpp.png" alt="stringCpp" width="500" height="186" /></p>
+<p>In case of a C++-string, I cannot make an error because the C++ runtime takes care of the memory management and the termination character. Additionally, if you access the elements of the C++-string with the at-operator instead of the index-operator, bounds errors are not possible. You can read the details of the at-operator in my previous post: <a href="https://www.modernescpp.com/index.php/c-core-guidelines-avoid-bound-errors">C++ Core Guidelines: Avoid Bounds Errors</a>.</p>
+<p>You know, what was strange in C++, including C++11? There was no way to create a C++-string without a C-string. This is strange because we want to get rid of the C-string. This inconsistency is gone with C++14.</p>
+<h2><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rstr-s">SL.str.12: Use the <code class="highlighter-rouge no-highlight">s</code> suffix for string literals meant to be standard-library <code class="highlighter-rouge no-highlight">string</code>s</a>&nbsp;</h2>
+<p>With C++14 we got C++-string literals. It's a C-string literal with the suffix s: "<span style="font-family: courier new, courier;">cStringLiteral"s</span>.</p>
+<p>Let me show you an example which makes my point: C-string literals and C++-string literals a different.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// stringLiteral.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;string&gt;</span>
+<span style="color: #009999;">#include &lt;utility&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+    
+    <span style="color: #006699; font-weight: bold;">using</span> <span style="color: #006699; font-weight: bold;">namespace</span> std<span style="color: #555555;">::</span>string_literals;                         <span style="color: #0099ff; font-style: italic;">// (1)</span>
+
+    std<span style="color: #555555;">::</span>string hello <span style="color: #555555;">=</span> <span style="color: #cc3300;">"hello"</span>;                                  <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    
+    <span style="color: #006699; font-weight: bold;">auto</span> firstPair <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>make_pair(hello, <span style="color: #ff6600;">5</span>);
+    <span style="color: #006699; font-weight: bold;">auto</span> secondPair <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>make_pair(<span style="color: #cc3300;">"hello"</span>, <span style="color: #ff6600;">15</span>);                <span style="color: #0099ff; font-style: italic;">// (3)</span>
+    <span style="color: #0099ff; font-style: italic;">// auto secondPair = std::make_pair("hello"s, 15);            // (4)</span>
+    
+    <span style="color: #006699; font-weight: bold;">if</span> (firstPair <span style="color: #555555;">&lt;</span> secondPair) std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"true"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl; <span style="color: #0099ff; font-style: italic;">// (5)</span>
+    
+}
+</pre>
+</div>
+<p></p>
+<p>It's a pity; I have to include the namespace <span style="font-family: courier new, courier;">std::string_literals</span> in line (1) to use the C++-string-literals. Line (2) is the critical line in the example. I use the C-string-literal <span style="font-family: courier new, courier;">"hello"</span> to create a C++-string. This is the reason that the type of <span style="font-family: courier new, courier;">firstPair</span> is (<span style="font-family: courier new, courier;">std::string, int</span>), but the type of the <span style="font-family: courier new, courier;">secondPair</span> is (<span style="font-family: courier new, courier;">const char*, int</span>). In the end, the comparison in line (5) fails, because you can not compare different types. Look carefully at the last line of the error message:&nbsp;</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesStrings/stringLiteralsError.PNG" alt="stringLiteralsError" width="600" height="238" /></p>
+<p>When I use the C++-string-literal in line (4 ) instead of the C-string-literal in line (3), the program behaves as expected:</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesStrings/stringLiterals.PNG" alt="stringLiterals" width="450" height="217" /></p>
+<p>C++-string-literals was a C++14 feature. Let's jump three years further. With C++17 we got <span style="font-family: courier new, courier;">std::string_view</span> and <span style="font-family: courier new, courier;">std::byte</span>. I already wrote, in particular, about <span style="font-family: courier new, courier;">std::string_view</span>. Therefore, I will only recap the most important facts.</p>
+<h2><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rstr-view">SL.str.2: Use <code class="highlighter-rouge no-highlight">std::string_view</code> or <code class="highlighter-rouge no-highlight">gsl::string_span</code> to refer to character sequences</a></h2>
+<p>Okay, a <span style="font-family: courier new, courier;">std::string</span> view only refers to the character sequence. To say it more explicitly: A <span style="font-family: courier new, courier;">std::string_view</span> does not own the character sequence. It represents<span style="font-family: Courier New, Courier, monospace;"></span> a view of a sequence of characters. This sequence of characters can be a C++-string or C-string. A <span style="font-family: Courier New, Courier, monospace;">std::string_view</span> only needs two information: the pointer to the character sequence and their length. It supports the reading part of the interface<span style="font-family: courier new, courier;"></span> of the <span style="font-family: courier new, courier;">std::string</span>. Additionally to a <span style="font-family: courier new, courier;">std::string, std::string_view</span> has two modifying operations: <span style="font-family: Courier New, Courier, monospace;">remove_prefix</span> and <span style="font-family: Courier New, Courier, monospace;">remove_suffix</span>.</p>
+<p>Maybe you wonder: Why do we need a <span style="font-family: courier new, courier;">std::string_view</span>? A <span style="font-family: courier new, courier;">std::string_view</span> is quite cheap to copy and needs no memory. My previous post <a href="https://www.modernescpp.com/index.php/c-17-avoid-copying-with-std-string-view">C++17 - Avoid Copying with std::string_view </a>shows the impressive performance numbers of a<span style="font-family: courier new, courier;"> std::string_view</span>.</p>
+<p>As I already mentioned it, we got with C++17 also a <span style="font-family: courier new, courier;">std::byte</span>.</p>
+<h2><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rstr-char*">SL.str.4: Use <code class="highlighter-rouge no-highlight">char*</code> to refer to a single character</a> and<a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rstr-byte"> SL.str.5: Use <code class="highlighter-rouge no-highlight">std::byte</code> to refer to byte values that do not necessarily represent characters</a></h2>
+<p>If you don't follow rule str.4 and use <span style="font-family: courier new, courier;">const char*</span> as a C-string, you may end with critical issues as the following one.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">char</span> arr[] <span style="color: #555555;">=</span> {<span style="color: #cc3300;">'a'</span>, <span style="color: #cc3300;">'b'</span>, <span style="color: #cc3300;">'c'</span>};
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">print</span>(<span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">char</span><span style="color: #555555;">*</span> p)
+{
+    cout <span style="color: #555555;">&lt;&lt;</span> p <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+}
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">use</span>()
+{
+    print(arr);   <span style="color: #0099ff; font-style: italic;">// run-time error; potentially very bad</span>
+}
+</pre>
+</div>
+<p></p>
+<p><span style="font-family: courier new, courier;">arr</span> decays to a pointer when used as argument of the function <span style="font-family: courier new, courier;">print</span>. The undefined-behaviour is, that <span style="font-family: courier new, courier;">arr</span> is not zero-terminated. If you now have the impression to can use <span style="font-family: courier new, courier;">std::byte</span> as a character, you are wrong.</p>
+<p><span style="font-family: courier new,courier;">std::byte</span> is a distinct type implementing the concept of a byte as specified in the C++ language definition. This means, a byte is not an integer or a character and is, therefore, not open to programmer errors. Its job is to access object storage. Consequently, its interface consists only of methods for bitwise logical operations.</p>
+<p>&nbsp;</p>
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">namespace</span> std { 
+
+  <span style="color: #0000ff;">  template</span> &lt;<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">IntType</span>&gt; 
+        constexpr byte <span style="color: #0000ff;">operator</span>&lt;&lt;(byte b, IntType shift); 
+  <span style="color: #0000ff;">  template</span> &lt;<span style="color: #0000ff;">class</span> <span style="color: #2b91af;">IntType</span>&gt; 
+        constexpr byte <span style="color: #0000ff;">operator</span>&gt;&gt;(byte b, IntType shift); 
+    constexpr byte <span style="color: #0000ff;">operator</span>|(byte l, byte r); 
+    constexpr byte <span style="color: #0000ff;">operator</span>&amp;(byte l, byte r); 
+    constexpr byte <span style="color: #0000ff;">operator</span>~(byte b); 
+    constexpr byte <span style="color: #0000ff;">operator</span>^(byte l, byte r); 
+
+} 
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>You can use the function<span style="font-family: courier new,courier;"> std::to_integer(std::byte b)</span> to convert a <span style="font-family: courier new,courier;">std::byte</span> to an integer type and the call <span style="font-family: courier new,courier;">std::byte{integer}</span> to do it the other way around. <span style="font-family: courier new,courier;">integer</span> has to be a non-negative value smaller than <span style="font-family: courier new,courier;">std::numeric_limits&lt;unsigned_char&gt;::max().</span></p>
+<h2>What's next?</h2>
+<p>I'm almost done with the rules to the standard library. Only a few rules to iostreams and the C-standard library are left. So you know, what I will write about in my next post.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Paul Baxter,&nbsp; Meeting C++, Matt Braun, Avi Lachmish, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Marko, Ramesh Jangama,</strong><span class="sc-kpOJdX fDWXFa" title="Emyr Williams"><strong> G Prvulovic, Reiner Eiteljörge, Benjamin Huth, Reinhold Dröge, Timo, Abernitzke,</strong> </span><strong><span title="Emyr Williams">Richard Ohnemus , Frank Grimm</span></strong><span title="Emyr Williams"><strong>, Sakib, and Broeserl.<span class="sc-htpNat dEZjR" style="color: #241e12; font-family: aktiv-grotesk, sans-serif; margin: 0px; position: relative; font-weight: 400; font-size: 1rem; line-height: 1.5;"></span></strong></span><span title="Emyr Williams"></span></p>
+<p><strong>Thanks in particular to:&nbsp; <a href="https://cranepay.io/"><img style="vertical-align: middle;" src="images/patreon/TakeUpCode-450-60.png" alt="TakeUpCode 450 60" width="150" height="20" /> &nbsp; &nbsp;&nbsp;<img src="images/patreon/crp4.png" alt="crp4" width="150" height="96" /> </a></strong></p>
+<p>&nbsp;</p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at Leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 600 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
+<p></p>
+<table style="width: 800px;">
+<tbody>
+<tr>
+<td colspan="2">
+<h2>Get your interactive course</h2>
+&nbsp;</td>
+</tr>
+<tr>
+<td>
+<h4 class="_3fBEwsM053hx2mPd0uV0nT" style="text-align: center;">Modern C++ Concurrency in Practice</h4>
+</td>
+<td>
+<h4>C++ Standard Library including C++14 &amp; C++17</h4>
+</td>
+</tr>
+<tr>
+<td><a href="https://goo.gl/2qWUkK"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseConcurrency/educative.png" alt="educative" width="300" height="152" /></a></td>
+<td><a href="https://www.educative.io/collection/10370001/5712008708096000?authorName=Rainer%20Grimm"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseLibrary/CLibrary.png" alt="CLibrary" width="300" height="150" /></a></td>
+</tr>
+<tr>
+<td>
+<p>Based on my book "Concurrency with Modern C++" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>140 lessons</li>
+<li>110 code playgrounds =&gt; Runs in the browser</li>
+<li>78 code snippets</li>
+<li>55 illustrations</li>
+</ul>
+</td>
+<td>
+<p>Based on my book "The C++ Standard Library" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>149 lessons</li>
+<li>111 code playgrounds =&gt; Runs in the browser</li>
+<li>164 code snippets</li>
+<li>25 illustrations</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
