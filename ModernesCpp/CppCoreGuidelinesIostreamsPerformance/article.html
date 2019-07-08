@@ -1,0 +1,404 @@
+<p>As easy as my title and the rules of the C++ core guidelines sound, getting more performance out of the Iostreams is no no-brainer.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidlinesIostreamPerformance/sport-659224_1280.jpg" alt="sport 659224 1280" width="500" height="294" /></p>
+<p>Okay, let step back. Although I did a lot of tests,&nbsp; my numbers in this post are more controversial than I thought. If you have any ideas, improvements, or clarifications, please let me know, and I will add them to this post.</p>
+<p>Here are the two performance-related rules from the guidelines to Iostreams.</p>
+<ul>
+<li><a href="https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rio-sync">SL.io.10: Unless you use <code class="highlighter-rouge no-highlight">printf</code>-family functions call <code class="highlighter-rouge no-highlight">ios_base::sync_with_stdio(false)</code></a></li>
+<li><a href="https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rio-endl">SL.io.50: Avoid <code class="highlighter-rouge no-highlight">endl</code></a></li>
+</ul>
+<p>I assume, you don't know <span style="font-family: courier new, courier;">std::ios_base::sync_with_stdio</span>?</p>
+<h2><a href="https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rio-sync">SL.io.10: Unless you use <code class="highlighter-rouge no-highlight">printf</code>-family functions call <code class="highlighter-rouge no-highlight">ios_base::sync_with_stdio(false)</code></a></h2>
+<p>Per default, operations on the C++ streams are synchronised with the C streams. This synchronisation happens after each in- or output operation.</p>
+<ul>
+<li>C++ Streams: <span class="t-lc"><a title="cpp/io/cin" href="https://en.cppreference.com/w/cpp/io/cin">std::cin</a></span>, <span class="t-lc"><a title="cpp/io/cout" href="https://en.cppreference.com/w/cpp/io/cout">std::cout</a></span>, <span class="t-lc"><a title="cpp/io/cerr" href="https://en.cppreference.com/w/cpp/io/cerr">std::cerr</a></span>, <span class="t-lc"><a title="cpp/io/clog" href="https://en.cppreference.com/w/cpp/io/clog">std::clog</a></span>, <span class="t-lc"><a title="cpp/io/cin" href="https://en.cppreference.com/w/cpp/io/cin">std::wcin</a></span>, <span class="t-lc"><a title="cpp/io/cout" href="https://en.cppreference.com/w/cpp/io/cout">std::wcout</a></span>, <span class="t-lc"><a title="cpp/io/cerr" href="https://en.cppreference.com/w/cpp/io/cerr">std::wcerr</a></span>, and <span class="t-lc"><a title="cpp/io/clog" href="https://en.cppreference.com/w/cpp/io/clog">std::wclog</a></span>.</li>
+<li>C Streams: <span class="t-lc"><a title="cpp/io/c" href="https://en.cppreference.com/w/cpp/io/c">stdin</a></span>, <span class="t-lc"><a title="cpp/io/c" href="https://en.cppreference.com/w/cpp/io/c">stdout</a></span>, and <span class="t-lc"><a title="cpp/io/c" href="https://en.cppreference.com/w/cpp/io/c">stderr</a></span>.</li>
+</ul>
+<p>This allows it to mix C++ and C in- or output operations because operations on the C++ streams go unbuffered to the C streams. What is also important to note from the concurrency perspective: synchronised C++ streams are thread-safe. All threads can write to the C++ streams without any need to synchronisation. The effect may be an interleaving of characters but not a data-race.</p>
+<p>When you set the<span style="font-family: courier new, courier;"> std::ios_base::sync_with_stdio(false)</span>, the synchronisation between C++ streams and C streams will not happen because the C++ stream may put their output into a buffer. Because of the buffering, the in- and output operation may become faster. You have to invoke<span style="font-family: courier new, courier;"> std::ios_base::sync_with_stdio(false)</span> before any in- or output operation. If not, the behaviour is implementation-defined.</p>
+<p>I assume you noticed that I wrote quite often maybe. That is for a reason.</p>
+<h3>Interleaving of C++ Streams and C Streams</h3>
+<p>First,&nbsp; I want to know what would happen when I execute the following program with various compilers.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// syncWithStdio.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;cstdio&gt;</span>
+ 
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+    
+    std<span style="color: #555555;">::</span>ios<span style="color: #555555;">::</span>sync_with_stdio(<span style="color: #336666;">false</span>);
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"1"</span>;
+    std<span style="color: #555555;">::</span>printf(<span style="color: #cc3300;">"2"</span>);
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"3"</span>;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>To get a better picture of my various compiler, I add a few information to them.</p>
+<h4>GCC 8.2</h4>
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidlinesIostreamPerformance/gcc.png" alt="gcc" width="600" height="180" /></p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidlinesIostreamPerformance/SyncWithStdioLinux.png" alt="SyncWithStdioLinux" width="400" height="152" /></p>
+<h4>Clang 8.0</h4>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidlinesIostreamPerformance/clang.PNG" alt="clang" width="400" height="167" /></p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidlinesIostreamPerformance/SyncWithStdioClang.png" alt="SyncWithStdioClang" width="400" height="156" /></p>
+<p>&nbsp;</p>
+<h4>cl.exe 19.20</h4>
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidlinesIostreamPerformance/clexe.PNG" alt="clexe" width="600" height="236" /></p>
+<p>&nbsp;</p>
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidlinesIostreamPerformance/SyncWithStdioWin.png" alt="SyncWithStdioWin" width="400" height="145" /></p>
+<p></p>
+<p>It seems that only the output on GCC is not synchronised. This observation does not hold for clang or cl.exe on Windows. A small performance test confirmed my first impression.</p>
+<h3>Performance with and without Synchronisation</h3>
+<p>Let me write a small program with and without synchronisation to the console. Doing in without synchronisation should be faster.</p>
+<ul>
+<li><strong>Synchronised</strong></li>
+</ul>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// syncWithStdioPerformanceSync.cpp</span>
+
+<span style="color: #009999;">#include &lt;chrono&gt;</span>
+<span style="color: #009999;">#include &lt;fstream&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;random&gt;</span>
+<span style="color: #009999;">#include &lt;sstream&gt;</span>
+<span style="color: #009999;">#include &lt;string&gt;</span>
+
+constexpr <span style="color: #007788; font-weight: bold;">int</span> iterations <span style="color: #555555;">=</span> <span style="color: #ff6600;">10</span>;
+
+std<span style="color: #555555;">::</span>ifstream openFile(<span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span>string<span style="color: #555555;">&amp;</span> myFile){                  
+
+  std<span style="color: #555555;">::</span>ifstream file(myFile, std<span style="color: #555555;">::</span>ios<span style="color: #555555;">::</span>in);
+  <span style="color: #006699; font-weight: bold;">if</span> ( <span style="color: #555555;">!</span>file ){
+    std<span style="color: #555555;">::</span>cerr <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Can't open file "</span><span style="color: #555555;">+</span> myFile <span style="color: #555555;">+</span> <span style="color: #cc3300;">"!"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    exit(EXIT_FAILURE);
+  }
+  <span style="color: #006699; font-weight: bold;">return</span> file;
+  
+}
+
+std<span style="color: #555555;">::</span>string readFile(std<span style="color: #555555;">::</span>ifstream file){                        
+    
+    std<span style="color: #555555;">::</span>stringstream buffer;
+    buffer <span style="color: #555555;">&lt;&lt;</span> file.rdbuf();
+    
+    <span style="color: #006699; font-weight: bold;">return</span> buffer.str();
+    
+}
+
+<span style="color: #006699; font-weight: bold;">auto</span> writeToConsole(<span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span>string<span style="color: #555555;">&amp;</span> fileContent){
+     
+    <span style="color: #006699; font-weight: bold;">auto</span> start <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>steady_clock<span style="color: #555555;">::</span>now();
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> c<span style="color: #555555;">:</span> fileContent) std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> c;
+    std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>duration<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">double</span><span style="color: #555555;">&gt;</span> dur <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>steady_clock<span style="color: #555555;">::</span>now() <span style="color: #555555;">-</span> start;
+    <span style="color: #006699; font-weight: bold;">return</span> dur;
+}  
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> Function<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">auto</span> measureTime(std<span style="color: #555555;">::</span><span style="color: #007788; font-weight: bold;">size_t</span> iter, Function<span style="color: #555555;">&amp;&amp;</span> f){
+    std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>duration<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">double</span><span style="color: #555555;">&gt;</span> dur{};
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #007788; font-weight: bold;">int</span> i <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>; i <span style="color: #555555;">&lt;</span> iter; <span style="color: #555555;">++</span>i){
+        dur <span style="color: #555555;">+=</span> f();
+    }
+    <span style="color: #006699; font-weight: bold;">return</span> dur <span style="color: #555555;">/</span> iter;
+}
+    
+<span style="color: #007788; font-weight: bold;">int</span> main(<span style="color: #007788; font-weight: bold;">int</span> argc, <span style="color: #007788; font-weight: bold;">char</span><span style="color: #555555;">*</span> argv[]){
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  
+    <span style="color: #0099ff; font-style: italic;">// get the filename</span>
+    std<span style="color: #555555;">::</span>string myFile;
+    <span style="color: #006699; font-weight: bold;">if</span> ( argc <span style="color: #555555;">==</span> <span style="color: #ff6600;">2</span> ){
+        myFile<span style="color: #555555;">=</span> argv[<span style="color: #ff6600;">1</span>];
+    }
+    <span style="color: #006699; font-weight: bold;">else</span>{
+        std<span style="color: #555555;">::</span>cerr <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Filename missing !"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+        exit(EXIT_FAILURE);
+    } 
+  
+    std<span style="color: #555555;">::</span>ifstream file <span style="color: #555555;">=</span> openFile(myFile);                                  <span style="color: #0099ff; font-style: italic;">// (1)</span>
+  
+    std<span style="color: #555555;">::</span>string fileContent <span style="color: #555555;">=</span> readFile(std<span style="color: #555555;">::</span>move(file));                    <span style="color: #0099ff; font-style: italic;">// (2)<br /> </span>
+                                                                            <span style="color: #0099ff; font-style: italic;">// (3)</span>   
+    <span style="color: #006699; font-weight: bold;">auto</span> averageWithSync <span style="color: #555555;">=</span> measureTime(iterations, [<span style="color: #555555;">&amp;</span>fileContent]{ <span style="color: #006699; font-weight: bold;">return</span> writeToConsole(fileContent); });
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+                                                                            <span style="color: #0099ff; font-style: italic;">// (4)</span> 
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"With Synchronisation: "</span> <span style="color: #555555;">&lt;&lt;</span> averageWithSync.count() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" seconds"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;  
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The program is quite easy to explain. I open a file (line 1), read its entire content (line 2) into a string, and write it <span style="font-family: courier new, courier;">iterations</span>-times to the console (line 3). This is done in the function <span style="font-family: courier new, courier;">writeToConsole(fileContent)</span>.</p>
+<p>iterations is in my concrete case 10. On end, I display the average time of the output operations (line 4).</p>
+<ul>
+<li><strong>Non-Synchronised</strong></li>
+</ul>
+<p>The non-synchronised version of the program is quite similar to the synchronised version. Only the main function changed a bit.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// syncWithStdioPerformanceWithoutSync.cpp</span>
+
+... 
+ 
+<span style="color: #007788; font-weight: bold;">int</span> main(<span style="color: #007788; font-weight: bold;">int</span> argc, <span style="color: #007788; font-weight: bold;">char</span><span style="color: #555555;">*</span> argv[]){
+    
+    std<span style="color: #555555;">::</span>ios<span style="color: #555555;">::</span>sync_with_stdio(<span style="color: #336666;">false</span>);    <span style="color: #0099ff; font-style: italic;">// (1)</span>
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  
+    <span style="color: #0099ff; font-style: italic;">// get the filename</span>
+    std<span style="color: #555555;">::</span>string myFile;
+    <span style="color: #006699; font-weight: bold;">if</span> ( argc <span style="color: #555555;">==</span> <span style="color: #ff6600;">2</span> ){
+        myFile<span style="color: #555555;">=</span> argv[<span style="color: #ff6600;">1</span>];
+    }
+    <span style="color: #006699; font-weight: bold;">else</span>{
+        std<span style="color: #555555;">::</span>cerr <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Filename missing !"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+        exit(EXIT_FAILURE);
+    } 
+  
+    std<span style="color: #555555;">::</span>ifstream file <span style="color: #555555;">=</span> openFile(myFile);
+  
+    std<span style="color: #555555;">::</span>string fileContent <span style="color: #555555;">=</span> readFile(std<span style="color: #555555;">::</span>move(file));
+    
+    <span style="color: #006699; font-weight: bold;">auto</span> averageWithSync <span style="color: #555555;">=</span> measureTime(iterations, [<span style="color: #555555;">&amp;</span>fileContent]{ <span style="color: #006699; font-weight: bold;">return</span> writeToConsole(fileContent); });
+    
+    <span style="color: #006699; font-weight: bold;">auto</span> averageWithoutSync <span style="color: #555555;">=</span> measureTime(iterations, [<span style="color: #555555;">&amp;</span>fileContent]{ <span style="color: #006699; font-weight: bold;">return</span> writeToConsole(fileContent); });
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Without Synchronisation: "</span> <span style="color: #555555;">&lt;&lt;</span> averageWithoutSync.count() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" seconds"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;  
+  
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>I just added the line (1) to the main program. Now, I hope for performance improvement.</p>
+<p>I did my performance test with a small program but also with a bigger text file (600.000 characters). The bigger file gave me no new insight; therefore, I skipped it.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #555555;">&gt;&gt;</span> syncWithStdioPerformanceSync syncWithStdioPerformanceSync.cpp
+<span style="color: #555555;">&gt;&gt;</span> syncWithStdioPerformanceWithoutSync syncWithStdioPerformanceSync.cpp
+</pre>
+</div>
+<h4>GCC</h4>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidlinesIostreamPerformance/syncWithStdioPerformanceCppGcc.png" alt="syncWithStdioPerformanceCppGcc" width="500" height="433" /></p>
+<h4>Clang</h4>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidlinesIostreamPerformance/syncWithStdioPerformanceCppClang.png" alt="syncWithStdioPerformanceCppClang" width="500" height="355" /></p>
+<h4>cl.exe</h4>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidlinesIostreamPerformance/syncWithStdioPerformanceCppWin.PNG" alt="syncWithStdioPerformanceCppWin" width="500" height="353" /></p>
+<p>&nbsp;</p>
+<p>The results puzzled me because of Windows.</p>
+<ul>
+<li>With GCC, I had a performance improvement of about 70% in the non-synchronised variant.</li>
+<li>Neither with Clang nor cl.exe showed any performance improvement. It seems that the non-synchronised in- and output operations are synchronised. My numbers proved my observation from the program <span style="font-family: courier new, courier;">syncWithStdio.cpp</span>.</li>
+<li>Only for the record. Did you notice, how slow the console on windows is?</li>
+</ul>
+<p>Of course, I'm guilty. I almost always break the next rule.</p>
+<h2><a href="https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rio-endl">SL.io.50: Avoid <code class="highlighter-rouge no-highlight">endl</code></a></h2>
+<p>Why should you avoid <span style="font-family: courier new, courier;">std::endl</span>? Or to say it differently: What is the difference between the manipulator <span style="font-family: courier new, courier;">std::endl</span> and '<span style="font-family: courier new, courier;">\n'</span>.</p>
+<ul>
+<li><span style="font-family: courier new, courier;">std::endl: </span>writes a newline and flushes the output buffer.</li>
+<li><span style="font-family: courier new, courier;">'\n': </span>writes a newline.<span style="font-family: courier new, courier;"></span></li>
+</ul>
+<p>Flushing the buffer is an expensive operation and should, therefore, be avoided. If necessary, the buffer is automatically flushed. Honestly, I was courious to see the numbers. To make it extremely worse, here is my program, which puts a linebreak (line&nbsp; 3) after each character.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// syncWithStdioPerformanceEndl.cpp</span>
+
+<span style="color: #009999;">#include &lt;chrono&gt;</span>
+<span style="color: #009999;">#include &lt;fstream&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;random&gt;</span>
+<span style="color: #009999;">#include &lt;sstream&gt;</span>
+<span style="color: #009999;">#include &lt;string&gt;</span>
+
+constexpr <span style="color: #007788; font-weight: bold;">int</span> iterations <span style="color: #555555;">=</span> <span style="color: #ff6600;">500</span>;                                                    <span style="color: #0099ff; font-style: italic;">// (1)</span>
+
+std<span style="color: #555555;">::</span>ifstream openFile(<span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span>string<span style="color: #555555;">&amp;</span> myFile){                  
+
+  std<span style="color: #555555;">::</span>ifstream file(myFile, std<span style="color: #555555;">::</span>ios<span style="color: #555555;">::</span>in);
+  <span style="color: #006699; font-weight: bold;">if</span> ( <span style="color: #555555;">!</span>file ){
+    std<span style="color: #555555;">::</span>cerr <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Can't open file "</span><span style="color: #555555;">+</span> myFile <span style="color: #555555;">+</span> <span style="color: #cc3300;">"!"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    exit(EXIT_FAILURE);
+  }
+  <span style="color: #006699; font-weight: bold;">return</span> file;
+  
+}
+
+std<span style="color: #555555;">::</span>string readFile(std<span style="color: #555555;">::</span>ifstream file){                        
+    
+    std<span style="color: #555555;">::</span>stringstream buffer;
+    buffer <span style="color: #555555;">&lt;&lt;</span> file.rdbuf();
+    
+    <span style="color: #006699; font-weight: bold;">return</span> buffer.str();
+    
+}
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> End<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">auto</span> writeToConsole(<span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span>string<span style="color: #555555;">&amp;</span> fileContent, End end){
+     
+    <span style="color: #006699; font-weight: bold;">auto</span> start <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>steady_clock<span style="color: #555555;">::</span>now();
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> c<span style="color: #555555;">:</span> fileContent) std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> c <span style="color: #555555;">&lt;&lt;</span> end;                                 <span style="color: #0099ff; font-style: italic;">// (3)</span>
+    std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>duration<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">double</span><span style="color: #555555;">&gt;</span> dur <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>steady_clock<span style="color: #555555;">::</span>now() <span style="color: #555555;">-</span> start;
+    <span style="color: #006699; font-weight: bold;">return</span> dur;
+}  
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> Function<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">auto</span> measureTime(std<span style="color: #555555;">::</span><span style="color: #007788; font-weight: bold;">size_t</span> iter, Function<span style="color: #555555;">&amp;&amp;</span> f){
+    std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>duration<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">double</span><span style="color: #555555;">&gt;</span> dur{};
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #007788; font-weight: bold;">int</span> i <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>; i <span style="color: #555555;">&lt;</span> iter; <span style="color: #555555;">++</span>i){
+        dur <span style="color: #555555;">+=</span> f();
+    }
+    <span style="color: #006699; font-weight: bold;">return</span> dur <span style="color: #555555;">/</span> iter;
+}
+    
+<span style="color: #007788; font-weight: bold;">int</span> main(<span style="color: #007788; font-weight: bold;">int</span> argc, <span style="color: #007788; font-weight: bold;">char</span><span style="color: #555555;">*</span> argv[]){
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  
+    <span style="color: #0099ff; font-style: italic;">// get the filename</span>
+    std<span style="color: #555555;">::</span>string myFile;
+    <span style="color: #006699; font-weight: bold;">if</span> ( argc <span style="color: #555555;">==</span> <span style="color: #ff6600;">2</span> ){
+        myFile<span style="color: #555555;">=</span> argv[<span style="color: #ff6600;">1</span>];
+    }
+    <span style="color: #006699; font-weight: bold;">else</span>{
+        std<span style="color: #555555;">::</span>cerr <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Filename missing !"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+        exit(EXIT_FAILURE);
+    } 
+  
+    std<span style="color: #555555;">::</span>ifstream file <span style="color: #555555;">=</span> openFile(myFile);
+  
+    std<span style="color: #555555;">::</span>string fileContent <span style="color: #555555;">=</span> readFile(std<span style="color: #555555;">::</span>move(file));
+    
+    <span style="color: #006699; font-weight: bold;">auto</span> averageWithFlush <span style="color: #555555;">=</span> measureTime(iterations, 
+                                        [<span style="color: #555555;">&amp;</span>fileContent]{ <span style="color: #006699; font-weight: bold;">return</span> writeToConsole(fileContent, std<span style="color: #555555;">::</span>endl<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">char</span>, std<span style="color: #555555;">::</span>char_traits<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">char</span><span style="color: #555555;">&gt;&gt;</span>); }); <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    <span style="color: #006699; font-weight: bold;">auto</span> averageWithoutFlush <span style="color: #555555;">=</span> measureTime(iterations, [<span style="color: #555555;">&amp;</span>fileContent]{ <span style="color: #006699; font-weight: bold;">return</span> writeToConsole(fileContent, <span style="color: #cc3300;">'\n'</span>); });                     <span style="color: #0099ff; font-style: italic;">// (3)</span>
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"With flush(std::endl) "</span> <span style="color: #555555;">&lt;&lt;</span> averageWithFlush.count() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" seconds"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;  
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Without flush(</span><span style="color: #cc3300; font-weight: bold;">\\</span><span style="color: #cc3300;">n): "</span> <span style="color: #555555;">&lt;&lt;</span> averageWithoutFlush.count() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" seconds"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;  
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"With Flush/Without Flush: "</span> <span style="color: #555555;">&lt;&lt;</span> averageWithFlush<span style="color: #555555;">/</span>averageWithoutFlush <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>In the first case, I did it with <span style="font-family: courier new, courier;">std::e</span>ndl (line 2), in the second case, I did it with <span style="font-family: courier new, courier;">'\n</span>' (line 3). The program is quite similar to the previous one. The big difference is that I made 500 iterations (line 3). Why? I was asthonised about the variations of the numbers. With a few iterations, I could not notice any difference. Sometimes, <span style="font-family: courier new, courier;">std::endl</span> was two times faster than <span style="font-family: courier new, courier;">'\n';</span> sometimes, <span style="font-family: courier new, courier;">std::endl</span> was four times slower. I got similar behaviour with cl.exe or with GCC.&nbsp; I also did it with other GCC or cl.exe compiler. Honestly, this was not what I expected. When I did it with 500 iterations, I got the expected winner. '<span style="font-family: courier new, courier;">\n</span>' seems to be 10% - 20% faster than<span style="font-family: courier new, courier;"> std::endl.</span> <strong>Once more, only 10% - 20% faster.</strong></p>
+<h3>GCC</h3>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidlinesIostreamPerformance/syncWithStdioPerformanceCppLinuxEndl.png" alt="syncWithStdioPerformanceCppLinuxEndl" width="500" height="226" /></p>
+<h3>cl.exe</h3>
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidlinesIostreamPerformance/syncWithStdioPerformanceCppWinEndl.PNG" alt="syncWithStdioPerformanceCppWinEndl" width="500" height="307" /></p>
+<p>&nbsp;</p>
+<h2>My Small Conclusion</h2>
+<p>I want to draw a small conclusion out of my performance test.</p>
+<ul>
+<li><span style="font-family: courier new, courier;">std::ios_base::sync_with_stdio(false)</span> can make a big difference on your platform, but you loose your thread-safety guarantee.</li>
+<li><span style="font-family: courier new, courier;">std::endl i</span>s not as bad as its reputation. I will not change my habit.</li>
+</ul>
+<h2>What's next?</h2>
+<p>Only one rule exists to the sections <span style="font-family: courier new, courier;">regex,</span> <span style="font-family: courier new, courier;">chrono,</span> and the C standard library. You see, I have to improvise in my next post.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Paul Baxter,&nbsp; Meeting C++, Matt Braun, Avi Lachmish, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Marko, Ramesh Jangama,</strong><span class="sc-kpOJdX fDWXFa" title="Emyr Williams"><strong> G Prvulovic, Reiner Eiteljörge, Benjamin Huth, Reinhold Dröge, Timo, Abernitzke,</strong> </span><strong><span title="Emyr Williams">Richard Ohnemus , Frank Grimm</span></strong><span title="Emyr Williams"><strong>, Sakib, and Broeserl.<span class="sc-htpNat dEZjR" style="color: #241e12; font-family: aktiv-grotesk, sans-serif; margin: 0px; position: relative; font-weight: 400; font-size: 1rem; line-height: 1.5;"></span></strong></span><span title="Emyr Williams"></span></p>
+<p><strong>Thanks in particular to:&nbsp; <a href="https://cranepay.io/"><img style="vertical-align: middle;" src="images/patreon/TakeUpCode-450-60.png" alt="TakeUpCode 450 60" width="150" height="20" /> &nbsp; &nbsp;&nbsp;<img src="images/patreon/crp4.png" alt="crp4" width="150" height="96" /> </a></strong></p>
+<p>&nbsp;</p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at Leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 600 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
+<p></p>
+<table style="width: 800px;">
+<tbody>
+<tr>
+<td colspan="2">
+<h2>Get your interactive course</h2>
+&nbsp;</td>
+</tr>
+<tr>
+<td>
+<h4 class="_3fBEwsM053hx2mPd0uV0nT" style="text-align: center;">Modern C++ Concurrency in Practice</h4>
+</td>
+<td>
+<h4>C++ Standard Library including C++14 &amp; C++17</h4>
+</td>
+</tr>
+<tr>
+<td><a href="https://goo.gl/2qWUkK"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseConcurrency/educative.png" alt="educative" width="300" height="152" /></a></td>
+<td><a href="https://www.educative.io/collection/10370001/5712008708096000?authorName=Rainer%20Grimm"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseLibrary/CLibrary.png" alt="CLibrary" width="300" height="150" /></a></td>
+</tr>
+<tr>
+<td>
+<p>Based on my book "Concurrency with Modern C++" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>140 lessons</li>
+<li>110 code playgrounds =&gt; Runs in the browser</li>
+<li>78 code snippets</li>
+<li>55 illustrations</li>
+</ul>
+</td>
+<td>
+<p>Based on my book "The C++ Standard Library" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>149 lessons</li>
+<li>111 code playgrounds =&gt; Runs in the browser</li>
+<li>164 code snippets</li>
+<li>25 illustrations</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
