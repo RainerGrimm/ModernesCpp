@@ -1,0 +1,237 @@
+<p>My original plan was it to write about the rules of the C++ Core Guidelines to the regex and chrono library, but beside the subsection title, there is no content available. I already wrote a few posts about&nbsp;<a href="https://www.modernescpp.com/index.php/tag/time">time </a>functionality. So I'm done. Today, I fill the gap and write about the regex library.</p>
+<hr id="system-readmore" />
+<div id="simple-translate">&nbsp;</div>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesRegex/concept-18290_1280.jpg" alt="concept 18290 1280" width="500" height="333" /></p>
+<p>&nbsp;</p>
+<p>Okay, here are my rules for regular expressions.</p>
+<h2>Only use a Regular Expression if you have to</h2>
+<p>Regular expressions are powerful but also sometimes expensive and complicated machinery to work with text. When the interface of a <span style="font-family: courier new, courier;">std::string</span> or the algorithms of the Standard Template Library can do the job, use them. &nbsp;</p>
+<p>Okay, but when should you use regular expressions? Here are the typical use-cases.</p>
+<h3>Use-Case for Regular Expressions</h3>
+<ul>
+<li>Check if a text matches a text pattern:<span style="font-family: courier new, courier;"> std::regex_match</span></li>
+<li>Search for a text pattern in a text: <span style="font-family: courier new, courier;">std::regex_search</span></li>
+<li>Replace a text pattern with a text: <span style="font-family: courier new, courier;">std::regex_replace</span></li>
+<li>Iterate through all text patterns in a text: <span style="font-family: courier new, courier;">std::regex_iterator</span> and <span style="font-family: courier new, courier;">std::regex_token_iterator</span></li>
+</ul>
+<p>I hope you noticed it. The operations work on text patterns and not on text.</p>
+<p>First, you should use raw strings to write your regular expression.</p>
+<h2>Use Raw Strings for Regular Expressions</h2>
+<p>First of all, for simplicity purposes, I will break the previous rule.</p>
+<p>The regular expression for the text C++ is quite ugly: <span style="font-family: courier new, courier;">C\\+\\+</span>. You have to use two backslashes for each + sign. First, the + sign is a special character in a regular expression. Second, the backslash is a special character in a string. Therefore one backslash escapes the + sign, the other backslash escapes the backslash.<br />By using a raw string literal the second backslash is not necessary any more, because the backslash is not be interpreted in the string.</p>
+<p>The following short example may not convince you.<br /><br /></p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">std<span style="color: #555555;">::</span>string regExpr(<span style="color: #cc3300;">"C</span><span style="color: #cc3300; font-weight: bold;">\\</span><span style="color: #cc3300;">+</span><span style="color: #cc3300; font-weight: bold;">\\</span><span style="color: #cc3300;">+"</span>);
+std<span style="color: #555555;">::</span>string regExprRaw(R<span style="color: #cc3300;">"(C\+\+)"</span>);
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Both strings stand for regular expression which matches the text<span style="font-family: courier new, courier;"> C++</span>. In particular, the raw string R"(C\+\+) is quite ugly to read. <span style="font-family: courier new, courier; color: #ff0000;"><strong>R"(</strong></span>Raw String<span style="font-family: courier new, courier; color: #ff0000;"><strong>)"</strong> </span>delimits the raw string. By the way, regular expressions and path names on windows <span style="font-family: courier new, courier;">"C:\temp\newFile.txt"</span> are typical use-case for raw strings.</p>
+<p>Imagine, you want to search for a floating point number in a text, which you identify by the following sequence of signs: Tabulator FloatingPointNumber Tabulator \\DELIMITER. Here is a concrete example for this pattern: <span style="font-family: courier new, courier;">"\t5.5\t\\DELIMITER</span>".</p>
+<p>The following program uses a regular expression encode in a string and in a raw string to match this pattern.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// regexSearchFloatingPoint.cpp</span>
+
+<span style="color: #009999;">#include &lt;regex&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;string&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+    std<span style="color: #555555;">::</span>string text <span style="color: #555555;">=</span> <span style="color: #cc3300;">"A text with floating pointer number </span><span style="color: #cc3300; font-weight: bold;">\t</span><span style="color: #cc3300;">5.5</span><span style="color: #cc3300; font-weight: bold;">\t\\</span><span style="color: #cc3300;">DELIMITER and more text."</span>;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> text <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+    std<span style="color: #555555;">::</span>regex rgx(<span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\\</span><span style="color: #cc3300;">t[0-9]+</span><span style="color: #cc3300; font-weight: bold;">\\</span><span style="color: #cc3300;">.[0-9]+</span><span style="color: #cc3300; font-weight: bold;">\\</span><span style="color: #cc3300;">t</span><span style="color: #cc3300; font-weight: bold;">\\\\</span><span style="color: #cc3300;">DELIMITER"</span>);          <span style="color: #0099ff; font-style: italic;">// (1)</span> 
+    std<span style="color: #555555;">::</span>regex rgxRaw(R<span style="color: #cc3300;">"(</span><span style="color: #cc3300; font-weight: bold;">\t</span><span style="color: #cc3300;">[0-9]+\.[0-9]+</span><span style="color: #cc3300; font-weight: bold;">\t\\</span><span style="color: #cc3300;">DELIMITER)"</span>);         <span style="color: #0099ff; font-style: italic;">// (2)</span> 
+
+    <span style="color: #006699; font-weight: bold;">if</span> (std<span style="color: #555555;">::</span>regex_search(text, rgx)) std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"found with rgx"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    <span style="color: #006699; font-weight: bold;">if</span> (std<span style="color: #555555;">::</span>regex_search(text, rgxRaw)) std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"found with rgxRaw"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}
+</pre>
+</div>
+<p></p>
+<p>The regular expression<strong><span style="color: #000000; font-family: 'courier new', courier;"> rgx("\\t[0-9]+\\.[0-9]+\\t\\\\DELIMITER")</span> </strong>is pretty ugly. To find n "<strong>\</strong>"-symbols (line 1), you have to write 2 * n "\"-symbols. In constrast, using a raw string to define a regular expression, makes it possible, to express the pattern your are looking for directly in the regular expression: <strong><span style="color: #000000; font-family: 'courier new', courier;">rgxRaw(R"(\t[0-9]+\.[0-9]+\t\\DELIMITER)") </span></strong><span style="color: #000000;">(line 2). The subexpression <span style="font-family: courier new, courier;"><strong>[0-9]+\.[0-9]+</strong>&nbsp;</span>of the regular expression stands for a floating point number: at least one number <strong><span style="font-family: 'courier new', courier;">[0-9]+</span> </strong>followed by a dot<strong><span style="font-family: 'courier new', courier;"> \.</span></strong> followed by at least one number<strong><span style="font-family: 'courier new', courier;"> [0-9]+</span></strong>.<span style="font-family: courier new, courier;">&nbsp; </span></span><span style="color: #000000; font-family: courier new, courier;"> </span></p>
+<p>Just for completeness, the output of the program.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesRegex/regexSearchFloatingPoint.png" alt="regexSearchFloatingPoint" width="550" height="184" /></p>
+<p>Honestly, this example was rather simple. Most of the times, you want to analyse your match result.</p>
+<h2>For further analyse use your <span style="font-family: courier new, courier;">match_result</span></h2>
+<p>Using a regular expression consists typically of three steps. This holds for <span style="font-family: courier new, courier;">std::regex_search</span>, and <span style="font-family: courier new, courier;">std::regex_match</span>.</p>
+<ol>
+<li>Define the regular expression.</li>
+<li>Store the result of the search.</li>
+<li>Analyse the result.</li>
+</ol>
+<p>Let's see what that means. This time I want to find the first e-mail address in a text. The following regular expression (RFC 5322 Official Standard) for an e-mail address finds not all e-mail addresses because they are very irregular.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"> 	
+(<span style="color: #555555;">?:</span>[a<span style="color: #555555;">-</span>z0<span style="color: #555555;">-</span><span style="color: #ff6600;">9</span><span style="color: #555555;">!</span><span style="color: #aa0000; background-color: #ffaaaa;">#$</span><span style="color: #555555;">%&amp;</span><span style="color: #aa0000; background-color: #ffaaaa;">'</span><span style="color: #555555;">*+/=?^</span>_<span style="color: #aa0000; background-color: #ffaaaa;">`</span>{<span style="color: #555555;">|</span>}<span style="color: #555555;">~-</span>]<span style="color: #555555;">+</span>(<span style="color: #555555;">?:</span><span style="color: #aa0000; background-color: #ffaaaa;">\</span>.[az0<span style="color: #555555;">-</span><span style="color: #ff6600;">9</span><span style="color: #555555;">!</span><span style="color: #aa0000; background-color: #ffaaaa;">#$</span><span style="color: #555555;">%&amp;</span><span style="color: #aa0000; background-color: #ffaaaa;">'</span><span style="color: #555555;">*+/=?^</span>_<span style="color: #aa0000; background-color: #ffaaaa;">`</span>{<span style="color: #555555;">|</span>}<span style="color: #555555;">~-</span>]<span style="color: #555555;">+</span>)<span style="color: #555555;">*|</span><span style="color: #cc3300;">"(?:[</span><span style="color: #cc3300; font-weight: bold;">\x01</span><span style="color: #cc3300;">-</span><span style="color: #cc3300; font-weight: bold;">\x08\x0b\x0c\x0e</span><span style="color: #cc3300;">-</span><span style="color: #cc3300; font-weight: bold;">\x1f</span><span style="color: #cc3300;">\x2</span><span style="color: #cc3300; font-weight: bold;">\x23</span><span style="color: #cc3300;">-</span><span style="color: #cc3300; font-weight: bold;">\x5b\x5d</span><span style="color: #cc3300;">-</span><span style="color: #cc3300; font-weight: bold;">\x7f</span><span style="color: #cc3300;">]|</span><span style="color: #cc3300; font-weight: bold;">\\</span><span style="color: #cc3300;">[</span><span style="color: #cc3300; font-weight: bold;">\x01</span><span style="color: #cc3300;">-</span><span style="color: #cc3300; font-weight: bold;">\x09\x0b\x0c\x0e</span><span style="color: #cc3300;">-</span><span style="color: #cc3300; font-weight: bold;">\x7f</span><span style="color: #cc3300;">])*"</span>)
+<span style="color: #aa0000; background-color: #ffaaaa;">@</span>(<span style="color: #555555;">?:</span>(<span style="color: #555555;">?:</span>[a<span style="color: #555555;">-</span>z0<span style="color: #555555;">-</span><span style="color: #ff6600;">9</span>](<span style="color: #555555;">?:</span>[a<span style="color: #555555;">-</span>z0<span style="color: #555555;">-</span><span style="color: #ff6600;">9</span><span style="color: #555555;">-</span>]<span style="color: #555555;">*</span>[a<span style="color: #555555;">-</span>z0<span style="color: #555555;">-</span><span style="color: #ff6600;">9</span>])<span style="color: #555555;">?</span><span style="color: #aa0000; background-color: #ffaaaa;">\</span>.)<span style="color: #555555;">+</span>[a<span style="color: #555555;">-</span>z0<span style="color: #555555;">-</span><span style="color: #ff6600;">9</span>](<span style="color: #555555;">?:</span>[a<span style="color: #555555;">-</span>z0<span style="color: #555555;">-</span><span style="color: #ff6600;">9</span><span style="color: #555555;">-</span>]<span style="color: #555555;">*</span>[a<span style="color: #555555;">-</span>z0<span style="color: #555555;">-</span><span style="color: #ff6600;">9</span>])<span style="color: #555555;">?|</span><span style="color: #aa0000; background-color: #ffaaaa;">\</span>[(<span style="color: #555555;">?:</span>(<span style="color: #555555;">?:</span><span style="color: #ff6600;">25</span>[<span style="color: #ff6600;">0</span><span style="color: #555555;">-</span><span style="color: #ff6600;">5</span>]<span style="color: #555555;">|</span><span style="color: #ff6600;">2</span>[<span style="color: #ff6600;">0</span><span style="color: #555555;">-</span><span style="color: #ff6600;">4</span>][<span style="color: #ff6600;">0</span><span style="color: #555555;">-</span><span style="color: #ff6600;">9</span>]<span style="color: #555555;">|</span>[<span style="color: #ff6600;">01</span>]<span style="color: #555555;">?</span>[<span style="color: #ff6600;">0</span><span style="color: #555555;">-</span><span style="color: #ff6600;">9</span>][<span style="color: #ff6600;">0</span><span style="color: #555555;">-</span><span style="color: #ff6600;">9</span>]<span style="color: #555555;">?</span>)<span style="color: #aa0000; background-color: #ffaaaa;">\</span>.){<span style="color: #ff6600;">3</span>}(<span style="color: #555555;">?:</span><span style="color: #ff6600;">25</span>[<span style="color: #ff6600;">0</span><span style="color: #555555;">-</span><span style="color: #ff6600;">5</span>]<span style="color: #555555;">|</span><span style="color: #ff6600;">2</span>[<span style="color: #ff6600;">0</span><span style="color: #555555;">-</span><span style="color: #ff6600;">4</span>][<span style="color: #ff6600;">0</span><span style="color: #555555;">-</span><span style="color: #ff6600;">9</span>]<span style="color: #555555;">|</span>[<span style="color: #ff6600;">01</span>]<span style="color: #555555;">?</span>[<span style="color: #ff6600;">0</span><span style="color: #555555;">-</span><span style="color: #ff6600;">9</span>][<span style="color: #ff6600;">0</span><span style="color: #555555;">-</span><span style="color: #ff6600;">9</span>]<span style="color: #555555;">?|</span>[a<span style="color: #555555;">-</span>z0<span style="color: #555555;">-</span><span style="color: #ff6600;">9</span><span style="color: #555555;">-</span>]<span style="color: #555555;">*</span>[a<span style="color: #555555;">-</span>z0<span style="color: #555555;">-</span><span style="color: #ff6600;">9</span>]<span style="color: #555555;">:</span>(<span style="color: #555555;">?:</span>[<span style="color: #aa0000; background-color: #ffaaaa;">\</span>x01<span style="color: #555555;">-</span><span style="color: #aa0000; background-color: #ffaaaa;">\</span>x08<span style="color: #aa0000; background-color: #ffaaaa;">\</span>x0b<span style="color: #aa0000; background-color: #ffaaaa;">\</span>x0c<span style="color: #aa0000; background-color: #ffaaaa;">\</span>x0e<span style="color: #555555;">-</span><span style="color: #aa0000; background-color: #ffaaaa;">\</span>x1f<span style="color: #aa0000; background-color: #ffaaaa;">\</span>x21<span style="color: #555555;">-</span><span style="color: #aa0000; background-color: #ffaaaa;">\</span>x5a<span style="color: #aa0000; background-color: #ffaaaa;">\</span>x53<span style="color: #555555;">-</span><span style="color: #aa0000; background-color: #ffaaaa;">\</span>x7f]<span style="color: #555555;">|</span><span style="color: #aa0000; background-color: #ffaaaa;">\\</span>[<span style="color: #aa0000; background-color: #ffaaaa;">\</span>x01<span style="color: #555555;">-</span><span style="color: #aa0000; background-color: #ffaaaa;">\</span>x09<span style="color: #aa0000; background-color: #ffaaaa;">\</span>x0b<span style="color: #aa0000; background-color: #ffaaaa;">\</span>x0c<span style="color: #aa0000; background-color: #ffaaaa;">\</span>x0e<span style="color: #555555;">-</span><span style="color: #aa0000; background-color: #ffaaaa;">\</span>x7f])<span style="color: #555555;">+</span>)<span style="color: #aa0000; background-color: #ffaaaa;">\</span>])
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>For readability, I made a line break in the regular expression. The first line matches the local part and the second line the domain part of the e-mail address. My program uses a simpler regular expression for matching an e-mail address. It's not perfect, but it will do its job. Additionally, I want to match the local part and the domain part of my e-mail address.</p>
+<p>Here we are:</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// regexSearchEmail.cpp</span>
+
+<span style="color: #009999;">#include &lt;regex&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;string&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+  std<span style="color: #555555;">::</span>string emailText <span style="color: #555555;">=</span> <span style="color: #cc3300;">"A text with an email address: rainer@grimm-jaud.de."</span>;
+
+  <span style="color: #0099ff; font-style: italic;">// (1) </span>
+  std<span style="color: #555555;">::</span>string regExprStr(R<span style="color: #cc3300;">"(([\w.%+-]+)@([\w.-]+\.[a-zA-Z]{2,4}))"</span>);
+  std<span style="color: #555555;">::</span>regex rgx(regExprStr);
+
+  <span style="color: #0099ff; font-style: italic;">// (2)</span>
+  std<span style="color: #555555;">::</span>smatch smatch;
+
+  <span style="color: #006699; font-weight: bold;">if</span> (std<span style="color: #555555;">::</span>regex_search(emailText, smatch, rgx)){
+      
+    <span style="color: #0099ff; font-style: italic;">// (3)  </span>
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Text: "</span> <span style="color: #555555;">&lt;&lt;</span> emailText <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Before the email address: "</span> <span style="color: #555555;">&lt;&lt;</span> smatch.prefix() <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"After the email address: "</span> <span style="color: #555555;">&lt;&lt;</span> smatch.suffix() <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Length of email adress: "</span> <span style="color: #555555;">&lt;&lt;</span> smatch.length() <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Email address: "</span> <span style="color: #555555;">&lt;&lt;</span> smatch[<span style="color: #ff6600;">0</span>] <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;          <span style="color: #0099ff; font-style: italic;">// (6)</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Local part: "</span> <span style="color: #555555;">&lt;&lt;</span> smatch[<span style="color: #ff6600;">1</span>] <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;             <span style="color: #0099ff; font-style: italic;">// (4)</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Domain name: "</span> <span style="color: #555555;">&lt;&lt;</span> smatch[<span style="color: #ff6600;">2</span>] <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;            <span style="color: #0099ff; font-style: italic;">// (5)</span>
+
+  }
+
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Lines 1, 2, and 3 stand for the beginning of the 3 typical steps of the usage of a regular expression. The regular expression in line 2 needs a few additional words.</p>
+<p>Here it is:<span style="color: #000000; font-family: courier new, courier;">([\w.%+-]+)@([\w.-]+\.[a-zA-Z]{2,4})</span></p>
+<ul>
+<li><span style="color: #000000; font-family: courier new, courier;"><strong>[\w.%+-]+</strong>: </span><span style="color: #000000;">At least one of the following characters:</span><span style="color: #000000;"> </span><strong><span style="color: #000000;"></span><span style="color: #000000; font-family: 'courier new', courier;">"\w",</span><span style="color: #000000;"></span><span style="color: #000000; font-family: 'courier new', courier;"> ".", </span><span style="color: #000000;"></span><span style="color: #000000; font-family: 'courier new', courier;">"%", </span><span style="color: #000000;"></span><span style="color: #000000; font-family: 'courier new', courier;">"+", </span></strong><span style="color: #000000;">or&nbsp;</span><strong><span style="color: #000000; font-family: 'courier new', courier;">"-". "\w" </span></strong><span style="color: #000000;">stands for a word character.</span><span style="color: #000000; font-family: courier new, courier;"><br /></span></li>
+<li><span style="color: #000000; font-family: courier new, courier;"><strong>[\w.-]+\.[a-zA-Z]{2,4}</strong>: </span><span style="color: #000000;">At least one of a</span><span style="color: #000000; font-family: courier new, courier;"><strong> "\w", ".", "-"</strong>,</span><span style="color: #000000;"> followed by a dot</span><span style="color: #000000; font-family: courier new, courier;"><strong> "."</strong>, </span><span style="color: #000000;">followed by <strong>2 - 4</strong> characters from the range <strong>a-z</strong> or the range<strong> A-Z.</strong></span><span style="color: #000000; font-family: courier new, courier;"><br /></span></li>
+<li><span style="color: #000000; font-family: courier new, courier;"><strong>(...)@(...)</strong>: </span><span style="color: #000000;">The round braces stand for a capture group. They allow you to identify a submatch in a match. The first capture (line 4) group is the local part of an address. The second capture group (line 5) is the domain part of the e-mail address. You can address the entire match with the 0-th capture group (line 6).</span><span style="color: #000000; font-family: courier new, courier;"><br /></span></li>
+</ul>
+<p>&nbsp;</p>
+<p>The output of the program shows the detailed analyse.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesRegex/regexSearchEmail.png" alt="regexSearchEmail" width="500" height="281" /></p>
+<h2>What's next?</h2>
+<p>I'm not done. There is more to write about regular expressions in my next post. I write about various types of text and iterating through all matches.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Paul Baxter,&nbsp; Meeting C++, Matt Braun, Avi Lachmish, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Marko, Ramesh Jangama,</strong><span class="sc-kpOJdX fDWXFa" title="Emyr Williams"><strong> G Prvulovic, Reiner Eiteljörge, Benjamin Huth, Reinhold Dröge, Timo, Abernitzke,</strong> </span><strong><span title="Emyr Williams">Richard Ohnemus , Frank Grimm</span></strong><span title="Emyr Williams"><strong>, Sakib, and Broeserl.<span class="sc-htpNat dEZjR" style="color: #241e12; font-family: aktiv-grotesk, sans-serif; margin: 0px; position: relative; font-weight: 400; font-size: 1rem; line-height: 1.5;"></span></strong></span><span title="Emyr Williams"></span></p>
+<p>&nbsp;</p>
+<table style="width: 490px; height: 103px;">
+<tbody>
+<tr>
+<td><strong>Thanks in particular to:</strong></td>
+<td>
+<div id="simple-translate">&nbsp;<a href="https://www.takeupcode.com/"><img style="vertical-align: middle;" src="images/patreon/TakeUpCode-450-60.png" alt="TakeUpCode 450 60" width="150" height="20" /></a></div>
+</td>
+<td><a href="https://cranepay.io/"><img src="images/patreon/crp4.png" alt="crp4" width="150" height="96" /></a></td>
+</tr>
+</tbody>
+</table>
+<p><strong>&nbsp;</strong></p>
+<p><strong>&nbsp;&nbsp;<a href="https://www.takeupcode.com/">&nbsp; </a></strong></p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at Leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 600 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
+<p></p>
+<table style="width: 800px;">
+<tbody>
+<tr>
+<td colspan="2">
+<h2>Get your interactive course</h2>
+&nbsp;</td>
+</tr>
+<tr>
+<td>
+<h4 class="_3fBEwsM053hx2mPd0uV0nT" style="text-align: center;">Modern C++ Concurrency in Practice</h4>
+</td>
+<td>
+<h4>C++ Standard Library including C++14 &amp; C++17</h4>
+</td>
+</tr>
+<tr>
+<td><a href="https://goo.gl/2qWUkK"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseConcurrency/educative.png" alt="educative" width="300" height="152" /></a></td>
+<td><a href="https://www.educative.io/collection/10370001/5712008708096000?authorName=Rainer%20Grimm"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseLibrary/CLibrary.png" alt="CLibrary" width="300" height="150" /></a></td>
+</tr>
+<tr>
+<td>
+<p>Based on my book "Concurrency with Modern C++" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>140 lessons</li>
+<li>110 code playgrounds =&gt; Runs in the browser</li>
+<li>78 code snippets</li>
+<li>55 illustrations</li>
+</ul>
+</td>
+<td>
+<p>Based on my book "The C++ Standard Library" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>149 lessons</li>
+<li>111 code playgrounds =&gt; Runs in the browser</li>
+<li>164 code snippets</li>
+<li>25 illustrations</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
