@@ -1,0 +1,238 @@
+<p>Of course, you already know many non-rules and myths to C++. Non-rules and myths which we have to argument against when we use modern C++. The supporting section of the C++ core guidelines addresses the most resistant once but also provides alternatives.<span style="font-family: Arial;"></span></p>
+<hr id="system-readmore" />
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesNonRulesAndMyths/dragons-head-310697_1280.png" alt="dragons head 310697 1280" width="500" height="458" /></p>
+<p>Here are the rules for today.</p>
+<ul>
+<li><a href="https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rnr-top">NR.1: Don’t: All declarations should be at the top of a function</a></li>
+<li><a href="https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rnr-single-return">NR.2: Don’t: Have only a single <code class="highlighter-rouge no-highlight">return</code>-statement in a function</a></li>
+<li><a href="https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rnr-no-exceptions">NR.3: Don’t: Don’t use exceptions</a></li>
+<li><a href="https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rnr-lots-of-files">NR.4: Don’t: Place each class declaration in its own source file</a></li>
+</ul>
+<p>Many programmers apply the first rules.</p>
+<h2><a href="https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rnr-top">NR.1: Don’t: All declarations should be at the top of a function</a></h2>
+<p>This rule is a relict of old programming languages that don't allow initialisation of variables and constants after a statement. The result of a significant distance of the variable declaration and their usage is often, that you forget to initialise the variable. Exactly this happens in the example of the C++ core guidelines:</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">use</span>(<span style="color: #007788; font-weight: bold;">int</span> x)
+{  
+    <span style="color: #007788; font-weight: bold;">int</span> i;
+    <span style="color: #007788; font-weight: bold;">char</span> c;
+    <span style="color: #007788; font-weight: bold;">double</span> d;
+    <span style="color: #0099ff; font-style: italic;">// ... some stuff ...</span>
+    <span style="color: #006699; font-weight: bold;">if</span> (x <span style="color: #555555;">&lt;</span> i) {
+        <span style="color: #0099ff; font-style: italic;">// ...</span>
+       i <span style="color: #555555;">=</span> f(x, d);
+    }
+    <span style="color: #006699; font-weight: bold;">if</span> (i <span style="color: #555555;">&lt;</span> x) {
+        <span style="color: #0099ff; font-style: italic;">// ...</span>
+        i <span style="color: #555555;">=</span> g(x, c);
+    }
+    <span style="color: #006699; font-weight: bold;">return</span> ;
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>I assume you already found the issue in this codesnippet. The variable<span style="font-family: Courier New, Courier, monospace;"> i </span>is not initialised because it is a built-in variable used in a local scope and, therefore, the program has undefined behaviour. If i would be a user-defined type such as <span style="font-family: Courier New, Courier, monospace;">std::string,</span> all would be fine. So, what should you do:</p>
+<ul>
+<li>Place the declaration of i directly before its first usage.</li>
+<li>Always initialise a variable such as<span style="font-family: Courier New, Courier, monospace;"> int i{}</span>, or better, use <span style="font-family: Courier New, Courier, monospace;">auto</span>. The compiler can not guess from a declaration such as <span style="font-family: Courier New, Courier, monospace;">auto i;</span> the type of<span style="font-family: Courier New, Courier, monospace;"> i </span>and will, therefore, reject the program. To put it the other way around <span style="font-family: courier new, courier;">auto</span> forces you to initialise your variables.</li>
+</ul>
+<p>I also know the next rule from discussions.</p>
+<h2><a href="https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rnr-single-return">NR.2: Don’t: Have only a single <code class="highlighter-rouge no-highlight">return</code>-statement in a function</a></h2>
+<p>When you follow this rule, you implicitly apply the first non-rule.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">T</span><span style="color: #555555;">&gt;</span>
+std<span style="color: #555555;">::</span>string sign(T x)    <span style="color: #0099ff; font-style: italic;">// bad</span>
+{
+    std<span style="color: #555555;">::</span>string res;   
+    <span style="color: #006699; font-weight: bold;">if</span> (x <span style="color: #555555;">&lt;</span> <span style="color: #ff6600;">0</span>)
+        res <span style="color: #555555;">=</span> <span style="color: #cc3300;">"negative"</span>;
+    <span style="color: #006699; font-weight: bold;">else</span> <span style="color: #006699; font-weight: bold;">if</span> (x <span style="color: #555555;">&gt;</span> <span style="color: #ff6600;">0</span>)
+        res <span style="color: #555555;">=</span> <span style="color: #cc3300;">"positive"</span>;
+    <span style="color: #006699; font-weight: bold;">else</span>
+        res <span style="color: #555555;">=</span> <span style="color: #cc3300;">"zero"</span>;
+    <span style="color: #006699; font-weight: bold;">return</span> res;
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Using more return statements make the code easier to read and also faster.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">T</span><span style="color: #555555;">&gt;</span>
+<span style="color: #0099ff; font-style: italic;">//  requires Number&lt;T&gt;</span>
+string sign(T x)
+{
+    <span style="color: #006699; font-weight: bold;">if</span> (x <span style="color: #555555;">&lt;</span> <span style="color: #ff6600;">0</span>)
+        <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc3300;">"negative"</span>;
+    <span style="color: #006699; font-weight: bold;">else</span> <span style="color: #006699; font-weight: bold;">if</span> (x <span style="color: #555555;">&gt;</span> <span style="color: #ff6600;">0</span>)
+        <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc3300;">"positive"</span>;
+    <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc3300;">"zero"</span>;
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Okay. What happens if I use automatic return type deduction return different types?</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// differentReturnTypes.cpp</span>
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">auto</span> getValue(T x){
+  <span style="color: #006699; font-weight: bold;">if</span> (x <span style="color: #555555;">&lt;</span> <span style="color: #ff6600;">0</span>)          <span style="color: #0099ff; font-style: italic;">// int</span>
+    <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #555555;">-</span><span style="color: #ff6600;">1</span>;
+  <span style="color: #006699; font-weight: bold;">else</span> <span style="color: #006699; font-weight: bold;">if</span> (x <span style="color: #555555;">&gt;</span> <span style="color: #ff6600;">0</span>)
+    <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #ff6600;">1.0</span>;       <span style="color: #0099ff; font-style: italic;">// double</span>
+  <span style="color: #006699; font-weight: bold;">else</span> <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #ff6600;">0.0f</span>;   <span style="color: #0099ff; font-style: italic;">// float</span>
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main(){
+
+    getValue(<span style="color: #ff6600;">5.5</span>);
+ 
+}  
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>As expected, just an error:</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesNonRulesAndMyths/differentReturnTypes.PNG" alt="differentReturnTypes" width="600" height="159" /></p>
+<p>Probably, the next non-rule is the most controversial one.</p>
+<h2><a href="https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rnr-no-exceptions">NR.3: Don’t: Don’t use exceptions</a></h2>
+<p>First, the guideline states the main reasons against exceptions:</p>
+<ol>
+<li>exceptions are inefficient</li>
+<li>exceptions lead to leaks and errors</li>
+<li>exception performance is not predictable</li>
+</ol>
+<p>The guidelines have profound answers to these statements.</p>
+<p>1. Often the efficiency of exception handling is compared to a program that just terminated, or displays the error code. Often the exception handling implementation is poor. Of course, a comparison makes in such cases no sense. I want to explicitly mention the paper <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/TR18015.pdf">Technical Report on C++ Performance</a> (TR18015.pdf), which presents two typical ways to implement exceptions:</p>
+<ol>
+<li>The code approach, where code is associated with each try-block</li>
+<li>The "table" approach, which uses compiler-generated static tables</li>
+</ol>
+<p>Roughly said, the "code" approach has the downside that even when no exceptions are thrown, the bookkeeping of the exception handling stack must be performed and, therefore, code unrelated to error handling slows down. This downside does not hold for the "table" approach, because it introduces not stack or runtime costs when no exception is thrown. In contrast, the "table" approach seems more complicated to implement, and the static table can get quite big.</p>
+<p>2. I have nothing to add to point 2. Exceptions can not be blamed for a missing resource management strategy.</p>
+<p>3. If you have hard-realtime guarantees to fulfil so that a too late answer is a wrong answer, an exception implementation based on the "table" approach will not&nbsp; - as we saw&nbsp; - affect the run-time of the program in the good case. Honestly, even if you have a hard-realtime system, this hard-realtime restriction typically only hold for small part of your system.&nbsp;</p>
+<p>Instead of arguing against the non-rules, here are the reasons for using exceptions:</p>
+<p>Exceptions</p>
+<ul>
+<li>clearly differentiate between erroneous return and ordinary return.</li>
+<li>cannot be forgotten or ignored.</li>
+<li>can be used systematically.</li>
+</ul>
+<p>Let me add an anecdote I once faced in legacy code. The system used error codes to signal the success or failure of a function. Okay, they checked the error codes. This was fine. But due to the error codes, the functions didn't use return values. The consequence was, that the functions operated on global variables and, consequently had no parameters because they used the global variables anyway. The end of the story was that the system was not maintainable or testable, and my job was it to refactor it.&nbsp;</p>
+<p>The typical wrong usage of exceptions handling I see is the following one. You catch every exception in every function. In the end, you get unmaintainable code with a spaghetti-like structure. Exceptions are not a tool to make a fast fix but should be part of the overall system architecture. Imagine, you design an input sub-system. You must also document and test the exceptions that can occur. Exceptions are an essential part of the non-functional channel and, therefore, part of the contract that you provide to the user of your sub-system. You need a clear boundary between the application and the sub-system. The result may be that the sub-system translates the obscure exceptions into simpler once so that the application can react. Translating an exception means that you catch obscure exceptions in the sub-system and re-throw an easy do digest exception:</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">try{
+     <span style="color: #0099ff; font-style: italic;">// code, that may throw an obscure exception</span>
+  }   
+  <span style="color: #006699; font-weight: bold;">catch</span> (ObscureException18<span style="color: #555555;">&amp;</span> ob){
+      <span style="color: #006699; font-weight: bold;">throw</span> InputSubsystemError(<span style="color: #cc3300;">"File has wrong permissions!"</span>);
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The result of such a system architecture including the non-functional channel (exceptions) is, that you can test the sub-system in isolation, that you can test the integration of the sub-system into the application, and that you can test the system (application).&nbsp;</p>
+<p>The last myth for today is quite easy to spot.</p>
+<h2><a href="https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rnr-lots-of-files">NR.4: Don’t: Place each class declaration in its own source file</a></h2>
+<p>The correct way to structure your code is not to use files; the correct way is it to use namespaces. Using a file for each class declarations result in many files and can make your program, therefore, harder to manage and slower to compile.</p>
+<h2>What's next?</h2>
+<p>You can be sure. The C++ core guidelines and I'm not done with the non-rules and myths to C++. I will continue in my next post. Afterwards, when you encounter the non-rules and myths you should know how to demystify them.</p>
+<p></p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Paul Baxter,&nbsp; Meeting C++, Matt Braun, Avi Lachmish, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Marko, Ramesh Jangama,</strong><span class="sc-kpOJdX fDWXFa" title="Emyr Williams"><strong> G Prvulovic, Reiner Eiteljörge, Benjamin Huth, Reinhold Dröge, Timo, Abernitzke,</strong> </span><strong><span title="Emyr Williams">Richard Ohnemus , Frank Grimm</span></strong><span title="Emyr Williams"><strong>, Sakib, and Broeserl.<span class="sc-htpNat dEZjR" style="color: #241e12; font-family: aktiv-grotesk, sans-serif; margin: 0px; position: relative; font-weight: 400; font-size: 1rem; line-height: 1.5;"></span></strong></span><span title="Emyr Williams"></span></p>
+<p>&nbsp;</p>
+<table style="width: 490px; height: 103px;">
+<tbody>
+<tr>
+<td><strong>Thanks in particular to:</strong></td>
+<td>
+<div id="simple-translate">&nbsp;<a href="https://www.takeupcode.com/"><img style="vertical-align: middle;" src="images/patreon/TakeUpCode-450-60.png" alt="TakeUpCode 450 60" width="150" height="20" /></a></div>
+</td>
+<td><a href="https://cranepay.io/"><img src="images/patreon/crp4.png" alt="crp4" width="150" height="96" /></a></td>
+</tr>
+</tbody>
+</table>
+<p><strong>&nbsp;</strong></p>
+<p><strong>&nbsp;&nbsp;<a href="https://www.takeupcode.com/">&nbsp; </a></strong></p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at Leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 600 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
+<p></p>
+<table style="width: 800px;">
+<tbody>
+<tr>
+<td colspan="2">
+<h2>Get your interactive course</h2>
+&nbsp;</td>
+</tr>
+<tr>
+<td>
+<h4 class="_3fBEwsM053hx2mPd0uV0nT" style="text-align: center;">Modern C++ Concurrency in Practice</h4>
+</td>
+<td>
+<h4>C++ Standard Library including C++14 &amp; C++17</h4>
+</td>
+</tr>
+<tr>
+<td><a href="https://goo.gl/2qWUkK"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseConcurrency/educative.png" alt="educative" width="300" height="152" /></a></td>
+<td><a href="https://www.educative.io/collection/10370001/5712008708096000?authorName=Rainer%20Grimm"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseLibrary/CLibrary.png" alt="CLibrary" width="300" height="150" /></a></td>
+</tr>
+<tr>
+<td>
+<p>Based on my book "Concurrency with Modern C++" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>140 lessons</li>
+<li>110 code playgrounds =&gt; Runs in the browser</li>
+<li>78 code snippets</li>
+<li>55 illustrations</li>
+</ul>
+</td>
+<td>
+<p>Based on my book "The C++ Standard Library" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>149 lessons</li>
+<li>111 code playgrounds =&gt; Runs in the browser</li>
+<li>164 code snippets</li>
+<li>25 illustrations</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
