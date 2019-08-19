@@ -1,0 +1,416 @@
+<p>Demystifying non-rules and myths in C++ is a laborious but absolutely necessary job. The goal is simple: use the powerful tool C++ appropriately.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesMoreNonRulesAndMyths/sao-jorge-1503439_1280.png" alt="sao jorge 1503439 1280" width="600" height="328" /></p>
+<p>By the way, did you noticed that my family name qualifies me, in particular,&nbsp;to write about this demystification? Anyway, here are the rules from the C++ core guidelines for today.</p>
+<ul>
+<li><a href="https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rnr-two-phase-init">NR.5: Don’t: Don’t do substantive work in a constructor; instead use two-phase initialization</a></li>
+<li><a href="https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rnr-goto-exit">NR.6: Don’t: Place all cleanup actions at the end of a function and <code class="highlighter-rouge no-highlight">goto exit</code></a></li>
+</ul>
+<h3><a href="https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rnr-two-phase-init">NR.5: Don’t: Don’t do substantive work in a constructor; instead use two-phase initialization</a></h3>
+<p>Obviously, this is the job a constructor: <strong>After the constructor is executed you should have a fully-initialised object.</strong> For that reason, the following code snippet from the guidelines is bad.&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Picture</span>
+{
+    <span style="color: #007788; font-weight: bold;">int</span> mx;
+    <span style="color: #007788; font-weight: bold;">int</span> my;
+    <span style="color: #007788; font-weight: bold;">char</span> <span style="color: #555555;">*</span> data;
+<span style="color: #9999ff;">public:</span>
+    Picture(<span style="color: #007788; font-weight: bold;">int</span> x, <span style="color: #007788; font-weight: bold;">int</span> y)
+    {
+        mx <span style="color: #555555;">=</span> x,
+        my <span style="color: #555555;">=</span> y;
+        data <span style="color: #555555;">=</span> nullptr;
+    }
+
+    <span style="color: #555555;">~</span>Picture()
+    {
+        Cleanup();
+    }
+
+    <span style="color: #007788; font-weight: bold;">bool</span> Init()
+    {
+        <span style="color: #0099ff; font-style: italic;">// invariant checks</span>
+        <span style="color: #006699; font-weight: bold;">if</span> (mx <span style="color: #555555;">&lt;=</span> <span style="color: #ff6600;">0</span> <span style="color: #555555;">||</span> my <span style="color: #555555;">&lt;=</span> <span style="color: #ff6600;">0</span>) {
+            <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #336666;">false</span>;
+        }
+        <span style="color: #006699; font-weight: bold;">if</span> (data) {
+            <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #336666;">false</span>;
+        }
+        data <span style="color: #555555;">=</span> (<span style="color: #007788; font-weight: bold;">char</span><span style="color: #555555;">*</span>) malloc(x<span style="color: #555555;">*</span>y<span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">sizeof</span>(<span style="color: #007788; font-weight: bold;">int</span>));
+        <span style="color: #006699; font-weight: bold;">return</span> data <span style="color: #555555;">!=</span> nullptr;
+    }
+
+    <span style="color: #007788; font-weight: bold;">void</span> Cleanup()                    <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    {
+        <span style="color: #006699; font-weight: bold;">if</span> (data) free(data);
+        data <span style="color: #555555;">=</span> nullptr;
+    }
+};
+
+Picture <span style="color: #cc00ff;">picture</span>(<span style="color: #ff6600;">100</span>, <span style="color: #ff6600;">0</span>); <span style="color: #0099ff; font-style: italic;">// not ready-to-use picture here</span>
+<span style="color: #0099ff; font-style: italic;">// this will fail..                   // (1)</span>
+<span style="color: #006699; font-weight: bold;">if</span> (<span style="color: #555555;">!</span>picture.Init()) {
+    puts(<span style="color: #cc3300;">"Error, invalid picture"</span>);
+}
+<span style="color: #0099ff; font-style: italic;">// now have a invalid picture object instance.</span>
+</pre>
+</div>
+<p></p>
+<p><span style="font-family: courier new, courier;">picture(100, 0)</span> is not fully initialised and, therefore, all operation on the picture in line (1) operate on an invalid picture. The solution to this problem is as simple as effective: put all initialisation into the constructor.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Picture</span>
+{
+    <span style="color: #007788; font-weight: bold;">size_t</span> mx;
+    <span style="color: #007788; font-weight: bold;">size_t</span> my;
+    vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">char</span><span style="color: #555555;">&gt;</span> data;
+
+    <span style="color: #006699; font-weight: bold;">static</span> <span style="color: #007788; font-weight: bold;">size_t</span> <span style="color: #cc00ff;">check_size</span>(<span style="color: #007788; font-weight: bold;">size_t</span> s)
+    {
+        <span style="color: #0099ff; font-style: italic;">// invariant check</span>
+        Expects(s <span style="color: #555555;">&gt;</span> <span style="color: #ff6600;">0</span>);
+        <span style="color: #006699; font-weight: bold;">return</span> s;
+    }
+
+<span style="color: #9999ff;">public:</span>
+    <span style="color: #0099ff; font-style: italic;">// even more better would be a class for a 2D Size as one single parameter</span>
+    Picture(<span style="color: #007788; font-weight: bold;">size_t</span> x, <span style="color: #007788; font-weight: bold;">size_t</span> y)
+        <span style="color: #555555;">:</span> mx(check_size(x))
+        , my(check_size(y))
+        <span style="color: #0099ff; font-style: italic;">// now we know x and y have a valid size</span>
+        , data(mx <span style="color: #555555;">*</span> my <span style="color: #555555;">*</span> <span style="color: #006699; font-weight: bold;">sizeof</span>(<span style="color: #007788; font-weight: bold;">int</span>)) <span style="color: #0099ff; font-style: italic;">// will throw std::bad_alloc on error</span>
+    {
+        <span style="color: #0099ff; font-style: italic;">// picture is ready-to-use</span>
+    }
+    <span style="color: #0099ff; font-style: italic;">// compiler generated dtor does the job. (also see C.21)</span>
+};
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Additionally, <span style="font-family: courier new, courier;">data</span> is in the second example a<span style="font-family: courier new, courier;"> std::vector</span> and not a raw pointer. This means the<span style="font-family: courier new, courier;"> Cleanup</span> function (line 2) from the first example is not necessary anymore because the compiler will automatically clean up. Thanks to the static function <span style="font-family: courier new, courier;">check_size,</span> the constructor can validate its arguments. But this is not the end of the benefits modern C++ gives up.&nbsp;</p>
+<p>Often you use constructors to set the default behaviour of an object. Don't do it. Directly set the default behaviour of an object in the class body. For example, compare the following classes <span style="font-family: courier new, courier;">Widget</span> and <span style="font-family: courier new, courier;">WidgetImpro.</span></p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// classMemberInitialiserWidget.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Widget</span>{
+  <span style="color: #9999ff;">public:</span>
+    Widget()<span style="color: #555555;">:</span> width(<span style="color: #ff6600;">640</span>), height(<span style="color: #ff6600;">480</span>), frame(<span style="color: #336666;">false</span>), visible(<span style="color: #336666;">true</span>) {}
+    <span style="color: #006699; font-weight: bold;">explicit</span> Widget(<span style="color: #007788; font-weight: bold;">int</span> w)<span style="color: #555555;">:</span> width(w), height(getHeight(w)), frame(<span style="color: #336666;">false</span>), visible(<span style="color: #336666;">true</span>){}
+    Widget(<span style="color: #007788; font-weight: bold;">int</span> w, <span style="color: #007788; font-weight: bold;">int</span> h)<span style="color: #555555;">:</span> width(w), height(h), frame(<span style="color: #336666;">false</span>), visible(<span style="color: #336666;">true</span>){}
+
+    <span style="color: #007788; font-weight: bold;">void</span> show(){ std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>boolalpha <span style="color: #555555;">&lt;&lt;</span> width <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"x"</span> <span style="color: #555555;">&lt;&lt;</span> height
+                           <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">", frame: "</span> <span style="color: #555555;">&lt;&lt;</span> frame <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">", visible: "</span> <span style="color: #555555;">&lt;&lt;</span> visible
+                           <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+     }
+  <span style="color: #9999ff;">private:</span>
+    <span style="color: #007788; font-weight: bold;">int</span> getHeight(<span style="color: #007788; font-weight: bold;">int</span> w){ <span style="color: #006699; font-weight: bold;">return</span> w<span style="color: #555555;">*</span><span style="color: #ff6600;">3</span><span style="color: #555555;">/</span><span style="color: #ff6600;">4</span>; }
+    <span style="color: #007788; font-weight: bold;">int</span> width;
+    <span style="color: #007788; font-weight: bold;">int</span> height;
+    <span style="color: #007788; font-weight: bold;">bool</span> frame;
+    <span style="color: #007788; font-weight: bold;">bool</span> visible;
+};
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">WidgetImpro</span>{
+  <span style="color: #9999ff;">public:</span>
+    WidgetImpro(){}
+    <span style="color: #006699; font-weight: bold;">explicit</span> WidgetImpro(<span style="color: #007788; font-weight: bold;">int</span> w)<span style="color: #555555;">:</span> width(w), height(getHeight(w)){}
+    WidgetImpro(<span style="color: #007788; font-weight: bold;">int</span> w, <span style="color: #007788; font-weight: bold;">int</span> h)<span style="color: #555555;">:</span> width(w), height(h){}
+
+    <span style="color: #007788; font-weight: bold;">void</span> show(){ std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>boolalpha <span style="color: #555555;">&lt;&lt;</span> width <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"x"</span> <span style="color: #555555;">&lt;&lt;</span> height
+                           <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">", frame: "</span> <span style="color: #555555;">&lt;&lt;</span> frame <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">", visible: "</span> <span style="color: #555555;">&lt;&lt;</span> visible
+                           <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    }
+
+  <span style="color: #9999ff;">private:</span>
+    <span style="color: #007788; font-weight: bold;">int</span> getHeight(<span style="color: #007788; font-weight: bold;">int</span> w){ <span style="color: #006699; font-weight: bold;">return</span> w <span style="color: #555555;">*</span> <span style="color: #ff6600;">3</span> <span style="color: #555555;">/</span> <span style="color: #ff6600;">4</span>; }
+    <span style="color: #007788; font-weight: bold;">int</span> width <span style="color: #555555;">=</span> <span style="color: #ff6600;">640</span>;
+    <span style="color: #007788; font-weight: bold;">int</span> height <span style="color: #555555;">=</span> <span style="color: #ff6600;">480</span>;
+    <span style="color: #007788; font-weight: bold;">bool</span> frame <span style="color: #555555;">=</span> <span style="color: #336666;">false</span>;
+    <span style="color: #007788; font-weight: bold;">bool</span> visible <span style="color: #555555;">=</span> <span style="color: #336666;">true</span>;
+};
+
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+  Widget wVGA;
+  Widget wSVGA(<span style="color: #ff6600;">800</span>);
+  Widget wHD(<span style="color: #ff6600;">1280</span>, <span style="color: #ff6600;">720</span>);
+
+  wVGA.show();
+  wSVGA.show();
+  wHD.show();
+
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+  WidgetImpro wImproVGA;
+  WidgetImpro wImproSVGA(<span style="color: #ff6600;">800</span>);
+  WidgetImpro wImproHD(<span style="color: #ff6600;">1280</span>, <span style="color: #ff6600;">720</span>);
+
+  wImproVGA.show();
+  wImproSVGA.show();
+  wImproHD.show();
+
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Both classes behave the same.</p>
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesMoreNonRulesAndMyths/classMemberInitialiserWidget.png" alt="classMemberInitialiserWidget" width="400" height="207" /></p>
+<p>The difference is that the constructors for the class <span style="font-family: courier new, courier;">WidgetImpro</span> are way more comfortable to use and to extend. When you add a new variable to both classes, you have in the case of <span style="font-family: courier new, courier;">WidgetImpro</span> only to edit one place, but each constructor in the case of the class <span style="font-family: courier new, courier;">Widget</span> class is affected. Here is the picture I have in mind when I design a new class:&nbsp;<strong>Define the default behaviour of each object in the class body. Use explicit constructors to vary the default behaviour.</strong></p>
+<p>Done? No!</p>
+<p>Often you use an init function to put common initialisation or validation stuff into one place. Fine, you follow the important DRY (<a href="https://en.wikipedia.org/wiki/Don%27t_repeat_yourself"><strong>D</strong>on't <strong>R</strong>epeat <strong>Y</strong>ourself</a>) principle, but you automatically break the other important principle, that you object should be fully initialised after the constructor call. How can you solve this riddle? Quite easy. Since C++11 we have constructor delegation. This means to put the common initialisation and validation stuff into one smart constructor and use the other constructors as kind of wrapper-constructors. Here is my idea translated to code.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// constructorDelegation.cpp</span>
+
+<span style="color: #009999;">#include &lt;cmath&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Degree</span>{
+<span style="color: #9999ff;">public:</span>
+  <span style="color: #006699; font-weight: bold;">explicit</span> Degree(<span style="color: #007788; font-weight: bold;">int</span> deg){                <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    degree <span style="color: #555555;">=</span> deg <span style="color: #555555;">%</span> <span style="color: #ff6600;">360</span>;
+    <span style="color: #006699; font-weight: bold;">if</span> (degree <span style="color: #555555;">&lt;</span> <span style="color: #ff6600;">0</span>) degree <span style="color: #555555;">+=</span> <span style="color: #ff6600;">360</span>;
+  }
+  
+  Degree() <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">default</span>;
+                                          <span style="color: #0099ff; font-style: italic;">// (3)</span>
+  <span style="color: #006699; font-weight: bold;">explicit</span> <span style="color: #cc00ff;">Degree</span>(<span style="color: #007788; font-weight: bold;">double</span> deg)<span style="color: #555555;">:</span>Degree(<span style="color: #006699; font-weight: bold;">static_cast</span><span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span>(ceil(deg))) {}  
+
+  <span style="color: #007788; font-weight: bold;">int</span> getDegree() <span style="color: #006699; font-weight: bold;">const</span> { <span style="color: #006699; font-weight: bold;">return</span> degree; }
+
+<span style="color: #9999ff;">private:</span>
+  <span style="color: #007788; font-weight: bold;">int</span> degree{};                           <span style="color: #0099ff; font-style: italic;">// (1)</span>
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+  Degree degree;
+  Degree degree10(<span style="color: #ff6600;">10</span>);
+  Degree degree45(<span style="color: #ff6600;">45</span>);
+  Degree degreeMinus315(<span style="color: #555555;">-</span><span style="color: #ff6600;">315</span>);
+  Degree degree405(<span style="color: #ff6600;">405</span>);
+  Degree degree44(<span style="color: #ff6600;">44.45</span>);
+
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Degree(): "</span> <span style="color: #555555;">&lt;&lt;</span> degree.getDegree() <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Degree(10): "</span> <span style="color: #555555;">&lt;&lt;</span> degree10.getDegree() <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Degree(45): "</span> <span style="color: #555555;">&lt;&lt;</span> degree45.getDegree() <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Degree(-315): "</span> <span style="color: #555555;">&lt;&lt;</span> degreeMinus315.getDegree() <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Degree(405): "</span> <span style="color: #555555;">&lt;&lt;</span> degree405.getDegree() <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Degree(44.45): "</span> <span style="color: #555555;">&lt;&lt;</span> degree44.getDegree() <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The expression int degree{} (line) 1 value-initialises the degree to 0. The constructor in line 2 is quite smart. It transforms each degree to the unit circle. The constructor, taking a <span style="font-family: courier new, courier;">double,</span> uses this constructor. For completeness, here is the output of the program:</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesMoreNonRulesAndMyths/constructorDelegation.png" alt="constructorDelegation" width="300" height="189" /></p>
+<h3><a href="https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rnr-goto-exit">NR.6: Don’t: Place all cleanup actions at the end of a function and <code class="highlighter-rouge no-highlight">goto exit</code></a></h3>
+<p>Okay, we can do better as the following code from the guidelines:</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">do_something</span>(<span style="color: #007788; font-weight: bold;">int</span> n)
+{
+    <span style="color: #006699; font-weight: bold;">if</span> (n <span style="color: #555555;">&lt;</span> <span style="color: #ff6600;">100</span>) <span style="color: #006699; font-weight: bold;">goto</span> exit;
+    <span style="color: #0099ff; font-style: italic;">// ...</span>
+    <span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">*</span> p <span style="color: #555555;">=</span> (<span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">*</span>) malloc(n);
+    <span style="color: #0099ff; font-style: italic;">// ...</span>
+<span style="color: #9999ff;">exit:</span>
+    free(p);
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>By the way. Do you spot the error? The jump <span style="font-family: courier new, courier;">goto exit</span> bypasses the definition of the pointer <span style="font-family: courier new, courier;">p</span>.</p>
+<p>What I often saw in legacy C-code was code structures like this.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #009999;">// lifecycle.c<br /><br />#include &lt;stdio.h&gt;</span>
+ 
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">initDevice</span>(<span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">char</span><span style="color: #555555;">*</span> mess){
+  printf(<span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n\n</span><span style="color: #cc3300;">INIT: %s</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>,mess);
+}
+ 
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">work</span>(<span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">char</span><span style="color: #555555;">*</span> mess){
+  printf(<span style="color: #cc3300;">"WORKING: %s"</span>,mess);
+}
+ 
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">shutDownDevice</span>(<span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">char</span><span style="color: #555555;">*</span> mess){
+  printf(<span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">SHUT DOWN: %s</span><span style="color: #cc3300; font-weight: bold;">\n\n</span><span style="color: #cc3300;">"</span>,mess);
+}
+ 
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(<span style="color: #007788; font-weight: bold;">void</span>){
+ 
+  initDevice(<span style="color: #cc3300;">"DEVICE 1"</span>);
+  work(<span style="color: #cc3300;">"DEVICE1"</span>);
+  {
+    initDevice(<span style="color: #cc3300;">"DEVICE 2"</span>);
+    work(<span style="color: #cc3300;">"DEVICE2"</span>);
+    shutDownDevice(<span style="color: #cc3300;">"DEVICE 2"</span>);
+  }
+  work(<span style="color: #cc3300;">"DEVICE 1"</span>);
+  shutDownDevice(<span style="color: #cc3300;">"DEVICE 1"</span>);
+ 
+  <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #ff6600;">0</span>;
+ 
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>This is very error-prone but also typical code. Each usage of the device consists of three steps: initialisation, usage, and release of the device. Honestly, this is the job of RAII.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #009999;">// lifecycle.cpp<br /><br />#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;string&gt;</span>
+ 
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Device</span>{
+  <span style="color: #9999ff;">private:</span>
+    <span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span>string resource;
+  <span style="color: #9999ff;">public:</span>
+    Device(<span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span>string<span style="color: #555555;">&amp;</span> res)<span style="color: #555555;">:</span>resource(res){
+      std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">INIT: "</span> <span style="color: #555555;">&lt;&lt;</span> resource <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">".</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>;
+    }
+    <span style="color: #007788; font-weight: bold;">void</span> work() <span style="color: #006699; font-weight: bold;">const</span> {
+      std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"WORKING: "</span> <span style="color: #555555;">&lt;&lt;</span> resource <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    }
+    <span style="color: #555555;">~</span>Device(){
+      std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"SHUT DOWN: "</span><span style="color: #555555;">&lt;&lt;</span> resource <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">".</span><span style="color: #cc3300; font-weight: bold;">\n\n</span><span style="color: #cc3300;">"</span>;
+    }
+};
+ 
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+ 
+ 
+  Device resGuard1{<span style="color: #cc3300;">"DEVICE 1"</span>};
+  resGuard1.work();
+ 
+  {
+    Device resGuard2{<span style="color: #cc3300;">"DEVICE 2"</span>};
+    resGuard2.work();
+  }
+  resGuard1.work();
+ 
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Initialise the resource in the constructor and release it in the destructor. First, you can not forget to initialise the object, and secont, the compiler takes care of the release of the resource. The output of both programs is equivalent:</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesMoreNonRulesAndMyths/lifecycle.png" alt="lifecycle" width="250" height="239" /></p>
+<p>&nbsp;</p>
+<p>You can find more information to RAII in my previous post: <a href="https://www.modernescpp.com/index.php/c-core-guidelines-when-raii-breaks">C++ Core Guidelines: When RAII breaks</a>.</p>
+<h2>More Myths</h2>
+<p>I'm sure, this is not the end of the fight and you know more non-rules and myths about C++. Please write a letter to <a href="mailto:rainer.grimm@modernescpp.de">rainer.grimm@modernescpp.de</a>. Describe the myth and present if possible your solution. I try to make a post out of your content and add - if you like it - your name. I'm totally curious about your ideas.</p>
+<h2>What's next</h2>
+<p>Only one rule to non-rules and myths is left in the C++ core guidelines. I hope for you input. <a href="mailto:rainer.grimm@modernescpp.de"></a></p>
+<p></p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Paul Baxter,&nbsp; Meeting C++, Matt Braun, Avi Lachmish, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Marko, Ramesh Jangama,</strong><span class="sc-kpOJdX fDWXFa" title="Emyr Williams"><strong> G Prvulovic, Reiner Eiteljörge, Benjamin Huth, Reinhold Dröge, Timo, Abernitzke,</strong> </span><strong><span title="Emyr Williams">Richard Ohnemus , Frank Grimm</span></strong><span title="Emyr Williams"><strong>, Sakib, and Broeserl.<span class="sc-htpNat dEZjR" style="color: #241e12; font-family: aktiv-grotesk, sans-serif; margin: 0px; position: relative; font-weight: 400; font-size: 1rem; line-height: 1.5;"></span></strong></span><span title="Emyr Williams"></span></p>
+<p>&nbsp;</p>
+<table style="width: 490px; height: 103px;">
+<tbody>
+<tr>
+<td><strong>Thanks in particular to:</strong></td>
+<td>
+<div id="simple-translate">&nbsp;<a href="https://www.takeupcode.com/"><img style="vertical-align: middle;" src="images/patreon/TakeUpCode-450-60.png" alt="TakeUpCode 450 60" width="150" height="20" /></a></div>
+</td>
+<td><a href="https://cranepay.io/"><img src="images/patreon/crp4.png" alt="crp4" width="150" height="96" /></a></td>
+</tr>
+</tbody>
+</table>
+<p><strong>&nbsp;</strong></p>
+<p><strong>&nbsp;&nbsp;<a href="https://www.takeupcode.com/">&nbsp; </a></strong></p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at Leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 600 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
+<p></p>
+<table style="width: 800px;">
+<tbody>
+<tr>
+<td colspan="2">
+<h2>Get your interactive course</h2>
+&nbsp;</td>
+</tr>
+<tr>
+<td>
+<h4 class="_3fBEwsM053hx2mPd0uV0nT" style="text-align: center;">Modern C++ Concurrency in Practice</h4>
+</td>
+<td>
+<h4>C++ Standard Library including C++14 &amp; C++17</h4>
+</td>
+</tr>
+<tr>
+<td><a href="https://goo.gl/2qWUkK"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseConcurrency/educative.png" alt="educative" width="300" height="152" /></a></td>
+<td><a href="https://www.educative.io/collection/10370001/5712008708096000?authorName=Rainer%20Grimm"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseLibrary/CLibrary.png" alt="CLibrary" width="300" height="150" /></a></td>
+</tr>
+<tr>
+<td>
+<p>Based on my book "Concurrency with Modern C++" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>140 lessons</li>
+<li>110 code playgrounds =&gt; Runs in the browser</li>
+<li>78 code snippets</li>
+<li>55 illustrations</li>
+</ul>
+</td>
+<td>
+<p>Based on my book "The C++ Standard Library" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>149 lessons</li>
+<li>111 code playgrounds =&gt; Runs in the browser</li>
+<li>164 code snippets</li>
+<li>25 illustrations</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
