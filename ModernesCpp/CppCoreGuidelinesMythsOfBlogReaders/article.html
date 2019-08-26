@@ -1,0 +1,214 @@
+<p>I was very curious about your C++ myths. In particular, my German readers were quite active. I got a few E-Mails and observed a vivid discussion on <a href="https://www.heise.de/forum/heise-Developer/Kommentare/C-Core-Guidelines-Mehr-Nichtregeln-und-Mythen/forum-432200/comment/">Heise Developer</a>.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesReadersMyths/dragon-1512457_1280.png" alt="dragon 1512457 1280" width="600" height="338" /></p>
+<p>Let me first conclude the myths of the C++ core guidelines before I write about your myths. Here is the last myth.</p>
+<h2><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rnr-protected-data">NR.7: Don’t: Make all data members <code class="highlighter-rouge no-highlight">protected</code></a></h2>
+<p>Protected data makes your program complex and error-prone. If you put protected data into a base class, you can not reason about derived classes in isolation and, therefore, you break encapsulation. You always have to reason about the entire class hierarchy.</p>
+<p>This means you have to answer at least these three questions.</p>
+<ol>
+<li>Do I have to implement a constructor in a derived class to initialise the protected data?</li>
+<li>What is the actual value of the protected data if I use them?</li>
+<li>Who will be affected if I modify the protected data?</li>
+</ol>
+<p>Answering these questions becomes more and more complicated, the deeper you class hierarchy becomes.</p>
+<p>If you think about it: protected data is a kind of global data in the scope of the class hierarchy. And you know, mutable shared state is terrible. It makes, for example, testing and concurrency quite tricky.</p>
+<p>Now, I switch to your myths. I write about them in the order I received them.</p>
+<h2>In C++ written programs need more memory and CPU as in C written programs (Gunter Königsmann)</h2>
+<p>First of all: thanks to Gunter Königsmann for the classical myth.</p>
+<p>Honestly, arguing against this myth is quite difficult and in general not possible for the C++ standard library. This is the reason, I make only a few observations add the end of this chapter. First of all, here are the hard facts. The "Technical Report on C++ Performance" helps me a lot.</p>
+<h3 id="h1-technical-report-on-c-performance"><a href="http://www.open-std.org/jtc1/sc22/wg21/docs/TR18015.pdf">Technical report on C++ performance</a></h3>
+<p>The Working Group WG 21 published in the year 2006 the paper <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/TR18015.pdf">ISO/IEC TR 18015</a>. The title sounds not very interesting but that document is the ultimate source if you want to get the performance numbers to the C++ features. The document expresses its concerns directly to the point.&nbsp;&nbsp;</p>
+<ul>
+<li><em>to give the reader a model of time and space overheads implied by use of various C++ language and library features,</em></li>
+<li><em>to debunk widespread myths about performance problems,</em></li>
+<li><em>to present techniques for use of C++ in applications where performance matters, and</em></li>
+<li><em>to present techniques for implementing C++ Standard language and library facilities to yield efficient code.</em></li>
+</ul>
+<p>Authors of the paper with more than 200 pages are well known C++ experts like&nbsp;Dave Abrahams, Howard Hinnand, Dietmar Kühl, Dan Saks, Bill Seymour, Bjarne Stroustrup, and Detlef Vollmann.</p>
+<p>The scope of the document are C++ features, their overhead and usage, the creation of efficient libraries in C++, the usage of C++ in embedded system, and the interfaces in C++ to communicate with the hardware.</p>
+<h3 id="h1-1-c-features-overhead-and-usage">C++ features, Overhead, and Usage</h3>
+<p>The authors use for their analysis three computer architectures with five different compilers. They use the compilers with different optimisation level. I will give you only an idea of the results that are quite remarkable.</p>
+<ul>
+<li>Namespaces
+<ul>
+<li>Have no significant overhead in size and performance</li>
+</ul>
+</li>
+<li>Type converting operator
+<ul>
+<li>The C++ casts <span style="font-family: courier new, courier;">const_cast, static_cast, </span>and <span style="font-family: courier new, courier;">reinterpret_cast</span> differ neither in size nor in performance from their C pedant.</li>
+<li>The at runtime executed <span style="font-family: courier new, courier;">dynamic_cast</span> has some overhead<em></em>. (Remark: The conversion has no C pedant.).</li>
+</ul>
+</li>
+<li>Inheritance<br />
+<ul>
+<li>Class<br />
+<ul>
+<li>A <span style="font-family: courier new, courier;">class</span> without virtual functions is as big as a <span style="font-family: courier new, courier;">struct</span>.</li>
+<li>A class with virtual functions has the overhead of a pointer and a virtual function table. These are about 2 to 4 bytes.&nbsp;</li>
+</ul>
+</li>
+<li>Function calls<br />
+<ul>
+<li>The call of a non-virtual, non-static, and non-inline function is as expensive as the call of a free function.</li>
+<li>The call of a virtual function is as expensive as the call of a free function with the help of a pointer that is stored in a table.&nbsp;</li>
+<li>Virtual functions of a class template can cause overhead in size.</li>
+<li>The <em>inlining </em>of a function causes significant performance benefits and is close to the performance of a C macro.</li>
+</ul>
+</li>
+<li>Multiple inheritances<br />
+<ul>
+<li>Can cause time and/or space overhead.</li>
+<li>Virtual base classes have overhead compared to non-virtual base classes.</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Run-time type&nbsp;information (RTTI)
+<ul>
+<li>There are about 40 additional bytes for each class necessary.</li>
+<li>The <span style="font-family: courier new, courier;">typeid</span> call is quite slow. That seems due to the quality of the implementation.</li>
+<li>The conversion during runtime with <span style="font-family: courier new, courier;">dynamic_cast</span> is slow. According to the reports that should also be due to the quality of the implementation.</li>
+</ul>
+</li>
+<li>Exception handling<br />
+<ul>
+<li>There are two strategies for dealing with exceptions. These are the code and the table strategy. The code strategy has to move and manage additional data structures for dealing with exceptions. The table strategy has the execution context in a table.&nbsp;
+<ul>
+<li>The&nbsp;<em></em>code strategy has a size overhead for the stack and the runtime. The runtime overhead is about 6%. This overhead exists even without the throwing of an exception.</li>
+<li><em></em>The table strategy has neither overhand in program size nor in runtime. (Remarks: That statements hold only if no exceptions was thrown.). The table strategy is more difficult to implement.&nbsp;</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Templates
+<ul>
+<li>You get for each template instantiation a new class template or function template. Therefore, the naive use of temples can cause code bloat. Modern C++ compilers can massively reduce the number of template instantiations. The usage of partial or full specialisation helps to reduce the template instantiations.</li>
+</ul>
+</li>
+</ul>
+<p>You can read the details, the exact number and few additionals topics directly in the report: <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/TR18015.pdf">TR18015.pdf.</a></p>
+<p>Still not convinced? Here is a cite from MISRA C++:</p>
+<h3><a href="http://www.misra.org.uk/Activities/tabid/56/Default.aspx">MISRA C++</a></h3>
+<p>MISRA C++ (<strong>M</strong>otor <strong>I</strong>ndustry <strong>S</strong>oftware <strong>R</strong>eliability <strong>A</strong>ssociation) formulates guidelines software in safety-critical systems.&nbsp; It was originally designed for the automotive industry and became the de facto standard in the aviation, military and medical sector. The question is, what MISRA says about C++?</p>
+<p>MISRA emphasises why the importance of C++ in critical systems becomes more important. (1.1 The use of C++ in critical systems):</p>
+<ul>
+<li><em>C++ gives good support for high-speed, low-level, input/output operations, which are essential to many embedded systems.</em></li>
+<li><em>The increased complexity of applications make the use of a high-level language more appropriate than assembly language.</em></li>
+<li><em>C++ compilers generate code with similar size and RAM requirements to those of C.</em></li>
+</ul>
+<p>But one small downer remains. MISRA C++ is based on classical C++. This is simply speaking C++98. Modern C++ has a lot more to offer for embedded systems. This remark does not only hold for MISRA C++ but also holds on the previous mentioned <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/TR18015.pdf">Technical report on C++ performance.</a></p>
+<p>I can not conclude my post without a few observations to modern C++.&nbsp; Modern C++ is a term which is mostly used for the three C++ standards&nbsp; C++11, C++14, and C++17.</p>
+<h3>My Observations</h3>
+<p>The difficulty in the comparison of the C++ standard library to its C pendants is, in particular, that you have to compare equivalent data structures or programs. This means, you can not compare a C-string and a C++-string, because the later supports automatic memory management. The same holds for a C-array in contrast to the C++ containers. Without further ado, here are my points. If you are more curious, read the mentioned post.</p>
+<ul>
+<li>A<span style="font-family: courier new, courier;"> std::array</span> is per design as fast and as cheap as a C-array and additionally knows it length: <a href="https://www.modernescpp.com/index.php/c-core-guidelines-std-array-and-std-vector-are-your-friends">C++ Core Guidelines: std::array and std::vector are your Friends.</a></li>
+<li>A<span style="font-family: courier new, courier;"> std::unique_ptr</span> is per design as fast and as cheap as a raw pointer. Of course, the <span style="font-family: courier new, courier;">std::unique_ptr</span> is safe per design: <a href="https://www.modernescpp.com/index.php/memory-and-performance-overhead-of-smart-pointer">Memory and Performance Overhead of Smart Pointers</a>.</li>
+<li>&nbsp;The type-traits library allows it to write code which optimises itself: <a href="https://www.modernescpp.com/index.php/type-traits-performance-matters">Type-Traits: Performance matters</a>.</li>
+<li>Thanks to <span style="font-family: courier new, courier;">constexpr</span>, you can perform expensive compute jobs at compile-time: <a href="https://www.modernescpp.com/index.php/c-core-guidelines-programming-at-compile-time-with-constexpr">C++ Core Guidelines: Programming at Compile Time with constexpr</a>.</li>
+<li>Move-semantic and perfect forwarding allow you to replace an expensive and insecure copy operation with a cheap and secure move operation. Generally, a copy operation can fail instead of a move operation:<a href="https://www.modernescpp.com/index.php/copy-versus-move-semantic-a-few-numbers">&nbsp;Copy versus Move Semantic: A few Numbers</a> and<a href="https://www.modernescpp.com/index.php/perfect-forwarding"> Perfect Forwarding</a>.</li>
+</ul>
+<h2>What's next?</h2>
+<p>Wow? It took me almost an entire post to argue against the memory and performance myth. You can imagine that I have to demystify additional myths, which I got. If you have a myth, now it's time to send them to me: <span id="cloak16b8d85e1f1952dfd67432c384344528"><a href="mailto:rainer.grimm@modernescpp.de">rainer.grimm@modernescpp.de</a></span>.</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Paul Baxter,&nbsp; Meeting C++, Matt Braun, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Marko, Ramesh Jangama,</strong><span class="sc-kpOJdX fDWXFa" title="Emyr Williams"><strong> G Prvulovic, Reiner Eiteljörge, Benjamin Huth, Reinhold Dröge, Timo, Abernitzke,</strong> </span><strong><span title="Emyr Williams">Richard Ohnemus , Frank Grimm</span></strong><span title="Emyr Williams"><strong>, Sakib, Broeserl, <span title="Emyr Williams"><strong>and </strong></span><strong><span title="Emyr Williams">António Pina.</span><span title="Emyr Williams"></span></strong><span class="sc-htpNat dEZjR" style="color: #241e12; font-family: aktiv-grotesk, sans-serif; margin: 0px; position: relative; font-weight: 400; font-size: 1rem; line-height: 1.5;"></span></strong></span><span title="Emyr Williams"> <br /></span></p>
+<p>&nbsp;</p>
+<table style="width: 490px; height: 103px;">
+<tbody>
+<tr>
+<td><strong>Thanks in particular to:</strong></td>
+<td>
+<div id="simple-translate">&nbsp;<a href="https://www.takeupcode.com/"><img style="vertical-align: middle;" src="images/patreon/TakeUpCode-450-60.png" alt="TakeUpCode 450 60" width="150" height="20" /></a></div>
+</td>
+<td><a href="https://cranepay.io/"><img src="images/patreon/crp4.png" alt="crp4" width="150" height="96" /></a></td>
+</tr>
+</tbody>
+</table>
+<p><strong>&nbsp;</strong></p>
+<p><strong>&nbsp;&nbsp;<a href="https://www.takeupcode.com/">&nbsp; </a></strong></p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at Leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 600 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
+<p></p>
+<table style="width: 800px;">
+<tbody>
+<tr>
+<td colspan="2">
+<h2>Get your interactive course</h2>
+&nbsp;</td>
+</tr>
+<tr>
+<td>
+<h4 class="_3fBEwsM053hx2mPd0uV0nT" style="text-align: center;">Modern C++ Concurrency in Practice</h4>
+</td>
+<td>
+<h4>C++ Standard Library including C++14 &amp; C++17</h4>
+</td>
+</tr>
+<tr>
+<td><a href="https://goo.gl/2qWUkK"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseConcurrency/educative.png" alt="educative" width="300" height="152" /></a></td>
+<td><a href="https://www.educative.io/collection/10370001/5712008708096000?authorName=Rainer%20Grimm"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseLibrary/CLibrary.png" alt="CLibrary" width="300" height="150" /></a></td>
+</tr>
+<tr>
+<td>
+<p>Based on my book "Concurrency with Modern C++" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>140 lessons</li>
+<li>110 code playgrounds =&gt; Runs in the browser</li>
+<li>78 code snippets</li>
+<li>55 illustrations</li>
+</ul>
+</td>
+<td>
+<p>Based on my book "The C++ Standard Library" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>149 lessons</li>
+<li>111 code playgrounds =&gt; Runs in the browser</li>
+<li>164 code snippets</li>
+<li>25 illustrations</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
