@@ -1,0 +1,299 @@
+<p>Today, I conclude my story to your myths about C++. These myths are around function parameters, the initialisation of class members, and pointer versus references.</p>
+<hr id="system-readmore" />
+<h2>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesMoreReadersMyths/dragon-4417431_1280.png" alt="dragon 4417431 1280" width="600" height="400" /></h2>
+<h2>Always take the parameter by const reference (Gunter Königsmann)</h2>
+<p>When a function takes its parameter and doesn't want to modify it, you have two options.</p>
+<ul>
+<li>Take the parameter by value (copy it)</li>
+<li>Take the parameter by const reference</li>
+</ul>
+<p>This was the correctness perspective, but what can be said about the performance. The C++ core guidelines is specific about performance. Let's look at the following example.</p>
+<div style="background: #f0f3f3 none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">f1</span>(<span style="color: #006699; font-weight: bold;">const</span> string<span style="color: #555555;">&amp;</span> s);  <span style="color: #0099ff; font-style: italic;">// OK: pass by reference to const; always cheap</span>
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">f2</span>(string s);         <span style="color: #0099ff; font-style: italic;">// bad: potentially expensive</span>
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">f3</span>(<span style="color: #007788; font-weight: bold;">int</span> x);            <span style="color: #0099ff; font-style: italic;">// OK: Unbeatable</span>
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">f4</span>(<span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&amp;</span> x);     <span style="color: #0099ff; font-style: italic;">// bad: overhead on access in f4()</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Presumably, based on experience, the guidelines states a rule of thumb:</p>
+<ul>
+<li><strong>You should take a parameter p by const reference&nbsp;if <span style="font-family: courier new, courier;">sizeof(p) &gt; 4 * sizeof(int)</span></strong></li>
+<li><strong>You should copy a parameter&nbsp;<span style="font-family: courier new, courier;">p</span> if <span style="font-family: courier new, courier;">sizeof(p) &lt; 3 * sizeof(int)</span></strong></li>
+</ul>
+<p>Okay, now you should know how big your data types are. The program <span style="font-family: courier new, courier;">sizeofArithmeticTypes.cpp</span> gives the answers for arithmetic types.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// sizeofArithmeticTypes.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+  
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"sizeof(void*): "</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #006699; font-weight: bold;">sizeof</span>(<span style="color: #007788; font-weight: bold;">void</span><span style="color: #555555;">*</span>) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;  
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+ 
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"sizeof(5):  "</span>  <span style="color: #555555;">&lt;&lt;</span> <span style="color: #006699; font-weight: bold;">sizeof</span>(<span style="color: #ff6600;">5</span>)   <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"sizeof(5l): "</span>  <span style="color: #555555;">&lt;&lt;</span> <span style="color: #006699; font-weight: bold;">sizeof</span>(<span style="color: #ff6600;">5l</span>)  <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"sizeof(5ll): "</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #006699; font-weight: bold;">sizeof</span>(<span style="color: #ff6600;">5ll</span>) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"sizeof(5.5f): "</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #006699; font-weight: bold;">sizeof</span>(<span style="color: #ff6600;">5.5f</span>) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"sizeof(5.5): "</span>  <span style="color: #555555;">&lt;&lt;</span> <span style="color: #006699; font-weight: bold;">sizeof</span>(<span style="color: #ff6600;">5.5</span>)  <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl; 
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"sizeof(5.5l): "</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #006699; font-weight: bold;">sizeof</span>(<span style="color: #ff6600;">5.5</span>l) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;       
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+            
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p><span style="font-family: courier new, courier;">sizeof(void*)</span> returns if it is a 32-bit or a 64-bit system. Thanks to online compiler <a href="https://rextester.com/">rextester</a>, I can execute the program with GCC, Clang, and cl.exe (Windows). Here are the numbers for all 64-bit systems.</p>
+<h3>GCC</h3>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesMoreReadersMyths/sizeofGCC.png" alt="sizeofGCC" /></p>
+<h3>Clang</h3>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesMoreReadersMyths/sizeofClang.png" alt="sizeofClang" /></p>
+<h3>cl.exe (Windows)</h3>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesMoreReadersMyths/sizeofVC.png" alt="sizeofVC" /></p>
+<p>cl.exe behaves differently to GCC and Clang. A<span style="font-family: courier new, courier;"> long int</span> has only 4 bytes, and a <span style="font-family: courier new, courier;">long double</span> has 8 bytes. On GCC and Clang, <span style="font-family: courier new, courier;">long int</span> and long <span style="font-family: courier new, courier;">double have</span> the double size.</p>
+<p>To decide, when to take the parameter by value or by const reference is just math. If you want to know the exact performance numbers for your architecture, there is only one answer: <strong>measure</strong>.</p>
+<h2>Initialisation and Assignment in the Constructor are equivalent (Gunter Königsmann)</h2>
+<p>First, let me show you initialisation and assignment in the constructor.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Good</span>{  
+    int i;
+<span style="color: #9999ff;">public:</span>
+    Good(int i_)<span style="color: #555555;">:</span> i{i_<span style="color: #cc3300;"></span>}{} 
+};
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Bad</span>{  
+    int i;
+<span style="color: #9999ff;">public:</span>
+    Bad(int i_)<span style="color: #555555;">:</span> { i <span style="color: #555555;">= i_</span><span style="color: #cc3300;"></span>; } 
+};
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The class <span style="font-family: 'courier new', courier;">Good</span> uses initialisation but the class <span style="font-family: 'courier new', courier;">Bad</span> assignment. The consequences are:</p>
+<ul>
+<li>The variable<span style="font-family: courier new, courier;"> i</span> is directly initialised in the class <span style="font-family: courier new, courier;">Good</span></li>
+<li>The variable<span style="font-family: courier new, courier;"> i</span> is default constructed and then assigned to in the class <span style="font-family: courier new, courier;">Bad</span></li>
+</ul>
+<p>&nbsp;The constructor initialisation is, on one hand, slower but does not work on the other hand for const members, references, or members which can not be default-constructed possible.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// constructorAssignment.cpp</span>
+
+<span style="color: #006699; font-weight: bold;">struct</span> NoDefault{
+    NoDefault(<span style="color: #007788; font-weight: bold;">int</span>){};
+};
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Bad</span>{
+    <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">int</span> constInt;
+    <span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&amp;</span> refToInt;
+    NoDefault noDefault;
+<span style="color: #9999ff;">public:</span>
+    Bad(<span style="color: #007788; font-weight: bold;">int</span> i, <span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&amp;</span> iRef){
+        constInt <span style="color: #555555;">=</span> i;
+        refToInt <span style="color: #555555;">=</span> iRef;
+    }
+    <span style="color: #0099ff; font-style: italic;">// Bad(int i, int&amp; iRef): constInt(i), refToInt(iRef), noDefault{i} {}</span>
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+    
+    <span style="color: #007788; font-weight: bold;">int</span> i <span style="color: #555555;">=</span> <span style="color: #ff6600;">10</span>;
+    <span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&amp;</span> j <span style="color: #555555;">=</span> i;
+  
+    Bad bad(i, j);
+  
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>When I try to compile the program, I get three different errors.</p>
+<ol>
+<li><span style="font-family: courier new, courier;">constInt</span> is not initialised and can not be assigned in the constructor.</li>
+<li><span style="font-family: courier new, courier;">refToIn</span>t is not initialised.</li>
+<li>The class<span style="font-family: courier new, courier;"> NoDefault</span> has no default constructor because I implemented one constructor for<span style="font-family: courier new, courier;"> int</span>. When you implement a constructor, the compiler will not automatically generate a default constructor.</li>
+</ol>
+<p>&nbsp;</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesMoreReadersMyths/constructorAssignment.png" alt="constructorAssignment" width="700" height="335" /></p>
+<p>In the second successful compilation, I used the second commented out constructor which uses initialisation instead of assignment.</p>
+<p>The example used references instead of raw pointers for a good reason.</p>
+<h2>You need Raw Pointers in your Code (<span class="full_user_string"><span class="pseudonym">Thargon110</span></span>)</h2>
+<p>Motivated by a comment from Thargon110, I want to be dogmatic: NNN. What? I mean <strong>N</strong>o <strong>Na</strong>ked <strong>N</strong>ew. From an application perspective, there is no reason to use raw pointers. If you need pointer like semantic, put your pointer into a smart pointer (You see: NNN) and you are done.</p>
+<p>In essence C++11 has a <span style="font-family: courier new, courier;">std::unique_ptr</span> for exclusive ownership and a <span style="font-family: courier new, courier;">std::shared_ptr</span> for shared ownership. Consequently, when you copy a <span style="font-family: courier new, courier;">std::shared_ptr</span>, the reference counter is incremented, and when you delete the <span style="font-family: courier new, courier;">std::shared_ptr,</span> the reference counter is decremented. Ownership means, that the smart pointer keeps track of the underlying memory and releases the memory if it is not necessary any more. The memory is not necessary any more in the case of the std::shared_ptr when the reference counter becomes 0.</p>
+<p>So memory leaks are gone with modern C++. Now I hear your complaints. I'm happy to destroy them.</p>
+<ul>
+<li>Cycles of <span style="font-family: courier new, courier;">std::shared_ptr</span> can create a memory leak because the reference counter will not become 0. Right, put a <span style="font-family: courier new, courier;">std::weak_ptr</span> in-between to break the cyclic reference:<a href="https://www.modernescpp.com/index.php/std-weak-ptr"> std::weak_ptr. </a></li>
+<li>A <span style="font-family: courier new, courier;">std::shared_ptr</span> has a management overhead and is, therefore, more expensive than a raw pointer. Right, use a <a href="https://www.modernescpp.com/index.php/std-unique-ptr"><span style="font-family: courier new, courier;">std::unique_ptr.</span></a></li>
+<li>A <span style="font-family: courier new, courier;">std::unique_ptr</span> is not comfortable enough because it can't be copied. Right, but a <span style="font-family: courier new, courier;">std::unique_ptr</span> can be moved.</li>
+</ul>
+<p>&nbsp;The last complaint is quite dominant. The small example should make my point:</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// moveUniquePtr.cpp</span>
+
+<span style="color: #009999;">#include &lt;algorithm&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;memory&gt;</span>
+<span style="color: #009999;">#include &lt;utility&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">takeUniquePtr</span>(std<span style="color: #555555;">::</span>unique_ptr<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> uniqPtr){          <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"*uniqPtr: "</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #555555;">*</span>uniqPtr <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+  
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  
+    <span style="color: #006699; font-weight: bold;">auto</span> uniqPtr1 <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>make_unique<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span>(<span style="color: #ff6600;">2014</span>);
+    
+    takeUniquePtr(std<span style="color: #555555;">::</span>move(uniqPtr1));                    <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    
+    <span style="color: #006699; font-weight: bold;">auto</span> uniqPtr2 <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>make_unique<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span>(<span style="color: #ff6600;">2017</span>);
+    <span style="color: #006699; font-weight: bold;">auto</span> uniqPtr3 <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>make_unique<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span>(<span style="color: #ff6600;">2020</span>);
+    <span style="color: #006699; font-weight: bold;">auto</span> uniqPtr4 <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>make_unique<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span>(<span style="color: #ff6600;">2023</span>);
+    
+    std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>unique_ptr<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;&gt;</span> vecUniqPtr;
+    vecUniqPtr.push_back(std<span style="color: #555555;">::</span>move(uniqPtr2));             <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    vecUniqPtr.push_back(std<span style="color: #555555;">::</span>move(uniqPtr3));             <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    vecUniqPtr.push_back(std<span style="color: #555555;">::</span>move(uniqPtr4));             <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>for_each(vecUniqPtr.begin(), vecUniqPtr.end(),    <span style="color: #0099ff; font-style: italic;">// (3)</span>
+                  [](std<span style="color: #555555;">::</span>unique_ptr<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;&amp;</span> uniqPtr){ std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span>  <span style="color: #555555;">*</span>uniqPtr <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl; } );
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The function <span style="font-family: courier new, courier;">takeUniquePtr</span> in line (1) takes a <span style="font-family: courier new, courier;">std::unique_ptr</span> by value. The key observation is that you have to move the <span style="font-family: courier new, courier;">std::unique_ptr</span> inside. The same argument holds for the <span style="font-family: courier new, courier;">std::vector&lt;std::unique_ptr&lt;int&gt;&gt; (line 2)</span>. <span style="font-family: courier new, courier;">std::vector </span>as all containers of the standard template library wants to own its elements but to copy a <span style="font-family: courier new, courier;">std::unique_ptr</span> is not possible. <span style="font-family: courier new, courier;">std::move</span> solves this issue. You can apply an algorithm such as <span style="font-family: courier new, courier;">std::for_each</span> on the <span style="font-family: courier new, courier;">std::vector&lt;std::unique_ptr&lt;int&gt;&gt;</span>&nbsp;(line 3) if no copy semantic is used.</p>
+<h3>Use References instead of Raw Pointers</h3>
+<p>On the end, I want to refer to the key concern of <span class="full_user_string"><span class="pseudonym">Thargon110. Admittedly, this rule is way more import in classical C++ without smart pointers because smart pointers are in contract to raw pointers owners.</span></span></p>
+<p><span class="full_user_string"><span class="pseudonym">Use a reference instead of a pointer because a reference has always a value. Boring checks such as the following one are gone with references.&nbsp;<br /></span></span></p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">if</span>(<span style="color: #555555;">!</span>ptr){
+   std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Something went terrible wrong"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+   <span style="color: #006699; font-weight: bold;">return</span>;
+}
+std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"All fine"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Additionally, you can forget the check.&nbsp;References behave just as constant pointers.</p>
+<h2>What's next?</h2>
+<p>The C++ core guidelines defines profiles. Profiles are subset of rules. They exist for type safety, bounds safety, and lifetime safety. They will be my next topic.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Paul Baxter,&nbsp; Meeting C++, Matt Braun, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Marko, Ramesh Jangama,</strong><span class="sc-kpOJdX fDWXFa" title="Emyr Williams"><strong> G Prvulovic, Reiner Eiteljörge, Benjamin Huth, Reinhold Dröge, Timo, Abernitzke,</strong> </span><strong><span title="Emyr Williams">Richard Ohnemus , Frank Grimm</span></strong><span title="Emyr Williams"><strong>, Sakib, Broeserl, and </strong></span><strong><span title="Emyr Williams">António Pina. </span><span title="Emyr Williams">&nbsp; </span><span title="Emyr Williams"><br /></span></strong></p>
+<p>&nbsp;</p>
+<table style="width: 490px; height: 103px;">
+<tbody>
+<tr>
+<td><strong>Thanks in particular to:</strong></td>
+<td>
+<div id="simple-translate">&nbsp;</div>
+</td>
+<td><a href="https://cranepay.io/"><img src="images/patreon/crp4.png" alt="crp4" width="150" height="96" /></a></td>
+</tr>
+</tbody>
+</table>
+<p><strong>&nbsp;</strong></p>
+<p><strong>&nbsp;&nbsp;<a href="https://www.takeupcode.com/">&nbsp; </a></strong></p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at Leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 600 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
+<p></p>
+<table style="width: 800px;">
+<tbody>
+<tr>
+<td colspan="2">
+<h2>Get your interactive course</h2>
+&nbsp;</td>
+</tr>
+<tr>
+<td>
+<h4 class="_3fBEwsM053hx2mPd0uV0nT" style="text-align: center;">Modern C++ Concurrency in Practice</h4>
+</td>
+<td>
+<h4>C++ Standard Library including C++14 &amp; C++17</h4>
+</td>
+</tr>
+<tr>
+<td><a href="https://goo.gl/2qWUkK"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseConcurrency/educative.png" alt="educative" width="300" height="152" /></a></td>
+<td><a href="https://www.educative.io/collection/10370001/5712008708096000?authorName=Rainer%20Grimm"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseLibrary/CLibrary.png" alt="CLibrary" width="300" height="150" /></a></td>
+</tr>
+<tr>
+<td>
+<p>Based on my book "Concurrency with Modern C++" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>140 lessons</li>
+<li>110 code playgrounds =&gt; Runs in the browser</li>
+<li>78 code snippets</li>
+<li>55 illustrations</li>
+</ul>
+</td>
+<td>
+<p>Based on my book "The C++ Standard Library" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>149 lessons</li>
+<li>111 code playgrounds =&gt; Runs in the browser</li>
+<li>164 code snippets</li>
+<li>25 illustrations</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
