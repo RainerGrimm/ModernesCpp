@@ -1,0 +1,222 @@
+<p>Informally, profiles are a subset of rules of the C++ core guidelines for specific concerns such as type safety, bounds safety, and lifetime safety. Thanks to the guideline support library, they can be checked</p>
+<hr id="system-readmore" />
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesProfiles/checklist-911840_1280.png" alt="checklist 911840 1280" width="400" height="518" /></p>
+<p>&nbsp;There are two main reasons for the profiles:</p>
+<ol>
+<li>You have to deal with legacy code and you can not apply all rules of the C++ core guidelines in one step. You have to apply the rules step by step and use, therefore, some rules first and some rules later.</li>
+<li>Some related rules may be more important to your codebase than others. They aim for a specific goal such as the "avoidance of bounds error" or the "correct usage of types". These related rules are called profiles.</li>
+</ol>
+<p>Here is the formal definition of profiles from the C++ core guidelines:</p>
+<ul>
+<li><strong>Profile</strong> : <em>A “profile” is a set of deterministic and portably enforceable subset rules (i.e., restrictions) that are designed to achieve a specific guarantee. “</em></li>
+</ul>
+<p>Two terms in the definition are quite interesting:</p>
+<ul>
+<li>Deterministic: Local analysis can analyse the rule it can be implemented by a compiler.</li>
+<li>Portably enforceable: Different tools on different platforms give you the same answer.</li>
+</ul>
+<p>Now, the question is: When does your code conform to a profile? The answer is simple: It has to be warning-free regarding a profile. There exist three profiles:</p>
+<ul>
+<li><a href="https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#SS-type">Type safety</a></li>
+<li><a href="https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#SS-bounds">Bounds safety</a></li>
+<li><a href="https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#SS-lifetime">Lifetime safety</a></li>
+</ul>
+<p>According to the C++ core guidelines, additionally, profiles may follow in the future regarding topics such as undefined, and unspecified behaviour. Before I continue in my next post with the three existing profiles, I have to explain what the difference between undefined and unspecified behaviour is. Let's make a detour.</p>
+<h2>Undefined and unspecified behaviour</h2>
+<p>Here are the definitions from the current C++20 draft. The draft is written in American English.</p>
+<ul>
+<li><strong>Undefined behavior (3.27):&nbsp; </strong>behavior for which this document imposes no requirements.</li>
+<li><strong>Unspecified behavior(3.28):</strong> behavior, for a well-formed program, construct and correct data, that depends on the implementation.</li>
+</ul>
+<p>Okay, let me give you more explanation and a few examples:</p>
+<h3>Undefined behaviour</h3>
+<p>Informally said when your program has undefined behaviour you can not give any guarantees about your program&nbsp; The result may be the <em>expected</em> result, you may get the wrong result, the compilation may break, or you get a runtime error. The behaviour may depend on the platform, the compiler, the compiler version, the optimisation level, or the state of the used computer. I could extend this list forever but I will stop here. The action you have to take is quite simple: <strong>Fix the undefined behaviour!</strong></p>
+<p>To make it more concrete, here a few typical examples of undefined behaviour.</p>
+<ul>
+<li>Access to containers such as C-arrays or STL-containers out of bounds</li>
+<li>Use of an uninitialised variable</li>
+<li>Dereferencing a null pointer</li>
+<li>Division by zero</li>
+<li>Undefined order of evaluation</li>
+</ul>
+<p>Besides the last point, the listed undefined behaviours should be obvious.</p>
+<p>Informally said, undefined order of evaluation of a subexpression A followed by a subexpression B means, that the compiler can evaluate the subexpression A and B in any order it wants. Now we need guarantees that A is <span style="font-family: courier new, courier;">sequenced_before</span> B because if A is <span style="font-family: courier new, courier;">sequenced_before</span> B, A is evaluated before B and we have these guarantees. For example logical operators, full expression (<span style="font-family: courier new, courier;">a = c</span>;), invoking or returning from a function, or the end of an initialisation establish <span style="font-family: courier new, courier;">sequenced_before</span> relations. Admittedly, this was a simplification to the order of evaluation. Read the details on <a href="https://en.cppreference.com/w/cpp/language/eval_order">cppreference.com</a>.&nbsp;</p>
+<p>Maybe a small program helps your understanding. When I execute the following program with C++14, I get three warnings.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// undefinedBehaviour.cpp</span>
+
+<span style="color: #009999;">#include &lt;array&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>array<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>, <span style="color: #ff6600;">1</span><span style="color: #555555;">&gt;</span> myArr{};                      <span style="color: #0099ff; font-style: italic;">// (0)</span>
+
+    <span style="color: #007788; font-weight: bold;">int</span> i{};                                         <span style="color: #0099ff; font-style: italic;">// (0)</span>
+
+    myArr[i] <span style="color: #555555;">=</span> i<span style="color: #555555;">++</span>;                                  <span style="color: #0099ff; font-style: italic;">// (1) </span>
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> i <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"  "</span> <span style="color: #555555;">&lt;&lt;</span> i<span style="color: #555555;">++</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;      <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+    <span style="color: #007788; font-weight: bold;">int</span> n <span style="color: #555555;">=</span> <span style="color: #555555;">++</span>i <span style="color: #555555;">+</span> i;                                 <span style="color: #0099ff; font-style: italic;">// (2)</span>
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"n: "</span> <span style="color: #555555;">&lt;&lt;</span> n <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;  
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}
+</pre>
+</div>
+<p></p>
+<p>I use in the line (0) curly braces to initialise both data-types. The three expressions in line (1) and line (2) have undefined behaviour with C++14. The reason is that each expression is fully evaluated at the end of the expression. The semicolon is in these cases the end of the expression. The Clang compiler gives self-explanatory warnings.</p>
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesProfiles/undefinedBehaviour.png" alt="undefinedBehaviour" width="600" height="276" /></p>
+<p>Unsequenced evaluation means that the operations may happen in any order and even overlap. This is even possible in a single-threaded execution because the underlying assembler instruction may interleave. Sorry, this was not the full truth. The lines (1) have undefined behaviour in C++14 but unspecified behaviour in C++17.</p>
+<h3>Unspecified behaviour</h3>
+<p>Unspecified behaviour means that the implementation is not required to document which behaviour occurs. For example, it is unspecified in which order the arguments of a function are evaluated.</p>
+<p>Here is an interesting example, which has undefined behaviour in C++14 but unspecified behaviour in C++17.</p>
+<div><br /> <!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">func</span>(<span style="color: #007788; font-weight: bold;">int</span> fir, <span style="color: #007788; font-weight: bold;">int</span> sec){
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"("</span> <span style="color: #555555;">&lt;&lt;</span> fir <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">","</span> <span style="color: #555555;">&lt;&lt;</span> sec <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">")"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+    <span style="color: #007788; font-weight: bold;">int</span> i <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>;
+    func(i<span style="color: #555555;">++</span>, i<span style="color: #555555;">++</span>);
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>When I execute the program, the output differs between GCC and Clang. Neither do you get the same result nor are the arguments evaluated left to right.</p>
+<div>&nbsp;</div>
+<h4>GCC</h4>
+<p><img style="float: left;" src="images/blog/ModernCpp/CppCoreGuidelinesProfiles/gcc.png" alt="gcc" /></p>
+<h4>&nbsp;</h4>
+<h4>&nbsp;</h4>
+<h4>&nbsp;</h4>
+<h4>Clang</h4>
+<p><img style="float: left;" src="images/blog/ModernCpp/CppCoreGuidelinesProfiles/clang.png" alt="clang" /></p>
+<p>&nbsp;</p>
+</div>
+<div>&nbsp;</div>
+<div>&nbsp;</div>
+<p>&nbsp;</p>
+<p>Unspecified behaviour in C++17 gives you the guarantee that each argument is first fully evaluated before the other argument is evaluated. But you have still no guarantee in which order it is done.</p>
+<h2>What's next?</h2>
+<p>After this necessary detour to undefined and unspecified behaviour, I will write in my next post about the three profiles type safety, bounds safety, and lifetime safety.</p>
+<h2>The election of the pdf packages is made:</h2>
+<p>You can see the details of the election in the provided links. The pdf packages will be available in 1 - 2 weeks.</p>
+<ul>
+<li>German blog (Concurrency mit C++17 und C++20): <a href="https://www.grimm-jaud.de/index.php/blog/welches-pdf-paeckchen-soll-ich-zusammenstellen-mache-dein-kreuz-6">Welches PDF-Päckchen soll ich zusammenstellen? Mache dein Kreuz! </a></li>
+<li>English Blog (C++ Core Guidelines: Performance) : <a href="https://www.modernescpp.com/index.php/which-pdf-bundle-should-i-provide-make-your-choice-5">Which PDF bundle should I provide? Make your choice!</a></li>
+</ul>
+<div>&nbsp;</div>
+<div>&nbsp;</div>
+<div>&nbsp;</div>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Paul Baxter,&nbsp; Meeting C++, Matt Braun, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Marko, Ramesh Jangama,</strong><span class="sc-kpOJdX fDWXFa" title="Emyr Williams"><strong> G Prvulovic, Reiner Eiteljörge, Benjamin Huth, Reinhold Dröge, Timo, Abernitzke,</strong> </span><strong><span title="Emyr Williams">Richard Ohnemus , Frank Grimm</span></strong><span title="Emyr Williams"><strong>, Sakib, Broeserl, and </strong></span><strong><span title="Emyr Williams">António Pina. </span><span title="Emyr Williams">&nbsp; </span><span title="Emyr Williams"><br /></span></strong></p>
+<p>&nbsp;</p>
+<table style="width: 490px; height: 103px;">
+<tbody>
+<tr>
+<td><strong>Thanks in particular to:</strong></td>
+<td>
+<div id="simple-translate">&nbsp;</div>
+</td>
+<td><a href="https://cranepay.io/"><img src="images/patreon/crp4.png" alt="crp4" width="150" height="96" /></a></td>
+</tr>
+</tbody>
+</table>
+<p><strong>&nbsp;</strong></p>
+<p><strong>&nbsp;&nbsp;<a href="https://www.takeupcode.com/">&nbsp; </a></strong></p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at Leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 600 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
+<p></p>
+<table style="width: 800px;">
+<tbody>
+<tr>
+<td colspan="2">
+<h2>Get your interactive course</h2>
+&nbsp;</td>
+</tr>
+<tr>
+<td>
+<h4 class="_3fBEwsM053hx2mPd0uV0nT" style="text-align: center;">Modern C++ Concurrency in Practice</h4>
+</td>
+<td>
+<h4>C++ Standard Library including C++14 &amp; C++17</h4>
+</td>
+</tr>
+<tr>
+<td><a href="https://goo.gl/2qWUkK"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseConcurrency/educative.png" alt="educative" width="300" height="152" /></a></td>
+<td><a href="https://www.educative.io/collection/10370001/5712008708096000?authorName=Rainer%20Grimm"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseLibrary/CLibrary.png" alt="CLibrary" width="300" height="150" /></a></td>
+</tr>
+<tr>
+<td>
+<p>Based on my book "Concurrency with Modern C++" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>140 lessons</li>
+<li>110 code playgrounds =&gt; Runs in the browser</li>
+<li>78 code snippets</li>
+<li>55 illustrations</li>
+</ul>
+</td>
+<td>
+<p>Based on my book "The C++ Standard Library" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>149 lessons</li>
+<li>111 code playgrounds =&gt; Runs in the browser</li>
+<li>164 code snippets</li>
+<li>25 illustrations</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
