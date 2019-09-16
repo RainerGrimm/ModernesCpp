@@ -1,0 +1,259 @@
+<p>The C++ core guidelines support three profiles: type safety, bounds safety, and lifetime safety. Thanks to the guideline support library (GSL), you can check your code against these profiles. Today, I start with the profile type safety.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesTypeSafety/checklist-1295319_1280.png" alt="checklist 1295319 1280" width="400" height="431" /></p>
+<p>&nbsp;</p>
+<p>If you don't know what a profile is, read my last post: <a href="https://www.modernescpp.com/index.php/profiles-in-the-c-core-guidelines">C++ Core Guidelines: Profiles</a>. Although the idea of a profile is it to target a specific goal, it needs assistance from the other profiles. This said, the type safety profile needs, for example, assistance from the bounds safety, and lifetime safety profile. Now, let's dive into the type safety.</p>
+<h2><a href="https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#SS-type">Type Safety</a></h2>
+<p>Type safety means that you use the types correctly and, therefore, avoid unsafe casts and unions. Type safety consists of eight rules which are called type. The rules start with don't, always, or avoid and refer to existing rules. If necessary, I will add content to the rules.</p>
+<h3>Type 1:</h3>
+<ul>
+<li>
+<p>Don’t use <code class="highlighter-rouge no-highlight">reinterpret_cast</code></p>
+</li>
+<li>
+<p><code class="highlighter-rouge no-highlight"></code><code class="highlighter-rouge no-highlight"></code>Don’t use <code class="highlighter-rouge no-highlight">static_cast</code> for arithmetic types</p>
+</li>
+<li>
+<p>Don’t cast between pointer types where the source type and the target type are the same</p>
+</li>
+<li>Don’t cast between pointer types when the conversion could be implicit</li>
+</ul>
+<p>The answer to this don't boil down to two points:</p>
+<p>Avoid&nbsp; in particular C-casts and prefer if necessary named casts:</p>
+<h4>Avoid casts:</h4>
+<p>Let's see what will happen if I screw up the type system.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;"><br />
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// casts.cpp</span></pre>
+<p>&nbsp;</p>
+<p><span style="color: #009999;">#include &lt;iostream&gt;</span></p>
+<p><span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){</p>
+<p><span style="color: #007788; font-weight: bold;">&nbsp; &nbsp; double</span> d <span style="color: #555555;">=</span> <span style="color: #ff6600;">2</span>;<br /> <span style="color: #006699; font-weight: bold;">&nbsp; &nbsp; auto</span> p <span style="color: #555555;">=</span> (<span style="color: #007788; font-weight: bold;">long</span><span style="color: #555555;">*</span>)<span style="color: #555555;">&amp;</span>d;<br /> <span style="color: #006699; font-weight: bold;">&nbsp; &nbsp; auto</span> q <span style="color: #555555;">=</span> (<span style="color: #007788; font-weight: bold;">long</span> <span style="color: #007788; font-weight: bold;">long</span><span style="color: #555555;">*</span>)<span style="color: #555555;">&amp;</span>d;<br />&nbsp; &nbsp; std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> d <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">' '</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #555555;">*</span>p <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">' '</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #555555;">*</span>q <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;<br /> <br />}</p>
+</div>
+<p>&nbsp;</p>
+<p>Neither the result with the Visual Studio compiler</p>
+<p><img src="images/blog/ModernCpp/CppCoreGuidelinesConversionsCasts/castsWin.png" alt="castsWin" width="300" height="85" /></p>
+<p>nor the result with the GCC or the Clang compiler is promising.</p>
+<p></p>
+<p><img src="images/blog/ModernCpp/CppCoreGuidelinesConversionsCasts/castsGccClang.png" alt="castsGccClang" width="300" height="42" /></p>
+<p></p>
+<p>What is so bad about the C-cast? You don't see which cast is performed. If you use a C-cast, a combination of casts will be applied if necessary. Roughly speaking, a C-cast starts with a <span style="font-family: 'courier new', courier;">static_cast</span>, continues with a <span style="font-family: 'courier new', courier;">const_cast</span>, and finally performs a <span style="font-family: 'courier new', courier;">reinterpret_cast.</span></p>
+<p>There is another issue I don't like about a C-cast. It's challenging to find C-casts in your source code. This remark does not hold for C++-casts such as <span style="font-family: courier new, courier;">dynamic_cast, const_cast, static_cast, </span>or<span style="font-family: courier new, courier;"> reinterpret_cast.</span></p>
+<p>Of course, you know how I will continue: <em>explicit is better than implicit.</em></p>
+<h4>Prefer named C++-casts</h4>
+<p>Including the GSL, C++ offers eight different named casts.</p>
+<p>Here are they including a short description:</p>
+<ul>
+<ul>
+<li><span style="font-family: 'courier new', courier;">static_cast: </span>conversion between similar types such as pointer types or numeric types</li>
+</ul>
+</ul>
+<ul>
+<ul>
+<li><span style="font-family: 'courier new', courier;">const_cast: </span>adds or removes const or volatile</li>
+</ul>
+</ul>
+<ul>
+<ul>
+<li><span style="font-family: 'courier new', courier;">reinterpret_cast: </span>converts between pointers or between integral types and pointers</li>
+</ul>
+</ul>
+<ul>
+<ul>
+<li><span style="font-family: 'courier new', courier;">dynamic_ cast: </span>converts between polymorph pointers or references in the same class hierarchy</li>
+</ul>
+</ul>
+<ul>
+<ul>
+<li><span style="font-family: 'courier new', courier;">std::move: </span>converts to an rvalue reference</li>
+</ul>
+</ul>
+<ul>
+<ul>
+<li><span style="font-family: 'courier new', courier;">std::forward: </span>converts to an rvalue reference</li>
+</ul>
+</ul>
+<ul>
+<ul>
+<li><span style="font-family: 'courier new', courier;">gsl::narrow_cast: applies</span>&nbsp;a <span style="font-family: 'courier new', courier;">static_cast</span></li>
+</ul>
+</ul>
+<ul>
+<ul>
+<li><span style="font-family: 'courier new', courier;">gsl::narrow: applies&nbsp;</span>a <span style="font-family: 'courier new', courier;">static_cast</span></li>
+</ul>
+</ul>
+<p>I know, the description is concise. I want to make a least two remarks:</p>
+<ol>
+<li>GSL stands for guideline support library and is a header only library using the namespace <span style="font-family: courier new, courier;">gsl</span>.&nbsp; The GSL can be used to automatically check the rules of the C++ core guidelines and, in particular, the profiles. I will write about this check in a future post. I have already written a post to the GSL: <a href="https://www.modernescpp.com/index.php/c-core-guideline-the-guidelines-support-library">C++ Core Guidelines: The Guidelines Support Library</a>.</li>
+<li>What? <span style="font-family: 'courier new', courier;">std::move</span>&nbsp;and <span style="font-family: 'courier new', courier;">std::forward</span> are casts? Let's have a closer look at the internals of <span style="font-family: 'courier new', courier;">std::move: static_cast<span style="color: #000000; font-weight: bold;"></span><span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>remove_reference<span style="color: #555555;">&lt;decltype(arg)</span><span style="color: #555555;">&gt;::</span>type<span style="color: #555555;">&amp;&amp;&gt;</span>(arg). </span>First the type of the argument <span style="font-family: 'courier new', courier;">arg</span> is determined by <span style="font-family: 'courier new', courier;">decltype(arg)</span>. Then all references are removed and two new references added. The function<span style="font-family: 'courier new', courier;"> std::remove_reference</span> is from the type-traits library. I have already written a few posts to the <a href="index.php/tag/type-traits">type-traits library.</a>&nbsp; In the end, each argument <span style="font-family: courier new, courier;">arg</span> to <span style="font-family: courier new, courier;">std:</span>:move comes out as rvalue reference.</li>
+</ol>
+<h3>Type 2:</h3>
+<ul>
+<li>Don’t use <code class="highlighter-rouge no-highlight">static_cast</code> to downcast</li>
+</ul>
+<p>I can give you a short answer: Use <span style="font-family: courier new, courier;">dynamic_cast</span> instead. I have already written about this topic in my post <a href="https://www.modernescpp.com/index.php/c-core-guidelines-accessing-objects-in-a-hierarchy">C++ Core Guidelines: Accessing Objects in a Hierarchy</a>.</p>
+<h3>Type 3:</h3>
+<ul>
+<li>Don’t use <code class="highlighter-rouge no-highlight">const_cast</code> to cast away <code class="highlighter-rouge no-highlight">const</code></li>
+</ul>
+<p>Let me be more specific. Casting away <span style="font-family: courier new, courier;">const</span> is undefined behaviour if the underlying object such as <span style="font-family: 'courier new', courier;">constInt</span> is not mutable.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">int</span> constInt <span style="color: #555555;">=</span> <span style="color: #ff6600;">10</span>;
+<span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">*</span> pToConstInt <span style="color: #555555;">=</span> <span style="color: #555555;">&amp;</span>constInt;
+ 
+<span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">*</span> pToInt <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">const_cast</span><span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">*&gt;</span>(pToConstInt);
+<span style="color: #555555;">*</span>pToInt <span style="color: #555555;">=</span> <span style="color: #ff6600;">12</span>;          <span style="color: #0099ff; font-style: italic;">// undefined behaviour</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>If you don't believe me, there is a footnote in the C standard [ISO/IEC 9899:2011] (subclause 6.7.3, paragraph 4) which is also relevant for the C++ standard:&nbsp;<em>The implementation may place a const object that is not volatile in a read-only region of storage. Moreover, the implementation need not allocate storage for such an object if its address is never used.&nbsp; </em>This means, that a modification of an originaly constant object may have no result.</p>
+<h3>Type 4:</h3>
+<ul>
+<li>Don’t use C-style <code class="highlighter-rouge no-highlight">(T)expression</code> or functional <code class="highlighter-rouge no-highlight">T(expression)</code> casts</li>
+</ul>
+<p>The first part of this don't is quite easy to answer: prefer named casts such as in type 1.</p>
+<p>The functional <span style="font-family: courier new, courier;">T(e)</span> cast is used to construct <span style="font-family: courier new, courier;">T</span> from the expression e. Let me show what can happen if you use the functional cast in the wrong way.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// functionalCast.cpp</span>
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">f</span>(<span style="color: #007788; font-weight: bold;">int</span> x, <span style="color: #007788; font-weight: bold;">long</span> y, <span style="color: #007788; font-weight: bold;">double</span> d, <span style="color: #007788; font-weight: bold;">long</span> <span style="color: #007788; font-weight: bold;">long</span> l){
+    <span style="color: #007788; font-weight: bold;">char</span> c1(x);   
+    <span style="color: #007788; font-weight: bold;">char</span> c2(y);   
+    <span style="color: #007788; font-weight: bold;">char</span> c3(d);   
+    <span style="color: #007788; font-weight: bold;">char</span> c4(l);
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){  
+  f(<span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">3l</span>, <span style="color: #ff6600;">3.0</span>, <span style="color: #ff6600;">3ll</span>);
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The function <span style="font-family: courier new, courier;">f</span> takes four arguments and use these arguments for initialising <span style="font-family: courier new, courier;">char</span>'s. You get what you deserve and can only hope for a warning. <a href="https://cppinsights.io/s/6f300871">C++ Insights</a> shows explicitly, how your code is transformed. A <span style="font-family: courier new, courier;">static_cast</span> is applied to each argument.</p>
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesTypeSafety/cppInsightFunctionalCast.png" alt="cppInsightFunctionalCast" width="400" height="308" /></p>
+<p>This process is called narrowing conversion and should be detected by the compiler. Using curly braces instead of round braces checks if a narrowing conversion happens. The C++ compiler must write a warning but typically throws an error when this happens. If you want to be sure that narrowing conversion always triggers an error, treat narrowing warnings wiht GCC and Clang as an error with <span style="font-family: courier new, courier;">-Werror=narrowing</span>. Here is the modified program using curly braces for initialisation.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// functionalCastCurlyBraces.cpp</span>
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">f</span>(<span style="color: #007788; font-weight: bold;">int</span> x, <span style="color: #007788; font-weight: bold;">long</span> y, <span style="color: #007788; font-weight: bold;">double</span> d, <span style="color: #007788; font-weight: bold;">long</span> <span style="color: #007788; font-weight: bold;">long</span> l){
+    <span style="color: #007788; font-weight: bold;">char</span> c1{x};   
+    <span style="color: #007788; font-weight: bold;">char</span> c2{y};   
+    <span style="color: #007788; font-weight: bold;">char</span> c3{d};   
+    <span style="color: #007788; font-weight: bold;">char</span> c4{l};
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){  
+  f(<span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">3l</span>, <span style="color: #ff6600;">3.0</span>, <span style="color: #ff6600;">3ll</span>);
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Now, the compiler detects what is going wrong.</p>
+<p>&nbsp;</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesTypeSafety/narrowingConversionError.png" alt="narrowingConversionError" width="700" height="305" /></p>
+<h2>What's next?</h2>
+<p>In the next post, I finish the rules to type safety. They are about initialisation, unions, and varargs. Now, I have to prepare for a very exciting week in Aurora. I give a two days workshop to concurrency, a back to basics talk to concurrency, and a presentation to concepts at the <a href="https://cppcon.org/">CppCon</a>.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Paul Baxter,&nbsp; Meeting C++, Matt Braun, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Marko, Ramesh Jangama,</strong><span class="sc-kpOJdX fDWXFa" title="Emyr Williams"><strong> G Prvulovic, Reiner Eiteljörge, Benjamin Huth, Reinhold Dröge, Timo, Abernitzke,</strong> </span><strong><span title="Emyr Williams">Richard Ohnemus , Frank Grimm</span></strong><span title="Emyr Williams"><strong>, Sakib, Broeserl, and </strong></span><strong><span title="Emyr Williams">António Pina. </span><span title="Emyr Williams">&nbsp; </span><span title="Emyr Williams"><br /></span></strong></p>
+<p>&nbsp;</p>
+<table style="width: 490px; height: 103px;">
+<tbody>
+<tr>
+<td><strong>Thanks in particular to:</strong></td>
+<td>
+<div id="simple-translate">&nbsp;</div>
+</td>
+<td><a href="https://cranepay.io/"><img src="images/patreon/crp4.png" alt="crp4" width="150" height="96" /></a></td>
+</tr>
+</tbody>
+</table>
+<p><strong>&nbsp;</strong></p>
+<p><strong>&nbsp;&nbsp;<a href="https://www.takeupcode.com/">&nbsp; </a></strong></p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at Leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 600 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
+<p></p>
+<table style="width: 800px;">
+<tbody>
+<tr>
+<td colspan="2">
+<h2>Get your interactive course</h2>
+&nbsp;</td>
+</tr>
+<tr>
+<td>
+<h4 class="_3fBEwsM053hx2mPd0uV0nT" style="text-align: center;">Modern C++ Concurrency in Practice</h4>
+</td>
+<td>
+<h4>C++ Standard Library including C++14 &amp; C++17</h4>
+</td>
+</tr>
+<tr>
+<td><a href="https://goo.gl/2qWUkK"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseConcurrency/educative.png" alt="educative" width="300" height="152" /></a></td>
+<td><a href="https://www.educative.io/collection/10370001/5712008708096000?authorName=Rainer%20Grimm"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseLibrary/CLibrary.png" alt="CLibrary" width="300" height="150" /></a></td>
+</tr>
+<tr>
+<td>
+<p>Based on my book "Concurrency with Modern C++" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>140 lessons</li>
+<li>110 code playgrounds =&gt; Runs in the browser</li>
+<li>78 code snippets</li>
+<li>55 illustrations</li>
+</ul>
+</td>
+<td>
+<p>Based on my book "The C++ Standard Library" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>149 lessons</li>
+<li>111 code playgrounds =&gt; Runs in the browser</li>
+<li>164 code snippets</li>
+<li>25 illustrations</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
