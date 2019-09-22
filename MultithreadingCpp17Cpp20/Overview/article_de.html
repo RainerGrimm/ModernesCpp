@@ -1,0 +1,270 @@
+<p>Vorhersagen über die Zukunft sind schwierig. Insbesondere, wenn sie C++20 betreffen. Trotzdem wage ich ein Blick in die Kristallkugel und werde in den nächsten Artikeln darüber schreiben, auf was wir uns als C++ Entwickler mit C++17 freuen, auf was wir in C++20 hoffen dürfen.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p><img src="images/blog/FutureMultithreading/OverviewCpp17andCpp20/timelineCpp17andCpp20.png" alt="timelineCpp17andCpp20" width="700" height="305" style="margin: 15px;" /></p>
+<p>Seit C++11 stellt sich C++ den Anforderungen der Multicore-Architekturen. Der 2011 veröffentlichte Standard definiert, wie sich ein C++ Programm beim mehreren Threads zu verhalten hat. Dabei setzen sich die C++11 Multithreading-Fähigkeiten aus zwei Komponenten zusammen. Das ist zum einen das definierte Speichermodell, das ist zum anderen die standardisierte Threading-Schnittstelle.</p>
+<p>Das definierte Speichermodell beschäftigt sich mit Antworten zu den Fragen.<span style="font-size: 12pt;"></span></p>
+<ol>
+<li>Was sind atomare Operationen?</li>
+<li>Welche Ordnung von Operationen ist gewährleistet?</li>
+<li>Wann sind Speichereffekte von Operationen sichtbar?</li>
+</ol>
+<p>Die standardisierte Threading-Schnittstelle setzt sich auf den folgenden Komponenten zusammen.</p>
+<ol>
+<li><span style="font-size: 12pt;">Threads</span></li>
+<li><span style="font-size: 12pt;">Tasks</span></li>
+<li><span style="font-size: 12pt;">Thread-lokale Daten</span></li>
+<li><span style="font-size: 12pt;">Bedingungsvariablen</span></li>
+</ol>
+<p>Für wen das keine alten Hütte sind, den verweise ich gerne auf die Artikel zum<a href="index.php/blog/category/speichermodell"> C++ Speichermodell</a> und der <a href="index.php/blog/category/multithreading">standardisierten Threading-Schnittstelle. </a></p>
+<p>Mit der Multithreading Brille betrachtet, hat C++14 nicht viel zu C++11 hinzugefügt. C++14 kennt <a href="index.php/blog/reader-writer-locks">Reader-Writer Locks</a>.</p>
+<p>Da stellt sich natürlich die Frage. Was bringt die C++ Zukunft?</p>
+<p>&nbsp;</p>
+<p><img src="images/blog/FutureMultithreading/OverviewCpp17andCpp20/timelineCpp17andCpp20_1.png" alt="timelineCpp17andCpp20 1" width="700" height="366" style="margin: 15px;" /></p>
+<h2>C++17</h2>
+<p>Mit C++17 wird es parallele Versionen fast aller Algorithmen der Standard Template Library geben. So kann einem Algorithmus die sogenannten <em>execution policy</em> mitgegeben werden. Die <em>execution policy</em> bestimmt, ob der Algorithmus sequentiell (<span style="font-family: courier new,courier;">std::seq</span>), parallel (<span style="font-family: courier new,courier;">std::par</span>) oder parallel und vektorisierend (<span style="font-family: courier new,courier;">std::par_unseq</span>) ausgeführt wird</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;"></span><span style="color: #0000ff;"></span>
+std::vector&lt;<span style="color: #2b91af;">int</span>&gt; vec ={3, 2, 1, 4, 5, 6, 10, 8, 9, 4};
+<span style="color: #008000;"></span>
+std::sort(vec.begin(), vec.end());                            <span style="color: #008000;">// sequential as ever</span>
+std::sort(std::execution::seq, vec.begin(), vec.end());       <span style="color: #008000;">// sequential</span>
+std::sort(std::execution::par, vec.begin(), vec.end());       <span style="color: #008000;">// parallel</span>
+std::sort(std::execution::par_unseq, vec.begin(), vec.end()); <span style="color: #008000;">// parallel and vectorized</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>So wird die erste und zweite Variante des sort Algorithmus sequentiell, die dritte parallel und die vierte parallel vektorisierend ausgeführt.</p>
+<p>C++20 bietet ganz neue Multithreading Konzepte in C++ an. Diese zeichnen sich im wesentlichen dadurch aus, das sie Multithreading einfacher und damit weniger fehleranfällig machen.</p>
+<h2>C++20</h2>
+<h3>Atomare Smart Pointer</h3>
+<p>Die atomaren Smart Pointer <span style="font-family: courier new,courier;">std::shared_ptr</span> und <span style="font-family: courier new,courier;">std::weak_ptr</span> besitzen ein konzeptionelles Problem in Multithreading Programmen. Sie teilen ihren veränderlichen Zustand. Damit sind sie natürlich implizit der Gefahr von<a href="index.php?option=com_content&amp;view=article&amp;id=70:threads-teilen-daten&amp;catid=35:c&amp;Itemid=101#KritischerWettlauf"> kritischen Wettläufen</a> und damit von undefiniertem Programmverhalten ausgesetzt.&nbsp;Zwar sichern <span style="font-family: courier new,courier;">std::shared_ptr</span> und <span style="font-family: courier new,courier;">std::weak_ptr</span> zu, dass das Inkrementieren und Dekrementieren der Referenzzähler eine atomare Operation ist und dass der Destruktor der Ressource genau nur einmal aufgerufen wird, aber sie sichern&nbsp;nicht zu, dass die Zugriffe auf ihre Ressourcen atomar sind. Damit räumen die neuen atomaren Smart Pointer auf.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">std::atomic_shared_ptr
+std::atomic_weak_ptr
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Mit Tasks in der Form von Promisen und Futuren führte C++11 ein neues Multithreading Konzept in C++ ein. Trotz ihres großen Mehrwertes besitzen sie eine große Unzulänglichkeit. Futures in C++11 können nicht komponiert werden</p>
+<h3>std::future Erweiterungen</h3>
+<p>Mit dieser Unzulänglichkeit räumen Futures in C++20 auf. So wird ein Future genau dann gestartet,</p>
+<ul>
+<li>wenn sein Vorgänger seine Arbeit vollzogen hat:</li>
+</ul>
+<p style="padding-left: 60px;">&nbsp;<strong>then:</strong></p>
+<p style="padding-left: 60px;"><!-- HTML generated using hilite.me --></p>
+<pre style="margin: 0px; line-height: 125%; padding-left: 60px;">future&lt;<span style="color: #2b91af;">int</span>&gt; f1= async([]() {<span style="color: #0000ff;">return</span> 123;});
+future&lt;string&gt; f2 = f1.then([](future&lt;<span style="color: #2b91af;">int</span>&gt; f) {     
+  <span style="color: #0000ff;">return</span> f.get().to_string(); 
+});<br />
+</pre>
+<ul>
+<li>wenn einer seiner Vorgänger seine Arbeit vollzogen hat:</li>
+</ul>
+<p style="padding-left: 60px;"><strong>when_any:</strong></p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em; padding-left: 60px;">
+<pre style="margin: 0px; line-height: 125%;">future&lt;<span style="color: #2b91af;">int</span>&gt; futures[] = {async([]() { <span style="color: #0000ff;">return</span> intResult(125); }),                          
+                         async([]() { <span style="color: #0000ff;">return</span> intResult(456); })};
+future&lt;vector&lt;future&lt;<span style="color: #2b91af;">int</span>&gt;&gt;&gt; any_f = when_any(begin(futures),end(futures));<br />
+</pre>
+</div>
+<ul>
+<li>wenn alle seine Vorgänger ihre Arbeiten vollzogen haben:</li>
+</ul>
+<p style="padding-left: 60px;"><strong>when_all:</strong></p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em; padding-left: 60px;">
+<pre style="margin: 0px; line-height: 125%;">future&lt;<span style="color: #2b91af;">int</span>&gt; futures[] = {async([]() { <span style="color: #0000ff;">return</span> intResult(125); }),                          
+                         async([]() { <span style="color: #0000ff;">return</span> intResult(456); })};
+future&lt;vector&lt;future&lt;<span style="color: #2b91af;">int</span>&gt;&gt;&gt; all_f = when_all(begin(futures), end(futures));
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>C++14 kennt keine Semaphoren. Semaphoren erlauben es, dass mehrere Threads gleichzeitig auf eine beschränkte Ressource zugreifen können. Kein Problem, mit C++20 bekommen wir Latches und Barriers.</p>
+<h3>Latches und Barrieres</h3>
+<p>Latches und Barriers erlauben es, dass mehrere Threads an einem Synchronisationspunkt warten, bis eine Bedingung erfüllt ist. Dabei ist <span style="font-family: courier new,courier;">std::latch</span> für den einmaligen Gebraucht, <span style="font-family: courier new,courier;">std::barrier</span> für den mehrmaligen Gebrauch und <span style="font-family: courier new,courier;">std::flex_barrier</span> für den mehrmaligen Gebrauch ausgelegt.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #2b91af;">void</span> doWork(threadpool* pool){
+  latch completion_latch(NUMBER_TASKS);
+  <span style="color: #0000ff;">for</span> (<span style="color: #2b91af;">int</span> i = 0; i &lt; NUMBER_TASKS; ++i){
+    pool-&gt;add_task([&amp;]{
+      <span style="color: #008000;">// perform the work</span>
+      ...
+      completion_latch.count_down();
+    });
+  }
+  <span style="color: #008000;">// block until all tasks are done</span>
+  completion_latch.wait();
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>So warten die Threads in Zeile 11, bis&nbsp;<span style="font-family: courier new,courier;">completion_latch</span> den&nbsp;Wert 0 besitzt. <span style="font-family: courier new,courier;">completion_latch</span> wird in Zeile 2 auf den Wert <span style="font-family: courier new,courier;">NUMBER_TASKS</span> gesetzt und in Zeile 7 dekrementiert.</p>
+<p>Coroutinen erweitern das Funktionskonzept in C++. Im Gegensatz zu Funktionen können sie ihren Ablauf unterbrechen und wieder aufnehmen und behalten dabei ihren Zustand.</p>
+<h3>Coroutinen</h3>
+<p>Coroutinen sind gerne das Mittel der<span id="transmark"></span> Wahl um kooperatives Multitasking in Betriebssystemen, Ereignisschleifen in Eventsystemen, unendliche Listen oder Pipelines zu implementieren.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;">generator&lt;<span style="color: #2b91af;">int</span>&gt; getInts(<span style="color: #2b91af;">int</span> first, <span style="color: #2b91af;">int</span> last){
+  <span style="color: #0000ff;">for</span> (<span style="color: #0000ff;">auto</span> i= first; i &lt;= last; ++i){
+    co_yield i;
+  }
+}
+
+<span style="color: #2b91af;">int</span> main(){
+  <span style="color: #0000ff;">for</span> (<span style="color: #0000ff;">auto</span> i: getInts(5, 10)){
+    std::cout &lt;&lt; i &lt;&lt; <span style="color: #a31515;">" "</span>;                      // 5 6 7 8 9 10
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>So gibt die Funktion <span style="font-family: courier new,courier;">getInts</span> (Zeile 1 - 5) einen Generator zurück, der auf Anfrage einen neuen Wert erzeugt. Der Ausdruck <span style="font-family: courier new,courier;">co_yield</span> erfüllt zwei Aufgaben. Zum einen gibt er den neuen Wert zurück, zum anderen wartet er, bis ein neuer Wert vom Generator angefordert wird. Die&nbsp;Range-basierten for-Schleife in Zeile 8 frägt sukzessive die Werte von 5 - 10 ab.&nbsp;</p>
+<p>Mit Transactional Memory wird die bewährte Idee der Transaktion in der Softwareentwicklung angewandt.</p>
+<h3>Transactional Memory</h3>
+<p>Transactional Memory basiert auf der Idee der Transaktion aus der Datenbanktheorie. Dabei ist eine Transaktion eine Aktion, die sich durch die Eigenschaften <strong>A</strong>tomicity, <strong>C</strong>onsistency,<strong> I</strong>solation und<strong> D</strong>urability (ACID) auszeichnet. Bis auf die Durability treffen alle Eigenschafen auch auf Transactional Memory zu. C++ kennt Transactional Memory in zwei Formen. So kennt C++ Synchronized Blocks und Atomic Blocks. Gemein ist beiden, das sie in einer einzigen, totalen Ordnung ausgeführt werden und sie sich verhalten, wie wenn sie durch ein globales Lock geschützt werden. Während in Synchronized Block transaction-unsafe Code ausgeführt werden kann, ist dies in einem Atomic Block nicht erlaubt.&nbsp;</p>
+<p>So kann <span style="font-family: courier new,courier;">std::cout</span> zwar in einem Synchronized Block ausgeführt werden aber nicht in einem Atomic Block.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #2b91af;">int</span> func() { 
+  <span style="color: #0000ff;">static</span> <span style="color: #2b91af;">int</span> i = 0; 
+  synchronized{ 
+    std::cout &lt;&lt; <span style="color: #a31515;">"Not interleaved \n"</span>; 
+    ++i; 
+    <span style="color: #0000ff;">return</span> i;  
+  } 
+}
+ 
+<span style="color: #2b91af;">int</span> main(){
+  std::vector&lt;std::<span style="color: #0000ff;">thread</span>&gt; v(10); 
+  <span style="color: #0000ff;">for</span>(<span style="color: #0000ff;">auto</span>&amp; t: v) 
+    t = std::<span style="color: #0000ff;">thread</span>([]{ <span style="color: #0000ff;">for</span>(<span style="color: #2b91af;">int</span> n = 0; n &lt; 10; ++n) func(); });
+} 
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p>Der <span style="font-family: courier new,courier;">synchronized</span> Schlüsselwort in Zeile 3 sichert zu, dass sich die Ausführung der Synchronized Blocks (Zeile 3&nbsp; - 7) nicht überlagern. Das heißt insbesondere, das es eine einzige, globale Ordnung zwischen allen Synchronized Blöcken gibt. Nochmals anders ausgedrückt. Das Ende jedes Synchronized Blocks synchronisiert sich mit dem Anfang des nächsten Synchronized Block.</p>
+<p>Auch wenn ich den Artikel Multithreading in C++17 und C++20 genannt habe, so gibt es neben der parallelen STL noch ein weiteres Feature, das das einfache parallelisieren von Aufgaben erlaubt.</p>
+<h3>Task Blocks</h3>
+<p>Task Blocks setzen das Fork-Join Paradigma um. Die Graphik bringt dies einfach auf den Punkt.</p>
+<p>&nbsp;<img src="images/blog/FutureMultithreading/OverviewCpp17andCpp20/ForkJoin.png" alt="ForkJoin" width="700" height="178" style="margin: 15px;" /></p>
+<p>In einem Task Block können durch den <span style="font-family: courier new,courier;">run</span> Aufruf neue Task <em>geforked</em> werden, die am Ende des Task Blocks wieder <em>gejoined</em> werden.&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table style="width: 525px; height: 186px;">
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">template</span> &lt;<span style="color: #0000ff;">typename</span> Func&gt; 
+<span style="color: #2b91af;">int</span> traverse(node&amp; n, Func &amp;&amp; f){ 
+    <span style="color: #2b91af;">int</span> left = 0, right = 0; 
+    define_task_block(                 
+        [&amp;](task_block&amp; tb){ 
+            <span style="color: #0000ff;">if</span> (n.left) tb.run([&amp;]{ left = traverse(*n.left, f); }); 
+            <span style="color: #0000ff;">if</span> (n.right) tb.run([&amp;]{ right = traverse(*n.right, f); });
+         }
+    );                                                         
+    <span style="color: #0000ff;">return</span> f(n) + left + right; 
+} </pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>&nbsp;</p>
+<p><span style="font-family: courier new,courier;">traverse</span> ist eine Funktions Template, das auf jedem Knoten des Baumes <span style="font-family: courier new,courier;">node</span> mit zwei Kindern die Funktion <span style="font-family: courier new,courier;">Func</span> aufruft. Das Schlüsselwort<span style="font-family: courier new,courier;"> define_task_block</span> definiert den Task Block. In diesem kann der Task Block <span style="font-family: courier new,courier;">tb</span> neue Tasks starten. Genau das findet für den linken und rechten Zweig des Baumes in Zeile 6 und 7 statt. Zeile 9 ist das Ende des Task Blocks und damit der Synchronisationspunkt.</p>
+<h2>Wie geht's weiter?</h2>
+<p>Nachdem dem Überblick zu den neuen Featuren rund um Multithreading in C++17 und C++20 folgen in den <a href="index.php/blog/parallele-algorithmen-der-stl">nächsten Artikeln</a> die Details. Los geht es mit der parallelen STL. Dabei bin ich mir ziemlich sicher. Dieser Artikel hat mehr Fragen unbeantwortet gelassen als beantwortet.&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="166" height="212" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Hole dir dein E-Book. Unterstütze meinen Blog.</span></strong></p>
+<p>&nbsp;</p>
+<div id="simple-translate">&nbsp;</div>
