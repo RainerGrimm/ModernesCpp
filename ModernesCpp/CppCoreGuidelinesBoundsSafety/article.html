@@ -1,0 +1,265 @@
+<p>Today's post is about the second profile of the C++ Core Guidelines: Bounds Safety. The goal of the profile bounds safety is it that you operate inside the bounds of allocated memory.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesBoundsSafety/industrsy.jpg" alt="industrsy" width="500" height="333" /></p>
+<p>The profile names the two enemies for bounds safety: pointer arithmetic and array indexing. Additionally, when you use a pointer, it should only address a single object but not an array. To make the profile bounds safety complete, you should combine it with the rules to type safety and lifetime safety. Type safety was the topic of my two previous posts: <a href="https://www.modernescpp.com/index.php/c-core-guidelines-the-profiles-type-safety-bounds-safety-and-lifetime-safety">C++ Core Guidelines: Type Safety</a> and <a href="https://www.modernescpp.com/index.php/c-core-guidelines-type-safety-per-design">C++ Core Guidelines: Type Safety by Design</a>. Lifetime safety will be the topic of my next post.</p>
+<h3><a href="https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#SS-bounds">Bounds Safety</a></h3>
+<p>Bounds safety consists of four rules:</p>
+<ul>
+<li>Bounds.1: Don’t use pointer arithmetic<code></code><code class="highlighter-rouge no-highlight"></code></li>
+<li>Bounds.2: Only index into arrays using constant expressions</li>
+<li>Bounds.3: No array-to-pointer decay</li>
+<li>Bounds.4: Don’t use standard-library functions and types that are not bounds-checked</li>
+</ul>
+<p>The four rules to bounds safety mention three rules of the C++ core guidelines. As in the last posts to the profiles, I will make my additions if necessary.</p>
+<h3>Bounds.1: Don’t use pointer arithmetic, <code></code><code class="highlighter-rouge no-highlight"></code>Bounds.2: Only index into arrays using constant expressions, and Bounds.3: No array-to-pointer decay</h3>
+<p>The reason for the three rules boils down to the three do's: pass pointers to single objects (only), keep pointer arithmetic simple, and use <span style="font-family: courier new, courier;">std::span.</span> The first do can also be formulated negatively: don't pass pointers to arrays. I assume you don't know std::span.<span style="font-family: courier new, courier;"> std::span&lt;T&gt;</span> represents a non-owning range of contiguous memory. This range can be an array, a pointer with a size, or a <span style="font-family: courier new, courier;">std::vector</span>.</p>
+<p>Let me cite the words of the guidelines: "<em>Complicated pointer manipulation is a major source of errors</em>.". Why should we care? Of course, our legacy code is full of functionality, such as this example:</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">f</span>(<span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">*</span> p, <span style="color: #007788; font-weight: bold;">int</span> count)
+{
+    <span style="color: #006699; font-weight: bold;">if</span> (count <span style="color: #555555;">&lt;</span> <span style="color: #ff6600;">2</span>) <span style="color: #006699; font-weight: bold;">return</span>;
+
+    <span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">*</span> q <span style="color: #555555;">=</span> p <span style="color: #555555;">+</span> <span style="color: #ff6600;">1</span>;    <span style="color: #0099ff; font-style: italic;">// BAD</span>
+
+    <span style="color: #007788; font-weight: bold;">int</span> n <span style="color: #555555;">=</span> <span style="color: #555555;">*</span>p<span style="color: #555555;">++</span>;      <span style="color: #0099ff; font-style: italic;">// BAD</span>
+
+    <span style="color: #006699; font-weight: bold;">if</span> (count <span style="color: #555555;">&lt;</span> <span style="color: #ff6600;">6</span>) <span style="color: #006699; font-weight: bold;">return</span>;
+
+    p[<span style="color: #ff6600;">4</span>] <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span>;          <span style="color: #0099ff; font-style: italic;">// BAD</span>
+
+    p[count <span style="color: #555555;">-</span> <span style="color: #ff6600;">1</span>] <span style="color: #555555;">=</span> <span style="color: #ff6600;">2</span>;  <span style="color: #0099ff; font-style: italic;">// BAD</span>
+
+    use(<span style="color: #555555;">&amp;</span>p[<span style="color: #ff6600;">0</span>], <span style="color: #ff6600;">3</span>);     <span style="color: #0099ff; font-style: italic;">// BAD</span>
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> myArray[<span style="color: #ff6600;">100</span>];     <span style="color: #0099ff; font-style: italic;">// (1)</span>
+
+f(myArray, <span style="color: #ff6600;">100</span>),      <span style="color: #0099ff; font-style: italic;">// (2)</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The main issue with&nbsp;this code is that the caller&nbsp;must&nbsp;provide the&nbsp;correct length of the&nbsp;C-array. If not, we get undefined behaviour.</p>
+<p>Think about the last lines (1) and (2) for a few seconds. We start with an array and remove its type information by passing it to the function f. This process is called an array to pointer decay and is the reason for a lot of errors. Maybe we had a bad day, and we&nbsp;count the number of elements wrong or the size of C-array changed. Anyway, the result is the same: undefined behaviour. The same argumentation will also hold for a C-string.</p>
+<p>What should we do? We should use a suitable data type. C++20 supports <span style="font-family: courier new, courier;">std::span</span><span style="font-family: 'courier new', courier;"></span>. Have a look here:</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">f</span>(span<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> a) <span style="color: #0099ff; font-style: italic;">// BETTER: use span in the function declaration</span>
+{
+    <span style="color: #006699; font-weight: bold;">if</span> (a.length() <span style="color: #555555;">&lt;</span> <span style="color: #ff6600;">2</span>) <span style="color: #006699; font-weight: bold;">return</span>;
+
+    <span style="color: #007788; font-weight: bold;">int</span> n <span style="color: #555555;">=</span> a[<span style="color: #ff6600;">0</span>];      <span style="color: #0099ff; font-style: italic;">// OK</span>
+
+    span<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> q <span style="color: #555555;">=</span> a.subspan(<span style="color: #ff6600;">1</span>); <span style="color: #0099ff; font-style: italic;">// OK</span>
+
+    <span style="color: #006699; font-weight: bold;">if</span> (a.length() <span style="color: #555555;">&lt;</span> <span style="color: #ff6600;">6</span>) <span style="color: #006699; font-weight: bold;">return</span>;
+
+    a[<span style="color: #ff6600;">4</span>] <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span>;          <span style="color: #0099ff; font-style: italic;">// OK</span>
+
+    a[count <span style="color: #555555;">-</span> <span style="color: #ff6600;">1</span>] <span style="color: #555555;">=</span> <span style="color: #ff6600;">2</span>;  <span style="color: #0099ff; font-style: italic;">// OK</span>
+
+    use(a.data(), <span style="color: #ff6600;">3</span>);  <span style="color: #0099ff; font-style: italic;">// OK</span>
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Fine! <span style="font-family: 'courier new', courier;">std::span</span> checks at run-time its boundaries.</p>
+<p>But I hear your complaints: We don't have C++20. No problem. It's quite easy to rewrite the functions <span style="font-family: 'courier new', courier;">f</span> <span style="font-family: 'courier new', courier;"></span>using the container&nbsp;<span style="font-family: 'courier new', courier;">std:</span>:<span style="font-family: 'courier new', courier;">array</span> and the method&nbsp;<span style="font-family: 'courier new', courier;">std::array::at</span>. Here we are:</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// spanVersusArray.cpp</span>
+
+<span style="color: #009999;">#include &lt;algorithm&gt;</span>
+<span style="color: #009999;">#include &lt;array&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">use</span>(<span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">*</span>, <span style="color: #007788; font-weight: bold;">int</span>){}
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">f</span>(std<span style="color: #555555;">::</span>array<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>, <span style="color: #ff6600;">100</span><span style="color: #555555;">&gt;&amp;</span> a){
+
+    <span style="color: #006699; font-weight: bold;">if</span> (a.size() <span style="color: #555555;">&lt;</span> <span style="color: #ff6600;">2</span>) <span style="color: #006699; font-weight: bold;">return</span>;
+
+    <span style="color: #007788; font-weight: bold;">int</span> n <span style="color: #555555;">=</span> a.at(<span style="color: #ff6600;">0</span>);      
+
+    std<span style="color: #555555;">::</span>array<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>, <span style="color: #ff6600;">99</span><span style="color: #555555;">&gt;</span> q;
+    std<span style="color: #555555;">::</span>copy(a.begin() <span style="color: #555555;">+</span> <span style="color: #ff6600;">1</span>, a.end(), q.begin());      <span style="color: #0099ff; font-style: italic;">// (1)</span>
+
+    <span style="color: #006699; font-weight: bold;">if</span> (a.size() <span style="color: #555555;">&lt;</span> <span style="color: #ff6600;">6</span>) <span style="color: #006699; font-weight: bold;">return</span>;
+
+    a.at(<span style="color: #ff6600;">4</span>) <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span>;          
+
+    a.at(a.size() <span style="color: #555555;">-</span> <span style="color: #ff6600;">1</span>) <span style="color: #555555;">=</span> <span style="color: #ff6600;">2</span>;
+
+    use(a.data(), <span style="color: #ff6600;">3</span>); 
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+
+    std<span style="color: #555555;">::</span>array<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>, <span style="color: #ff6600;">100</span><span style="color: #555555;">&gt;</span> arr{};
+
+    f(arr);
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The <span style="font-family: 'courier new', courier;">std:</span>:<span style="font-family: 'courier new', courier;">array::at</span> operator will check at runtime its bounds. If <span style="font-family: 'courier new', courier;">pos &gt;= size()</span>, you will get an <a href="http://en.cppreference.com/w/cpp/error/out_of_range"><span style="font-family: 'courier new', courier;">std::out_of_range</span></a><span style="color: #000000; font-family: DejaVuSans, 'DejaVu Sans', arial, sans-serif; font-size: 12.8px; font-style: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing: 0px; background-color: #ffffff; float: none;">&nbsp;exception.&nbsp;</span><span style="color: #000000; font-family: DejaVuSans, 'DejaVu Sans', arial, sans-serif; font-size: 12.8px; font-style: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing: 0px; background-color: #ffffff; float: none;">If you look carefully at the <span style="font-family: 'courier new', courier;">spanVersusArray.cpp</span>&nbsp;program, you will notice two issues. First, the expression (1) is more verbose than the<span style="font-family: courier new, courier;"> std::span</span> version and second, the size of the <span style="font-family: 'courier new', courier;">std:</span></span><span style="font-family: courier new, courier;">:array</span> <span style="color: #000000; font-family: DejaVuSans, 'DejaVu Sans', arial, sans-serif; font-size: 12.8px; font-style: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing: 0px; background-color: #ffffff; float: none;">is part of the signature of the function&nbsp;<span style="font-family: 'courier new', courier;">f.</span> This is bad. I can only use f with the type <span style="font-family: 'courier new', courier;">std::array</span></span><span style="color: #000000; font-family: DejaVuSans, 'DejaVu Sans', arial, sans-serif; font-size: 12.8px; font-style: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing: 0px; background-color: #ffffff; float: none;"><span style="font-family: 'courier new', courier;">&lt;int, 100&gt;</span>.&nbsp; In this case, the checks of the array size inside the function are superfluous.&nbsp;</span></p>
+<p>To your rescue, C++ has templates; therefore, it's easy to overcome the type restrictions but staying type-safe.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// at.cpp</span>
+
+<span style="color: #009999;">#include &lt;algorithm&gt;</span>
+<span style="color: #009999;">#include &lt;array&gt;</span>
+<span style="color: #009999;">#include &lt;deque&gt;</span>
+<span style="color: #009999;">#include &lt;string&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">void</span> use(T<span style="color: #555555;">*</span>, <span style="color: #007788; font-weight: bold;">int</span>){}
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">void</span> f(T<span style="color: #555555;">&amp;</span> a){
+
+    <span style="color: #006699; font-weight: bold;">if</span> (a.size() <span style="color: #555555;">&lt;</span> <span style="color: #ff6600;">2</span>) <span style="color: #006699; font-weight: bold;">return</span>;
+
+    <span style="color: #007788; font-weight: bold;">int</span> n <span style="color: #555555;">=</span> a.at(<span style="color: #ff6600;">0</span>);      
+
+    std<span style="color: #555555;">::</span>array<span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">::</span>value_type , <span style="color: #ff6600;">99</span><span style="color: #555555;">&gt;</span> q;                 <span style="color: #0099ff; font-style: italic;">// (5)</span>
+    std<span style="color: #555555;">::</span>copy(a.begin() <span style="color: #555555;">+</span> <span style="color: #ff6600;">1</span>, a.end(), q.begin());     
+
+    <span style="color: #006699; font-weight: bold;">if</span> (a.size() <span style="color: #555555;">&lt;</span> <span style="color: #ff6600;">6</span>) <span style="color: #006699; font-weight: bold;">return</span>;
+
+    a.at(<span style="color: #ff6600;">4</span>) <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span>;          
+
+    a.at(a.size() <span style="color: #555555;">-</span> <span style="color: #ff6600;">1</span>) <span style="color: #555555;">=</span> <span style="color: #ff6600;">2</span>;
+
+    use(a.data(), <span style="color: #ff6600;">3</span>);                                          <span style="color: #0099ff; font-style: italic;">// (6)</span>
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main(){
+
+    std<span style="color: #555555;">::</span>array<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>, <span style="color: #ff6600;">100</span><span style="color: #555555;">&gt;</span> arr{};                                             
+    f(arr);                                                    <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    
+    std<span style="color: #555555;">::</span>array<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">double</span>, <span style="color: #ff6600;">20</span><span style="color: #555555;">&gt;</span> arr2{};
+    f(arr2);                                                   <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    
+    std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">double</span><span style="color: #555555;">&gt;</span> vec{<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">5</span>, <span style="color: #ff6600;">6</span>, <span style="color: #ff6600;">7</span>, <span style="color: #ff6600;">8</span>, <span style="color: #ff6600;">9</span>};
+    f(vec);                                                    <span style="color: #0099ff; font-style: italic;">// (3)</span>
+    
+    std<span style="color: #555555;">::</span>string myString<span style="color: #555555;">=</span> <span style="color: #cc3300;">"123456789"</span>;
+    f(myString);                                               <span style="color: #0099ff; font-style: italic;">// (4)</span>
+    
+    <span style="color: #0099ff; font-style: italic;">// std::deque&lt;int&gt; deq{1, 2, 3, 4, 5, 6, 7, 8, 9, 10};</span>
+    <span style="color: #0099ff; font-style: italic;">// f(deq);                                                 </span>
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Now, the function f works for <span style="font-family: 'courier new', courier;">std:</span>:<span style="font-family: courier new, courier;">array</span>'s of different sizes and types (lines (1) and (2)) but also for an <span style="font-family: 'courier new', courier;">std:</span>:<span style="font-family: courier new, courier;">vector&nbsp;</span>(3) or an&nbsp;<span style="font-family: 'courier new', courier;">std:</span><span style="font-family: courier new, courier;">:string&nbsp;</span>(4). This containers have in common that their data is stored in a&nbsp;contiguous memory block. This will no hold <span style="font-family: 'courier new', courier;">std::deque;</span> therefore, the call <span style="font-family: 'courier new', courier;">a.data()</span> in expression (6) fails. A <span style="font-family: courier new, courier;">std::deque</span> is a kind of doubly-linked list of small memory blocks.</p>
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesMoreExpressions/deque.png" alt="deque" width="500" height="38" /></p>
+<p>The expression&nbsp;<span style="font-family: 'courier new', courier;">T::value_type</span> (5) helps me to get the underlying value type of each container. <span style="font-family: 'courier new', courier;">T</span> is a so-called dependent type because <span style="font-family: 'courier new', courier;">T</span> is a type parameter of the function template <span style="font-family: 'courier new', courier;">f</span>. This is the reason, I have to give the compiler as a hint that <span style="font-family: 'courier new', courier;">T::value_type</span> is a type:&nbsp;<span style="font-family: 'courier new', courier;">typename T::value_type</span>.</p>
+<h3>Bounds.4: Don’t use standard-library functions and types that are not bounds-checked</h3>
+<p>I have already written a post <a href="https://www.modernescpp.com/index.php/c-core-guidelines-avoid-bound-errors">C++ Core Guidelines: Avoid Bounds Errors</a>. This post gives background information to this rule and provides do's.&nbsp;</p>
+<h2>What's next?</h2>
+<p>The name of the third profile is Lifetime Safety Profile. This profile which is the topic of my next post boils down to one rule: Don’t dereference a possibly invalid pointer.</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Paul Baxter,&nbsp; Meeting C++, Matt Braun, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Marko, Ramesh Jangama,</strong><span class="sc-kpOJdX fDWXFa" title="Emyr Williams"><strong> G Prvulovic, Reiner Eiteljörge, Benjamin Huth, Reinhold Dröge, Abernitzke,</strong> </span><strong><span title="Emyr Williams">Richard Ohnemus , Frank Grimm</span></strong><span title="Emyr Williams"><strong>, Sakib, Broeserl, and </strong></span><strong><span title="Emyr Williams">António Pina. </span><span title="Emyr Williams">&nbsp; </span><span title="Emyr Williams"><br /></span></strong></p>
+<p>&nbsp;</p>
+<table style="width: 490px; height: 103px;">
+<tbody>
+<tr>
+<td><strong>Thanks in particular to:</strong></td>
+<td>
+<div id="simple-translate">&nbsp;</div>
+</td>
+<td><a href="https://cranepay.io/"><img src="images/patreon/crp4.png" alt="crp4" width="150" height="96" /></a></td>
+</tr>
+</tbody>
+</table>
+<p><strong>&nbsp;</strong></p>
+<p><strong>&nbsp;&nbsp;<a href="https://www.takeupcode.com/">&nbsp; </a></strong></p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at Leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 600 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
+<p></p>
+<table style="width: 800px;">
+<tbody>
+<tr>
+<td colspan="2">
+<h2>Get your interactive course</h2>
+&nbsp;</td>
+</tr>
+<tr>
+<td>
+<h4 class="_3fBEwsM053hx2mPd0uV0nT" style="text-align: center;">Modern C++ Concurrency in Practice</h4>
+</td>
+<td>
+<h4>C++ Standard Library including C++14 &amp; C++17</h4>
+</td>
+</tr>
+<tr>
+<td><a href="https://goo.gl/2qWUkK"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseConcurrency/educative.png" alt="educative" width="300" height="152" /></a></td>
+<td><a href="https://www.educative.io/collection/10370001/5712008708096000?authorName=Rainer%20Grimm"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseLibrary/CLibrary.png" alt="CLibrary" width="300" height="150" /></a></td>
+</tr>
+<tr>
+<td>
+<p>Based on my book "Concurrency with Modern C++" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>140 lessons</li>
+<li>110 code playgrounds =&gt; Runs in the browser</li>
+<li>78 code snippets</li>
+<li>55 illustrations</li>
+</ul>
+</td>
+<td>
+<p>Based on my book "The C++ Standard Library" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>149 lessons</li>
+<li>111 code playgrounds =&gt; Runs in the browser</li>
+<li>164 code snippets</li>
+<li>25 illustrations</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
