@@ -1,0 +1,222 @@
+<p>The lifetime safety profile in the C++ core guidelines boils down to one issue: don't dereference a possible invalid pointer. A pointer may be invalid because it is not initialised or the <code class="highlighter-rouge no-highlight"><span style="font-family: courier new, courier;">nullptr</span>. </code>A pointer may also point beyond its rage or to a deleted object.</p>
+<hr id="system-readmore" />
+<div id="simple-translate">&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesLifetimeSafety/cemetery.jpg" alt="cemetery" width="600" height="307" /></div>
+<div>&nbsp;</div>
+<h3>&nbsp;</h3>
+<h2>Lifetime Safety</h2>
+<h5 id="impact-2">When you don't dereference a possible invalid pointer, the impact to your program is according to the C++ core guidelines manifold:</h5>
+<ul>
+<li>eliminates one of the major sources of nasty errors in C++</li>
+<li>eliminates a major source of potential security violations</li>
+<li>improves performance by eliminating redundant “paranoia” checks</li>
+<li>increases confidence in correctness of code</li>
+<li>avoids undefined behavior by enforcing a key C++ language rule</li>
+</ul>
+<p>Honestly, dealing with pointers is part of a bigger story: ownership. Ownership means that at each point in time, it must be obvious, who is responsible for managing the lifetime of an object. Roughly speaking, C++11 support six kinds of ownership:</p>
+<ul>
+<li><strong>Local objects</strong>. The C++ runtime, as the owner automatically manages the lifetime of these resources. The same holds for global objects or members of a class. The guidelines calls them scoped objects.</li>
+<li><strong>References</strong>: I'm not the owner. I only borrowed the resource that cannot be empty.</li>
+<li><strong>Raw pointers</strong>: I'm not the owner. I only borrowed the resource that can be can be empty. I must not delete the resource.</li>
+<li><strong><span style="font-family: courier new, courier;">std::unique_ptr</span></strong>: I'm the exclusive owner of the resource. I may explicitly release the resource.</li>
+<li><strong><span style="font-family: courier new, courier;">std::shared_ptr</span></strong>: I share the resource with other shared pointer. I may explicitly release my shared ownership.</li>
+<li><strong><span style="font-family: courier new, courier;">std::weak_ptr</span></strong>: I'm not the owner of the resource, but I may become temporary the shared owner of the resource by using the method <a href="http://en.cppreference.com/w/cpp/memory/weak_ptr/lock"><span style="font-family: courier new, courier;">std::weak_ptr::lock</span></a>.</li>
+</ul>
+<p>Compare this fine-grained ownership semantic with a raw pointer. Now you know, what I like about modern C++.</p>
+<p>Now, you may ask yourself: Having rules is fine but how can I check that my code follows these rules? Thanks to the Guidelines Support Library (GSL) the rules of the C++ core guidelines can automatically be checked.&nbsp;</p>
+<h2>Checking the Rules of the Guidelines</h2>
+<p>The GSL is a small library for supporting the guidelines of the C++ core guidelines. They are already a few implementations of the GSL available.</p>
+<p>The GSL is a header only library, hence, you can use the functions and types of the library quite easily. The best-known implementation is the one from Microsoft, hosted at Github: <a href="https://github.com/Microsoft/GSL">Microsoft/GSL</a>. The Microsoft version requires C++14 support and runs on various platforms. Here are a few quite popular platforms:</p>
+<ul>
+<li>Windows using Visual Studio 2015</li>
+<li>Windows using Visual Studio 2017</li>
+<li>Windows using Visual Studio 2019</li>
+<li>Windows using Clang/LLVM 3.6</li>
+<li>Windows using Clang/LLVM 7.0.0</li>
+<li>Windows using GCC 5.1</li>
+<li>Windows using Intel C++ Compiler 18.0</li>
+<li>GNU/Linux using Clang/LLVM 3.6-3.9</li>
+<li>GNU/Linux using Clang/LLVM 4.0</li>
+<li>GNU/Linux using Clang/LLVM 5.0</li>
+<li>GNU/Linux using Clang/LLVM 6.0</li>
+<li>GNU/Linux using Clang/LLVM 7.0</li>
+<li>GNU/Linux using GCC 5.1</li>
+</ul>
+<p>Let's see what I can achieve with the GSL. Here is a program, which breaks <a href="https://www.modernescpp.com/index.php/c-core-guidelines-the-profiles-type-safety-bounds-safety-and-lifetime-safety">Type Safety</a>, <a href="https://www.modernescpp.com/index.php/c-core-guidelines-bounds-safety">Bounds Safey</a>, and Lifetime Safety.</p>
+<h3>Break of Type Safety, Bounds Safety, and Lifetime Safety</h3>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// gslCheck.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">f</span>(<span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">*</span> p, <span style="color: #007788; font-weight: bold;">int</span> count) {
+}
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">f2</span>(<span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">*</span> p) {
+    <span style="color: #007788; font-weight: bold;">int</span> x <span style="color: #555555;">=</span> <span style="color: #555555;">*</span>p;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    <span style="color: #0099ff; font-style: italic;">// Break of type safety</span>
+    <span style="color: #0099ff; font-style: italic;">// use of a c-cast</span>
+    <span style="color: #007788; font-weight: bold;">double</span> d <span style="color: #555555;">=</span> <span style="color: #ff6600;">2</span>;
+    <span style="color: #006699; font-weight: bold;">auto</span> p <span style="color: #555555;">=</span> (<span style="color: #007788; font-weight: bold;">long</span><span style="color: #555555;">*</span>)<span style="color: #555555;">&amp;</span>d;
+    <span style="color: #006699; font-weight: bold;">auto</span> q <span style="color: #555555;">=</span> (<span style="color: #007788; font-weight: bold;">long</span> <span style="color: #007788; font-weight: bold;">long</span><span style="color: #555555;">*</span>)<span style="color: #555555;">&amp;</span>d;
+
+    <span style="color: #0099ff; font-style: italic;">// Break of bounds safety</span>
+    <span style="color: #0099ff; font-style: italic;">// array to pointer decay</span>
+    <span style="color: #007788; font-weight: bold;">int</span> myArray[<span style="color: #ff6600;">100</span>];
+    f(myArray, <span style="color: #ff6600;">100</span>);
+
+    <span style="color: #0099ff; font-style: italic;">// Break of Lifetime Safety</span>
+    <span style="color: #0099ff; font-style: italic;">// a is not valid</span>
+    <span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">*</span> a <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">new</span> <span style="color: #007788; font-weight: bold;">int</span>;
+    <span style="color: #006699; font-weight: bold;">delete</span> a;
+    f2(a);
+
+}
+</pre>
+</div>
+<p></p>
+<p>The comments in the source code document my issues. Now, let me start Visual Studio 2019 and show my steps to visualise the issues.</p>
+<h3>Enable Code Analysis on Build</h3>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesLifetimeSafety/EnableCodeAnalysis.PNG" alt="EnableCodeAnalysis" width="600" height="401" /></p>
+<p>You have to enable the Checkbox. Per default, the three <a href="https://www.modernescpp.com/index.php/c-core-guidelines-the-profiles-type-safety-bounds-safety-and-lifetime-safety">Type Safety</a>, <a href="https://www.modernescpp.com/index.php/c-core-guidelines-bounds-safety">Bounds Safety</a>, and Lifetime Safety rules are not part of the Microsoft Native Recommended Rules.</p>
+<h3>Configure your Active Rules</h3>
+<p>As you can see from the screenshot, I create my ruleset <span style="font-family: courier new, courier;">CheckProfile</span>, which consisted of the rules C++ Core Guidelines Bounds Rules, C++ Core Guidelines Type Rules, and C++ Core Guidelines Lifetime Rules.</p>
+<h3>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesLifetimeSafety/gsl.PNG" alt="gsl" width="600" height="401" /></h3>
+<h3>Run Code Analysis on Solution</h3>
+<p>Applying my set of rules on the code example was quite promising.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesLifetimeSafety/check.PNG" alt="check" width="700" height="86" /></p>
+<p>All issues are found. For each issue such as the first one, I get the line number (17), and the rule of the affected profile (type.4).</p>
+<h3>Suppress Warnings</h3>
+<p>Sometimes, you want to suppress specific warnings. You can achieve this with attributes. My next example applies two times an array to pointer decay. Only the second call should give a warning.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// gslCheckSuppress.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">f</span>(<span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">*</span> p, <span style="color: #007788; font-weight: bold;">int</span> count) {
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    <span style="color: #007788; font-weight: bold;">int</span> myArray[<span style="color: #ff6600;">100</span>];
+    
+    <span style="color: #0099ff; font-style: italic;">// Break of bounds safety</span>
+    [[gsl<span style="color: #555555;">::</span>suppress(bounds<span style="color: #ff6600;">.3</span>)]] {   <span style="color: #0099ff; font-style: italic;">// suppress warning</span>
+        f(myArray, <span style="color: #ff6600;">100</span>);
+    }
+
+    f(myArray, <span style="color: #ff6600;">100</span>);                <span style="color: #0099ff; font-style: italic;">// warning           </span>
+
+}
+</pre>
+</div>
+<p></p>
+<p>The attribute <span style="font-family: courier new, courier;">gsl::suppress(bounds.3)</span> behaves as expected. It's only valid in its scope. The second break of bounds safety is displayed.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesLifetimeSafety/checkSuppress.PNG" alt="checkSuppress" width="600" height="72" /></p>
+<h2>What's next?</h2>
+<p>I skip the next section of the C++ core guidelines because I already wrote a post to the <a href="https://www.modernescpp.com/index.php/c-core-guideline-the-guidelines-support-library">Guidelines Support Library</a>. I assume the next chapter will be quite controversial: naming and layout rules.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Paul Baxter,&nbsp; Meeting C++, Matt Braun, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Marko, </strong><span class="sc-kpOJdX fDWXFa" title="Emyr Williams"><strong>G Prvulovic, Reiner Eiteljörge, Benjamin Huth, Reinhold Dröge, Abernitzke,</strong> </span><strong><span title="Emyr Williams">Richard Ohnemus , Frank Grimm</span></strong><span title="Emyr Williams"><strong>, Sakib, Broeserl, and </strong></span><strong><span title="Emyr Williams">António Pina. </span><span title="Emyr Williams">&nbsp; </span><span title="Emyr Williams"><br /></span></strong></p>
+<p>&nbsp;</p>
+<table style="width: 490px; height: 103px;">
+<tbody>
+<tr>
+<td><strong>Thanks in particular to:</strong></td>
+<td>
+<div id="simple-translate">&nbsp;</div>
+</td>
+<td><a href="https://cranepay.io/"><img src="images/patreon/crp4.png" alt="crp4" width="150" height="96" /></a></td>
+</tr>
+</tbody>
+</table>
+<p><strong>&nbsp;</strong></p>
+<p><strong>&nbsp;&nbsp;<a href="https://www.takeupcode.com/">&nbsp; </a></strong></p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at Leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 600 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
+<p></p>
+<table style="width: 800px;">
+<tbody>
+<tr>
+<td colspan="2">
+<h2>Get your interactive course</h2>
+&nbsp;</td>
+</tr>
+<tr>
+<td>
+<h4 class="_3fBEwsM053hx2mPd0uV0nT" style="text-align: center;">Modern C++ Concurrency in Practice</h4>
+</td>
+<td>
+<h4>C++ Standard Library including C++14 &amp; C++17</h4>
+</td>
+</tr>
+<tr>
+<td><a href="https://goo.gl/2qWUkK"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseConcurrency/educative.png" alt="educative" width="300" height="152" /></a></td>
+<td><a href="https://www.educative.io/collection/10370001/5712008708096000?authorName=Rainer%20Grimm"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseLibrary/CLibrary.png" alt="CLibrary" width="300" height="150" /></a></td>
+</tr>
+<tr>
+<td>
+<p>Based on my book "Concurrency with Modern C++" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>140 lessons</li>
+<li>110 code playgrounds =&gt; Runs in the browser</li>
+<li>78 code snippets</li>
+<li>55 illustrations</li>
+</ul>
+</td>
+<td>
+<p>Based on my book "The C++ Standard Library" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>149 lessons</li>
+<li>111 code playgrounds =&gt; Runs in the browser</li>
+<li>164 code snippets</li>
+<li>25 illustrations</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
