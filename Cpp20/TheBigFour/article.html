@@ -1,0 +1,245 @@
+<p>This post presents you the big four: concepts, ranges, coroutines, and modules, C++20 has a lot to offer. Before I give you a first impression to the big four, here a first overview of C++20.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/WhatsInside/TimelineCpp20BigFourUpdate.png" alt="TimelineCpp20BigFourUpdate" width="650" height="224" /></p>
+<p>The timeline gives you the first idea. Besides the big four, many features affect the core language, the library, and the concurrency capabilities of C++20.</p>
+<h2>Compiler Support for C++20</h2>
+<p>The easiest way to get used to the new features is to play with them. Okay. This approach arises immediately the question: Which C++20 features are supported by which compiler? As so often, <a href="https://en.cppreference.com/w/cpp/compiler_support">cppreference.com/compiler_support</a> gives you the answer to the core language and the library.</p>
+<p>To make it simple, the brand new GCC, Clang, and EDG compiler give the best support to the core language. Additionally, the MSVC and Apple Clang compiler support also many C++20 features.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/WhatsInside/Core.PNG" alt="Core" width="600" height="432" /></p>
+<p>&nbsp;</p>
+<p>The story is similar for the library. GCC has the best support for the library, followed by the Clang and the MSVC compiler.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/WhatsInside/Library.PNG" alt="Library" width="600" height="448" /></p>
+<p>The screenshots show only the beginning of the tables, but they also give you an answer which is not so satisfying. Even if you use all brand new compilers, there are many features which are not supported by any compiler.</p>
+<p>Often, you find workarounds to play with the new features. Here are two examples:</p>
+<ul>
+<li>Concepts: GCC support a previous version of concepts.</li>
+<li><span style="font-family: courier new, courier;">std::jthread</span>: There is a draft implementation on <a href="https://github.com/josuttis/jthread">Github </a>maintained by Nicolai Josuttis.</li>
+</ul>
+<p>To make my story short. The situation is not so bad. <span class="tlid-translation translation" lang="en"><span class="" title="">With a little tinkering, many new features can be tried out. I will mention this little tinkering, if necessary. <br /></span></span></p>
+<p>But now, let me give you a bird-eyes view of the new features. Of course, we should start with the big four.</p>
+<h2>The Big Four</h2>
+<h3>Concepts</h3>
+<p>The key idea of generic programming with templates is it to define functions and classes which can be used with various types. Often it happens that you instantiate a template with the wrong type. The result is typically a few pages of cryptic error messages. This sad story ends with concepts. Concepts empower you to write requirements for your templates which can be checked by the compiler. Concepts revolutionise the way, we think about and write generic code. Here is why:</p>
+<ul>
+<li>Requirements for templates are part of the interface.</li>
+<li>The overloading of functions or specialisation of class templates can be based on concepts.</li>
+<li>We get improved error message because the compiler compares the requirements of the template parameter with the actual template arguments.</li>
+</ul>
+<p>However, this is not the end of the story.</p>
+<ul>
+<li>You can use predefined concepts or define your own.</li>
+<li>The usage of auto and concepts is unified. Instead of auto, you can use a concept.</li>
+<li>If a function declaration uses a concept, it automatically becomes a function template. Writing function templates is, therefore, as easy as writing a function.</li>
+</ul>
+<p>The following code snippet shows you the definition and the usage of the straightforward concept <span style="font-family: courier new, courier;">Integral</span>:</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+concept <span style="color: #007788; font-weight: bold;">bool</span> Integral(){
+    <span style="color: #006699; font-weight: bold;">return</span> std<span style="color: #555555;">::</span>is_integral<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value;
+}
+
+Integral <span style="color: #006699; font-weight: bold;">auto</span> gcd(Integral <span style="color: #006699; font-weight: bold;">auto</span> a,     
+                  Integral <span style="color: #006699; font-weight: bold;">auto</span> b){
+    <span style="color: #006699; font-weight: bold;">if</span>( b <span style="color: #555555;">==</span> <span style="color: #ff6600;">0</span> ) <span style="color: #006699; font-weight: bold;">return</span> a; 
+    <span style="color: #006699; font-weight: bold;">else</span> <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc00ff;">gcd</span>(b, a <span style="color: #555555;">%</span> b);
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Integral is the concept which requires from it type-parameter <span style="font-family: courier new, courier;">T</span> that <span style="font-family: courier new, courier;">std::is_integral&lt;T&gt;::value </span>holds. <span style="font-family: courier new, courier;">std::is_integral&lt;T&gt;::value</span> is a function from the type-traits library which checks at compile-time if <span style="font-family: courier new, courier;">T</span> is integral. If <span style="font-family: courier new, courier;">std::is_integral&lt;T&gt;::value</span> evaluates to <span style="font-family: courier new, courier;">true,</span> all is fine. If not, you get a compile-time error. For the curious ones - and you should be curious- here are my posts to the <a href="index.php/tag/type-traits">type-traits library</a>.</p>
+<p>The gcd algorithm determines the greatest common divisor, based on the <a href="https://en.wikipedia.org/wiki/Euclidean_algorithm">Euclidean algorithm</a>.&nbsp; I used the so-called abbreviated function template syntax to define <span style="font-family: courier new, courier;">gcd.</span> <span style="font-family: courier new, courier;">gcd</span> requires from its arguments and return type, that they support the concept <span style="font-family: courier new, courier;">Integral</span>.&nbsp; <span style="font-family: courier new, courier;">gcd</span> is a kind of function templates which puts requirements on its arguments and return value. When I remove the <a href="https://en.wikipedia.org/wiki/Syntactic_sugar">syntactic sugar</a>, maybe you can see the real nature of <span style="font-family: courier new, courier;">gcd</span>.</p>
+<p>Here is the semantically equivalent <span style="font-family: courier new, courier;">gcd</span> algorithm.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+requires Integral<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span>()
+T gcd(T a, T b){
+    <span style="color: #006699; font-weight: bold;">if</span>( b <span style="color: #555555;">==</span> <span style="color: #ff6600;">0</span> ) <span style="color: #006699; font-weight: bold;">return</span> a; 
+    <span style="color: #006699; font-weight: bold;">else</span> <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc00ff;">gcd</span>(b, a <span style="color: #555555;">%</span> b);
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>If you don't see the real nature of <span style="font-family: courier new, courier;">gcd</span>, you have to wait for my posts to concepts which will come in a few weeks.</p>
+<h3>Ranges Library</h3>
+<p>The ranges library is the first customer of concepts. It supports algorithms which</p>
+<ul>
+<li>can operate directly on the container; you don't need iterators to specify a range</li>
+<li>can be evaluated lazily</li>
+<li>can be composed</li>
+</ul>
+<p>To make it short: The ranges library support functional patterns.&nbsp;</p>
+<p>Okay, code may help more than words. The following functions show function composition with the pipe symbol.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #009999;">#include &lt;vector&gt;</span>
+<span style="color: #009999;">#include &lt;ranges&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+ 
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+  std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> ints{<span style="color: #ff6600;">0</span>, <span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">5</span>};
+  <span style="color: #006699; font-weight: bold;">auto</span> even <span style="color: #555555;">=</span> [](<span style="color: #007788; font-weight: bold;">int</span> i){ <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #ff6600;">0</span> <span style="color: #555555;">==</span> i <span style="color: #555555;">%</span> <span style="color: #ff6600;">2</span>; };
+  <span style="color: #006699; font-weight: bold;">auto</span> square <span style="color: #555555;">=</span> [](<span style="color: #007788; font-weight: bold;">int</span> i) { <span style="color: #006699; font-weight: bold;">return</span> i <span style="color: #555555;">*</span> i; };
+ 
+  <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #007788; font-weight: bold;">int</span> i <span style="color: #555555;">:</span> ints <span style="color: #555555;">|</span> std<span style="color: #555555;">::</span>view<span style="color: #555555;">::</span>filter(even) <span style="color: #555555;">|</span> 
+                      std<span style="color: #555555;">::</span>view<span style="color: #555555;">::</span>transform(square)) {
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> i <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">' '</span>;             <span style="color: #0099ff; font-style: italic;">// 0 4 16</span>
+  }
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p><span style="font-family: courier new, courier;">even</span> is a lambda function which returns if a i is even and the lambda function <span style="font-family: courier new, courier;">square</span> maps i to its square. The rest ist function composition which you have to read from left to right: <span style="font-family: courier new, courier; color: #000000;">for (int i : ints | std::view::filter(even) | std::view::transform(square)). </span><span style="color: #000000;">Apply on each element of <span style="font-family: courier new, courier;">ints</span> the filter <span style="font-family: courier new, courier;">even</span> and map each remaining element to its <span style="font-family: courier new, courier;">square</span>. If you are familiar with functional programming, this reads like prose. </span><span style="color: #000000;"> </span></p>
+<h3>Coroutines</h3>
+<p>Coroutines are generalised functions that can be suspended and resumed while keeping their state. Coroutines are the usual way to write event-driven applications. An event-driven application can be simulations, games, servers, user interfaces, or even algorithms. Coroutines are also typically used for <a href="https://en.wikipedia.org/wiki/Cooperative_multitasking">cooperative multitasking</a>.</p>
+<p>We don't get with C++20 concrete coroutines; we will get a framework for writing our coroutines. The framework for writing coroutines consists of more than 20 functions which you partially have to implement and partially could overwrite. Therefore, you can tailor the coroutine to your needs.</p>
+<p>Let me show you the usage of a special coroutine. The following program uses a generator for an infinite data-stream.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">Generator<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> getNext(<span style="color: #007788; font-weight: bold;">int</span> start <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>, <span style="color: #007788; font-weight: bold;">int</span> step <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span>){
+    <span style="color: #006699; font-weight: bold;">auto</span> value <span style="color: #555555;">=</span> start;
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #007788; font-weight: bold;">int</span> i <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>;; <span style="color: #555555;">++</span>i){
+        co_yield value;            <span style="color: #0099ff; font-style: italic;">// 1</span>
+        value <span style="color: #555555;">+=</span> step;
+    }
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main() {
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"getNext():"</span>;
+    <span style="color: #006699; font-weight: bold;">auto</span> gen <span style="color: #555555;">=</span> getNext();
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #007788; font-weight: bold;">int</span> i <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>; i <span style="color: #555555;">&lt;=</span> <span style="color: #ff6600;">10</span>; <span style="color: #555555;">++</span>i) {
+        gen.next();               <span style="color: #0099ff; font-style: italic;">// 2</span>
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span> <span style="color: #555555;">&lt;&lt;</span> gen.getValue();                  
+    }
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n\n</span><span style="color: #cc3300;">"</span>;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"getNext(100, -10):"</span>;
+    <span style="color: #006699; font-weight: bold;">auto</span> gen2 <span style="color: #555555;">=</span> getNext(<span style="color: #ff6600;">100</span>, <span style="color: #555555;">-</span><span style="color: #ff6600;">10</span>);
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #007788; font-weight: bold;">int</span> i <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>; i <span style="color: #555555;">&lt;=</span> <span style="color: #ff6600;">20</span>; <span style="color: #555555;">++</span>i) {
+        gen2.next();             <span style="color: #0099ff; font-style: italic;">// 3</span>
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span> <span style="color: #555555;">&lt;&lt;</span> gen2.getValue();
+    }
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Okay, I have to add a few words. Thi piece is only a code-snippet. The function <span style="font-family: courier new, courier;">getNext</span> is a coroutine because it uses the keyword<span style="font-family: courier new, courier;"> co_yield. getNext</span> has an infinite loop which returns the <span style="font-family: courier new, courier;">value</span> after <span style="font-family: courier new, courier;">co_yield</span>. A call to <span style="font-family: courier new, courier;">next()</span> (line 2 and 3) resumes the coroutine and the following <span style="font-family: courier new, courier;">getValue</span> call gets the value. After the <span style="font-family: 'courier new', courier;">getNext</span> call, the coroutine pauses once more. It pauses until the next&nbsp;<span style="font-family: courier new, courier;">next()</span> call. There is one big unknown in my example. This unknown is the return value <span style="font-family: courier new, courier;">Generator&lt;int&gt;</span> of the <span style="font-family: courier new, courier;">getNext</span> function. Here the complicated stuff starts, which will be part of detailed posts to coroutines.</p>
+<p>Thanks to <a href="https://wandbox.org/">Wandbox </a>online compiler, I can show you the output of the program.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/WhatsInside/infiniteDataStream.PNG" alt="infiniteDataStream" width="500" height="124" /></p>
+<h3>Modules</h3>
+<p>&nbsp;For modules, I make it quite short because the post is already too long.</p>
+<p>&nbsp;Modules promise:</p>
+<ul>
+<li>Faster compile times</li>
+<li>Isolation of macros</li>
+<li>Express the logical structure of the code</li>
+<li>Make header files superfluous</li>
+<li>Get rid of an ugly macro workarounds</li>
+</ul>
+<h2>What's next?</h2>
+<p>After the high-level overview of the big four, I will continue in my next post with the core language features as shown in my image.</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Paul Baxter,&nbsp; Meeting C++, Matt Braun, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Marko, </strong><span class="sc-kpOJdX fDWXFa" title="Emyr Williams"><strong>G Prvulovic, Reiner Eiteljörge, Benjamin Huth, Reinhold Dröge, Abernitzke,</strong> </span><strong><span title="Emyr Williams">Richard Ohnemus, Frank Grimm</span></strong><span title="Emyr Williams"><strong>, Sakib, Broeserl, </strong></span><strong><span title="Emyr Williams">António Pina, and Markus Falkner</span><span title="Emyr Williams"><span class="sc-htpNat dEZjR" style="color: #241e12; font-family: aktiv-grotesk, sans-serif; margin: 0px; position: relative; font-weight: 400; font-size: 1rem; line-height: 1.5;"><span class="sc-htpNat ebhhXb" style="color: #241e12; font-family: aktiv-grotesk, sans-serif; margin: 0px; position: relative; font-weight: bold; font-size: 1rem; line-height: 1.5;">.</span></span></span></strong></p>
+<p>&nbsp;</p>
+<table style="width: 490px; height: 103px;">
+<tbody>
+<tr>
+<td><strong>Thanks in particular to:</strong></td>
+<td>&nbsp;</td>
+<td><a href="https://cranepay.io/"><img src="images/patreon/crp4.png" alt="crp4" width="150" height="96" /></a></td>
+</tr>
+</tbody>
+</table>
+<p><strong>&nbsp;</strong></p>
+<p><strong>&nbsp;&nbsp;<a href="https://www.takeupcode.com/">&nbsp; </a></strong></p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at Leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages. I also included more than 120 source files.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more than 140 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 700 pages full of modern C++ and more than 260 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
+<p></p>
+<table style="width: 800px;">
+<tbody>
+<tr>
+<td colspan="2">
+<h2>Get your interactive course</h2>
+&nbsp;</td>
+</tr>
+<tr>
+<td>
+<h4 class="_3fBEwsM053hx2mPd0uV0nT" style="text-align: center;">Modern C++ Concurrency in Practice</h4>
+</td>
+<td>
+<h4>C++ Standard Library including C++14 &amp; C++17</h4>
+</td>
+</tr>
+<tr>
+<td><a href="https://goo.gl/2qWUkK"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseConcurrency/educative.png" alt="educative" width="300" height="152" /></a></td>
+<td><a href="https://www.educative.io/collection/10370001/5712008708096000?authorName=Rainer%20Grimm"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseLibrary/CLibrary.png" alt="CLibrary" width="300" height="150" /></a></td>
+</tr>
+<tr>
+<td>
+<p>Based on my book "Concurrency with Modern C++" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>140 lessons</li>
+<li>110 code playgrounds =&gt; Runs in the browser</li>
+<li>78 code snippets</li>
+<li>55 illustrations</li>
+</ul>
+</td>
+<td>
+<p>Based on my book "The C++ Standard Library" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>149 lessons</li>
+<li>111 code playgrounds =&gt; Runs in the browser</li>
+<li>164 code snippets</li>
+<li>25 illustrations</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
