@@ -1,0 +1,202 @@
+<p>This post concludes my overview of C++20. Today's post is about the concurrency features in the next C++ standard.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/Concurrency/TimelineCpp20Concurrency.png" alt="TimelineCpp20Concurrency" width="650" height="254" /></p>
+<h2>Concurrency</h2>
+<p>C++20 has various concurrency improvements.</p>
+<h3><span style="font-family: courier new, courier;">std::atomic_ref&lt;T&gt;</span></h3>
+<p>The class template <span style="font-family: courier new, courier;">std::atomic_ref</span> applies atomic operations to the referenced non-atomic object. Concurrent writing and reading of the referenced object is, therefore, no data race. The lifetime of the referenced object must exceed the lifetime of the atomic_ref. Accessing a subobject of the referenced object with an <span style="font-family: courier new, courier;">atomic_ref</span> is not thread-safe.</p>
+<p>Accordingly to <span style="font-family: courier new, courier;">std::atomic, std::atomic_ref</span> can be specialised and supports specialisations for the built-in data types.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">struct</span> Counters {
+    <span style="color: #007788; font-weight: bold;">int</span> a;
+    <span style="color: #007788; font-weight: bold;">int</span> b;
+};
+
+Counter counter;<br />
+std<span style="color: #555555;">::</span>atomic_ref<span style="color: #555555;">&lt;</span>Counters<span style="color: #555555;">&gt;</span> cnt(counter);
+</pre>
+</div>
+<h3><span style="font-family: courier new, courier;">std::atomic&lt;std::shared_ptr&lt;T&gt;&gt;</span> and <span style="font-family: courier new, courier;">std::atomic&lt;std::weak_ptr&lt;T&gt;&gt;</span></h3>
+<p><span style="font-family: courier new, courier;">std::shared_ptr</span> is the only non-atomic data type on which you can apply atomic operations. First, let me write about the motivation for this exception. The C++ committee saw the necessity that instances of<span style="font-family: courier new, courier;"> std::shared_ptr</span> should provide a minimum atomicity guarantee in multithreading programs. What is this minimal atomicity guarantee for <span style="font-family: courier new, courier;">std::shared_ptr</span>? The control block of the <span style="font-family: courier new, courier;">std::shared_ptr</span> is thread-safe. This means that the increase and decrease operations of the reference-counter are atomic. You also have the guarantee that the resource is destroyed exactly once.</p>
+<p>The assertions that a <span style="font-family: courier new, courier;">std::shared_ptr</span> provides, are described by <a href="²http://www.boost.org/doc/libs/1_57_0/libs/smart_ptr/shared_ptr.htm#ThreadSafety">Boost</a>.</p>
+<ol>
+<li>A <span style="font-family: courier new, courier;">shared_ptr</span> instance can be “read” (accessed using only constant operations) simultaneously by multiple threads.</li>
+<li>Different <span style="font-family: courier new, courier;">shared_ptr</span> instances can be “written to” (accessed using mutable operations such as operator= or reset) simultaneously by multiple threads (even when these instances are copies, and share the same reference count underneath).</li>
+</ol>
+<p>With C++20 we get two new smart pointers: <span style="font-family: courier new, courier;">std::atomic&lt;std::shared_ptr&lt;T&gt;&gt;</span> and <span style="font-family: courier new, courier;">std::atomic&lt;std::weak_ptr&lt;T&gt;&gt;.</span></p>
+<h3>Floating Point Atomics</h3>
+<p>In addition to C++11, you can not only create atomics for integral types but also for floating points. This is quite convenient when you have a floating-point number, which is concurrently incremented by various threads. With a floating-point atomic, you don't need to protect the floating pointer number.</p>
+<h3>Waiting on Atomics</h3>
+<p><span style="font-family: courier new, courier;">std::atomic_flag</span> is an atomic boolean. It has a clear and a set state. For simplicity reasons, I call the clear state <span style="font-family: courier new, courier;">false</span> and the set state <span style="font-family: courier new, courier;">true</span>. Its <span style="font-family: courier new, courier;">clear</span> method enables you to set its value to <span style="font-family: courier new, courier;">false</span>. With the <span style="font-family: courier new, courier;">test_and_set</span> method, you can set the value to <span style="font-family: courier new, courier;">true</span> and return the previous value. There is no method to ask for the current value. This will change with C++20. With C++20, a&nbsp; <span style="font-family: courier new, courier;">std::atomic_flag</span> has a <span style="font-family: courier new, courier;">test</span> method.</p>
+<p>Additionally, <span style="font-family: courier new, courier;">std::atomic_flag</span> can be used for thread synchronisation via the methods<span style="font-family: courier new, courier;"> notify_one, notify_all,</span> and <span style="font-family: courier new, courier;">wait</span>. Notifying and waiting is with C++20 available on all partial and full specialisation of <span style="font-family: Courier New, Courier, monospace;">std::atomic</span> (bools, integrals, floats and pointers) and <span style="font-family: Courier New, Courier, monospace;">std::atomic_ref.</span></p>
+<h3>Semaphores, Latches and Barriers</h3>
+<p>All three types are means to synchronise threads.</p>
+<h4>Semaphores</h4>
+<p>Semaphores are a synchronisation mechanism used to control concurrent access to a shared resource. A counting semaphore such as the on in C++20, is a special semaphore which has a counter that is bigger than zero. The counter is initialised in the constructor. Acquiring the semaphore decreases the counter and releasing the semaphore increases the counter. If a thread tries to acquire the semaphore when the counter is zero, the thread will block until another thread increments the counter by releasing the semaphore.</p>
+<h4>Latches and Barriers</h4>
+<p>Latches and barriers are simple thread synchronisation mechanisms which enable some threads to block until a counter becomes zero.</p>
+<p>What are the differences between these two mechanisms to synchronise threads? You can use a<span style="font-family: Courier New, Courier, monospace;"> std::latch</span> only once, but you can use a <span style="font-family: Courier New, Courier, monospace;">std::barrier</span> more than once. A<span style="font-family: Courier New, Courier, monospace;"> std::latch </span>is useful for managing one task by multiple threads; a<span style="font-family: Courier New, Courier, monospace;"> std::barrier</span> is useful for managing repeated tasks by multiple threads. Additionally, a<span style="font-family: Courier New, Courier, monospace;"> std::barrier</span> can adjust the counter in each iteration.</p>
+<p>The following code snippet is from the Proposal <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2014/n4204.html">N4204</a>.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">DoWork</span>(threadpool<span style="color: #555555;">*</span> pool) {
+
+    latch completion_latch(NTASKS);   <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #007788; font-weight: bold;">int</span> i <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>; i <span style="color: #555555;">&lt;</span> NTASKS; <span style="color: #555555;">++</span>i) {
+        pool<span style="color: #555555;">-&gt;</span>add_task([<span style="color: #555555;">&amp;</span>] {          <span style="color: #0099ff; font-style: italic;">// (2)</span>
+
+        <span style="color: #0099ff; font-style: italic;">// perform work</span>
+        ...
+        completion_latch.count_down();<span style="color: #0099ff; font-style: italic;">// (4)</span>
+        }));                          <span style="color: #0099ff; font-style: italic;">// (3)</span>
+    }
+    <span style="color: #0099ff; font-style: italic;">// Block until work is done</span>
+    completion_latch.wait();          <span style="color: #0099ff; font-style: italic;">// (5)</span>
+}
+</pre>
+</div>
+<pre class="moz-signature">&nbsp;</pre>
+<p>The <span style="font-family: Courier New, Courier, monospace;">std::latch completion_latch</span> is in its constructor set to <span style="font-family: Courier New, Courier, monospace;">NTASKS </span>(line 1). The thread pool executes<span style="font-family: Courier New, Courier, monospace;"> NTASKS </span>(lines 2 - 3) jobs. At the end of each job (line 4), the counter is decremented. Line 5 is the barrier for the thread running the function <span style="font-family: Courier New, Courier, monospace;">DoWork </span>and hence for the small workflow. This thread is blocked until all tasks have been finished.</p>
+<h3><span style="font-family: Courier New, Courier, monospace;">std::jthread</span></h3>
+<p><span style="font-family: Courier New, Courier, monospace;">std::jthread</span> stands for joining thread. In addition to <span style="font-family: Courier New, Courier, monospace;">std::thread</span> from C++11, <span style="font-family: Courier New, Courier, monospace;">std::jthread</span> can automatically join the started thread and can be interrupted.</p>
+<p>Here is the non-intuitive behaviour of<span style="font-family: Courier New, Courier, monospace;"> std::thread</span>. If a <span style="font-family: Courier New, Courier, monospace;">std::thread </span>is still joinable, <span style="font-family: Courier New, Courier, monospace;">std::terminate</span> is called in its destructor. A thread <span style="font-family: Courier New, Courier, monospace;">thr </span>is joinable if either<span style="font-family: Courier New, Courier, monospace;"> thr.join()</span> nor <span style="font-family: Courier New, Courier, monospace;">thr.detach() </span>was called.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #009999;"><span style="color: #0099ff; font-style: italic;">// threadJoinable.cpp</span><br /><br />#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;thread&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>boolalpha;
+    std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> thr{[]{ std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Joinable std::thread"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl; }};
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"thr.joinable(): "</span> <span style="color: #555555;">&lt;&lt;</span> thr.joinable() <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>When executed, the program terminates.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/Concurrency/threadJoinable.png" alt="threadJoinable" width="500" height="279" /></p>
+<p>Both executions of the program<span style="font-family: Courier New, Courier, monospace;"> </span>terminate. In the second run, the thread <span style="font-family: Courier New, Courier, monospace;">thr </span>has enough time to display its message: “<span style="font-family: Courier New, Courier, monospace;">Joinable std::thread</span>”.</p>
+<p>In the next example, I replace the header <span style="font-family: Courier New, Courier, monospace;">&lt;thread&gt;</span> with "<span style="font-family: Courier New, Courier, monospace;">jthread.hpp</span>" and, therefore, use <span style="font-family: Courier New, Courier, monospace;">std::jthread</span> from the upcoming C++20 standard.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #009999;"><span style="color: #009999;"><span style="color: #0099ff; font-style: italic;">// jthreadJoinable.cpp</span></span><br /><br />#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include "jthread.hpp"</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>boolalpha;
+    std<span style="color: #555555;">::</span>jthread thr{[]{ std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Joinable std::thread"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl; }};
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"thr.joinable(): "</span> <span style="color: #555555;">&lt;&lt;</span> thr.joinable() <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Now, the thread <span style="font-family: courier new, courier;">thr</span> automatically joins in its destructor such as in this case if still joinable.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/Concurrency/jthreadJoinable.png" alt="jthreadJoinable" width="350" height="177" /></p>
+<h2>What's next?</h2>
+<p>I provided in the last four posts an overview of the new features in C++20. After the overview, let me dive into the details. My next post is about concepts.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Paul Baxter,&nbsp; Meeting C++, Matt Braun, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Marko, </strong><span class="sc-kpOJdX fDWXFa" title="Emyr Williams"><strong>G Prvulovic, Reiner Eiteljörge, Reinhold Dröge, Abernitzke,</strong> </span><strong><span title="Emyr Williams">Richard Ohnemus, Frank Grimm</span></strong><span title="Emyr Williams"><strong>, Sakib, Broeserl, </strong></span><strong><span title="Emyr Williams">António Pina, Markus Falkner, Darshan Mody, and Sergey Agafyin.</span><span title="Emyr Williams"><span class="sc-htpNat dEZjR" style="color: #241e12; font-family: aktiv-grotesk, sans-serif; margin: 0px; position: relative; font-weight: 400; font-size: 1rem; line-height: 1.5;"><span class="sc-htpNat ebhhXb" style="color: #241e12; font-family: aktiv-grotesk, sans-serif; margin: 0px; position: relative; font-weight: bold; font-size: 1rem; line-height: 1.5;"> <br /></span></span></span></strong></p>
+<p>&nbsp;</p>
+<table style="width: 490px; height: 103px;">
+<tbody>
+<tr>
+<td><strong>Thanks in particular to:</strong></td>
+<td>&nbsp;</td>
+<td><a href="https://cranepay.io/"><img src="images/patreon/crp4.png" alt="crp4" width="150" height="96" /></a></td>
+</tr>
+</tbody>
+</table>
+<p><strong>&nbsp;</strong></p>
+<p><strong>&nbsp;&nbsp;<a href="https://www.takeupcode.com/">&nbsp; </a></strong></p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at Leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages. I also included more than 120 source files.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more than 140 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 700 pages full of modern C++ and more than 260 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
+<p></p>
+<table style="width: 800px;">
+<tbody>
+<tr>
+<td colspan="2">
+<h2>Get your interactive course</h2>
+&nbsp;</td>
+</tr>
+<tr>
+<td>
+<h4 class="_3fBEwsM053hx2mPd0uV0nT" style="text-align: center;">Modern C++ Concurrency in Practice</h4>
+</td>
+<td>
+<h4>C++ Standard Library including C++14 &amp; C++17</h4>
+</td>
+</tr>
+<tr>
+<td><a href="https://goo.gl/2qWUkK"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseConcurrency/educative.png" alt="educative" width="300" height="152" /></a></td>
+<td><a href="https://www.educative.io/collection/10370001/5712008708096000?authorName=Rainer%20Grimm"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseLibrary/CLibrary.png" alt="CLibrary" width="300" height="150" /></a></td>
+</tr>
+<tr>
+<td>
+<p>Based on my book "Concurrency with Modern C++" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>140 lessons</li>
+<li>110 code playgrounds =&gt; Runs in the browser</li>
+<li>78 code snippets</li>
+<li>55 illustrations</li>
+</ul>
+</td>
+<td>
+<p>Based on my book "The C++ Standard Library" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>149 lessons</li>
+<li>111 code playgrounds =&gt; Runs in the browser</li>
+<li>164 code snippets</li>
+<li>25 illustrations</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>

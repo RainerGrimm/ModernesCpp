@@ -1,0 +1,280 @@
+<p>In my last post <a href="http://bit.ly/2s7giyL">C++20: Two Extremes and the Rescue with Concepts</a>, I gave the first motivation for concepts. Concepts put semantic constraints on template parameters. Today, I present different <span>use-cases</span> for concepts in a compact form.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/ConceptsTheDetails/TimelineCpp20Concepts.png" alt="TimelineCpp20Concepts" width="650" height="255" /></p>
+<h2>The Details</h2>
+<p>Just do keep it in mind: What are the advantages of concepts?</p>
+<ul>
+<li>Requirements for templates are part of the interface.</li>
+<li>The overloading of functions or specialisation of class templates can be based on concepts.</li>
+<li>We get improved error message because the compiler compares the requirements of the template parameter with the actual template arguments</li>
+<li>You can use predefined concepts or define your own.</li>
+<li>The usage of auto and concepts is unified. Instead of auto, you can use a concept.</li>
+<li>If a function declaration uses a concept, it automatically becomes a function template. Writing function templates is, therefore, as easy as writing a function.</li>
+</ul>
+<p>This post is about the first three points. Let me show many different usages of concepts:</p>
+<h3>Three Ways</h3>
+<p>There are three ways to use the concept <span style="font-family: courier new, courier;">Sortable</span>. For simplicity reasons, I only show the declaration of the function template.</p>
+<h4>Requires Clause</h4>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> Cont<span style="color: #555555;">&gt;</span>
+    requires Sortable<span style="color: #555555;">&lt;</span>Cont<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">void</span> sort(Cont<span style="color: #555555;">&amp;</span> container);
+</pre>
+</div>
+<h4>Trailing Requires Clause</h4>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> Cont<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">void</span> sort(Cont<span style="color: #555555;">&amp;</span> container) requires Sortable<span style="color: #555555;">&lt;</span>Cont<span style="color: #555555;">&gt;</span>;
+</pre>
+</div>
+<h4>Constrained Template Parameters</h4>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span>Sortable Cont<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">void</span> sort(Cont<span style="color: #555555;">&amp;</span> container)
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The algorithm <span style="font-family: Courier New;">sort </span>requires in this case that the container is sortable.<span style="font-family: Courier New, Courier, monospace;"> Sortable </span>has to be a constant expression and a predicate.</p>
+<h4>Classes</h4>
+<p>You can define a class template which only accepts objects.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span>Object T<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">MyVector</span>{};
+
+MyVector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> v1;   <span style="color: #0099ff; font-style: italic;">// OK</span>
+MyVector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&amp;&gt;</span> v2;  <span style="color: #0099ff; font-style: italic;">// ERROR: int&amp; does not satisfy the constraint Object</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The compiler complains that and reference is not an object. Maybe you wonder, what an object is.? A possible implementation der type-traits function <a href="https://en.cppreference.com/w/cpp/types/is_object"><span style="font-family: Courier New, Courier, monospace;">std::is_object</span></a> gives the answer:</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span> <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">T</span><span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">struct</span> is_object <span style="color: #555555;">:</span> std<span style="color: #555555;">::</span>integral_constant<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">bool</span>,
+                     std<span style="color: #555555;">::</span>is_scalar<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">||</span>
+                     std<span style="color: #555555;">::</span>is_array<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value  <span style="color: #555555;">||</span>
+                     std<span style="color: #555555;">::</span>is_union<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value  <span style="color: #555555;">||</span>
+                     std<span style="color: #555555;">::</span>is_class<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value<span style="color: #555555;">&gt;</span> {};
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>An object is either a scalar, or an array, or a union, or a class.</p>
+<h4>Member Functions</h4>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">template<span style="color: #555555;">&lt;</span>Object T<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">MyVector</span>{
+    ... 
+    <span style="color: #007788; font-weight: bold;">void</span> push_back(<span style="color: #006699; font-weight: bold;">const</span> T<span style="color: #555555;">&amp;</span> e) requires Copyable<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span>{}
+    ...
+};
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>In this case, the member function requires that the template parameter<span style="font-family: Courier New;"> T </span>must be copyable.</p>
+<h4>Variadic Templates</h4>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #009999;">&nbsp;<span style="color: #0099ff; font-style: italic;">// allAnyNone.cpp</span><br /><br />#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;type_traits&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+concept Arithmetic <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>is_arithmetic<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value;
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span>Arithmetic... Args<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">bool</span> all(Args... args) { <span style="color: #006699; font-weight: bold;">return</span> (... <span style="color: #555555;">&amp;&amp;</span> args); }
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span>Arithmetic... Args<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">bool</span> any(Args... args) { <span style="color: #006699; font-weight: bold;">return</span> (... <span style="color: #555555;">||</span> args); }
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span>Arithmetic... Args<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">bool</span> none(Args... args) { <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #555555;">!</span>(... <span style="color: #555555;">||</span> args); }
+
+<span style="color: #007788; font-weight: bold;">int</span> main(){
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>boolalpha <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+               
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"all(5, true, 5.5, false): "</span> <span style="color: #555555;">&lt;&lt;</span> all(<span style="color: #ff6600;">5</span>, <span style="color: #336666;">true</span>, <span style="color: #ff6600;">5.5</span>, <span style="color: #336666;">false</span>) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;  
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"any(5, true, 5.5, false): "</span> <span style="color: #555555;">&lt;&lt;</span> any(<span style="color: #ff6600;">5</span>, <span style="color: #336666;">true</span>, <span style="color: #ff6600;">5.5</span>, <span style="color: #336666;">false</span>) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl; 
+              
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"none(5, true, 5.5, false): "</span> <span style="color: #555555;">&lt;&lt;</span> none(<span style="color: #ff6600;">5</span>, <span style="color: #336666;">true</span>, <span style="color: #ff6600;">5.5</span>, <span style="color: #336666;">false</span>) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;     
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>You can use concepts in variadic templates.&nbsp; The definition of the function templates are based on <a href="index.php/fold-expressions">fold expressions</a>. <span style="font-family: Courier New;">all</span>, <span style="font-family: Courier New;">any</span>, and <span style="font-family: Courier New;">none </span>requires from it type parameter <span style="font-family: courier new, courier;">T</span> that is has to support the concept <span style="font-family: Courier New;">Arithmetic. Arithmetic </span>essential means that <span style="font-family: Courier New;">T</span> is either integral or floating-point.</p>
+<p>The brand-new Microsoft compiler 19.23 supports partially as the only one the proposed concepts syntax.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/ConceptsTheDetails/allAnyNone.png" alt="allAnyNone" width="300" height="143" /></p>
+<h4>More Requirements</h4>
+<p>Of course, you can use more than one requirement for the template parameters.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span>SequenceContainer S,   
+          EqualityComparable<span style="color: #555555;">&lt;</span>value_type<span style="color: #555555;">&lt;</span>S<span style="color: #555555;">&gt;&gt;</span> T<span style="color: #555555;">&gt;</span>
+Iterator_type<span style="color: #555555;">&lt;</span>S<span style="color: #555555;">&gt;</span> find(S<span style="color: #555555;">&amp;&amp;</span> seq, <span style="color: #006699; font-weight: bold;">const</span> T<span style="color: #555555;">&amp;</span> val){
+    ...
+}
+</pre>
+</div>
+<p></p>
+<p>The function template&nbsp;<span style="font-family: courier new, courier;">find</span> requires that the container<span style="font-family: courier new, courier;"> S</span> is a <span style="font-family: courier new, courier;">SequenceContainer</span> and that its elements are <span style="font-family: courier new, courier;">EqualityComparable</span>.</p>
+<h4>Overloading</h4>
+<p><span style="font-family: courier new, courier;">std::advance(iter, n)</span> puts its iterator<span style="font-family: courier new, courier;"> iter n</span> position further. Depending on the iterator, the implementation can use pointer arithmetic or just go <span style="font-family: courier new, courier;">n</span> times further. In the first case, the execution time is constant; in the second case, the execution time depends on the stepsize <span style="font-family: courier new, courier;">n</span>. Thanks to concepts, you can overload <span style="font-family: courier new, courier;">std::advance</span> on the iterator category.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span>InputIterator I<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">void</span> advance(I<span style="color: #555555;">&amp;</span> iter, <span style="color: #007788; font-weight: bold;">int</span> n){...}
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span>BidirectionalIterator I<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">void</span> advance(I<span style="color: #555555;">&amp;</span> iter, <span style="color: #007788; font-weight: bold;">int</span> n){...}
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span>RandomAccessIterator I<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">void</span> advance(I<span style="color: #555555;">&amp;</span> iter, <span style="color: #007788; font-weight: bold;">int</span> n){...}
+
+<span style="color: #0099ff; font-style: italic;">// usage</span>
+
+std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> vec{<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">5</span>, <span style="color: #ff6600;">6</span>, <span style="color: #ff6600;">7</span>, <span style="color: #ff6600;">8</span>, <span style="color: #ff6600;">9</span>};
+<span style="color: #006699; font-weight: bold;">auto</span> vecIt <span style="color: #555555;">=</span> vec.begin();
+std<span style="color: #555555;">::</span>advance(vecIt, <span style="color: #ff6600;">5</span>);       <span style="color: #0099ff; font-style: italic;">//  RandomAccessIterator</span>
+
+std<span style="color: #555555;">::</span>list<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> lst{<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">5</span>, <span style="color: #ff6600;">6</span>, <span style="color: #ff6600;">7</span>, <span style="color: #ff6600;">8</span>, <span style="color: #ff6600;">9</span>};
+<span style="color: #006699; font-weight: bold;">auto</span> lstIt <span style="color: #555555;">=</span> lst.begin();
+std<span style="color: #555555;">::</span>advance(lstIt, <span style="color: #ff6600;">5</span>);       <span style="color: #0099ff; font-style: italic;">//  BidirectionalIterator</span>
+
+std<span style="color: #555555;">::</span>forward_list<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> forw{<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">5</span>, <span style="color: #ff6600;">6</span>, <span style="color: #ff6600;">7</span>, <span style="color: #ff6600;">8</span>, <span style="color: #ff6600;">9</span>};
+<span style="color: #006699; font-weight: bold;">auto</span> forwIt <span style="color: #555555;">=</span> forw.begin();
+std<span style="color: #555555;">::</span>advance(forwIt, <span style="color: #ff6600;">5</span>);      <span style="color: #0099ff; font-style: italic;">//  InputIterator</span>
+</pre>
+</div>
+<p></p>
+<p>Based on the iterator category, the containers<span style="font-family: courier new, courier;"> std::vector, std::list</span>, and<span style="font-family: courier new, courier;"> std::forward_list</span> support, the best fitting <span style="font-family: courier new, courier;">std::advance</span> implementation is used.</p>
+<h4>Specialisations</h4>
+<p>Concepts also support template specialisations.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">MyVector</span>{};
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span>Object T<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">MyVector</span>{};
+
+MyVector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> v1;     <span style="color: #0099ff; font-style: italic;">// Object T</span>
+MyVector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&amp;&gt;</span> v2;    <span style="color: #0099ff; font-style: italic;">// typename T</span>
+</pre>
+</div>
+<p></p>
+<ul>
+<li>
+<p><span style="font-family: courier new, courier;">MyVector&lt;int&amp;&gt;</span> goes to the unconstrained template parameter.</p>
+</li>
+<li>
+<p><span style="font-family: courier new, courier;">MyVector&lt;int&gt;</span> goes to the constrained template parameter.</p>
+</li>
+</ul>
+<h2>What's next?</h2>
+<p>My next post is about the syntactical unification in C++20. With C++20, you can use a constrained placeholder (concept) in each place you could use an unconstrained placeholder (<span style="font-family: courier new, courier;">auto</span>) in C++11. But this is not the end of the unification. Defining a template becomes with C++20 a piece of cake. Just use a constrained or an unconstrained placeholder in the declaration of a function.</p>
+<p></p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Paul Baxter,&nbsp; Meeting C++, Matt Braun, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Marko, </strong><span class="sc-kpOJdX fDWXFa" title="Emyr Williams"><strong>G Prvulovic, Reiner Eiteljörge, Reinhold Dröge, Abernitzke,</strong> </span><strong><span title="Emyr Williams">Richard Ohnemus, Frank Grimm</span></strong><span title="Emyr Williams"><strong>, Sakib, Broeserl, </strong></span><strong><span title="Emyr Williams">António Pina, Markus Falkner, Darshan Mody, Sergey Agafyin, <span class="sc-gZMcBi hdSbOl" data-tag="user-details-full-name">Андрей Бурмистров, and Jake.</span></span><span title="Emyr Williams"><span class="sc-htpNat dEZjR" style="color: #241e12; font-family: aktiv-grotesk, sans-serif; margin: 0px; position: relative; font-weight: 400; font-size: 1rem; line-height: 1.5;"><span class="sc-htpNat ebhhXb" style="color: #241e12; font-family: aktiv-grotesk, sans-serif; margin: 0px; position: relative; font-weight: bold; font-size: 1rem; line-height: 1.5;"><br /></span></span></span></strong></p>
+<p>&nbsp;</p>
+<table style="width: 490px; height: 103px;">
+<tbody>
+<tr>
+<td><strong>Thanks in particular to:</strong></td>
+<td>&nbsp;</td>
+<td><a href="https://cranepay.io/"><img src="images/patreon/crp4.png" alt="crp4" width="150" height="96" /></a></td>
+</tr>
+</tbody>
+</table>
+<p><strong>&nbsp;</strong></p>
+<p><strong>&nbsp;&nbsp;<a href="https://www.takeupcode.com/">&nbsp; </a></strong></p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at Leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages. I also included more than 120 source files.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more than 140 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 700 pages full of modern C++ and more than 260 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
+<p></p>
+<table style="width: 800px;">
+<tbody>
+<tr>
+<td colspan="2">
+<h2>Get your interactive course</h2>
+&nbsp;</td>
+</tr>
+<tr>
+<td>
+<h4 class="_3fBEwsM053hx2mPd0uV0nT" style="text-align: center;">Modern C++ Concurrency in Practice</h4>
+</td>
+<td>
+<h4>C++ Standard Library including C++14 &amp; C++17</h4>
+</td>
+</tr>
+<tr>
+<td><a href="https://goo.gl/2qWUkK"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseConcurrency/educative.png" alt="educative" width="300" height="152" /></a></td>
+<td><a href="https://www.educative.io/collection/10370001/5712008708096000?authorName=Rainer%20Grimm"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseLibrary/CLibrary.png" alt="CLibrary" width="300" height="150" /></a></td>
+</tr>
+<tr>
+<td>
+<p>Based on my book "Concurrency with Modern C++" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>140 lessons</li>
+<li>110 code playgrounds =&gt; Runs in the browser</li>
+<li>78 code snippets</li>
+<li>55 illustrations</li>
+</ul>
+</td>
+<td>
+<p>Based on my book "The C++ Standard Library" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>149 lessons</li>
+<li>111 code playgrounds =&gt; Runs in the browser</li>
+<li>164 code snippets</li>
+<li>25 illustrations</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>

@@ -1,0 +1,288 @@
+<p>Today, I have a simple answer to a challenging question: Where can I use my concept? Concepts can be used where <span style="font-family: courier new, courier;">auto</span> is usable.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/ConceptsPlaceholderSyntax/TimelineCpp20Concepts.png" alt="TimelineCpp20Concepts" width="600" height="235" /></p>
+<p>Before I write about the placeholder syntax and about the new way to define function templates, I have to make a detour. We have asymmetries in C++11/14.</p>
+<h2>From Asymmetries in C++11/14 to Symmetries in C++20</h2>
+<p>I often have discussions in my C++ seminars which goes like this.</p>
+<p>What is the Standard Template Library from the birds-eyes perspective? Generic containers which can be manipulated with generic algorithms. The glue between these two disjunct components are iterators.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/ConceptsPlaceholderSyntax/stl.png" alt="stl" width="400" height="103" /></p>
+<p>&nbsp;</p>
+<p>Generic containers and generic algorithms mean that they are not bound to a specific type. Fine. Many of the algorithms can be parametrised by a callable. For example, <a href="https://en.cppreference.com/w/cpp/algorithm/sort"><span style="font-family: courier new, courier;">std::sort</span></a> has an overload which takes a binary predicate (callable). This binary predicate is applied to the elements of the container. A binary predicate is a function which takes two arguments and returns a boolean. You can use a function, a function object, or with C++11 a lambda as a binary predicate.</p>
+<h3>The Small Asymmetry in C++11</h3>
+<p>What's wrong with the following program? (I know, that we have<span style="font-family: courier new, courier;"> </span>the predefined predicate <a href="https://en.cppreference.com/w/cpp/utility/functional/greater">std::greater</a>.)</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// lambdaCpp11.cpp</span>
+
+<span style="color: #009999;">#include &lt;algorithm&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;string&gt;</span>
+<span style="color: #009999;">#include &lt;array&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> Cont, <span style="color: #006699; font-weight: bold;">typename</span> Pred<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">void</span> sortDescending(Cont<span style="color: #555555;">&amp;</span> cont, Pred pred){
+    std<span style="color: #555555;">::</span>sort(cont.begin(), cont.end(), pred);
+}
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> Cont<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">void</span> printMe(<span style="color: #006699; font-weight: bold;">const</span> Cont<span style="color: #555555;">&amp;</span> cont){
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> c<span style="color: #555555;">:</span> cont) std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> c <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span>;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main(){
+
+    std<span style="color: #555555;">::</span> cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>array<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>, <span style="color: #ff6600;">10</span><span style="color: #555555;">&gt;</span> myArray{<span style="color: #ff6600;">5</span>, <span style="color: #555555;">-</span><span style="color: #ff6600;">10</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">7</span>, <span style="color: #ff6600;">8</span>, <span style="color: #ff6600;">9</span>, <span style="color: #555555;">-</span><span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>};
+    std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">double</span><span style="color: #555555;">&gt;</span> myVector{<span style="color: #ff6600;">5.1</span>, <span style="color: #555555;">-</span><span style="color: #ff6600;">10.5</span>, <span style="color: #ff6600;">3.1</span>, <span style="color: #ff6600;">2.0</span>, <span style="color: #ff6600;">7.2</span>, <span style="color: #ff6600;">8.3</span>};
+    std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>string<span style="color: #555555;">&gt;</span> myVector2{<span style="color: #cc3300;">"Only"</span>, <span style="color: #cc3300;">"for"</span>, <span style="color: #cc3300;">"testing"</span>, <span style="color: #cc3300;">"purpose"</span>};
+    
+    sortDescending(myArray, [](<span style="color: #007788; font-weight: bold;">int</span> fir, <span style="color: #007788; font-weight: bold;">int</span> sec){ <span style="color: #006699; font-weight: bold;">return</span> fir <span style="color: #555555;">&gt;</span> sec; });           <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    sortDescending(myVector, [](<span style="color: #007788; font-weight: bold;">double</span> fir, <span style="color: #007788; font-weight: bold;">double</span> sec){ <span style="color: #006699; font-weight: bold;">return</span> fir <span style="color: #555555;">&gt;</span> sec; });    <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    sortDescending(myVector2, [](<span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span>string<span style="color: #555555;">&amp;</span> fir, <span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span>string<span style="color: #555555;">&amp;</span> sec){ <span style="color: #0099ff; font-style: italic;">// (3)</span>
+       <span style="color: #006699; font-weight: bold;">return</span> fir <span style="color: #555555;">&gt;</span> sec; 
+    });
+
+    printMe(myArray);
+    printMe(myVector);
+    printMe(myVector2);
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The program has a <span style="font-family: courier new, courier;">std::array</span> of <span style="font-family: courier new, courier;">int'</span>s, a <span style="font-family: courier new, courier;">std::vector</span> of <span style="font-family: courier new, courier;">double'</span>s, and a <span style="font-family: courier new, courier;">std::vector</span> of <span style="font-family: courier new, courier;">std::string</span>'s. All containers should be sorted in descending order and displayed. To ease my job, I create the two function templates <span style="font-family: courier new, courier;">sortDescending</span> and <span style="font-family: courier new, courier;">printMe. </span></p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/ConceptsPlaceholderSyntax/lambdaCpp11.png" alt="lambdaCpp11" width="300" height="191" /></p>
+<p>Although containers and algorithms are generic, C++11 has only type-based lambdas. I have to implement the binary predicate for each data type (lines 1 - 3) and break, therefore, my generic approach.</p>
+<p>With C++14, this asymmetry disappears. Containers, algorithms are generic and lambdas can be generic.</p>
+<h3>The Big Asymmetry in C++14</h3>
+<p>C++14 makes the implementation of the previous program <span style="font-family: courier new, courier;">lambdaCpp11.cpp</span> straightforward.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// lambdaCpp14.cpp</span>
+
+<span style="color: #009999;">#include &lt;algorithm&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;string&gt;</span>
+<span style="color: #009999;">#include &lt;array&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> Cont<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">void</span> sortDescending(Cont<span style="color: #555555;">&amp;</span> cont){
+    std<span style="color: #555555;">::</span>sort(cont.begin(), cont.end(), [](<span style="color: #006699; font-weight: bold;">auto</span> fir, <span style="color: #006699; font-weight: bold;">auto</span> sec){   <span style="color: #0099ff; font-style: italic;">// (1)</span>
+        <span style="color: #006699; font-weight: bold;">return</span> fir <span style="color: #555555;">&gt;</span> sec; 
+    });
+}
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> Cont<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">void</span> printMe(<span style="color: #006699; font-weight: bold;">const</span> Cont<span style="color: #555555;">&amp;</span> cont){
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> c<span style="color: #555555;">:</span> cont) std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> c <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span>;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main(){
+
+    std<span style="color: #555555;">::</span> cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>array<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>, <span style="color: #ff6600;">10</span><span style="color: #555555;">&gt;</span> myArray{<span style="color: #ff6600;">5</span>, <span style="color: #555555;">-</span><span style="color: #ff6600;">10</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">7</span>, <span style="color: #ff6600;">8</span>, <span style="color: #ff6600;">9</span>, <span style="color: #555555;">-</span><span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>};
+    std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">double</span><span style="color: #555555;">&gt;</span> myVector{<span style="color: #ff6600;">5.1</span>, <span style="color: #555555;">-</span><span style="color: #ff6600;">10.5</span>, <span style="color: #ff6600;">3.1</span>, <span style="color: #ff6600;">2.0</span>, <span style="color: #ff6600;">7.2</span>, <span style="color: #ff6600;">8.3</span>};
+    std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>string<span style="color: #555555;">&gt;</span> myVector2{<span style="color: #cc3300;">"Only"</span>, <span style="color: #cc3300;">"for"</span>, <span style="color: #cc3300;">"testing"</span>, <span style="color: #cc3300;">"purpose"</span>};
+    
+    sortDescending(myArray);      <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    sortDescending(myVector);     <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    sortDescending(myVector2);    <span style="color: #0099ff; font-style: italic;">// (2)</span>
+
+    printMe(myArray);
+    printMe(myVector);
+    printMe(myVector2);
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+}
+</pre>
+</div>
+<p><span style="font-family: courier new, courier;"></span></p>
+<p>Fine? Yes and No. Yes, because I can use a generic lambda (line 1) for each data-type in line 2. No, because I replaced one small asymmetry in C++11 with a bigger asymmetry in C++14. The small asymmetry in C++11 was, that lambdas are type-bound. The big asymmetry in C++14 is, that generic lambdas introduced a new syntactic form to write generic functions, better known as function templates. Here is the proof:</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// genericLambdaTemplate.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;string&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">auto</span> addLambda <span style="color: #555555;">=</span> [](<span style="color: #006699; font-weight: bold;">auto</span> fir, <span style="color: #006699; font-weight: bold;">auto</span> sec){ <span style="color: #006699; font-weight: bold;">return</span> fir <span style="color: #555555;">+</span> sec; }; <span style="color: #0099ff; font-style: italic;">// (1)</span>
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T, <span style="color: #006699; font-weight: bold;">typename</span> T2<span style="color: #555555;">&gt;</span>                            <span style="color: #0099ff; font-style: italic;">// (2)</span>
+<span style="color: #006699; font-weight: bold;">auto</span> addTemplate(T fir, T2 sec){ <span style="color: #006699; font-weight: bold;">return</span> fir <span style="color: #555555;">+</span> sec; }
+
+<span style="color: #007788; font-weight: bold;">int</span> main(){
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>boolalpha <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> addLambda(<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">5</span>) <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span> <span style="color: #555555;">&lt;&lt;</span> addTemplate(<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">5</span>) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> addLambda(<span style="color: #336666;">true</span>, <span style="color: #ff6600;">5</span>) <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span> <span style="color: #555555;">&lt;&lt;</span> addTemplate(<span style="color: #336666;">true</span>, <span style="color: #ff6600;">5</span>) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> addLambda(<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">5.5</span>) <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span> <span style="color: #555555;">&lt;&lt;</span> addTemplate(<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">5.5</span>) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    <span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span>string fir{<span style="color: #cc3300;">"ge"</span>};
+    <span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span>string sec{<span style="color: #cc3300;">"neric"</span>};
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> addLambda(fir, sec) <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span> <span style="color: #555555;">&lt;&lt;</span> addTemplate(fir, sec) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The generic lambda in line 1 and the function template in line 2 produce the same results.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/ConceptsPlaceholderSyntax/genericLambdaTemplate.png" alt="genericLambdaTemplate" width="350" height="218" /></p>
+<p>This is the asymmetry in C++14. Generic lambdas introduce a new way to define function templates.</p>
+<p>When I teach this in my seminars, I almost always get the question: Can we use <span style="font-family: courier new, courier;">auto</span> in functions to get function templates? No with C++17 but yes with C++20.&nbsp; In C++20, you can use constrained placeholders (concepts) or unconstrained placeholders <span style="font-family: courier new, courier;">(auto)</span> in function declarations to get function templates. This means the asymmetry in C++ is gone with C++20.</p>
+<h3>The Solution in C++20</h3>
+<p>Before I write about the new way to define function templates, I want to answer my origin question: Where can I use my concept? Concepts can be used where <span style="font-family: courier new, courier;">auto</span> is usable.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// placeholdersDraft.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;type_traits&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>                                   <span style="color: #0099ff; font-style: italic;">// (1)</span>
+concept Integral <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>is_integral<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value;
+
+Integral <span style="color: #006699; font-weight: bold;">auto</span> <span style="color: #cc00ff;">getIntegral</span>(<span style="color: #007788; font-weight: bold;">int</span> val){                    <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    <span style="color: #006699; font-weight: bold;">return</span> val;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>boolalpha <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+ 
+    std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> vec{<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">5</span>};
+    <span style="color: #006699; font-weight: bold;">for</span> (Integral <span style="color: #006699; font-weight: bold;">auto</span> i<span style="color: #555555;">:</span> vec) std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> i <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span>;  <span style="color: #0099ff; font-style: italic;">// (3)</span>
+ 
+    Integral <span style="color: #006699; font-weight: bold;">auto</span> b <span style="color: #555555;">=</span> <span style="color: #336666;">true</span>;                            <span style="color: #0099ff; font-style: italic;">// (4)</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> b <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+    Integral <span style="color: #006699; font-weight: bold;">auto</span> integ <span style="color: #555555;">=</span> getIntegral(<span style="color: #ff6600;">10</span>);             <span style="color: #0099ff; font-style: italic;">// (5)</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> integ <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+    <span style="color: #006699; font-weight: bold;">auto</span> integ1 <span style="color: #555555;">=</span> getIntegral(<span style="color: #ff6600;">10</span>);                     <span style="color: #0099ff; font-style: italic;">// (6)</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> integ1 <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The concept <span style="font-family: courier new, courier;">Integral</span> in line 1 can be used as a return type (line 2), in a range-based for-loop (line 3), or as a type for the variable <span style="font-family: courier new, courier;">b</span> (line 4) or the variable <span style="font-family: courier new, courier;">integ </span>(line 5). To see the symmetry, line 6 uses type-deduction with <span style="font-family: courier new, courier;">auto</span> instead. I have to admit that there is now no compiler available, which can compile completely the proposed concepts syntax which I used in my example. The following output is, therefore, from GCC and the previous Concepts Technical Specification (Concepts TS).</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/ConceptsPlaceholderSyntax/conceptsPlaceholder.png" alt="conceptsPlaceholder" width="350" height="179" /></p>
+<h2>What's next?</h2>
+<p>My next post is about the syntactic sugar, we get with constrained placeholders (concepts) and unconstrained placeholders (auto) in C++20. I assume, the function (template)<span style="font-family: courier new, courier;"> getIntegral</span> gives you a first impression.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Paul Baxter,&nbsp; Meeting C++, Matt Braun, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Marko, </strong><span class="sc-kpOJdX fDWXFa" title="Emyr Williams"><strong>G Prvulovic, Reiner Eiteljörge, Reinhold Dröge, Abernitzke,</strong> </span><strong><span title="Emyr Williams">Richard Ohnemus, Frank Grimm</span></strong><span title="Emyr Williams"><strong>, Sakib, Broeserl, </strong></span><strong><span title="Emyr Williams">António Pina, Markus Falkner, Darshan Mody, Sergey Agafyin, <span class="sc-gZMcBi hdSbOl" data-tag="user-details-full-name">Андрей Бурмистров, and Jake.</span></span><span title="Emyr Williams"><span class="sc-htpNat dEZjR" style="color: #241e12; font-family: aktiv-grotesk, sans-serif; margin: 0px; position: relative; font-weight: 400; font-size: 1rem; line-height: 1.5;"><span class="sc-htpNat ebhhXb" style="color: #241e12; font-family: aktiv-grotesk, sans-serif; margin: 0px; position: relative; font-weight: bold; font-size: 1rem; line-height: 1.5;"><br /></span></span></span></strong></p>
+<p>&nbsp;</p>
+<table style="width: 490px; height: 103px;">
+<tbody>
+<tr>
+<td><strong>Thanks in particular to:</strong></td>
+<td>&nbsp;</td>
+<td><a href="https://cranepay.io/"><img src="images/patreon/crp4.png" alt="crp4" width="150" height="96" /></a></td>
+</tr>
+</tbody>
+</table>
+<p><strong>&nbsp;</strong></p>
+<p><strong>&nbsp;&nbsp;<a href="https://www.takeupcode.com/">&nbsp; </a></strong></p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at Leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages. I also included more than 120 source files.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more than 140 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 700 pages full of modern C++ and more than 260 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
+<p></p>
+<table style="width: 800px;">
+<tbody>
+<tr>
+<td colspan="2">
+<h2>Get your interactive course</h2>
+&nbsp;</td>
+</tr>
+<tr>
+<td>
+<h4 class="_3fBEwsM053hx2mPd0uV0nT" style="text-align: center;">Modern C++ Concurrency in Practice</h4>
+</td>
+<td>
+<h4>C++ Standard Library including C++14 &amp; C++17</h4>
+</td>
+</tr>
+<tr>
+<td><a href="https://goo.gl/2qWUkK"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseConcurrency/educative.png" alt="educative" width="300" height="152" /></a></td>
+<td><a href="https://www.educative.io/collection/10370001/5712008708096000?authorName=Rainer%20Grimm"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseLibrary/CLibrary.png" alt="CLibrary" width="300" height="150" /></a></td>
+</tr>
+<tr>
+<td>
+<p>Based on my book "Concurrency with Modern C++" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>140 lessons</li>
+<li>110 code playgrounds =&gt; Runs in the browser</li>
+<li>78 code snippets</li>
+<li>55 illustrations</li>
+</ul>
+</td>
+<td>
+<p>Based on my book "The C++ Standard Library" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>149 lessons</li>
+<li>111 code playgrounds =&gt; Runs in the browser</li>
+<li>164 code snippets</li>
+<li>25 illustrations</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>

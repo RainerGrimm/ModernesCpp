@@ -1,0 +1,245 @@
+<p>I finished my overview of C++20 in the last post. Now, its time to dive into the details. What can be a better starting point for our journey than concepts?</p>
+<hr id="system-readmore" />
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/ConceptsTwoExtrems/TimelineCpp20Concepts.png" alt="TimelineCpp20Concepts" width="650" height="254" /></p>
+<p>I have to confess: I'm a big fan of concepts and, therefore, biased. Anyway, let's start with a motivating example.</p>
+<h2>Two Extrems</h2>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/ConceptsTwoExtrems/TwoExtrems.jpg" alt="TwoExtrems" width="400" height="221" /></p>
+<p>Until C++20 we have in C++ two diametral ways to think about functions or classes. Functions or classes can be defined on specific types or on generic types. In the second case, we call them function or class templates. What is wrong with each way?</p>
+<h3>Too Specific</h3>
+<p>It's quite a job to define for each specific type a function or a class. To avoid that burden, type conversion comes often to our rescue. What seems like rescue is often a curse.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// tooSpecific.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">needInt</span>(<span style="color: #007788; font-weight: bold;">int</span> i){
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"int: "</span> <span style="color: #555555;">&lt;&lt;</span> i <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+	
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>boolalpha <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+	
+    <span style="color: #007788; font-weight: bold;">double</span> d{<span style="color: #ff6600;">1.234</span>};                             <span style="color: #0099ff; font-style: italic;">// (1)N</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"double: "</span> <span style="color: #555555;">&lt;&lt;</span> d <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    needInt(d);                                  <span style="color: #0099ff; font-style: italic;">// (2)            </span>
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    <span style="color: #007788; font-weight: bold;">bool</span> b{<span style="color: #336666;">true</span>};                                <span style="color: #0099ff; font-style: italic;">// (3)</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"bool: "</span> <span style="color: #555555;">&lt;&lt;</span> b <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    needInt(b);                                  <span style="color: #0099ff; font-style: italic;">// (4)</span>
+	
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+	
+}
+</pre>
+</div>
+<p></p>
+<p>In the first case (line 1), I start with a <span style="font-family: courier new, courier;">double</span> and end with an <span style="font-family: courier new, courier;">int</span> (line 2). In the second case, I start with a <span style="font-family: courier new, courier;">bool</span> (line 3) and end also with an <span style="font-family: courier new, courier;">int</span> (line 4).</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/ConceptsTwoExtrems/tooSpecific.PNG" alt="tooSpecific" width="300" height="187" /></p>
+<h4>Narrowing Conversion</h4>
+<p>Invoking <code>getInt(int a)</code>&nbsp;with a <code>double g</code><span>ives you narrowing conversion. Narrowing conversion is conversion which a loss of accuracy. I assume this is not what you want. </span><code> </code></p>
+<h4>Integral Promotion</h4>
+<p>But the other way around is also not better. Invoking <span style="font-family: courier new, courier;">getInt(int a</span>) with a <span style="font-family: courier new, courier;">bool</span> promotes the <span style="font-family: courier new, courier;">bool</span> to <span style="font-family: courier new, courier;">int</span>. Surprised? Many C++ developers don't know, which type they will get when they add to<span style="font-family: courier new, courier;"> boo</span>l's.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">auto</span> add(T first, T second){
+    <span style="color: #006699; font-weight: bold;">return</span> first <span style="color: #555555;">+</span> second;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main(){
+    add(<span style="color: #336666;">true</span>, <span style="color: #336666;">false</span>);
+}
+</pre>
+</div>
+<p></p>
+<p><a href="https://cppinsights.io/s/22249b6a">C++ Insights</a> shows you the truth.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/ConceptsTwoExtrems/addGeneric.PNG" alt="addGeneric" width="400" height="279" /></p>
+<p>The template instantiation of the function template <span style="font-family: courier new, courier;">add</span> creates a full specialisation (lines 6 - 12) with the return type <span style="font-family: courier new, courier;">int.</span></p>
+<p><strong>My strong belief is that we need for convenience reasons the entire magic of conversions in C/C++ to deal with the fact that functions only accept specific types.</strong></p>
+<p>Okay. Let's do it the other way around. Write not specific, but write generically. Maybe, writing generic code with templates is our rescue.</p>
+<h3>Too Generic</h3>
+<p>Here is my first try. Sorting is such a generic idea. It should work for each container if the elements of the container are sortable. Let's apply <span style="font-family: 'courier new', courier;">std::sor</span>t to a <span style="font-family: courier new, courier;">std::list.</span></p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// sortList.cpp</span>
+
+<span style="color: #009999;">#include &lt;algorithm&gt;</span>
+<span style="color: #009999;">#include &lt;list&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+    
+    std<span style="color: #555555;">::</span>list<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> myList{<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">10</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">5</span>};
+    
+    std<span style="color: #555555;">::</span>sort(myList.begin(), myList.end());
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>WOW! This is, what you get when I try to compile the small program.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/ConceptsTwoExtrems/sortList.png" alt="sortList" width="600" height="379" /></p>
+<p>I don't even want to decipher this message. What is going wrong? Let's have a closer look at the signature of the used overload of <span style="font-family: courier new, courier;">std::sort.</span></p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span> <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">RandomIt</span> <span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">void</span> sort( RandomIt first, RandomIt last );
+</pre>
+</div>
+<p></p>
+<p><span style="font-family: courier new, courier;">std::sort</span> uses strange-named arguments such as <span style="font-family: courier new, courier;">RandomIT</span>. <span style="font-family: courier new, courier;">RandomIT</span> stands for a random access iterator. This is the reason for the overwhelming error message, for which templates are infamous. A <span style="font-family: courier new, courier;">std::list</span> provides only a bidirectional iterator but <span style="font-family: courier new, courier;">std:sort</span> requires a random access iterator. The structure of a <span style="font-family: courier new, courier;">std::list</span> makes this obvious.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/ConceptsTwoExtrems/list.png" alt="list" width="500" height="35" /></p>
+<p>When you study carefully the documentation on&nbsp;<a href="https://en.cppreference.com/w/cpp/algorithm/sort">cppreference.com</a> page to <span style="font-family: courier new, courier;">std::sort</span>, you find something very interesting: type requirements on <span style="font-family: courier new, courier;">std::sort.</span></p>
+<h3>Concepts to the Rescue</h3>
+<p>Concepts are the rescue because they put semantic constraints on template parameter.</p>
+<p>Here are the already mentioned type requirements on <span style="font-family: courier new, courier;">std::sort.</span></p>
+<ul>
+<li>
+<div class="spacer">&nbsp;<code>RandomIt</code> must meet the requirements of <a href="https://en.cppreference.com/w/cpp/named_req/ValueSwappable"><span style="font-family: Georgia, 'DejaVu Serif', serif; font-style: italic;">ValueSwappable</span></a> and <a href="https://en.cppreference.com/w/cpp/named_req/RandomAccessIterator"><span style="font-family: Georgia, 'DejaVu Serif', serif; font-style: italic;">LegacyRandomAccessIterator</span></a>.</div>
+</li>
+<li>The type of dereferenced <code>RandomIt</code> must meet the requirements of <a href="https://en.cppreference.com/w/cpp/named_req/MoveAssignable"><span style="font-family: Georgia, 'DejaVu Serif', serif; font-style: italic;">MoveAssignable</span></a> and <a href="https://en.cppreference.com/w/cpp/named_req/MoveConstructible"><span style="font-family: Georgia, 'DejaVu Serif', serif; font-style: italic;">MoveConstructible</span></a>.</li>
+<li>
+<div class="spacer"><code>Compare</code> must meet the requirements of <a href="https://en.cppreference.com/w/cpp/named_req/Compare">Compare.</a></div>
+</li>
+</ul>
+<p>The type requirements on<span style="font-family: courier new, courier;"> std::sort</span> are concepts. For a short introduction to concepts, read my post <a href="index.php/thebigfour">C++20: The Big Four</a>. In particular, <span style="font-family: courier new, courier;">std::sor</span>t requires a <a title="cpp/named req/RandomAccessIterator" href="https://en.cppreference.com/w/cpp/named_req/RandomAccessIterator"><span style="font-family: Georgia, 'DejaVu Serif', serif; font-style: italic;">LegacyRandomAccessIterator</span></a>. Let's have a closer look at the concept. I polished the example from <a href="https://en.cppreference.com/w/cpp/named_req/RandomAccessIterator">cppreference.com</a> a little bit.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> It<span style="color: #555555;">&gt;</span>
+concept LegacyRandomAccessIterator <span style="color: #555555;">=</span>
+  LegacyBidirectionalIterator<span style="color: #555555;">&lt;</span>It<span style="color: #555555;">&gt;</span> <span style="color: #555555;">&amp;&amp;        <span style="color: #0099ff; font-style: italic;">// (1)</span></span>
+  std<span style="color: #555555;">::</span>totally_ordered<span style="color: #555555;">&lt;</span>It<span style="color: #555555;">&gt;</span> <span style="color: #555555;">&amp;&amp;</span>
+  requires(It i, <span style="color: #006699; font-weight: bold;">typename</span> std<span style="color: #555555;">::</span>incrementable_traits<span style="color: #555555;">&lt;</span>It<span style="color: #555555;">&gt;::</span>difference_type n) {
+    { i <span style="color: #555555;">+=</span> n } <span style="color: #555555;">-&gt;</span> std<span style="color: #555555;">::</span>same_as<span style="color: #555555;">&lt;</span>It<span style="color: #555555;">&amp;&gt;</span>;        <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    { i <span style="color: #555555;">-=</span> n } <span style="color: #555555;">-&gt;</span> std<span style="color: #555555;">::</span>same_as<span style="color: #555555;">&lt;</span>It<span style="color: #555555;">&amp;&gt;</span>;
+    { i <span style="color: #555555;">+</span>  n } <span style="color: #555555;">-&gt;</span> std<span style="color: #555555;">::</span>same_as<span style="color: #555555;">&lt;</span>It<span style="color: #555555;">&gt;</span>;
+    { n <span style="color: #555555;">+</span>  i } <span style="color: #555555;">-&gt;</span> std<span style="color: #555555;">::</span>same_as<span style="color: #555555;">&lt;</span>It<span style="color: #555555;">&gt;</span>;
+    { i <span style="color: #555555;">-</span>  n } <span style="color: #555555;">-&gt;</span> std<span style="color: #555555;">::</span>same_as<span style="color: #555555;">&lt;</span>It<span style="color: #555555;">&gt;</span>;
+    { i <span style="color: #555555;">-</span>  i } <span style="color: #555555;">-&gt;</span> std<span style="color: #555555;">::</span>same_as<span style="color: #555555;">&lt;</span>decltype(n)<span style="color: #555555;">&gt;</span>;
+    {  i[n]  } <span style="color: #555555;">-&gt;</span> std<span style="color: #555555;">::</span>convertible_to<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span><span style="color: #007788; font-weight: bold;">iter_reference_t</span><span style="color: #555555;">&lt;</span>It<span style="color: #555555;">&gt;&gt;</span>;
+  };
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Here is the key observation. A type<span style="font-family: courier new, courier;"> It</span> supports the concept&nbsp; <span style="font-family: courier new, courier;">LegacyRandomAccessIterator </span>if it supports the concept<span style="font-family: courier new, courier;"> LegacyBidirectionalIterator</span> (line 2) and all other requirements. For example, the requirement in line 2 means that for a value of type <span style="font-family: courier new, courier;">It:<span style="color: #555555;"></span></span><span style="color: #555555;"><span style="font-family: courier new, courier;"> </span></span>{ i += n } is a valid expression and it returns an<span style="font-family: courier new, courier;"> I&amp;</span>. To complete my story, <span style="font-family: courier new, courier;">std::list</span> support a <span style="font-family: courier new, courier;">LegacyBidirectionalIterator. </span></p>
+<p>Admittedly, this section was quite technical. Let's try it out. With concepts, you could expect a concise error message such as the following on:</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/ConceptsTwoExtrems/listError.png" alt="listError" width="400" height="59" /></p>
+<p>Of course, this error message was a fake, because no compiler implements the C++20 syntax for concepts. MSVC 19.23 support them partially, and GCC a previous version of concepts. <a href="https://en.cppreference.com/w/cpp/compiler_support">cppreference.com </a>gives more details to the current state of concepts.</p>
+<p>Did I mention that GCC supports the previous version of concepts?</p>
+<h2>The long, long History</h2>
+<p>I heard the first time about concepts around 2005 - 2006. The reminded me of Haskell type classes. Type classes in Haskell are interfaces for similar types. Here is a part of Haskell type classes hierarchy.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/ConceptsTwoExtrems/haskellsTypeclasses.png" alt="haskellsTypeclasses" width="400" height="345" /></p>
+<p>But C++ concepts are different. Here are a few observations.</p>
+<ul>
+<li>In Haskell, a type has to be an instance of a type class. In C++20, a type has to fulfil the requirements of a concept.</li>
+<li>Concepts can be used on non-type arguments of templates. For example, numbers such as 5 are non-type arguments. When you want to have a <span style="font-family: courier new, courier;">std::array</span> of <span style="font-family: courier new, courier;">in</span>t's with 5 elements, you use the non-type argument 5<span style="font-family: courier new, courier;">: std::array&lt;int, 5&gt; myArray.</span></li>
+<li>Concepts add no run-time costs.</li>
+</ul>
+<p>Originally, concepts should be the key feature of <strong>C++11</strong>, but they were removed in the standardisation meeting in July 2009 in Frankfurt. The quote from Bjarne Stroustrup speaks for itself: "T<em>he C++Ox concept design evolved into a monster of complexity.</em>". A few years later, the next try was also not successful: concepts lite were removed from the <strong>C++17</strong> standard. Finally, they are part of <strong>C++20.</strong></p>
+<h2>What's next?</h2>
+<p>Of course, my next post is about concepts. I present many examples, what semantic constraints on template parameter mean.</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Paul Baxter,&nbsp; Meeting C++, Matt Braun, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Marko, </strong><span class="sc-kpOJdX fDWXFa" title="Emyr Williams"><strong>G Prvulovic, Reiner Eiteljörge, Reinhold Dröge, Abernitzke,</strong> </span><strong><span title="Emyr Williams">Richard Ohnemus, Frank Grimm</span></strong><span title="Emyr Williams"><strong>, Sakib, Broeserl, </strong></span><strong><span title="Emyr Williams">António Pina, Markus Falkner, Darshan Mody, Sergey Agafyin, and&nbsp;<span class="sc-gZMcBi hdSbOl" data-tag="user-details-full-name">Андрей Бурмистров</span></span><span title="Emyr Williams"><span class="sc-htpNat dEZjR" style="color: #241e12; font-family: aktiv-grotesk, sans-serif; margin: 0px; position: relative; font-weight: 400; font-size: 1rem; line-height: 1.5;"><span class="sc-htpNat ebhhXb" style="color: #241e12; font-family: aktiv-grotesk, sans-serif; margin: 0px; position: relative; font-weight: bold; font-size: 1rem; line-height: 1.5;"> <br /></span></span></span></strong></p>
+<p>&nbsp;</p>
+<table style="width: 490px; height: 103px;">
+<tbody>
+<tr>
+<td><strong>Thanks in particular to:</strong></td>
+<td>&nbsp;</td>
+<td><a href="https://cranepay.io/"><img src="images/patreon/crp4.png" alt="crp4" width="150" height="96" /></a></td>
+</tr>
+</tbody>
+</table>
+<p><strong>&nbsp;</strong></p>
+<p><strong>&nbsp;&nbsp;<a href="https://www.takeupcode.com/">&nbsp; </a></strong></p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at Leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages. I also included more than 120 source files.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more than 140 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 700 pages full of modern C++ and more than 260 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
+<p></p>
+<table style="width: 800px;">
+<tbody>
+<tr>
+<td colspan="2">
+<h2>Get your interactive course</h2>
+&nbsp;</td>
+</tr>
+<tr>
+<td>
+<h4 class="_3fBEwsM053hx2mPd0uV0nT" style="text-align: center;">Modern C++ Concurrency in Practice</h4>
+</td>
+<td>
+<h4>C++ Standard Library including C++14 &amp; C++17</h4>
+</td>
+</tr>
+<tr>
+<td><a href="https://goo.gl/2qWUkK"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseConcurrency/educative.png" alt="educative" width="300" height="152" /></a></td>
+<td><a href="https://www.educative.io/collection/10370001/5712008708096000?authorName=Rainer%20Grimm"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseLibrary/CLibrary.png" alt="CLibrary" width="300" height="150" /></a></td>
+</tr>
+<tr>
+<td>
+<p>Based on my book "Concurrency with Modern C++" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>140 lessons</li>
+<li>110 code playgrounds =&gt; Runs in the browser</li>
+<li>78 code snippets</li>
+<li>55 illustrations</li>
+</ul>
+</td>
+<td>
+<p>Based on my book "The C++ Standard Library" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>149 lessons</li>
+<li>111 code playgrounds =&gt; Runs in the browser</li>
+<li>164 code snippets</li>
+<li>25 illustrations</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>

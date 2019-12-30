@@ -1,0 +1,280 @@
+<p>The Template Introduction from the Concepts TS is a new way to use concepts. This syntactic variant is not included in the Concepts Draft and, therefore, in the C++20 standard. But, I don't know what the farther away future brings.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<h3>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/ConceptsWhatWeNotGet/TimelineCpp20Concepts.png" alt="TimelineCpp20Concepts" width="600" height="235" /></h3>
+<h3>Template Introduction</h3>
+<p>Let me first start with a short riddle. Which one, of the following syntactic variants, is not possible with the concepts draft?</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>                                  <span style="color: #0099ff; font-style: italic;">// (1)</span>
+requires Integral<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span>
+T gcd(T a, T b){
+    <span style="color: #006699; font-weight: bold;">if</span>( b <span style="color: #555555;">==</span> <span style="color: #ff6600;">0</span> ) <span style="color: #006699; font-weight: bold;">return</span> a;
+    <span style="color: #006699; font-weight: bold;">else</span> <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc00ff;">gcd</span>(b, a <span style="color: #555555;">%</span> b);
+}
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>                                  <span style="color: #0099ff; font-style: italic;">// (2)</span>
+T gcd1(T a, T b) requires Integral<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span>{
+    <span style="color: #006699; font-weight: bold;">if</span>( b <span style="color: #555555;">==</span> <span style="color: #ff6600;">0</span> ){ <span style="color: #006699; font-weight: bold;">return</span> a; }
+    <span style="color: #006699; font-weight: bold;">else</span> <span style="color: #006699; font-weight: bold;">return</span> gcd(b, a <span style="color: #555555;">%</span> b);
+}
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span>Integral T<span style="color: #555555;">&gt;</span>                                  <span style="color: #0099ff; font-style: italic;">// (3)</span>
+T gcd2(T a, T b){
+    <span style="color: #006699; font-weight: bold;">if</span>( b <span style="color: #555555;">==</span> <span style="color: #ff6600;">0</span> ){ <span style="color: #006699; font-weight: bold;">return</span> a; }
+    <span style="color: #006699; font-weight: bold;">else</span> <span style="color: #006699; font-weight: bold;">return</span> gcd(b, a <span style="color: #555555;">%</span> b);
+}
+
+Integral <span style="color: #006699; font-weight: bold;">auto</span> gcd3(Integral <span style="color: #006699; font-weight: bold;">auto</span> a, Integral <span style="color: #006699; font-weight: bold;">auto</span> b){ <span style="color: #0099ff; font-style: italic;">// (4)</span>
+    <span style="color: #006699; font-weight: bold;">if</span>( b <span style="color: #555555;">==</span> <span style="color: #ff6600;">0</span> ){ <span style="color: #006699; font-weight: bold;">return</span> a; }
+    <span style="color: #006699; font-weight: bold;">else</span> <span style="color: #006699; font-weight: bold;">return</span> gcd(b, a <span style="color: #555555;">%</span> b);
+}
+
+Integral{T}                                           <span style="color: #0099ff; font-style: italic;">// (5)</span>
+Integral gcd(T a, T b){
+  <span style="color: #006699; font-weight: bold;">if</span>( b <span style="color: #555555;">==</span> <span style="color: #ff6600;">0</span> ){ <span style="color: #006699; font-weight: bold;">return</span> a; }
+  <span style="color: #006699; font-weight: bold;">else</span>{
+    <span style="color: #006699; font-weight: bold;">return</span> gcd(b, a <span style="color: #555555;">%</span> b);
+  }
+}
+</pre>
+</div>
+<p></p>
+<p>Maybe, you don't know. So let me name the five variants.</p>
+<ol>
+<li>Requires clause</li>
+<li>Trailing requires clause</li>
+<li>Constrained template parameters</li>
+<li>Abbreviated Function Templates</li>
+<li>Template Introduction</li>
+</ol>
+<p>I assume you have chosen the most obscure one: Template Introduction. You are right. Maybe we get it with a later C++ standard, but I'm highly sceptical. In my talks in the last year, I heard no one complaining that they are not part of C++20. I'm also not a big fan of Template Introduction because they introduced a new asymmetry, and you know, I'm not a fan of asymmetries.</p>
+<h3>The Asymmetry</h3>
+<p>Instead of declaring your constrained template by using <span style="font-family: courier new,courier;">template&lt;Integral T&gt;</span>, you can just <span style="font-family: courier new,courier;">Integral{T}</span>. Here, you see the asymmetry. You can only use Template Introduction with concepts (constrained placeholders) but not with <span style="font-family: courier new, courier;">auto</span> (unconstrained placeholders). The following example makes my point. This and the following example is based on the previous concepts TS specification and compiled with the GCC.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// templateIntroduction.cpp</span>
+
+<span style="color: #009999;">#include &lt;type_traits&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+concept <span style="color: #007788; font-weight: bold;">bool</span> Integral(){
+  <span style="color: #006699; font-weight: bold;">return</span> std<span style="color: #555555;">::</span>is_integral<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value;
+}
+
+Integral{T}                            <span style="color: #0099ff; font-style: italic;">// (1)</span>
+Integral gcd(T a, T b){
+  <span style="color: #006699; font-weight: bold;">if</span>( b <span style="color: #555555;">==</span> <span style="color: #ff6600;">0</span> ){ <span style="color: #006699; font-weight: bold;">return</span> a; }
+  <span style="color: #006699; font-weight: bold;">else</span>{
+    <span style="color: #006699; font-weight: bold;">return</span> gcd(b, a <span style="color: #555555;">%</span> b);
+  }
+}
+
+Integral{T}                            <span style="color: #0099ff; font-style: italic;">// (2)</span>
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">ConstrainedClass</span>{};
+
+<span style="color: #0099ff; font-style: italic;">/*</span>
+
+<span style="color: #0099ff; font-style: italic;">auto{T}                                // (4)</span>
+<span style="color: #0099ff; font-style: italic;">auto gcd(T a, T b){</span>
+<span style="color: #0099ff; font-style: italic;">  if( b == 0 ){ return a; }</span>
+<span style="color: #0099ff; font-style: italic;">  else{</span>
+<span style="color: #0099ff; font-style: italic;">    return gcd(b, a % b);</span>
+<span style="color: #0099ff; font-style: italic;">  }</span>
+<span style="color: #0099ff; font-style: italic;">}</span>
+
+<span style="color: #0099ff; font-style: italic;">auto{T}                                // (5)</span>
+<span style="color: #0099ff; font-style: italic;">class ConstrainedClass{};</span>
+
+<span style="color: #0099ff; font-style: italic;">*/</span>
+
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  
+  <span style="color: #006699; font-weight: bold;">auto</span> res<span style="color: #555555;">=</span> gcd(<span style="color: #ff6600;">100</span>, <span style="color: #ff6600;">10</span>); 
+
+  ConstrainedClass<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> constrainedClass;
+  ConstrainedClass<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">double</span><span style="color: #555555;">&gt;</span> constrainedClass1;  <span style="color: #0099ff; font-style: italic;">// (3)</span>
+  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}
+</pre>
+</div>
+<p></p>
+<p>I use Template introduction for the function template <span style="font-family: courier new,courier;">gcd</span> (line 1) and the class template <span style="font-family: comic sans ms,sans-serif;">ConstrainedClass</span> (line 2). As expected,&nbsp; the concept will kick in if I try to instantiate <span style="font-family: courier new,courier;">ConstraintedClass</span> for <span style="font-family: courier new,courier;">double</span> (line 3).</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Functional/ConceptPlaceholders2/templateIntroductionError.png" alt="templateIntroductionError" width="600" height="149" /></p>
+<p>&nbsp;</p>
+<p>I don't like it that I can not just replace <span style="font-family: courier new,courier;">Integral</span> with <span style="font-family: courier new,courier;">auto</span> such as in lines 4 and 5. Up to this point in my posts to concepts, I used constrained placeholders (concepts) and unconstrained placeholders (auto) interchangeably. This straightforward principle is gone with Template Introduction.</p>
+<p>Of course, I could easily overcome this restriction by defining a concept that always evaluated to <span style="font-family: courier new, courier;">true</span>.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// templateIntroductionGeneric.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;string&gt;</span>
+<span style="color: #009999;">#include &lt;typeinfo&gt;</span>
+<span style="color: #009999;">#include &lt;utility&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">struct</span> NoDefaultConstructor{               <span style="color: #0099ff; font-style: italic;">// (5)</span>
+    NoDefaultConstructor() <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">delete</span>;
+};
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>                       <span style="color: #0099ff; font-style: italic;">// (1)</span>
+concept <span style="color: #007788; font-weight: bold;">bool</span> Generic(){
+  <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #336666;">true</span>;
+}
+
+Generic{T}                                 <span style="color: #0099ff; font-style: italic;">// (2)</span>
+Generic gcd(T a, T b){
+  <span style="color: #006699; font-weight: bold;">if</span>( b <span style="color: #555555;">==</span> <span style="color: #ff6600;">0</span> ){ <span style="color: #006699; font-weight: bold;">return</span> a; }
+  <span style="color: #006699; font-weight: bold;">else</span>{
+    <span style="color: #006699; font-weight: bold;">return</span> gcd(b, a <span style="color: #555555;">%</span> b);
+  }
+}
+
+Generic{T}                                 <span style="color: #0099ff; font-style: italic;">// (3)</span>
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">ConstrainedClass</span>{
+<span style="color: #9999ff;">public:</span>
+  ConstrainedClass(){
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #006699; font-weight: bold;">typeid</span>(decltype(std<span style="color: #555555;">::</span>declval<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span>())).name()   <span style="color: #0099ff; font-style: italic;">// (4)</span>
+              <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  }
+};
+
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"gcd(100, 10): "</span> <span style="color: #555555;">&lt;&lt;</span> gcd(<span style="color: #ff6600;">100</span>, <span style="color: #ff6600;">10</span>) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+ 
+  ConstrainedClass<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> genericClassInt;
+  ConstrainedClass<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>string<span style="color: #555555;">&gt;</span> genericClassString;
+  ConstrainedClass<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">double</span><span style="color: #555555;">&gt;</span> genericClassDouble;
+  ConstrainedClass<span style="color: #555555;">&lt;</span>NoDefaultConstructor<span style="color: #555555;">&gt;</span> genericNoDefaultConstructor;
+  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p><span style="font-family: courier new,courier;">Generic</span> (line 1) is a concept that returns <span style="font-family: courier new,courier;">true</span> for all types. Now, I can unify the syntax and define an unconstrained function template (line 4) and an unconstrained class template (line 3). Honestly, the terms unconstrained or constrained function templates or class template are not official. I coined them for simplicity reasons.</p>
+<p>The expression<span style="font-family: courier new,courier;"> typeid(decltype(std::declval&lt;T&gt;())).name()</span> (line 4)&nbsp; may look weird to you. <span style="font-family: courier new, courier;">std::declvar&lt;T&gt; </span>(C++11) converts the type parameter T into a reference type. Thanks to the reference type, you can use it in a <span style="font-family: courier new, courier;">decltype</span> expression to invoke any member function on<span style="font-family: courier new, courier;"> T</span> without constructing <span style="font-family: courier new, courier;">T</span>. <span style="font-family: courier new, courier;"></span>It works even for a type T without a default constructor (line 5). In my case (line 4), I invoked the constructor on the reference type to get the string representation of the type parameter T. Here is the output of the program with GCC.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Functional/ConceptPlaceholders2/templateIntroductionGeneric2.png" alt="templateIntroductionGeneric2" width="500" height="232" /></p>
+<h3>What's next?</h3>
+<p>One big topic is left to complete the story to concepts: define your concept. Most of the times, you reinvent the wheel because C++20 has many pre-defined concepts. Anyway, I present with my next post the pre-defined concepts and who you can define your one.</p>
+<p>&nbsp;</p>
+<table>
+<tbody>
+<tr>
+<td>This is my last post for 2019. You hear from me on 12.01.2020. If your hopefully contemplative time is too contemplative, here are about 300 posts to modern C++:</td>
+<td><a href="index.php/der-einstieg-in-modernes-c"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Functional/ConceptPlaceholders2/StartHere.png" alt="StartHere" /></a></td>
+</tr>
+</tbody>
+</table>
+<p>&nbsp;</p>
+<p></p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Paul Baxter,&nbsp; Meeting C++, Matt Braun, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Marko, </strong><span class="sc-kpOJdX fDWXFa" title="Emyr Williams"><strong>G Prvulovic, Reiner Eiteljörge, Reinhold Dröge, Abernitzke,</strong> </span><strong><span title="Emyr Williams">Richard Ohnemus, Frank Grimm</span></strong><span title="Emyr Williams"><strong>, Sakib, Broeserl, </strong></span><strong><span title="Emyr Williams">António Pina, Markus Falkner, Darshan Mody, Sergey Agafyin, <span class="sc-gZMcBi hdSbOl" data-tag="user-details-full-name">Андрей Бурмистров, and Jake.</span></span><span title="Emyr Williams"><span class="sc-htpNat dEZjR" style="color: #241e12; font-family: aktiv-grotesk, sans-serif; margin: 0px; position: relative; font-weight: 400; font-size: 1rem; line-height: 1.5;"><span class="sc-htpNat ebhhXb" style="color: #241e12; font-family: aktiv-grotesk, sans-serif; margin: 0px; position: relative; font-weight: bold; font-size: 1rem; line-height: 1.5;"><br /></span></span></span></strong></p>
+<p>&nbsp;</p>
+<table style="width: 490px; height: 103px;">
+<tbody>
+<tr>
+<td><strong>Thanks in particular to:</strong></td>
+<td>&nbsp;</td>
+<td><a href="https://cranepay.io/"><img src="images/patreon/crp4.png" alt="crp4" width="150" height="96" /></a></td>
+</tr>
+</tbody>
+</table>
+<p><strong>&nbsp;</strong></p>
+<p><strong>&nbsp;&nbsp;<a href="https://www.takeupcode.com/">&nbsp; </a></strong></p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at Leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages. I also included more than 120 source files.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more than 140 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 700 pages full of modern C++ and more than 260 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
+<p></p>
+<table style="width: 800px;">
+<tbody>
+<tr>
+<td colspan="2">
+<h2>Get your interactive course</h2>
+&nbsp;</td>
+</tr>
+<tr>
+<td>
+<h4 class="_3fBEwsM053hx2mPd0uV0nT" style="text-align: center;">Modern C++ Concurrency in Practice</h4>
+</td>
+<td>
+<h4>C++ Standard Library including C++14 &amp; C++17</h4>
+</td>
+</tr>
+<tr>
+<td><a href="https://goo.gl/2qWUkK"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseConcurrency/educative.png" alt="educative" width="300" height="152" /></a></td>
+<td><a href="https://www.educative.io/collection/10370001/5712008708096000?authorName=Rainer%20Grimm"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseLibrary/CLibrary.png" alt="CLibrary" width="300" height="150" /></a></td>
+</tr>
+<tr>
+<td>
+<p>Based on my book "Concurrency with Modern C++" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>140 lessons</li>
+<li>110 code playgrounds =&gt; Runs in the browser</li>
+<li>78 code snippets</li>
+<li>55 illustrations</li>
+</ul>
+</td>
+<td>
+<p>Based on my book "The C++ Standard Library" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>149 lessons</li>
+<li>111 code playgrounds =&gt; Runs in the browser</li>
+<li>164 code snippets</li>
+<li>25 illustrations</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
