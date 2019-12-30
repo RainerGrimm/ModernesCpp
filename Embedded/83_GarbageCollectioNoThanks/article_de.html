@@ -1,10 +1,10 @@
 <p>C++ ist eine so altmodische Programmiersprache. Sie unterstützt kein Garbage Collection. Kein Garbage Collection? Stimmt! Altmodisch? Stimmt nicht!</p>
 <hr id="system-readmore" />
 <p>&nbsp;</p>
-<p>Was spricht gegen Garbage Collection in C++? Zuallererst erst widerspricht Garbage Collection einem der wichtigsten Prinzipien in C++: "Don't pay for something you don't use". Das heißt, wenn das Programm kein Garbage Collection benötigt, soll die C++ Laufzeit auch nicht damit beschäftigt sein, den Speicher aufzuräumen. Meine zweite Erwiderung ist schon ein wenig anspruchsvoller.</p>
+<p>Was spricht gegen Garbage Collection in C++? Zuallererst widerspricht Garbage Collection einem der wichtigsten Prinzipien in C++: "Don't pay for something you don't use". Das heißt, wenn das Programm kein Garbage Collection benötigt, soll die C++ Laufzeit auch nicht damit beschäftigt sein, den Speicher aufzuräumen. Meine zweite Erwiderung ist schon ein wenig anspruchsvoller.</p>
 <p>Wir besitzen in C++ RAII und damit die vollkommen deterministische Ausführung der Destruktoren von Objekten. Doch was ist RAII? Genau darum dreht sich der Artikel.</p>
 <h2>Rescource Acquisition Is Initialization</h2>
-<p>RAII steht für <strong>R</strong>escource <strong>A</strong>cquisition <strong>I</strong>s <strong>I</strong>nitialization. Dies wohl wichtigste C++ Idiom besagt, das eine Ressource in Konstruktor eines Objektes angefordert und im Destruktor des Objektes wieder freigegeben wird. Das entscheidende dabei ist, dass der Destruktor genau dann automatisch aufgerufen wird, wenn das Objekt seine Gültigkeit verliert. Wenn das nicht vollkommen deterministisch ist? Die Garantie geben Destruktoren in Java oder Python (<span style="font-family: courier new,courier;">__del__</span>) nicht. Daher kann es tödlich sein, in Python einen Destruktor zu verwenden, eine&nbsp;kritische Ressource wie ein Lock wieder freizugeben. Ein klassisches Anti-Pattern für einen Deadlock. Das gilt aber nicht für C++.&nbsp;</p>
+<p>RAII steht für <strong>R</strong>escource <strong>A</strong>cquisition <strong>I</strong>s <strong>I</strong>nitialization. Dieses, wohl wichtigste C++ Idiom besagt, dass eine Ressource in Konstruktor eines Objektes angefordert und im Destruktor des Objektes wieder freigegeben wird. Das Entscheidende dabei ist, dass der Destruktor genau dann automatisch aufgerufen wird, wenn das Objekt seine Gültigkeit verliert. Wenn das nicht vollkommen deterministisch ist? Die Garantie geben Destruktoren in Java oder Python (<span style="font-family: courier new,courier;">__del__</span>) nicht. Daher kann es tödlich sein, in Python einen Destruktor zu verwenden, eine&nbsp;kritische Ressource wie ein Lock wieder freizugeben. Ein klassisches Anti-Pattern für einen Deadlock. Das gilt aber nicht für C++.&nbsp;</p>
 <p>Zuerst ein Beispiel, dass das deterministische Verhalten von RAII auf den Punkt bringt.&nbsp;</p>
 <!-- HTML generated using hilite.me -->
 <div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
@@ -114,7 +114,7 @@
 </div>
 <p>&nbsp;</p>
 <p><span style="font-family: courier new,courier;">ResourceGuard</span> repräsentiert einen Wächter, der auf die ihm anvertraute Ressource verwaltet. In dem konkreten Fall ist die Ressource nur als String angedeutet. ResourceGuard legt in seinem Konstruktor (Zeile 11 - 13) seine Ressource an und gibt sie in seinem Destruktor (Zeile 14 - 16). Seine Aufgabe macht er sehr zuverlässig.</p>
-<p>So wird der Destruktor von <span style="font-family: courier new,courier;">resGuard1</span> (Zeile 23) genau nach dem Ende der <span style="font-family: courier new,courier;">main</span>-Funktion (Zeile 46). Die Lebenszeit von <span style="font-family: courier new,courier;">resGuard2</span> (Zeile 27) endet schon in der Zeile 28. Dies führt automatische zum Aufruf seines Destruktors. Selbst eine Ausnahme ändert nicht an der Zuverlässigkeit von <span style="font-family: courier new,courier;">resGuard3</span> (Zeile 36). Seine Destruktor wird bei dem Verlassen des<span style="font-family: courier new,courier;"> try-</span>Blocks (Zeile 35 - 38) aufgerufen.</p>
+<p>So wird der Destruktor von <span style="font-family: courier new,courier;">resGuard1</span> (Zeile 23) genau nach dem Ende der <span style="font-family: courier new,courier;">main</span>-Funktion (Zeile 46). Die Lebenszeit von <span style="font-family: courier new,courier;">resGuard2</span> (Zeile 27) endet schon in der Zeile 28. Dies führt automatische zum Aufruf seines Destruktors. Selbst eine Ausnahme ändert nichts an der Zuverlässigkeit von <span style="font-family: courier new,courier;">resGuard3</span> (Zeile 36). Seine Destruktor wird bei dem Verlassen des<span style="font-family: courier new,courier;"> try-</span>Blocks (Zeile 35 - 38) aufgerufen.</p>
 <p>Der Screenshot des Programms zeigt schön die Lebenszyklen der Objekte.</p>
 <p><img src="images/blog/EmbeddedProgrammierung/RAII/raii.png" alt="raii" style="margin: 15px;" /></p>
 <p>Ich will nochmals auf das Programm <span style="font-family: courier new,courier;">raii.cpp</span> zurückkommen. Was ist die entscheidende Idee des RAII-Idioms?<strong> Der Lebenszyklus einer Ressource wird an den Lebensyzklus einer lokalen Variable gebunden. C++ verwaltet automatisch den Lebenszyklus seiner lokalen Ressource.</strong></p>
@@ -129,7 +129,7 @@
 </ol>
 <p>Damit bleibt C++ seinem wichtigen Prinzip in doppelter Hinsicht treu. Don't pay for something you don't use.</p>
 <h2>Besondere Ressourcen</h2>
-<p>Dank RAII wird der Destruktor des lokalen Objektes und damit die Aufräumfunktion der Ressource absolut deterministisch aufgerufen. So weit, so gut. Kann die Aufräumfunktion aber eine Ausnahme werfen, wird RAII diese Ausnahme durch seinen Destruktoraufruf immer anstoßen. Dies ist zum Beispiel der Fall, wenn die Ressource eine Datei ist. In diesem Fall kann die <span style="font-family: courier new,courier;">close</span>-Funktion eine Ausnahme auslösen. Da stellt sich natürlich die Frage, ob es tolerierbar ist, das der Destruktor ein Ausname werfen kann oder ob in diesem Fall RAII nicht verwendet werden soll. Diese Entscheidung muss natürlich im konkreten Einzelfall getroffen werden.</p>
+<p>Dank RAII wird der Destruktor des lokalen Objektes und damit die Aufräumfunktion der Ressource absolut deterministisch aufgerufen. So weit, so gut. Kann die Aufräumfunktion aber eine Ausnahme werfen, wird RAII diese Ausnahme durch seinen Destruktoraufruf immer anstoßen. Dies ist zum Beispiel der Fall, wenn die Ressource eine Datei ist. In diesem Fall kann die <span style="font-family: courier new,courier;">close</span>-Funktion eine Ausnahme auslösen. Da stellt sich natürlich die Frage, ob es tolerierbar ist, dass der Destruktor eine Ausnahme werfen kann oder ob in diesem Fall RAII nicht verwendet werden soll. Diese Entscheidung muss natürlich im konkreten Einzelfall getroffen werden.</p>
 <h3>Umgang mit werfenden Destruktoren (<strong>Udo Steinbach</strong>)</h3>
 <p>Das Problem der werfenden Destruktoren hat Udo Steinbach deutlich beschrieben. Daher möchte ich seine E-Mail hier zitieren. Kleine Anmerkungen habe ich in runden Klammern eingefügt.</p>
 <p>RAII ist eine nützliche Sache - solange keine Fehler auftreten können. Letzteres wird beim Frohlocken über RAII leider oft vergessen. Warum ein Destruktor nicht werfen sollte, kann man an vielen Stellen <a href="https://www.qwant.com/?q=should%20destructors%20throw">https://www.qwant.com/?q=should%20destructors%20throw</a> nachlesen. Die Folge ist, das RAII in vielen Fällen manuell ergänzt werden muß und damit doppelt gemoppelt scheint.&nbsp;</p>
@@ -155,7 +155,7 @@
    ...
 }<br /><br /></pre>
 </div>
-<p>Verweigert <span style="font-family: courier new,courier;">CloseFile()</span> das Schließen, wird (eine) korrekte Funktion vorgetäuscht, das Handle ist verloren, der Benutzer muß das Programm neu starten und mitunter die Datei selbst suchen und löschen, oder andere peinliche Symptome, wie sie aus Anwendungsprogrammen allzu bekannt sind. <br />Also muß die Klasse um ein werfendes</p>
+<p>Verweigert <span style="font-family: courier new,courier;">CloseFile()</span> das Schließen, wird (eine) korrekte Funktion vorgetäuscht, das Handle ist verloren, der Benutzer muss das Programm neu starten und mitunter die Datei selbst suchen und löschen, oder andere peinliche Symptome, wie sie aus Anwendungsprogrammen allzu bekannt sind. <br />Also muß die Klasse um ein werfendes</p>
 <pre><span style="font-family: courier new,courier;">void Close();</span></pre>
 <p>ergänzt werden und der Destruktor überprüfen:</p>
 <pre><span style="font-family: courier new,courier;">{ <br />  MyFileHandle file(...)<br />  </span>... <br />  file.Close();<br />}</pre>
@@ -163,15 +163,15 @@
 <p>Das sieht schon weniger nach RAII aus. Um eine Symmetrie herzustellen, scheint ein manuelles Open() sinnvoll:</p>
 <pre>{<br />  MyFileHandle file;<br />  file.Open(...); <br />  ...<br /><span id="transmark"></span>  file.Close();<br />}</pre>
 <p>&nbsp;</p>
-<p>... RAII perdu. Für den Liebhaber bleibt immerhin der Trost, daß das Objekt nun wiederverwendbar ist und das sowohl für den Fehlerfall Vorkehrungen getroffen wurden und es ansonsten korrekt läuft.</p>
+<p>... RAII perdu. Für den Liebhaber bleibt immerhin der Trost, dass das Objekt nun wiederverwendbar ist und das sowohl für den Fehlerfall Vorkehrungen getroffen wurden und es ansonsten korrekt läuft.</p>
 <p>Unter der Maßgabe einer ordentlichen Fehlerbehandlung aus Sicht des Programm-Benutzers verzichte ich bei vielen meiner Klassen auf RAII. Modultests nach einer Idee von <a href="http://www.boost.org/community/exception_safety.html" class="moz-txt-link-freetext">http://www.boost.org/community/exception_safety.html</a> zeigen</p>
 <ul>
 <li>mindestens grundlegende Ausnahmesicherheit <a href="http://en.wikipedia.org/wiki/Exception_safety" class="moz-txt-link-freetext">http://en.wikipedia.org/wiki/Exception_safety</a> ,</li>
 <li>bei ordentlcher Fehlerbehandlung, auf die bei RAII ja verzichtet werden muß, z.B. automatisches Löschen unvollständiger Dateien und weiter werfen der Ausnahme,</li>
 <li>und dem Benutzer präsentierbare Fehlermeldungen,</li>
 </ul>
-<p>ein stets bestmögliches Verhalten des Programms: Mache Benutzer und Support glücklich durch Ersetzen von Absturz und Datenmüll durch aussagekräftige Meldungen.</p>
-<p>Ein Automatismus, hier Destruktor oder Garbage Collector, kann Fehler nur automatisch behandeln, also ignorieren oder minimalistisch. In Anwendungsprogrammen sollte das nicht akzeptabel sein, und muß es auch nicht.</p>
+<p>ein stets bestmögliches Verhalten des Programms: Mache Benutzer und Support glücklich durch das Ersetzen von Absturz und Datenmüll durch aussagekräftige Meldungen.</p>
+<p>Ein Automatismus, hier Destruktor oder Garbage Collector, kann Fehler nur automatisch behandeln, also ignorieren oder minimalistisch. In Anwendungsprogrammen sollte das nicht akzeptabel sein, und muss es auch nicht.</p>
 <h2>Die berühmten letzten Worte von Bjarne Stroustrup</h2>
 <p><img src="images/blog/EmbeddedProgrammierung/RAII/BjarneStroustrup.jpg" alt="BjarneStroustrup" /></p>
 <p>Bjarne Stroustrup schrieb einen kurzen Kommentar zu meinen News auf <a href="https://www.facebook.com/groups/cppEnthusiasts/">C++Enthusiasts: </a></p>
