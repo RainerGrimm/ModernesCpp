@@ -1,0 +1,274 @@
+<p><a href="http://bit.ly/2NL0yJN">In my last post</a>, I defined the concept <span style="font-family: 'courier new', courier;">Equal</span>. Now, I go one step further and use the concept <span style="font-family: 'courier new', courier;">Equal</span> to define the concept <span style="font-family: 'courier new', courier;">Ordering</span>.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/ConceptsEqualAndOrdering/TimelineCpp20Concepts.png" alt="TimelineCpp20Concepts" width="650" height="255" /></p>
+<p>Here is a short reminder of where I ended with my last post. I defined the concept of <span style="font-family: 'courier new', courier;">Equal</span> and a function <span style="font-family: 'courier new', courier;">areEqual</span> to use it.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #cc00ff;">template</span><span style="color: #555555;">&lt;</span>typename <span style="color: #007788; font-weight: bold;">T</span><span style="color: #555555;">&gt;</span>
+<span style="color: #cc00ff;">concept</span> <span style="color: #007788; font-weight: bold;">Equal</span> <span style="color: #000000; font-weight: bold;">=</span>
+    requires(<span style="color: #007788; font-weight: bold;">T</span> a, <span style="color: #007788; font-weight: bold;">T</span> b) {
+        { a <span style="color: #555555;">==</span> b } <span style="color: #000000; font-weight: bold;">-&gt;</span> bool;
+        { a <span style="color: #555555;">!=</span> b } <span style="color: #000000; font-weight: bold;">-&gt;</span> bool;
+};
+
+
+<span style="color: #cc00ff;">bool</span> areEqual(<span style="color: #007788; font-weight: bold;">Equal</span> auto fir, <span style="color: #007788; font-weight: bold;">Equal</span> auto sec) {                       
+  return fir <span style="color: #555555;">==</span> sec;
+}
+</pre>
+</div>
+<p></p>
+<h3>My Wrong Usage of the Concept <span style="font-family: 'courier new', courier;">Equal</span></h3>
+<p>I used the concept of <span style="font-family: 'courier new', courier;">Equal</span>&nbsp;in my last post in the wrong way. The concept <span style="font-family: 'courier new', courier;">Equal</span> requires that <span style="font-family: 'courier new', courier;">a</span> and <span style="font-family: 'courier new', courier;">b</span> have the same type but, the function <span style="font-family: 'courier new', courier;">areEqual</span> allows that<span style="font-family: 'courier new', courier;"> fir</span> and <span style="font-family: 'courier new', courier;">sec</span> could be different types that both support the concept <span style="font-family: 'courier new', courier;">Equal</span>. Using a constrained template parameter instead of placeholder syntax solves the issue:</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #cc00ff;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">Equal</span> <span style="color: #007788; font-weight: bold;">T</span><span style="color: #555555;">&gt;</span>
+<span style="color: #cc00ff;">bool</span> areEqual(<span style="color: #007788; font-weight: bold;">T</span> fir, <span style="color: #007788; font-weight: bold;">T</span> sec) {
+    fir <span style="color: #555555;">==</span> sec;
+}
+</pre>
+</div>
+<p></p>
+<p>Now, <span style="font-family: 'courier new', courier;">fir</span> and <span style="font-family: 'courier new', courier;">sec</span> must have the same type.&nbsp;</p>
+<p>Thanks a lot to Corentin Jabot&nbsp;for pointing this inconsistency out.&nbsp;</p>
+<p>Additionally, the concept <span style="font-family: 'courier new', courier;">Equal</span> should not check if the equal and unequal operator returns a <span style="font-family: 'courier new', courier;">bool</span> but something which is implicitly or explicitly convertible to a <span style="font-family: 'courier new', courier;">bool</span>. Here we are.&nbsp;</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #cc00ff;">template</span><span style="color: #555555;">&lt;</span>typename <span style="color: #007788; font-weight: bold;">T</span><span style="color: #555555;">&gt;</span>
+<span style="color: #cc00ff;">concept</span> <span style="color: #007788; font-weight: bold;">Equal</span> <span style="color: #000000; font-weight: bold;">=</span>
+    requires(<span style="color: #007788; font-weight: bold;">T</span> a, <span style="color: #007788; font-weight: bold;">T</span> b) {
+        { a <span style="color: #555555;">==</span> b } <span style="color: #000000; font-weight: bold;">-&gt;</span> std<span style="color: #000000; font-weight: bold;">::</span>convertible_to<span style="color: #555555;">&lt;</span>bool<span style="color: #555555;">&gt;</span>;
+        { a <span style="color: #555555;">!=</span> b } <span style="color: #000000; font-weight: bold;">-&gt;</span> std<span style="color: #000000; font-weight: bold;">::</span>convertible_to<span style="color: #555555;">&lt;</span>bool<span style="color: #555555;">&gt;</span>;
+};
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>I have to add. <span style="font-family: 'courier new', courier;"><a href="https://en.cppreference.com/w/cpp/concepts/convertible_to">std::convertible_to</a>&nbsp;</span>is a concept and requires, therefore, the header <span style="font-family: 'courier new', courier;">&lt;concepts&gt;</span>.&nbsp;&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #cc00ff;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">class</span> <span style="color: #007788; font-weight: bold;">From</span>, <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #007788; font-weight: bold;">To</span><span style="color: #555555;">&gt;</span>
+<span style="color: #cc00ff;">concept</span> convertible_to <span style="color: #000000; font-weight: bold;">=</span>
+  std<span style="color: #000000; font-weight: bold;">::</span>is_convertible_v<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">From</span>, <span style="color: #007788; font-weight: bold;">To</span><span style="color: #555555;">&gt;</span> <span style="color: #555555;">&amp;&amp;</span>
+  requires(<span style="color: #007788; font-weight: bold;">From</span> (<span style="color: #555555;">&amp;</span>f)<span style="color: #336666;">()</span>) {
+    static_cast<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">To</span><span style="color: #555555;">&gt;</span>(f<span style="color: #336666;">()</span>);
+  };
+</pre>
+</div>
+<p></p>
+<p>The C++ 20 standard has already defined two concepts for equality comparing:</p>
+<ul>
+<li><span style="font-family: 'courier new', courier;"><strong>std::equality_comparabl</strong>e</span>: corresponds to my concept&nbsp;<span style="font-family: 'courier new', courier;">Equal</span></li>
+<li><strong><span style="font-family: 'courier new', courier;">std::equality_comparable_with</span></strong>: allows the comparison of values of different type; e.g.: <span style="font-family: 'courier new', courier;">1.0 == 1.0f</span></li>
+</ul>
+<h2>The Challenge</h2>
+<p>I ended&nbsp;<a href="http://bit.ly/2NL0yJN">my last post</a> by presenting a part of the type class hierarchy of Haskell.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/ConceptsEqualAndOrdering/haskellsTypeclasses.png" alt="haskellsTypeclasses" width="400" height="345" /></p>
+<p>The class hierarchy shows that the type class <span style="font-family: 'courier new', courier;">Ord</span>&nbsp;is a refinement of the type class&nbsp;<span style="font-family: 'courier new', courier;">Eq</span>. This can elegantly be expressed in Haskell.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">class</span> <span style="color: #007788; font-weight: bold;">Eq</span> a <span style="color: #006699; font-weight: bold;">where</span>
+    (<span style="color: #555555;">==</span>) <span style="color: #000000; font-weight: bold;">::</span> a <span style="color: #000000; font-weight: bold;">-&gt;</span> a <span style="color: #000000; font-weight: bold;">-&gt;</span> <span style="color: #007788; font-weight: bold;">Bool</span>
+    (<span style="color: #555555;">/=</span>) <span style="color: #000000; font-weight: bold;">::</span> a <span style="color: #000000; font-weight: bold;">-&gt;</span> a <span style="color: #000000; font-weight: bold;">-&gt;</span> <span style="color: #007788; font-weight: bold;">Bool</span>
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #007788; font-weight: bold;">Eq</span> a <span style="color: #000000; font-weight: bold;">=&gt;</span> <span style="color: #007788; font-weight: bold;">Ord</span> a <span style="color: #006699; font-weight: bold;">where</span>
+    compare <span style="color: #000000; font-weight: bold;">::</span> a <span style="color: #000000; font-weight: bold;">-&gt;</span> a <span style="color: #000000; font-weight: bold;">-&gt;</span> <span style="color: #007788; font-weight: bold;">Ordering</span>
+    (<span style="color: #555555;">&lt;</span>) <span style="color: #000000; font-weight: bold;">::</span> a <span style="color: #000000; font-weight: bold;">-&gt;</span> a <span style="color: #000000; font-weight: bold;">-&gt;</span> <span style="color: #007788; font-weight: bold;">Bool</span>
+    (<span style="color: #555555;">&lt;=</span>) <span style="color: #000000; font-weight: bold;">::</span> a <span style="color: #000000; font-weight: bold;">-&gt;</span> a <span style="color: #000000; font-weight: bold;">-&gt;</span> <span style="color: #007788; font-weight: bold;">Bool</span>
+    (<span style="color: #555555;">&gt;</span>) <span style="color: #000000; font-weight: bold;">::</span> a <span style="color: #000000; font-weight: bold;">-&gt;</span> a <span style="color: #000000; font-weight: bold;">-&gt;</span> <span style="color: #007788; font-weight: bold;">Bool</span>
+    (<span style="color: #555555;">&gt;=</span>) <span style="color: #000000; font-weight: bold;">::</span> a <span style="color: #000000; font-weight: bold;">-&gt;</span> a <span style="color: #000000; font-weight: bold;">-&gt;</span> <span style="color: #007788; font-weight: bold;">Bool</span>
+    max <span style="color: #000000; font-weight: bold;">::</span> a <span style="color: #000000; font-weight: bold;">-&gt;</span> a <span style="color: #000000; font-weight: bold;">-&gt;</span> a
+</pre>
+</div>
+<p></p>
+<p>Here is my challenge. Can I express such as relationship quite elegantly with concepts in C++20? For simplicity reasons, I ignore the functions <span style="font-family: 'courier new', courier;">compare</span> and <span style="font-family: 'courier new', courier;">max</span> of Haskell's type class. Of course, I can.</p>
+<h2>The Concept <span style="font-family: 'courier new', courier;">Ordering</span></h2>
+<p>Thanks to requires-expression, the definition of the concept <span style="font-family: 'courier new', courier;">Ordering</span> looks quite similar to the definition of the type class <span style="font-family: 'courier new', courier;">Equal</span>.&nbsp;&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #cc00ff;">template</span> <span style="color: #555555;">&lt;</span>typename <span style="color: #007788; font-weight: bold;">T</span><span style="color: #555555;">&gt;</span>
+<span style="color: #cc00ff;">concept</span> <span style="color: #007788; font-weight: bold;">Ordering</span> <span style="color: #000000; font-weight: bold;">=</span>
+    <span style="color: #007788; font-weight: bold;">Equal</span><span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">T</span><span style="color: #555555;">&gt;</span> <span style="color: #555555;">&amp;&amp;</span>
+    requires(<span style="color: #007788; font-weight: bold;">T</span> a, <span style="color: #007788; font-weight: bold;">T</span> b) {
+        { a <span style="color: #555555;">&lt;=</span> b } <span style="color: #000000; font-weight: bold;">-&gt;</span> bool;
+        { a <span style="color: #555555;">&lt;</span> b } <span style="color: #000000; font-weight: bold;">-&gt;</span> bool;
+        { a <span style="color: #555555;">&gt;</span> b } <span style="color: #000000; font-weight: bold;">-&gt;</span> bool;
+        { a <span style="color: #555555;">&gt;=</span> b } <span style="color: #000000; font-weight: bold;">-&gt;</span> bool;
+    };
+</pre>
+</div>
+<p></p>
+<p>Okay, let me try it out.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #555555;">//</span> conceptsDefinitionOrdering<span style="color: #555555;">.</span>cpp
+
+<span style="color: #555555;">#</span>include <span style="color: #555555;">&lt;</span>concepts<span style="color: #555555;">&gt;</span>
+<span style="color: #555555;">#</span>include <span style="color: #555555;">&lt;</span>iostream<span style="color: #555555;">&gt;</span>
+<span style="color: #555555;">#</span>include <span style="color: #555555;">&lt;</span>unordered_set<span style="color: #555555;">&gt;</span>
+
+<span style="color: #cc00ff;">template</span><span style="color: #555555;">&lt;</span>typename <span style="color: #007788; font-weight: bold;">T</span><span style="color: #555555;">&gt;</span>
+<span style="color: #cc00ff;">concept</span> <span style="color: #007788; font-weight: bold;">Equal</span> <span style="color: #000000; font-weight: bold;">=</span>
+    requires(<span style="color: #007788; font-weight: bold;">T</span> a, <span style="color: #007788; font-weight: bold;">T</span> b) {
+        { a <span style="color: #555555;">==</span> b } <span style="color: #000000; font-weight: bold;">-&gt;</span> std<span style="color: #000000; font-weight: bold;">::</span>convertible_to<span style="color: #555555;">&lt;</span>bool<span style="color: #555555;">&gt;</span>;
+        { a <span style="color: #555555;">!=</span> b } <span style="color: #000000; font-weight: bold;">-&gt;</span> std<span style="color: #000000; font-weight: bold;">::</span>convertible_to<span style="color: #555555;">&lt;</span>bool<span style="color: #555555;">&gt;</span>;
+    };
+
+
+<span style="color: #cc00ff;">template</span> <span style="color: #555555;">&lt;</span>typename <span style="color: #007788; font-weight: bold;">T</span><span style="color: #555555;">&gt;</span>
+<span style="color: #cc00ff;">concept</span> <span style="color: #007788; font-weight: bold;">Ordering</span> <span style="color: #000000; font-weight: bold;">=</span>
+    <span style="color: #007788; font-weight: bold;">Equal</span><span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">T</span><span style="color: #555555;">&gt;</span> <span style="color: #555555;">&amp;&amp;</span>
+    requires(<span style="color: #007788; font-weight: bold;">T</span> a, <span style="color: #007788; font-weight: bold;">T</span> b) {
+        { a <span style="color: #555555;">&lt;=</span> b } <span style="color: #000000; font-weight: bold;">-&gt;</span> std<span style="color: #000000; font-weight: bold;">::</span>convertible_to<span style="color: #555555;">&lt;</span>bool<span style="color: #555555;">&gt;</span>;
+        { a <span style="color: #555555;">&lt;</span> b } <span style="color: #000000; font-weight: bold;">-&gt;</span> std<span style="color: #000000; font-weight: bold;">::</span>convertible_to<span style="color: #555555;">&lt;</span>bool<span style="color: #555555;">&gt;</span>;
+        { a <span style="color: #555555;">&gt;</span> b } <span style="color: #000000; font-weight: bold;">-&gt;</span> std<span style="color: #000000; font-weight: bold;">::</span>convertible_to<span style="color: #555555;">&lt;</span>bool<span style="color: #555555;">&gt;</span>;
+        { a <span style="color: #555555;">&gt;=</span> b } <span style="color: #000000; font-weight: bold;">-&gt;</span> std<span style="color: #000000; font-weight: bold;">::</span>convertible_to<span style="color: #555555;">&lt;</span>bool<span style="color: #555555;">&gt;</span>;
+    };
+
+<span style="color: #cc00ff;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">Equal</span> <span style="color: #007788; font-weight: bold;">T</span><span style="color: #555555;">&gt;</span>
+<span style="color: #cc00ff;">bool</span> areEqual(<span style="color: #007788; font-weight: bold;">T</span> a, <span style="color: #007788; font-weight: bold;">T</span> b) {
+    return a <span style="color: #555555;">==</span> b;
+}
+
+<span style="color: #cc00ff;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">Ordering</span> <span style="color: #007788; font-weight: bold;">T</span><span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">T</span> getSmaller(<span style="color: #007788; font-weight: bold;">T</span> a, <span style="color: #007788; font-weight: bold;">T</span> b) {
+    return (a <span style="color: #555555;">&lt;</span> b) <span style="color: #555555;">?</span> a <span style="color: #007788; font-weight: bold;">:</span> b;
+}
+    
+<span style="color: #cc00ff;">int</span> main<span style="color: #336666;">()</span> {
+  
+    std<span style="color: #000000; font-weight: bold;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #000000; font-weight: bold;">::</span>boolalpha <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #000000; font-weight: bold;">::</span>endl;
+  
+    std<span style="color: #000000; font-weight: bold;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"areEqual(1, 5): "</span> <span style="color: #555555;">&lt;&lt;</span> areEqual(<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">5</span>) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #000000; font-weight: bold;">::</span>endl;
+  
+    std<span style="color: #000000; font-weight: bold;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"getSmaller(1, 5): "</span> <span style="color: #555555;">&lt;&lt;</span> getSmaller(<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">5</span>) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #000000; font-weight: bold;">::</span>endl;
+  
+    std<span style="color: #000000; font-weight: bold;">::</span>unordered_set<span style="color: #555555;">&lt;</span>int<span style="color: #555555;">&gt;</span> firSet{<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">5</span>};
+    std<span style="color: #000000; font-weight: bold;">::</span>unordered_set<span style="color: #555555;">&lt;</span>int<span style="color: #555555;">&gt;</span> secSet{<span style="color: #ff6600;">5</span>, <span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">1</span>};
+  
+    std<span style="color: #000000; font-weight: bold;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"areEqual(firSet, secSet): "</span> <span style="color: #555555;">&lt;&lt;</span> areEqual(firSet, secSet) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #000000; font-weight: bold;">::</span>endl;
+  
+    <span style="color: #555555;">//</span> auto smallerSet <span style="color: #000000; font-weight: bold;">=</span> getSmaller(firSet, secSet);
+  
+    std<span style="color: #000000; font-weight: bold;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #000000; font-weight: bold;">::</span>endl;
+  
+}
+</pre>
+</div>
+<p></p>
+<p>The function <span style="font-family: 'courier new', courier;">getSmaller</span> requires, that both arguments <span style="font-family: 'courier new', courier;">a</span> and <span style="font-family: 'courier new', courier;">b</span> support the concept <span style="font-family: 'courier new', courier;">Ordering,</span> and both have the same type. This requirement holds for the numbers 1 and 5.&nbsp;</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/ConceptsEqualAndOrdering/equalAndOrdering.png" alt="equalAndOrdering" width="400" height="149" /></p>
+<p>Of course, a <span style="font-family: 'courier new', courier;">std::unordered_set</span> does not support ordering. The actual msvc compiler is very specific, when I try to compile the line <span style="font-family: 'courier new', courier;">auto smaller = getSmaller(firSet, secSet</span>) with the flag <span style="font-family: 'courier new', courier;">/std:c++latest</span>.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/ConceptsEqualAndOrdering/equalAndOrderingError.png" alt="equalAndOrderingError" width="650" height="222" /></p>
+<p>By the way. The error message is very clear: <span style="font-family: 'courier new', courier;">the associated constraints are not satisfied</span>.</p>
+<p>Of course, the concept <span style="font-family: 'courier new', courier;">Ordering</span> is already part of the C++20 standard.</p>
+<ul>
+<li><strong><span style="font-family: 'courier new', courier;">std::three_way_comparable:&nbsp;</span></strong>corresponds to my concept<span style="font-family: 'courier new', courier;">&nbsp;Ordering</span><span style="font-family: 'courier new', courier;"><span style="font-family: 'courier new', courier;"><br /></span></span></li>
+<li><strong><span style="font-family: 'courier new', courier;">std::three_way_comparable_with:&nbsp;</span></strong>allows the comparison of values of different type; e.g.: <span style="font-family: 'courier new', courier;">1.0 &lt; 1.0f</span></li>
+</ul>
+<p>Maybe, you are irritated by the term three-way. With C++20, we get the three-way comparison operator, also known as the spaceship operator. <span style="font-family: 'courier new', courier;">&lt;=&gt;</span>. Here is the first overview: <a href="http://bit.ly/2PKLKge">C++20: The Core Language</a>. I write about the three-way comparison operator in a future post.&nbsp;</p>
+<h3>&nbsp;</h3>
+<h3 style="color: #000000;">Compiler Support</h3>
+<p>I learn new stuff by trying it out. Maybe, you don't have an actual msvc available. In this case, use the current GCC (trunk) on the Compiler Explorer. GCC support the C++20 syntax for concepts. Here is the<span style="font-family: 'courier new', courier;"> conceptsDefinitionOrdering.cpp</span> for further experiments:&nbsp;<a href="https://godbolt.org/z/uyVFX8">https://godbolt.org/z/uyVFX8</a>.&nbsp;&nbsp;</p>
+<h2>What's next?</h2>
+<p>When you want to define a concrete type that works well in the C++ ecosystem, you should define a type that "behaves link an <span style="font-family: 'courier new', courier;">int</span>". &nbsp;Such a concrete type could be copied and, the result of the copy operation is independent of the original one and has the same value.&nbsp; Formally, your concrete type should be a regular type. In the next post, I define the concepts <span style="font-family: 'courier new', courier;">Regular</span> and <span style="font-family: 'courier new', courier;">SemiRegular</span>.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Meeting C++, Matt Braun, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Marko, </strong><span class="sc-kpOJdX fDWXFa" title="Emyr Williams"><strong>G Prvulovic, Reinhold Dröge, Abernitzke,</strong> </span><strong><span title="Emyr Williams">Richard Ohnemus, Frank Grimm</span></strong><span title="Emyr Williams"><strong>, Sakib, Broeserl, </strong></span><strong><span title="Emyr Williams">António Pina, Markus Falkner, Darshan Mody, Sergey Agafyin, <span class="sc-gZMcBi hdSbOl" data-tag="user-details-full-name">Андрей Бурмистров, Jake, GS, and Lawton Shoemake.</span></span><span title="Emyr Williams"><span class="sc-htpNat dEZjR" style="color: #241e12; font-family: aktiv-grotesk, sans-serif; margin: 0px; position: relative; font-weight: 400; font-size: 1rem; line-height: 1.5;"><span class="sc-htpNat ebhhXb" style="color: #241e12; font-family: aktiv-grotesk, sans-serif; margin: 0px; position: relative; font-weight: bold; font-size: 1rem; line-height: 1.5;"><br /></span></span></span></strong></p>
+<p>&nbsp;</p>
+<table style="width: 490px; height: 103px;">
+<tbody>
+<tr>
+<td><strong>Thanks in particular to:</strong></td>
+<td>&nbsp;</td>
+<td><a href="https://cranepay.io/"><img src="images/patreon/crp4.png" alt="crp4" width="150" height="96" /></a></td>
+</tr>
+</tbody>
+</table>
+<p><strong>&nbsp;</strong></p>
+<p><strong>&nbsp;&nbsp;<a href="https://www.takeupcode.com/">&nbsp; </a></strong></p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at Leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages. I also included more than 120 source files.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more than 140 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 700 pages full of modern C++ and more than 260 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
+<p></p>
+<table style="width: 800px;">
+<tbody>
+<tr>
+<td colspan="2">
+<h2>Get your interactive course</h2>
+&nbsp;</td>
+</tr>
+<tr>
+<td>
+<h4 class="_3fBEwsM053hx2mPd0uV0nT" style="text-align: center;">Modern C++ Concurrency in Practice</h4>
+</td>
+<td>
+<h4>C++ Standard Library including C++14 &amp; C++17</h4>
+</td>
+</tr>
+<tr>
+<td><a href="https://goo.gl/2qWUkK"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseConcurrency/educative.png" alt="educative" width="300" height="152" /></a></td>
+<td><a href="https://www.educative.io/collection/10370001/5712008708096000?authorName=Rainer%20Grimm"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseLibrary/CLibrary.png" alt="CLibrary" width="300" height="150" /></a></td>
+</tr>
+<tr>
+<td>
+<p>Based on my book "Concurrency with Modern C++" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>140 lessons</li>
+<li>110 code playgrounds =&gt; Runs in the browser</li>
+<li>78 code snippets</li>
+<li>55 illustrations</li>
+</ul>
+</td>
+<td>
+<p>Based on my book "The C++ Standard Library" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>149 lessons</li>
+<li>111 code playgrounds =&gt; Runs in the browser</li>
+<li>164 code snippets</li>
+<li>25 illustrations
+<div class="favicon"><img src="administrator/templates/isis/favicon.ico" alt="" width="16px" height="16px" /></div>
+</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
