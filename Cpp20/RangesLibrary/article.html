@@ -1,0 +1,236 @@
+<p style="margin: 0px 0px 10px; color: #444444; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 14px; font-style: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing: 0px; background-color: #ffffff;">Thanks to the ranges library in C++20, working with the Standard Template Library (STL) will become much more comfortable and powerful. The algorithms of the ranges library are lazy, can work directly on the container and can easily be composed. To make it short: The comfort and the power of the ranges library are due to its functional ideas. Let me show you what that means.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/RangesLibrary/TimelineCpp20.png" alt="TimelineCpp20" width="650" height="248" /></p>
+<p>Before I dive into the details. Here is a first example of the ranges library:</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// rangesFilterTransform.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;ranges&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> numbers <span style="color: #555555;">=</span> {<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">5</span>, <span style="color: #ff6600;">6</span>};
+  
+    <span style="color: #006699; font-weight: bold;">auto</span> results <span style="color: #555555;">=</span> numbers <span style="color: #555555;">|</span> std<span style="color: #555555;">::</span>view<span style="color: #555555;">::</span>filter([](<span style="color: #007788; font-weight: bold;">int</span> n){ <span style="color: #006699; font-weight: bold;">return</span> n <span style="color: #555555;">%</span> <span style="color: #ff6600;">2</span> <span style="color: #555555;">==</span> <span style="color: #ff6600;">0</span>; })
+                           <span style="color: #555555;">|</span> std<span style="color: #555555;">::</span>view<span style="color: #555555;">::</span>transform([](<span style="color: #007788; font-weight: bold;">int</span> n){ <span style="color: #006699; font-weight: bold;">return</span> n <span style="color: #555555;">*</span> <span style="color: #ff6600;">2</span>; });
+                           
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> v<span style="color: #555555;">:</span> results) std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> v <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span>;     <span style="color: #0099ff; font-style: italic;">// 4 8 12</span>
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>You have to read the expression from left to right.&nbsp;The pipe symbol stands for function composition: First, all numbers can pass which are even (<span style="font-family: 'courier new', courier;">std::view::filter([](int n){ return n % 2 == 0; }</span>)). Afterwards, each remaining number is mapped to its square (<span style="font-family: 'courier new', courier;">std::view::transform([](int n){ return n * 2; })</span>). The small example shows already two new features of the ranges library: Function composition which operators on the entire container.&nbsp;&nbsp;</p>
+<p>Now you should be prepared for the details. Let's go back to square one: ranges and views are concepts.</p>
+<h2>Range&nbsp;</h2>
+<ul>
+<li><span style="font-family: 'courier new', courier;"><strong>std::range: </strong></span>A range is a group of items that you can iterator over. It provides a begin iterator and an end sentinel. Of course, the containers of the STL are ranges.</li>
+</ul>
+<p>There exist refinements of <span style="font-family: 'courier new', courier;">std::range</span>:&nbsp;</p>
+<ul>
+<li><strong><span style="font-family: 'courier new', courier;">std::ranges::input_range:&nbsp;<span style="color: #000000; font-family: DejaVuSans, 'DejaVu Sans', arial, sans-serif; font-size: 12.8px; font-style: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing: 0px; background-color: #ffffff; float: none;">s</span></span></strong>pecifies a range whose iterator type satisfies input_iterator (can iterate from begin to end at least once)</li>
+<li><strong><span style="font-family: 'courier new', courier;">std::ranges::output_range:&nbsp;<span style="color: #000000; font-family: DejaVuSans, 'DejaVu Sans', arial, sans-serif; font-size: 12.8px; font-style: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing: 0px; background-color: #ffffff; float: none;">s</span></span></strong>pecifies a range whose iterator type satisfies output_iterator&nbsp;</li>
+<li><strong><span style="font-family: 'courier new', courier;">std::ranges::forward_range:&nbsp;<span style="font-family: 'courier new', courier;"><span style="color: #000000; font-family: DejaVuSans, 'DejaVu Sans', arial, sans-serif; font-size: 12.8px; font-style: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing: 0px; background-color: #ffffff; float: none;">s</span></span></span></strong>pecifies a range whose iterator type satisfies forward_iterator (can iterate from begin to end more than once)</li>
+<li><strong><span style="font-family: 'courier new', courier;">std::ranges::bidirectional_range:&nbsp;<span style="font-family: 'courier new', courier;"><span style="color: #000000; font-family: DejaVuSans, 'DejaVu Sans', arial, sans-serif; font-size: 12.8px; font-style: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing: 0px; background-color: #ffffff; float: none;">s</span></span></span></strong>pecifies a range whose iterator type satisfies bidirectional_iterator (can iterate forward and backward more than once)</li>
+<li><strong><span style="font-family: 'courier new', courier;">std::ranges::random_access_range:&nbsp;<span style="font-family: 'courier new', courier;"><span style="color: #000000; font-family: DejaVuSans, 'DejaVu Sans', arial, sans-serif; font-size: 12.8px; font-style: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing: 0px; background-color: #ffffff; float: none;">s</span></span></span></strong>pecifies a range whose iterator type satisfies random_access_iterator (can jump in constant time to an arbitrary element with the index operator [])</li>
+<li><strong><span style="font-family: 'courier new', courier;">std::ranges::contiguous_range:&nbsp;<span style="font-family: 'courier new', courier;"><span style="color: #000000; font-family: DejaVuSans, 'DejaVu Sans', arial, sans-serif; font-size: 12.8px; font-style: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing: 0px; background-color: #ffffff; float: none;">s</span></span></span></strong>pecifies a range whose iterator type satisfies contiguous_iterator (elements are stored consecutively in memory)</li>
+</ul>
+<p>&nbsp;The containers of the STL and<span style="font-family: 'courier new', courier;"> std::string</span> model different concepts:</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/RangesLibrary/RangeConcepts.png" alt="RangeConcepts" width="650" height="397" /></p>
+<p>&nbsp;</p>
+<p>A container supporting the <span style="font-family: 'courier new', courier;">std::ranges::contiguous_range </span>concept, supports all other concepts above such as <span style="font-family: 'courier new', courier;">std::ranges::random_access_range</span>, <span style="font-family: 'courier new', courier;">std::ranges::bidirectional_range</span>, and<span style="font-family: 'courier new', courier;"> std::ranges::input_range</span>. The same observation holds for all other ranges.&nbsp;</p>
+<p><span style="color: inherit; font-size: 35px;">View</span></p>
+<ul>
+<li>A <strong>View</strong> is something that you apply on a range and performs some operation. A view does not own data and it's time to copy, move, assignment its constant. Here is a quote from Eric Nieblers <a href="https://github.com/ericniebler/range-v3">range-v3 implementation</a> which is the base for the C++20 ranges: "<em>Views are composable adaptations of ranges where the adaptation happens lazily as the view is iterated.</em>"</li>
+</ul>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> numbers <span style="color: #555555;">=</span> {<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">5</span>, <span style="color: #ff6600;">6</span>};
+
+<span style="color: #006699; font-weight: bold;">auto</span> results <span style="color: #555555;">=</span> numbers <span style="color: #555555;">|</span> std<span style="color: #555555;">::</span>view<span style="color: #555555;">::</span>filter([](<span style="color: #007788; font-weight: bold;">int</span> n){ <span style="color: #006699; font-weight: bold;">return</span> n <span style="color: #555555;">%</span> <span style="color: #ff6600;">2</span> <span style="color: #555555;">==</span> <span style="color: #ff6600;">0</span>; })
+                       <span style="color: #555555;">|</span> std<span style="color: #555555;">::</span>view<span style="color: #555555;">::</span>transform([](<span style="color: #007788; font-weight: bold;">int</span> n){ <span style="color: #006699; font-weight: bold;">return</span> n <span style="color: #555555;">*</span> <span style="color: #ff6600;">2</span>; });
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>In this code-snippet, <span style="font-family: 'courier new', courier;">numbers</span> is the range and <span style="font-family: 'courier new', courier;">std::view::filter</span> and <span style="font-family: 'courier new', courier;">std::view::transform</span> are the views.&nbsp;</p>
+<p>Due to the power of views, C++20 allows programming in a functional style. <strong>Views can be combined and are lazy. </strong>l already presented two views but we get more.&nbsp;</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">std<span style="color: #555555;">::</span>all_view, std<span style="color: #555555;">::</span>views<span style="color: #555555;">::</span>all               <span style="color: #0099ff; font-style: italic;">// takes all elements</span>
+
+std<span style="color: #555555;">::</span>ref_view                                <span style="color: #0099ff; font-style: italic;">// takes all elements of another view</span>
+
+std<span style="color: #555555;">::</span>filter_view, std<span style="color: #555555;">::</span>views<span style="color: #555555;">::</span>filter         <span style="color: #0099ff; font-style: italic;">// takes the elements which satisfies the predicate</span>
+
+std<span style="color: #555555;">::</span>transform_view, std<span style="color: #555555;">::</span>views<span style="color: #555555;">::</span>transform   <span style="color: #0099ff; font-style: italic;">// transforms each element</span>
+
+std<span style="color: #555555;">::</span>take_view, std<span style="color: #555555;">::</span>views<span style="color: #555555;">::</span>take             <span style="color: #0099ff; font-style: italic;">// takes the first N elements of another view</span>
+
+std<span style="color: #555555;">::</span>take_while_view, std<span style="color: #555555;">::</span>views<span style="color: #555555;">::</span>take_while <span style="color: #0099ff; font-style: italic;">// takes the elements of another view as long as the predicate returns true</span>
+
+std<span style="color: #555555;">::</span>drop_view, std<span style="color: #555555;">::</span>views<span style="color: #555555;">::</span>drop             <span style="color: #0099ff; font-style: italic;">// skips the first N elements of another view</span>
+
+std<span style="color: #555555;">::</span>drop_while_view, std<span style="color: #555555;">::</span>views<span style="color: #555555;">::</span>drop_while <span style="color: #0099ff; font-style: italic;">// skips the initial elements of another view until the predicate returns false</span>
+
+std<span style="color: #555555;">::</span>join_view, std<span style="color: #555555;">::</span>views<span style="color: #555555;">::</span>join             <span style="color: #0099ff; font-style: italic;">// joins a view of ranges</span>
+
+std<span style="color: #555555;">::</span>split_view, std<span style="color: #555555;">::</span>views<span style="color: #555555;">::</span>split           <span style="color: #0099ff; font-style: italic;">// splits a view by using a delimiter</span>
+
+std<span style="color: #555555;">::</span>common_view, std<span style="color: #555555;">::</span>views<span style="color: #555555;">::</span>common         <span style="color: #0099ff; font-style: italic;">// converts a view into a std::common_range</span>
+
+std<span style="color: #555555;">::</span>reverse_view, std<span style="color: #555555;">::</span>views<span style="color: #555555;">::</span>reverse       <span style="color: #0099ff; font-style: italic;">// iterates in reverse order</span>
+
+std<span style="color: #555555;">::</span>basic_istream_view, std<span style="color: #555555;">::</span>istream_view   <span style="color: #0099ff; font-style: italic;">// applies operator&gt;&gt; on the view</span>
+
+std<span style="color: #555555;">::</span>elements_view, std<span style="color: #555555;">::</span>views<span style="color: #555555;">::</span>elements     <span style="color: #0099ff; font-style: italic;">// creates a view on the N-th element of tuples</span>
+
+std<span style="color: #555555;">::</span>keys_view, std<span style="color: #555555;">::</span>views<span style="color: #555555;">::</span>keys             <span style="color: #0099ff; font-style: italic;">// creates a view on the first element of a pair-like values</span>
+
+std<span style="color: #555555;">::</span>values_view, std<span style="color: #555555;">::</span>views<span style="color: #555555;">::</span>values         <span style="color: #0099ff; font-style: italic;">// creates a view on the second elements of a pair-like values</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>In general, you can use a view such as <span style="font-family: 'courier new', courier;">std::views::transform</span> with the alternative name <span style="font-family: 'courier new', courier;">std::transform_view</span>.&nbsp; I show the usage of various views as I go on.</p>
+<h2>Implementation Status</h2>
+<p>As far as I know, there is no implementation of the ranges library now (February 2020) available. This is not an issue. You can use the already mentioned&nbsp; <a href="https://github.com/ericniebler/range-v3">range-v3 implementation</a>&nbsp;on the online compiler <a href="https://wandbox.org/">Wandbox</a> or the <a href="https://godbolt.org/">Compiler Explorer </a>with the HEAD GCC. Here is what you have to do to translate my examples such as<span style="color: #000000;">&nbsp;<span style="font-family: 'courier new', courier;">rangesFilterTransform.cpp</span> to see it in action.</span></p>
+<ul>
+<li>Replace the namespaces<span style="font-family: 'courier new', courier;"> std::view::</span> with <span style="font-family: 'courier new', courier;">ranges::view::.</span></li>
+<li>Replace the header <span style="font-family: 'courier new', courier;">&lt;ranges&gt;</span> with the header <span style="font-family: 'courier new', courier;">&lt;range/v3/all.hpp&gt;</span>. For more details, study the documentation in&nbsp;<a href="https://github.com/ericniebler/range-v3">range-v3 implementation</a>.</li>
+<li>Compile your program with C++20 support:&nbsp;<code>-std=c++2a.</code></li>
+<li>When you use the&nbsp;<a href="https://godbolt.org/">Compiler Explorer</a>, you have to use the trunk version of the&nbsp;<a href="https://github.com/ericniebler/range-v3">range-v3 implementation</a>. The following picture should help you find the option.</li>
+</ul>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/RangesLibrary/CompilerExplorer.png" alt="CompilerExplorer" width="500" height="372" /></p>
+<p>Transforming the program get&nbsp;<span style="font-family: 'courier new', courier;">rangesFilterTransform.cpp</span> gives me the following program.&nbsp;</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// rangesV3FilterTransform.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;range/v3/all.hpp&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> numbers <span style="color: #555555;">=</span> {<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">5</span>, <span style="color: #ff6600;">6</span>};
+  
+    <span style="color: #006699; font-weight: bold;">auto</span> results <span style="color: #555555;">=</span> numbers <span style="color: #555555;">|</span> ranges<span style="color: #555555;">::</span>view<span style="color: #555555;">::</span>filter([](<span style="color: #007788; font-weight: bold;">int</span> n){ <span style="color: #006699; font-weight: bold;">return</span> n <span style="color: #555555;">%</span> <span style="color: #ff6600;">2</span> <span style="color: #555555;">==</span> <span style="color: #ff6600;">0</span>; })
+                           <span style="color: #555555;">|</span> ranges<span style="color: #555555;">::</span>view<span style="color: #555555;">::</span>transform([](<span style="color: #007788; font-weight: bold;">int</span> n){ <span style="color: #006699; font-weight: bold;">return</span> n <span style="color: #555555;">*</span> <span style="color: #ff6600;">2</span>; });
+                           
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> v<span style="color: #555555;">:</span> results) std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> v <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span>;    
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Thanks to&nbsp;<a href="https://wandbox.org/">Wandbox</a>, here is the output of the program without a faked source file:<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/RangesLibrary/Wandbox.png" alt="Wandbox" width="120" height="141" /></p>
+<p>I use in my future posts the proposed C++20 syntax. Consequentially, you have to do the transformation step manually.&nbsp;</p>
+<h2>What's next?</h2>
+<p>In this post, I explained the basics to the ranges library. These basics enables me to write in my next post about their power. The ranges library extends C++20 with two new concepts: function composition and lazy evaluation. This is the reason, ranges belong to the<a href="http://bit.ly/3471cqH"> big four of C++20</a>. Each part of the big four changes the way we think, and we write modern C++.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Meeting C++, Matt Braun, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Marko, </strong><span class="sc-kpOJdX fDWXFa" title="Emyr Williams"><strong>G Prvulovic, Reinhold Dröge, Abernitzke,</strong> </span><strong><span title="Emyr Williams">Richard Ohnemus, Frank Grimm</span></strong><span title="Emyr Williams"><strong>, Sakib, Broeserl, </strong></span><strong><span title="Emyr Williams">António Pina, Markus Falkner, Darshan Mody, Sergey Agafyin, <span class="sc-gZMcBi hdSbOl" data-tag="user-details-full-name">Андрей Бурмистров, Jake, GS, Lawton Shoemake, and Animus24.</span></span><span title="Emyr Williams"><span class="sc-htpNat dEZjR" style="color: #241e12; font-family: aktiv-grotesk, sans-serif; margin: 0px; position: relative; font-weight: 400; font-size: 1rem; line-height: 1.5;"><span class="sc-htpNat ebhhXb" style="color: #241e12; font-family: aktiv-grotesk, sans-serif; margin: 0px; position: relative; font-weight: bold; font-size: 1rem; line-height: 1.5;"><br /></span></span></span></strong></p>
+<p>&nbsp;</p>
+<table style="width: 490px; height: 103px;">
+<tbody>
+<tr>
+<td><strong>Thanks in particular to:</strong></td>
+<td>&nbsp;</td>
+<td><a href="https://cranepay.io/"><img src="images/patreon/crp4.png" alt="crp4" width="150" height="96" /></a></td>
+</tr>
+</tbody>
+</table>
+<p><strong>&nbsp;</strong></p>
+<p><strong>&nbsp;&nbsp;<a href="https://www.takeupcode.com/">&nbsp; </a></strong></p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at Leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages. I also included more than 120 source files.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more than 140 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 700 pages full of modern C++ and more than 260 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
+<p></p>
+<table style="width: 800px;">
+<tbody>
+<tr>
+<td colspan="2">
+<h2>Get your interactive course</h2>
+&nbsp;</td>
+</tr>
+<tr>
+<td>
+<h4 class="_3fBEwsM053hx2mPd0uV0nT" style="text-align: center;">Modern C++ Concurrency in Practice</h4>
+</td>
+<td>
+<h4>C++ Standard Library including C++14 &amp; C++17</h4>
+</td>
+</tr>
+<tr>
+<td><a href="https://goo.gl/2qWUkK"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseConcurrency/educative.png" alt="educative" width="300" height="152" /></a></td>
+<td><a href="https://www.educative.io/collection/10370001/5712008708096000?authorName=Rainer%20Grimm"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseLibrary/CLibrary.png" alt="CLibrary" width="300" height="150" /></a></td>
+</tr>
+<tr>
+<td>
+<p>Based on my book "Concurrency with Modern C++" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>140 lessons</li>
+<li>110 code playgrounds =&gt; Runs in the browser</li>
+<li>78 code snippets</li>
+<li>55 illustrations</li>
+</ul>
+</td>
+<td>
+<p>Based on my book "The C++ Standard Library" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>149 lessons</li>
+<li>111 code playgrounds =&gt; Runs in the browser</li>
+<li>164 code snippets</li>
+<li>25 illustrations</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
