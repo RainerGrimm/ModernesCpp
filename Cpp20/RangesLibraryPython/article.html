@@ -1,0 +1,260 @@
+<p>Today, I start an experiment. I want to implement beloved functions in Python in C++ using the ranges library. I'm curious about how it goes.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/RangesLibraryPython/TimelineCpp20.png" alt="TimelineCpp20" width="650" height="248" /></p>
+<p>You maybe know it. I'm also a Python trainer since 2004. Python has awesome functions and often Python is for me the threshold of how comfortable a programming language could be. Today, I want to implement the Python functions <span style="font-family: courier new, courier;">range</span> and <span style="font-family: courier new, courier;">filter</span>.<span style="font-family: courier new, courier;"></span></p>
+<ul>
+<li><span style="font-family: courier new, courier;">range</span> creates a list "containing an arithmetic progression of integers" (Pythons built-in help).</li>
+<li><span style="font-family: courier new, courier;">filter</span> applies a predicate to a sequence and returns those elements for which the predicate returns true.&nbsp;</li>
+</ul>
+<p>A sequence is a term in Python which stands for something iterable such as a <span style="font-family: courier new, courier;">list</span> (<span style="font-family: courier new, courier;">[1, 2, 3]</span>), a <span style="font-family: courier new, courier;">tuple</span> (<span style="font-family: courier new, courier;">(1, 2, 3)</span>), or a <span style="font-family: courier new, courier;">string</span> (<span style="font-family: courier new, courier;">"123"</span>). Instead of a <span style="font-family: courier new, courier;">list</span>, I use a <span style="font-family: courier new, courier;">std::vector</span> <span style="font-family: courier new, courier;"></span>in C++. The functions <span style="font-family: courier new, courier;">filter&nbsp;</span>stand for the functional style in Python.</p>
+<p>Before I start with the <span style="font-family: courier new, courier;">range</span> function, I have to make a few remarks.</p>
+<ol>
+<li>I use in my examples the<a href="https://github.com/ericniebler/range-v3"> range-v3</a> library from Eric Niebler, which is the basis for the C++20 ranges. I showed in my previous post <a href="index.php/c-20-the-ranges-library">C++20: The Ranges Library</a>, how to translate the ranges-v3 to the C++20 syntax.</li>
+<li>The Python code is often shorter than the C++ Code for two reasons. First, I don't store the Python lists in a variable and second, I don't display the result.</li>
+<li>I don't like religious wars about programming languages. The middle-ages are long gone. I will not react to these comments.</li>
+</ol>
+<p>Let's start with the <span style="font-family: courier new, courier;">range</span> function. The <span style="font-family: courier new, courier;">range</span> function is a kind of building-block for creating integers.</p>
+<h2><span style="font-family: courier new, courier;">range</span></h2>
+<p>In the following examples, I first show the python expression commented out and then the corresponding C++ call.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #555555;">//</span> <span style="color: #336666;">range</span><span style="color: #555555;">.</span>cpp
+
+<span style="color: #0099ff; font-style: italic;">#include &lt;iostream&gt;</span>
+<span style="color: #0099ff; font-style: italic;">#include &lt;range/v3/all.hpp&gt;</span>
+<span style="color: #0099ff; font-style: italic;">#include &lt;vector&gt;</span>
+
+std::vector<span style="color: #555555;">&lt;</span><span style="color: #336666;">int</span><span style="color: #555555;">&gt;</span> <span style="color: #336666;">range</span>(<span style="color: #336666;">int</span> begin, <span style="color: #336666;">int</span> end, <span style="color: #336666;">int</span> stepsize <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span>) {
+    std::vector<span style="color: #555555;">&lt;</span><span style="color: #336666;">int</span><span style="color: #555555;">&gt;</span> result{};
+    <span style="color: #006699; font-weight: bold;">if</span> (begin <span style="color: #555555;">&lt;</span> end) {                                     <span style="color: #555555;">//</span> (<span style="color: #ff6600;">5</span>)
+        auto boundary <span style="color: #555555;">=</span> [end](<span style="color: #336666;">int</span> i){ <span style="color: #006699; font-weight: bold;">return</span> i <span style="color: #555555;">&lt;</span> end; };
+        <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #336666;">int</span> i: ranges::views::iota(begin) <span style="color: #555555;">|</span> ranges::views::stride(stepsize) 
+                                               <span style="color: #555555;">|</span> ranges::views::take_while(boundary)) {
+            result<span style="color: #555555;">.</span>push_back(i);
+        }
+    }
+    <span style="color: #006699; font-weight: bold;">else</span> {                                                 <span style="color: #555555;">//</span> (<span style="color: #ff6600;">6</span>)
+        begin<span style="color: #555555;">++</span>;
+        end<span style="color: #555555;">++</span>;
+        stepsize <span style="color: #555555;">*=</span> <span style="color: #555555;">-</span><span style="color: #ff6600;">1</span>;
+        auto boundary <span style="color: #555555;">=</span> [begin](<span style="color: #336666;">int</span> i){ <span style="color: #006699; font-weight: bold;">return</span> i <span style="color: #555555;">&lt;</span> begin; };
+        <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #336666;">int</span> i: ranges::views::iota(end) <span style="color: #555555;">|</span> ranges::views::take_while(boundary) 
+                                             <span style="color: #555555;">|</span> ranges::views::reverse 
+                                             <span style="color: #555555;">|</span> ranges::views::stride(stepsize)) {
+            result<span style="color: #555555;">.</span>push_back(i);
+        }
+    }
+    <span style="color: #006699; font-weight: bold;">return</span> result;
+}<span style="color: #555555;"></span><span style="color: #000000; font-weight: bold;"></span><span style="color: #000000; font-weight: bold;"></span><span style="color: #555555;"></span><span style="color: #ff6600;"></span><span style="color: #555555;"></span><span style="color: #ff6600;"></span>
+        
+<span style="color: #336666;">int</span> main() {
+    
+    std::cout <span style="color: #555555;">&lt;&lt;</span> std::endl;
+
+    <span style="color: #555555;">//</span> <span style="color: #336666;">range</span>(<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">50</span>)                                       <span style="color: #555555;">//</span> (<span style="color: #ff6600;">1</span>)
+    auto res <span style="color: #555555;">=</span> <span style="color: #336666;">range</span>(<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">50</span>);
+    <span style="color: #006699; font-weight: bold;">for</span> (auto i: res) std::cout <span style="color: #555555;">&lt;&lt;</span> i <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span>;
+    
+    std::cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n\n</span><span style="color: #cc3300;">"</span>;
+    
+    <span style="color: #555555;">//</span> <span style="color: #336666;">range</span>(<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">50</span>, <span style="color: #ff6600;">5</span>)                                    <span style="color: #555555;">//</span> (<span style="color: #ff6600;">2</span>)
+    res <span style="color: #555555;">=</span> <span style="color: #336666;">range</span>(<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">50</span>, <span style="color: #ff6600;">5</span>);
+    <span style="color: #006699; font-weight: bold;">for</span> (auto i: res) std::cout <span style="color: #555555;">&lt;&lt;</span> i <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span>;
+    
+    std::cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n\n</span><span style="color: #cc3300;">"</span>;
+    
+    <span style="color: #555555;">//</span> <span style="color: #336666;">range</span>(<span style="color: #ff6600;">50</span>, <span style="color: #ff6600;">10</span>, <span style="color: #555555;">-</span><span style="color: #ff6600;">1</span>)                                  <span style="color: #555555;">//</span> (<span style="color: #ff6600;">3</span>)
+    res <span style="color: #555555;">=</span> <span style="color: #336666;">range</span>(<span style="color: #ff6600;">50</span>, <span style="color: #ff6600;">10</span>, <span style="color: #555555;">-</span><span style="color: #ff6600;">1</span>);
+    <span style="color: #006699; font-weight: bold;">for</span> (auto i: res) std::cout <span style="color: #555555;">&lt;&lt;</span> i <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span>;
+    
+    std::cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n\n</span><span style="color: #cc3300;">"</span>;
+    
+    <span style="color: #555555;">//</span> <span style="color: #336666;">range</span>(<span style="color: #ff6600;">50</span>, <span style="color: #ff6600;">10</span>, <span style="color: #555555;">-</span><span style="color: #ff6600;">5</span>)                                  <span style="color: #555555;">//</span> (<span style="color: #ff6600;">4</span>)
+    res <span style="color: #555555;">=</span> <span style="color: #336666;">range</span>(<span style="color: #ff6600;">50</span>, <span style="color: #ff6600;">10</span>, <span style="color: #555555;">-</span><span style="color: #ff6600;">5</span>);
+    <span style="color: #006699; font-weight: bold;">for</span> (auto i: res) std::cout <span style="color: #555555;">&lt;&lt;</span> i <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span>;
+    
+    std::cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n\n</span><span style="color: #cc3300;">"</span>;
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The calls in the lines (1) - (4) should be quite easy to read when you look at the output.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/RangesLibraryPython/range.png" alt="range" width="650" height="279" /></p>
+<p>The first two arguments of the range call stand for the beginning and end of the created integers. Beginning is included but not the end. step size as the third parameter is per default 1. When the interval [begin, end[ is decreasing, the step size should be negative. If not, you get an empty <span style="font-family: courier new, courier;">list</span> or an empty <span style="font-family: courier new, courier;">std::vector&lt;int&gt;</span>.</p>
+<p>I cheat a little in my range implementation. I use the function <span style="font-family: courier new, courier;">ranges::views::stride</span> that is not part of C++20. <span style="font-family: courier new, courier;">stride(n)</span> returns the n-th element of the given range. If you know an elegant implementation based on C++20, please let me know.</p>
+<p>The if condition (<span style="font-family: courier new, courier;">begin &lt; end</span>) of the range function in line (1) should be quite easy to read. Create all numbers starting with begin (<span style="font-family: courier new, courier;">ranges::views::iota(begin)),</span> take each n-th element (<span style="font-family: courier new, courier;">ranges::views::stride(stepsize</span>), and do it as long as the boundary condition holds (<span style="font-family: courier new, courier;">ranges::views::take_while(boundar</span>y). Finally, push the integers on the <span style="font-family: courier new, courier;">std::vector&lt;int&gt;. </span></p>
+<p>In the else case (line 2), I use a little trick. I create the numbers <span style="font-family: courier new, courier;">[end++, begin++[,</span> take them until the boundary condition is meet, reverse them (<span style="font-family: courier new, courier;">ranges::views::reverse</span>), and take each n-th element.</p>
+<p>I implement the eager version for <span style="font-family: courier new, courier;">filter</span> and <span style="font-family: courier new, courier;">map</span> (next post) in my examples. With Python 3 <span style="font-family: courier new, courier;">filter</span> and <span style="font-family: courier new, courier;">map</span> are lazy. <span style="font-family: 'courier new', courier;">filter</span> and <span style="font-family: 'courier new', courier;">map</span> return in this case generators. To get the eager behavior of Python 2 put a <span style="font-family: courier new, courier;">list</span> around the <span style="font-family: courier new, courier;">filter</span> and <span style="font-family: courier new, courier;">map</span> calls in Python 3.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #336666;">filter</span>(<span style="color: #006699; font-weight: bold;">lambda</span> i: (i % 2) == 1<span style="color: #555555;"> </span>, <span style="color: #336666;">range</span>(<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">10</span>))       <span style="color: #0099ff; font-style: italic;"># Python 2   </span>
+
+<span style="color: #336666;">list</span>(<span style="color: #336666;">filter</span>(<span style="color: #006699; font-weight: bold;">lambda</span> i: (i % 2) == 1<span style="color: #555555;"></span>, <span style="color: #336666;">range</span>(<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">10</span>))) <span style="color: #0099ff; font-style: italic;"># Python 3</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Both calls produce the same list: <span style="font-family: courier new, courier;">[1, 3, 5, 9</span>].</p>
+<p>I continue with the function <span style="font-family: courier new, courier;">filter</span> because it is easier to implement such as the map function.</p>
+<h2><span style="font-family: courier new, courier;">filter</span></h2>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #555555;">//</span> <span style="color: #336666;">filter</span><span style="color: #555555;">.</span>cpp
+
+<span style="color: #0099ff; font-style: italic;">#include "range.hpp"                          // (1)</span>
+
+<span style="color: #0099ff; font-style: italic;">#include &lt;fstream&gt;</span>
+<span style="color: #0099ff; font-style: italic;">#include &lt;iostream&gt;</span>
+<span style="color: #0099ff; font-style: italic;">#include &lt;range/v3/all.hpp&gt;<br />#include &lt;sstream&gt;</span>
+<span style="color: #0099ff; font-style: italic;">#include &lt;string&gt;</span>
+<span style="color: #0099ff; font-style: italic;">#include &lt;vector&gt;</span>
+<span style="color: #0099ff; font-style: italic;">#include &lt;utility&gt;</span>
+
+template <span style="color: #555555;">&lt;</span>typename Func, typename Seq<span style="color: #555555;">&gt;       <span style="color: #0099ff; font-style: italic;">// (2)</span></span>
+auto <span style="color: #336666;">filter</span>(Func func, Seq seq) {
+    
+    typedef typename Seq::value_type value_type;
+
+    std::vector<span style="color: #555555;">&lt;</span>value_type<span style="color: #555555;">&gt;</span> result{};
+    <span style="color: #006699; font-weight: bold;">for</span> (auto i : seq <span style="color: #555555;">|</span> ranges::views::<span style="color: #336666;">filter</span>(func)) result<span style="color: #555555;">.</span>push_back(i);
+    
+    <span style="color: #006699; font-weight: bold;">return</span> result;
+}
+
+
+<span style="color: #336666;">int</span> main() {
+    
+    std::cout <span style="color: #555555;">&lt;&lt;</span> std::endl;
+    
+    <span style="color: #555555;">//</span> <span style="color: #336666;">filter</span>(<span style="color: #006699; font-weight: bold;">lambda</span> i: (i <span style="color: #555555;">%</span> <span style="color: #ff6600;">3</span>) <span style="color: #555555;">==</span> <span style="color: #ff6600;">0</span> , <span style="color: #336666;">range</span>(<span style="color: #ff6600;">20</span>, <span style="color: #ff6600;">50</span>))     <span style="color: #0099ff; font-style: italic;">// (3)</span>
+    auto res <span style="color: #555555;">=</span> <span style="color: #336666;">filter</span>([](<span style="color: #336666;">int</span> i){ <span style="color: #006699; font-weight: bold;">return</span> (i <span style="color: #555555;">%</span> <span style="color: #ff6600;">3</span>) <span style="color: #555555;">==</span> <span style="color: #ff6600;">0</span>; }, <span style="color: #336666;">range</span>(<span style="color: #ff6600;">20</span>, <span style="color: #ff6600;">50</span>) );
+    <span style="color: #006699; font-weight: bold;">for</span> (auto v: res) std::cout <span style="color: #555555;">&lt;&lt;</span> v <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span>;
+    
+                                                          <span style="color: #0099ff; font-style: italic;">// (4)</span> 
+    <span style="color: #555555;">//</span> <span style="color: #336666;">filter</span>(<span style="color: #006699; font-weight: bold;">lambda</span> word: word[<span style="color: #ff6600;">0</span>]<span style="color: #555555;">.</span>isupper(), [<span style="color: #cc3300;">"Only"</span>, <span style="color: #cc3300;">"for"</span>, <span style="color: #cc3300;">"testing"</span>, <span style="color: #cc3300;">"purpose"</span>]) 
+    std::vector<span style="color: #555555;">&lt;</span>std::string<span style="color: #555555;">&gt;</span> myStrings{<span style="color: #cc3300;">"Only"</span>, <span style="color: #cc3300;">"for"</span>, <span style="color: #cc3300;">"testing"</span>, <span style="color: #cc3300;">"purpose"</span>};
+    auto res2 <span style="color: #555555;">=</span> <span style="color: #336666;">filter</span>([](const std::string<span style="color: #555555;">&amp;</span> s){ <span style="color: #006699; font-weight: bold;">return</span> static_cast<span style="color: #555555;">&lt;</span><span style="color: #336666;">bool</span><span style="color: #555555;">&gt;</span>(std::isupper(s[<span style="color: #ff6600;">0</span>])); }, myStrings);
+     
+    std::cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n\n</span><span style="color: #cc3300;">"</span>;
+     
+    <span style="color: #006699; font-weight: bold;">for</span> (auto word: res2) std::cout <span style="color: #555555;">&lt;&lt;</span> word <span style="color: #555555;">&lt;&lt;</span> std::endl;
+    
+    std::cout <span style="color: #555555;">&lt;&lt;</span> std::endl;
+                                                        
+                                                          <span style="color: #0099ff; font-style: italic;">// (5)</span>
+    <span style="color: #555555;">//</span> <span style="color: #336666;">len</span>(<span style="color: #336666;">filter</span>(<span style="color: #006699; font-weight: bold;">lambda</span> line: line[<span style="color: #ff6600;">0</span>] <span style="color: #555555;">==</span> <span style="color: #cc3300;">"#"</span>, <span style="color: #336666;">open</span>(<span style="color: #cc3300;">"/etc/services"</span>)<span style="color: #555555;">.</span>readlines()))
+    std::ifstream <span style="color: #336666;">file</span>(<span style="color: #cc3300;">"/etc/services"</span>, std::ios::<span style="color: #000000; font-weight: bold;">in</span>);
+    std::vector lines;<br />    std::string line;<br />    while(std::getline(file, line)){<br />        lines.push_back(line);<br />    }<span style="color: #555555;"></span><span style="color: #555555;"></span><span style="color: #555555;"></span><span style="color: #cc3300;"></span><span style="color: #cc3300; font-weight: bold;"></span><span style="color: #cc3300;"></span>
+    std::vector<span style="color: #555555;">&lt;</span>std::string<span style="color: #555555;">&gt;</span> commentLines <span style="color: #555555;">=</span> <span style="color: #336666;">filter</span>([](const std::string<span style="color: #555555;">&amp;</span> s){  <span style="color: #006699; font-weight: bold;">return</span> s[<span style="color: #ff6600;">0</span>] <span style="color: #555555;">==</span> <span style="color: #cc3300;">'#'</span>; }, lines);
+    
+    std::cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Comment lines: "</span> <span style="color: #555555;">&lt;&lt;</span> commentLines<span style="color: #555555;">.</span>size() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n\n</span><span style="color: #cc3300;">"</span>;
+                                          
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Before I explain the program let me show you the output.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/RangesLibraryPython/filter.png" alt="filter" width="350" height="280" /></p>
+<p>This time, I include the range implementation from before. The <span style="font-family: courier new, courier;">filter</span> function (line 2) should be easy to read. I just apply the callable <span style="font-family: courier new, courier;">func</span> to each element of the sequence and materialize the elements in the<span style="font-family: courier new, courier;"> std::vector.</span> line (3) creates all numbers i from 20 to 50 for which hold (i % 3) == 0. Only the strings that start with an uppercase letter&nbsp; can pass the filter in line (4). Line (5) counts, how many lines in the file "<span style="font-family: courier new, courier;">/etc/services</span>" are comments. Comments are lines which start with the<span style="font-family: courier new, courier;"> '#'</span> character.</p>
+<p>If you ignore the different ways to implement lambdas in Python and in C++, the <span style="font-family: courier new, courier;">filter</span> calls are quite similar.</p>
+<h2>What's next?</h2>
+<p>map was way more complicated to implement than <span style="font-family: courier new, courier;">filter.</span> First, <span style="font-family: courier new, courier;">map</span> may change the type of the input sequence. Second, my implementation of <span style="font-family: courier new, courier;">map</span> triggered a GCC bug report. Afterward, I combine the functions <span style="font-family: courier new, courier;">map</span> and <span style="font-family: courier new, courier;">filter</span> in a function and I get ... .<span style="font-family: courier new, courier;"> </span>Read the details in my next post.</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Meeting C++, Matt Braun, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Marko, </strong><span class="sc-kpOJdX fDWXFa" title="Emyr Williams"><strong>G Prvulovic, Reinhold Dröge, Abernitzke,</strong> </span><strong><span title="Emyr Williams">Richard Ohnemus, Frank Grimm</span></strong><span title="Emyr Williams"><strong>, Sakib, Broeserl, </strong></span><strong><span title="Emyr Williams">António Pina, Markus Falkner, Darshan Mody, Sergey Agafyin, <span class="sc-gZMcBi hdSbOl" data-tag="user-details-full-name">Андрей Бурмистров, Jake, GS, Lawton Shoemake, Animus24, and Jozo Leko.</span></span><span title="Emyr Williams"><span class="sc-htpNat dEZjR" style="color: #241e12; font-family: aktiv-grotesk, sans-serif; margin: 0px; position: relative; font-weight: 400; font-size: 1rem; line-height: 1.5;"><span class="sc-htpNat ebhhXb" style="color: #241e12; font-family: aktiv-grotesk, sans-serif; margin: 0px; position: relative; font-weight: bold; font-size: 1rem; line-height: 1.5;"><br /></span></span></span></strong></p>
+<p>&nbsp;</p>
+<table style="width: 490px; height: 103px;">
+<tbody>
+<tr>
+<td><strong>Thanks in particular to:</strong></td>
+<td>&nbsp;</td>
+<td><a href="https://cranepay.io/"><img src="images/patreon/crp4.png" alt="crp4" width="150" height="96" /></a></td>
+</tr>
+</tbody>
+</table>
+<p><strong>&nbsp;</strong></p>
+<p><strong>&nbsp;&nbsp;<a href="https://www.takeupcode.com/">&nbsp; </a></strong></p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at Leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages. I also included more than 120 source files.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more than 140 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 700 pages full of modern C++ and more than 260 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
+<p></p>
+<table style="width: 800px;">
+<tbody>
+<tr>
+<td colspan="2">
+<h2>Get your interactive course</h2>
+&nbsp;</td>
+</tr>
+<tr>
+<td>
+<h4 class="_3fBEwsM053hx2mPd0uV0nT" style="text-align: center;">Modern C++ Concurrency in Practice</h4>
+</td>
+<td>
+<h4>C++ Standard Library including C++14 &amp; C++17</h4>
+</td>
+</tr>
+<tr>
+<td><a href="https://goo.gl/2qWUkK"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseConcurrency/educative.png" alt="educative" width="300" height="152" /></a></td>
+<td><a href="https://www.educative.io/collection/10370001/5712008708096000?authorName=Rainer%20Grimm"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseLibrary/CLibrary.png" alt="CLibrary" width="300" height="150" /></a></td>
+</tr>
+<tr>
+<td>
+<p>Based on my book "Concurrency with Modern C++" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>140 lessons</li>
+<li>110 code playgrounds =&gt; Runs in the browser</li>
+<li>78 code snippets</li>
+<li>55 illustrations</li>
+</ul>
+</td>
+<td>
+<p>Based on my book "The C++ Standard Library" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>149 lessons</li>
+<li>111 code playgrounds =&gt; Runs in the browser</li>
+<li>164 code snippets</li>
+<li>25 illustrations</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
