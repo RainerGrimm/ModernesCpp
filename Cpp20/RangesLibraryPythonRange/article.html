@@ -1,0 +1,261 @@
+<p>In my last post <a href="http://bit.ly/2TyfqNX">C++20: Pythonic with the Ranges Library</a>, I started my experiment to implement the beloved Python functions <span style="font-family: 'courier new', courier;">range</span> and <span style="font-family: 'courier new', courier;">filter</span> in C++. Due to two very interesting comments to my last post, I revisit the function <span style="font-family: 'courier new', courier;">range</span>.&nbsp;</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/RangesLibraryMorePython/TimelineCpp20.png" alt="TimelineCpp20" width="650" height="248" /></p>
+<p>Admittedly, it took me quite a time to become comfortable with the ranges library but the effort paid off. You will see, why.&nbsp;</p>
+<p>I got a few very interesting remarks about my range implementation in my last post. Therefore, I have to visit it once more.</p>
+<h2><span style="font-family: 'courier new', courier;">range</span></h2>
+<p>As a short reminder. The call r<span style="font-family: 'courier new', courier;">ange(begin, end, step)</span> generates in Python 2 a list of all integers from <span style="font-family: 'courier new', courier;">begin</span> to <span style="font-family: 'courier new', courier;">end</span> in <span style="font-family: 'courier new', courier;">stepsize</span> steps. <span style="font-family: 'courier new', courier;">begin</span> is inclusive and end is exclusive. <span style="font-family: 'courier new', courier;">step</span> is per default 1.</p>
+<h3>Over-Engineering</h3>
+<p>My last <span style="font-family: 'courier new', courier;">range</span> implementation of the last was over-engineered as one of my German readers remarked. The following code snippet shows the over-engineered and the improved version.&nbsp;</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> range(<span style="color: #007788; font-weight: bold;">int</span> begin, <span style="color: #007788; font-weight: bold;">int</span> end, <span style="color: #007788; font-weight: bold;">int</span> stepsize <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span>) {
+    std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> result{};
+    <span style="color: #006699; font-weight: bold;">if</span> (begin <span style="color: #555555;">&lt;</span> end) {                                     
+        <span style="color: #006699; font-weight: bold;">auto</span> boundary <span style="color: #555555;">=</span> [end](<span style="color: #007788; font-weight: bold;">int</span> i){ <span style="color: #006699; font-weight: bold;">return</span> i <span style="color: #555555;">&lt;</span> end; };    
+        <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #007788; font-weight: bold;">int</span> i<span style="color: #555555;">:</span> ranges<span style="color: #555555;">::</span>views<span style="color: #555555;">::</span>iota(begin)               <span style="color: #0099ff; font-style: italic;">// (2)</span>
+                  <span style="color: #555555;">|</span> ranges<span style="color: #555555;">::</span>views<span style="color: #555555;">::</span>stride(stepsize) 
+                  <span style="color: #555555;">|</span> ranges<span style="color: #555555;">::</span>views<span style="color: #555555;">::</span>take_while(boundary)) {   <span style="color: #0099ff; font-style: italic;">// (1)</span>
+            result.push_back(i);
+        }
+    }
+    <span style="color: #006699; font-weight: bold;">else</span> {                                                
+        begin<span style="color: #555555;">++</span>;
+        end<span style="color: #555555;">++</span>;
+        stepsize <span style="color: #555555;">*=</span> <span style="color: #555555;">-</span><span style="color: #ff6600;">1</span>;
+        <span style="color: #006699; font-weight: bold;">auto</span> boundary <span style="color: #555555;">=</span> [begin](<span style="color: #007788; font-weight: bold;">int</span> i){ <span style="color: #006699; font-weight: bold;">return</span> i <span style="color: #555555;">&lt;</span> begin; }; 
+        <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #007788; font-weight: bold;">int</span> i<span style="color: #555555;">:</span> ranges<span style="color: #555555;">::</span>views<span style="color: #555555;">::</span>iota(end)                
+                  <span style="color: #555555;">|</span> ranges<span style="color: #555555;">::</span>views<span style="color: #555555;">::</span>take_while(boundary)      
+                  <span style="color: #555555;">|</span> ranges<span style="color: #555555;">::</span>views<span style="color: #555555;">::</span>reverse 
+                  <span style="color: #555555;">|</span> ranges<span style="color: #555555;">::</span>views<span style="color: #555555;">::</span>stride(stepsize)) {
+            result.push_back(i);
+        }
+    }
+    <span style="color: #006699; font-weight: bold;">return</span> result;
+}  
+
+std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> range(<span style="color: #007788; font-weight: bold;">int</span> begin, <span style="color: #007788; font-weight: bold;">int</span> end, <span style="color: #007788; font-weight: bold;">int</span> stepsize <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span>) {
+    std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> result{};
+    <span style="color: #006699; font-weight: bold;">if</span> (begin <span style="color: #555555;">&lt;</span> end) {
+        <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #007788; font-weight: bold;">int</span> i<span style="color: #555555;">:</span> ranges<span style="color: #555555;">::</span>views<span style="color: #555555;">::</span>iota(begin, end)         <span style="color: #0099ff; font-style: italic;">// (3)</span>
+                 <span style="color: #555555;">|</span> ranges<span style="color: #555555;">::</span>views<span style="color: #555555;">::</span>stride(stepsize)) {
+            result.push_back(i);
+        }
+    }
+    <span style="color: #006699; font-weight: bold;">else</span> {
+        begin<span style="color: #555555;">++</span>;
+        end<span style="color: #555555;">++</span>;
+        stepsize <span style="color: #555555;">*=</span> <span style="color: #555555;">-</span><span style="color: #ff6600;">1</span>;
+        <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #007788; font-weight: bold;">int</span> i<span style="color: #555555;">:</span> ranges<span style="color: #555555;">::</span>views<span style="color: #555555;">::</span>iota(end, begin)         
+                  <span style="color: #555555;">|</span> ranges<span style="color: #555555;">::</span>views<span style="color: #555555;">::</span>reverse 
+                  <span style="color: #555555;">|</span> ranges<span style="color: #555555;">::</span>views<span style="color: #555555;">::</span>stride(stepsize)) {
+            result.push_back(i);
+        }
+    }
+    <span style="color: #006699; font-weight: bold;">return</span> result;
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>I removed the boundary condition (line 1) in the first implementation and changed the infinite number generator <span style="font-family: 'courier new', courier;">ranges::views::iota(begin)</span> (line 2) to a finite number generator <span style="font-family: 'courier new', courier;">ranges::view::iota(begin, end)</span> (line 3). Consequentially, I did the same in the <span style="font-family: 'courier new', courier;">else</span> branch.&nbsp;</p>
+<h3>From <span style="font-family: 'courier new', courier;">range</span> to <span style="font-family: 'courier new', courier;">xrange</span></h3>
+<p>The presented <span style="font-family: 'courier new', courier;">range</span> function is eager.&nbsp;It generates a <span style="font-family: 'courier new', courier;">std::vector&lt;int&gt;</span>. &nbsp;Aleksei Guzev reminded me that Python 2 has also a lazy&nbsp;<span style="font-family: 'courier new', courier;">xrange</span> function which corresponds to the Python 3 <span style="font-family: 'courier new', courier;">range</span> function. He is right. Now, I'm sufficiently comfortable with the ranges library to apply functional concepts to C++. If you are puzzled by the term eager and lazy, read my previous post <a href="http://bit.ly/32iY77s">C++20: Functional Patterns with the Ranges Library</a>.&nbsp;</p>
+<p>The following example shows a lazy variant of <span style="font-family: 'courier new', courier;">range</span>, which I called, consequentially, <span style="font-family: 'courier new', courier;">xrange</span>.&nbsp;</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// xrange.hpp</span>
+
+<span style="color: #009999;">#include &lt;range/v3/all.hpp&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">long</span> <span style="color: #007788; font-weight: bold;">long</span> Begin, <span style="color: #007788; font-weight: bold;">long</span> <span style="color: #007788; font-weight: bold;">long</span> End<span style="color: #555555;">&gt;</span>           <span style="color: #0099ff; font-style: italic;">// (3)</span>
+<span style="color: #006699; font-weight: bold;">auto</span> xrange(<span style="color: #007788; font-weight: bold;">int</span> stepsize <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span>) {
+    <span style="color: #006699; font-weight: bold;">if</span> constexpr (Begin <span style="color: #555555;">&lt;</span> End) {                    <span style="color: #0099ff; font-style: italic;">// (2)</span>
+        <span style="color: #006699; font-weight: bold;">return</span> ranges<span style="color: #555555;">::</span>views<span style="color: #555555;">::</span>iota(Begin, End)      <span style="color: #0099ff; font-style: italic;">// (1)</span>
+               <span style="color: #555555;">|</span> ranges<span style="color: #555555;">::</span>views<span style="color: #555555;">::</span>stride(stepsize); 
+    }
+    <span style="color: #006699; font-weight: bold;">else</span> {
+        <span style="color: #007788; font-weight: bold;">long</span> <span style="color: #007788; font-weight: bold;">long</span> end  <span style="color: #555555;">=</span> End <span style="color: #555555;">+</span> <span style="color: #ff6600;">1</span>;                   <span style="color: #0099ff; font-style: italic;">// (4)</span>
+        <span style="color: #007788; font-weight: bold;">long</span> <span style="color: #007788; font-weight: bold;">long</span> begin <span style="color: #555555;">=</span> Begin <span style="color: #555555;">+</span> <span style="color: #ff6600;">1</span>;                <span style="color: #0099ff; font-style: italic;">// (4)</span>
+        stepsize <span style="color: #555555;">*=</span> <span style="color: #555555;">-</span><span style="color: #ff6600;">1</span>; 
+        <span style="color: #006699; font-weight: bold;">return</span> ranges<span style="color: #555555;">::</span>views<span style="color: #555555;">::</span>iota(end, begin)      <span style="color: #0099ff; font-style: italic;">// (1)</span>
+               <span style="color: #555555;">|</span> ranges<span style="color: #555555;">::</span>views<span style="color: #555555;">::</span>reverse 
+               <span style="color: #555555;">|</span> ranges<span style="color: #555555;">::</span>views<span style="color: #555555;">::</span>stride(stepsize);
+    }
+}
+</pre>
+</div>
+<p></p>
+<p>This implementation of the lazy <span style="font-family: 'courier new', courier;">xrange</span> function is way more complicated than the previous eager <span style="font-family: 'courier new', courier;">range</span> function. But the added complexity pays off. The following numbers correspond to the numbers in the source code snippet.</p>
+<ol>
+<li>The <span style="font-family: 'courier new', courier;">xrange</span> function returns not a <span style="font-family: 'courier new', courier;">std::vector&lt;int&gt;</span> but a composition of views. To ease my job, I let the compiler deduce the return type with <span style="font-family: 'courier new', courier;">auto</span>. Fine, but the return type caused the first challenge. The return types of the <span style="font-family: 'courier new', courier;">if</span> and <span style="font-family: 'courier new', courier;">else</span> branch diver.&nbsp;A function with different return types is not valid C++.</li>
+<li>To overcome this issue, I used a C++17 feature: <span style="font-family: 'courier new', courier;">constexpr if.</span>&nbsp;<a href="https://en.cppreference.com/w/cpp/language/if"><span style="font-family: 'courier new', courier;">constexpr if</span></a> allows conditional compilation. When the expression i<span style="font-family: 'courier new', courier;">f constexpr (Begin &lt; End))</span> becomes true, the <span style="font-family: 'courier new', courier;">if</span> branch is compiled; if not, the <span style="font-family: 'courier new', courier;">else</span> branch. In order to be valid, <span style="font-family: 'courier new', courier;">Begin</span> and <span style="font-family: 'courier new', courier;">End</span> have to be constant expressions.</li>
+<li><span style="font-family: 'courier new', courier;">Begin</span> and <span style="font-family: 'courier new', courier;">End</span> are now non-type template parameters which make it possible to use them in a <span style="font-family: 'courier new', courier;">constexpr if</span> (line 2) expression. I used a non-type template parameter of type <span style="font-family: 'courier new', courier;">long long</span> to deal with big numbers. You read in a few sentences, why.&nbsp;</li>
+<li>Constant expressions such as <span style="font-family: 'courier new', courier;">Begin</span> and <span style="font-family: 'courier new', courier;">End</span> can not be modified. Consequentially, I introduced the variables <span style="font-family: 'courier new', courier;">end</span> and <span style="font-family: 'courier new', courier;">begin</span> to adapt the boundaries for the <span style="font-family: 'courier new', courier;">ranges::views::iota</span> call.&nbsp;</li>
+</ol>
+<p>&nbsp;Let's try it out.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// range.cpp</span>
+
+<span style="color: #009999;">#include "xrange.hpp"</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;range/v3/all.hpp&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+
+        
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+    <span style="color: #006699; font-weight: bold;">auto</span> res <span style="color: #555555;">=</span> xrange<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">10</span><span style="color: #555555;">&gt;</span>();                    <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> i<span style="color: #555555;">:</span> res) std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> i <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span>;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n\n</span><span style="color: #cc3300;">"</span>;
+    
+    res <span style="color: #555555;">=</span> xrange<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">50</span><span style="color: #555555;">&gt;</span>(<span style="color: #ff6600;">5</span>);                        <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> i<span style="color: #555555;">:</span> res) std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> i <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span>;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n\n</span><span style="color: #cc3300;">"</span>;
+    
+    <span style="color: #006699; font-weight: bold;">auto</span> res2 <span style="color: #555555;">=</span> xrange<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">20</span>, <span style="color: #ff6600;">10</span><span style="color: #555555;">&gt;</span>(<span style="color: #555555;">-</span><span style="color: #ff6600;">1</span>);                <span style="color: #0099ff; font-style: italic;">// (3)</span>
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> i<span style="color: #555555;">:</span> res2) std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> i <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span>;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n\n</span><span style="color: #cc3300;">"</span>;
+    
+    res2 <span style="color: #555555;">=</span> xrange<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">50</span>, <span style="color: #ff6600;">10</span><span style="color: #555555;">&gt;</span>(<span style="color: #555555;">-</span><span style="color: #ff6600;">5</span>);                     <span style="color: #0099ff; font-style: italic;">// (4)</span>
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> i<span style="color: #555555;">:</span> res2) std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> i <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span>;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n\n</span><span style="color: #cc3300;">"</span>;
+    
+    res <span style="color: #555555;">=</span> xrange<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">1'</span><span style="color: #ff6600;">000'</span><span style="color: #ff6600;">000'</span><span style="color: #ff6600;">000'</span><span style="color: #ff6600;">000'</span><span style="color: #ff6600;">000'</span><span style="color: #ff6600;">000</span><span style="color: #555555;">&gt;</span>();  <span style="color: #0099ff; font-style: italic;">// (5)</span>
+    <span style="color: #0099ff; font-style: italic;">// for (auto i: res) std::cout &lt;&lt; i &lt;&lt; " ";    // (6)</span>
+    
+    
+                                                   <span style="color: #0099ff; font-style: italic;">// (7)</span>
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> i<span style="color: #555555;">:</span> res <span style="color: #555555;">|</span> ranges<span style="color: #555555;">::</span>views<span style="color: #555555;">::</span>take(<span style="color: #ff6600;">10</span>)) std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> i <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span>;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n\n</span><span style="color: #cc3300;">"</span>;
+    
+                                                  <span style="color: #0099ff; font-style: italic;">// (8)</span>
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> i<span style="color: #555555;">:</span> res <span style="color: #555555;">|</span> ranges<span style="color: #555555;">::</span>views<span style="color: #555555;">::</span>drop_while([](<span style="color: #007788; font-weight: bold;">int</span> i){ <span style="color: #006699; font-weight: bold;">return</span> i <span style="color: #555555;">&lt;</span> <span style="color: #ff6600;">1'</span><span style="color: #ff6600;">000'</span><span style="color: #ff6600;">000</span>; })
+                     <span style="color: #555555;">|</span> ranges<span style="color: #555555;">::</span>views<span style="color: #555555;">::</span>take_while([](<span style="color: #007788; font-weight: bold;">int</span> i){ <span style="color: #006699; font-weight: bold;">return</span> i <span style="color: #555555;">&lt;</span> <span style="color: #ff6600;">1'</span><span style="color: #ff6600;">000'</span><span style="color: #ff6600;">010</span>; })) {
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> i <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span>;
+    }
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n\n</span><span style="color: #cc3300;">"</span>;
+    
+}
+</pre>
+</div>
+<p></p>
+<p>Lines (1) - (4) shows that the <span style="font-family: 'courier new', courier;">xrange</span> function works as the previous <span style="font-family: 'courier new', courier;">range</span> function. The only difference is that the function arguments become template arguments. When I want to have all numbers up to a quintillion (line 6), I have to kill the program.&nbsp;</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/RangesLibraryMorePython/xrangeBreak.png" alt="xrangeBreak" width="650" height="292" /></p>
+<p>Using tics for numbers (<span style="font-family: 'courier new', courier;">1'000'000'000'000'000'000</span>) (line 5) is valid since C++14 and makes the big numbers easier to read. I should not be so eager but lazy. If I ask only for 10 numbers (line 7) or for the numbers between <span style="font-family: 'courier new', courier;">1'000'000</span> and <span style="font-family: 'courier new', courier;">1'000'010</span> (line 8) the program works like a charm. Only the numbers are generated that are requested.</p>
+<h2><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/RangesLibraryMorePython/xrange.png" alt="xrange" width="500" height="243" /></h2>
+<h2>What's next?</h2>
+<p><span>As I already promised in my last post <a href="http://bit.ly/2TyfqNX">C++20: Pythonic with the Ranges Library</a>, I present in my next post Python's <span style="font-family: 'courier new', courier;">map</span> function. <span style="font-family: 'courier new', courier;">map</span> empowers you to apply a function to sequences. For convenience reasons, I combine the <span style="font-family: 'courier new', courier;">map</span> and <span style="font-family: 'courier new', courier;">filter</span> function into one function.&nbsp;</span></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Meeting C++, Matt Braun, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Marko, </strong><span class="sc-kpOJdX fDWXFa" title="Emyr Williams"><strong>G Prvulovic, Reinhold Dröge, Abernitzke,</strong> </span><strong><span title="Emyr Williams">Richard Ohnemus, Frank Grimm</span></strong><span title="Emyr Williams"><strong>, Sakib, Broeserl, </strong></span><strong><span title="Emyr Williams">António Pina, Markus Falkner, Darshan Mody, Sergey Agafyin, <span class="sc-gZMcBi hdSbOl" data-tag="user-details-full-name">Андрей Бурмистров, Jake, GS, Lawton Shoemake, Animus24, Jozo Leko, and John Breland.</span></span><span title="Emyr Williams"><span class="sc-htpNat dEZjR" style="color: #241e12; font-family: aktiv-grotesk, sans-serif; margin: 0px; position: relative; font-weight: 400; font-size: 1rem; line-height: 1.5;"><span class="sc-htpNat ebhhXb" style="color: #241e12; font-family: aktiv-grotesk, sans-serif; margin: 0px; position: relative; font-weight: bold; font-size: 1rem; line-height: 1.5;"><br /></span></span></span></strong></p>
+<p>&nbsp;</p>
+<table style="width: 490px; height: 103px;">
+<tbody>
+<tr>
+<td><strong>Thanks in particular to:</strong></td>
+<td>&nbsp;</td>
+<td><a href="https://cranepay.io/"><img src="images/patreon/crp4.png" alt="crp4" width="150" height="96" /></a></td>
+</tr>
+</tbody>
+</table>
+<p><strong>&nbsp;</strong></p>
+<p><strong>&nbsp;&nbsp;<a href="https://www.takeupcode.com/">&nbsp; </a></strong></p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at Leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages. I also included more than 120 source files.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight into the current and upcoming concurrency in C++. This insight includes the theory and a lot of practice with more than 140 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 700 pages full of modern C++ and more than 260 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
+<p></p>
+<table style="width: 800px;">
+<tbody>
+<tr>
+<td colspan="2">
+<h2>Get your interactive course</h2>
+&nbsp;</td>
+</tr>
+<tr>
+<td>
+<h4 class="_3fBEwsM053hx2mPd0uV0nT" style="text-align: center;">Modern C++ Concurrency in Practice</h4>
+</td>
+<td>
+<h4>C++ Standard Library including C++14 &amp; C++17</h4>
+</td>
+</tr>
+<tr>
+<td><a href="https://goo.gl/2qWUkK"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseConcurrency/educative.png" alt="educative" width="300" height="152" /></a></td>
+<td><a href="https://www.educative.io/collection/10370001/5712008708096000?authorName=Rainer%20Grimm"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseLibrary/CLibrary.png" alt="CLibrary" width="300" height="150" /></a></td>
+</tr>
+<tr>
+<td>
+<p>Based on my book "Concurrency with Modern C++" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>140 lessons</li>
+<li>110 code playgrounds =&gt; Runs in the browser</li>
+<li>78 code snippets</li>
+<li>55 illustrations</li>
+</ul>
+</td>
+<td>
+<p>Based on my book "The C++ Standard Library" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>149 lessons</li>
+<li>111 code playgrounds =&gt; Runs in the browser</li>
+<li>164 code snippets</li>
+<li>25 illustrations</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
