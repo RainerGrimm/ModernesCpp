@@ -1,0 +1,275 @@
+<p>C++20 provides four features that change the way we think about and write modern C++: concepts, the ranges library, coroutines, and modules. I already wrote a few posts to <a href="index.php/tag/concepts">concepts</a> and the <a href="index.php/tag/ranges-library">ranges library</a>. Let's have a closer look at coroutines.&nbsp;</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/CoroutinesAFirstOverview/TimelineCpp20.png" alt="TimelineCpp20" width="650" height="233" /></p>
+<p>&nbsp;</p>
+<p>I want to use this post as a starting point to dive deeper into coroutines.&nbsp;</p>
+<p>Coroutines are functions that can suspend and resume their execution while keeping their state. The&nbsp;evolution of functions goes in C++ one step further.&nbsp;What I present as a new idea in C++20 is quite old. <a href="https://en.wikipedia.org/wiki/Melvin_Conway">Melvin Conway</a> coined the term coroutine. He used it in his publication on compiler construction in 1963. <a href="https://en.wikipedia.org/wiki/Donald_Knuth">Donald Knuth</a>&nbsp;called procedures a special case of coroutines.&nbsp;</p>
+<p>With the new keywords<span style="font-family: 'courier new', courier;"> co_await</span> and <span style="font-family: 'courier new', courier;">co_yield</span>, C++20 extends the execution of C++ functions with&nbsp;two new concepts.</p>
+<ul>
+<li>Thanks to <strong><span style="font-family: 'courier new', courier;">co_await expression</span></strong> expression, it is possible to suspend and resume the execution of the an expression.&nbsp;If you use <span style="font-family: 'courier new', courier;">co_await expression</span> in a function <span style="font-family: 'courier new', courier;">func</span>, the call <span style="font-family: 'courier new', courier;">auto getResult = func()</span> does not&nbsp;block if the result of the function is not available. Instead of resource-consuming blocking, you have&nbsp;resource-friendly waiting.</li>
+<li><span style="font-family: 'courier new', courier;"><strong>co_yield expression</strong></span> expression allows it to write a generator function. The generator function returns a new&nbsp;value each time. A generator function is a kind of data stream from which you can pick values. The&nbsp;data stream can be infinite. Consequentially, we are in the center of lazy evaluation.</li>
+</ul>
+<p>Before I present a generator function to show the difference between a function and coroutines, I want to say a few words about the evolution of functions.</p>
+<h2>Evolution of Functions</h2>
+<p>The following code example shows the various simplified steps in the evolution of functions.&nbsp;</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// functionEvolution.cpp</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">func1</span>() {
+    <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #ff6600;">1972</span>;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">func2</span>(<span style="color: #007788; font-weight: bold;">int</span> arg) {
+    <span style="color: #006699; font-weight: bold;">return</span> arg;
+}
+
+<span style="color: #007788; font-weight: bold;">double</span> <span style="color: #cc00ff;">func2</span>(<span style="color: #007788; font-weight: bold;">double</span> arg) {
+    <span style="color: #006699; font-weight: bold;">return</span> arg;
+}
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">int</span> func3(T arg) {
+    <span style="color: #006699; font-weight: bold;">return</span> arg;
+}
+
+<span style="color: #006699; font-weight: bold;">struct</span> FuncObject4 {
+    <span style="color: #007788; font-weight: bold;">int</span> <span style="color: #006699; font-weight: bold;">operator</span>()() { <span style="color: #0099ff; font-style: italic;">// (1)</span>
+        <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #ff6600;">1998</span>;
+    }
+};
+
+<span style="color: #006699; font-weight: bold;">auto</span> func5 <span style="color: #555555;">=</span> [] {
+    <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #ff6600;">2011</span>;
+};
+
+<span style="color: #006699; font-weight: bold;">auto</span> func6 <span style="color: #555555;">=</span> [] (<span style="color: #006699; font-weight: bold;">auto</span> arg){
+    <span style="color: #006699; font-weight: bold;">return</span> arg;
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    func1();        <span style="color: #0099ff; font-style: italic;">// 1972</span>
+
+    func2(<span style="color: #ff6600;">1998</span>);    <span style="color: #0099ff; font-style: italic;">// 1998</span>
+    func2(<span style="color: #ff6600;">1998.0</span>);  <span style="color: #0099ff; font-style: italic;">// 1998.0</span>
+    func3(<span style="color: #ff6600;">1998</span>);    <span style="color: #0099ff; font-style: italic;">// 1998</span>
+    func3(<span style="color: #ff6600;">1998.0</span>);  <span style="color: #0099ff; font-style: italic;">// 1998.0</span>
+    FuncObject4 func4;
+    func4();        <span style="color: #0099ff; font-style: italic;">// 1998</span>
+
+    func5();        <span style="color: #0099ff; font-style: italic;">// 2011</span>
+
+    func6(<span style="color: #ff6600;">2014</span>);    <span style="color: #0099ff; font-style: italic;">// 2014</span>
+    func6(<span style="color: #ff6600;">2014.0</span>);  <span style="color: #0099ff; font-style: italic;">// 2014</span>
+
+}   
+</pre>
+</div>
+<p></p>
+<ul>
+<li>Since the first C standard in 1972, we have functions: <span style="font-family: 'courier new', courier;">func1</span>.</li>
+<li>With the first C++ standard in 1998 functions become way more powerful. We got
+<ul>
+<li>Function overloading:<span style="font-family: 'courier new', courier;"> func2.</span></li>
+<li>Function templates:<span style="font-family: 'courier new', courier;"> func3.</span></li>
+<li>Function objects: <span style="font-family: 'courier new', courier;">func4</span>. Often, they are erroneous, called functors. Function objects are due to the overload call operator (<span style="font-family: 'courier new', courier;">operator ()</span>) objects, which can be invoked. The second pair of round braces in line (1) stands for the function call parameters.</li>
+</ul>
+</li>
+<li>C++11 gave us lambda functions: <span style="font-family: 'courier new', courier;">func5.</span></li>
+<li>With C++14, lambda functions can be generic: <span style="font-family: 'courier new', courier;">func6.&nbsp;</span></li>
+</ul>
+<p>Let's go one step further. Generators are special coroutines.</p>
+<h2>Generators</h2>
+<p>In classical C++, I can implement a greedy generator.</p>
+<h3>A Greedy Generator</h3>
+<p>The following program is as straightforward as possible. The function <span style="font-family: 'courier new', courier;">getNumbers</span> returns all integers from&nbsp;<span style="font-family: 'courier new', courier;">begin</span> to <span style="font-family: 'courier new', courier;">end</span> incremented by inc. <span style="font-family: 'courier new', courier;">begin</span> has to be smaller than <span style="font-family: 'courier new', courier;">end</span> and <span style="font-family: 'courier new', courier;">inc</span> has to be positive.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// greedyGenerator.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+
+std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> getNumbers(<span style="color: #007788; font-weight: bold;">int</span> begin, <span style="color: #007788; font-weight: bold;">int</span> end, <span style="color: #007788; font-weight: bold;">int</span> inc <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span>) {
+  
+    std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> numbers;                      <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #007788; font-weight: bold;">int</span> i <span style="color: #555555;">=</span> begin; i <span style="color: #555555;">&lt;</span> end; i <span style="color: #555555;">+=</span> inc) {
+        numbers.push_back(i);
+    }
+  
+    <span style="color: #006699; font-weight: bold;">return</span> numbers;
+  
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+    <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #006699; font-weight: bold;">auto</span> numbers<span style="color: #555555;">=</span> getNumbers(<span style="color: #555555;">-</span><span style="color: #ff6600;">10</span>, <span style="color: #ff6600;">11</span>);
+  
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> n<span style="color: #555555;">:</span> numbers) std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> n <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span>;
+  
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n\n</span><span style="color: #cc3300;">"</span>;
+
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> n<span style="color: #555555;">:</span> getNumbers(<span style="color: #ff6600;">0</span>, <span style="color: #ff6600;">101</span>, <span style="color: #ff6600;">5</span>)) std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> n <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span>;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n\n</span><span style="color: #cc3300;">"</span>;
+
+}
+</pre>
+</div>
+<p></p>
+<p>Of course, I am reinventing the wheel with <span style="font-family: 'courier new', courier;">getNumbers</span> because that job could be done quite good with the algorithm<a href="https://en.cppreference.com/w/cpp/algorithm/iota">&nbsp;std::iota</a>. The output of the program is as expected.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/CoroutinesAFirstOverview/greedyGenerator.png" alt="greedyGenerator" width="500" height="129" /></p>
+<p>Two observations of the program are essential. On the one hand, the vector <span style="font-family: 'courier new', courier;">numbers</span> in line (1) always gets all values. This holds even if I’m only interested in the first five elements of a vector with&nbsp;1000 elements. On the other hand, it’s quite easy to transform the function <span style="font-family: 'courier new', courier;">getNumbers</span> into a lazy&nbsp;generator.</p>
+<h3>A Lazy Generator</h3>
+<p>That's all.&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// lazyGenerator.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+
+generator<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> generatorForNumbers(<span style="color: #007788; font-weight: bold;">int</span> begin, <span style="color: #007788; font-weight: bold;">int</span> inc <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span>) {
+  
+  <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #007788; font-weight: bold;">int</span> i <span style="color: #555555;">=</span> begin;; i <span style="color: #555555;">+=</span> inc) {
+    co_yield i;
+  }
+  
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+    <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #006699; font-weight: bold;">auto</span> numbers<span style="color: #555555;">=</span> generatorForNumbers(<span style="color: #555555;">-</span><span style="color: #ff6600;">10</span>);                   <span style="color: #0099ff; font-style: italic;">// (2)</span>
+  
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #007788; font-weight: bold;">int</span> i<span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span>; i <span style="color: #555555;">&lt;=</span> <span style="color: #ff6600;">20</span>; <span style="color: #555555;">++</span>i) std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> numbers <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span>;       <span style="color: #0099ff; font-style: italic;">// (4)</span>
+  
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n\n</span><span style="color: #cc3300;">"</span>;
+                                                         
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> n<span style="color: #555555;">:</span> generatorForNumbers(<span style="color: #ff6600;">0</span>, <span style="color: #ff6600;">5</span>)) std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> n <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span>;  <span style="color: #0099ff; font-style: italic;">// (3)</span>
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n\n</span><span style="color: #cc3300;">"</span>;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>While the function <span style="font-family: 'courier new', courier;">getNumbers</span> in the file <span style="font-family: 'courier new', courier;">greedyGenerator.cpp</span> returns a std::vector, the&nbsp;coroutine <span style="font-family: 'courier new', courier;">generatorForNumbers</span> in <span style="font-family: 'courier new', courier;">lazyGenerator.cpp</span> returns a generator. The generator <span style="font-family: 'courier new', courier;">numbers</span>&nbsp;in line (2) or<span style="font-family: 'courier new', courier;"> generatorForNumbers(0, 5)</span> in line (3) returns a new number on request. The range-based for-loop triggers the query. To be more precise, the query of the coroutine returns the value <span style="font-family: 'courier new', courier;">i&nbsp;via co_yield i</span> and immediately suspends its execution. If a new value is requested, the coroutine&nbsp;resumes its execution exactly at that place.&nbsp;</p>
+<p><span style="color: #000000;">The expression<span style="font-family: 'courier new', courier;"> generatorForNumbers(0, 5)</span> in line (3) is a just-in-place usage of a generator.&nbsp;I want to stress one point explicitly. The coroutine <span style="font-family: 'courier new', courier;">generatorForNumbers</span> creates an infinite data&nbsp;stream because the for-loop in line (3) has no end condition. This infinite data stream is fine if I only ask for a finite&nbsp;number of values such as in line (4). This does not hold for line (3) since there is no end condition. Consequentially, the expression runs forever.</span></p>
+<h2>What's next?</h2>
+<p>We don't get with C++20 concrete coroutines; we get a framework for writing our coroutines. You can assume that I have a lot to write about them.</p>
+<h2>First Virtual Meetup</h2>
+<p>I'm happy to give the first virtual talk for the C++ User Group in Munich. Here is the official invitation:</p>
+<p><img style="margin: 20px; float: left;" src="images/blog/Cpp20/CoroutinesAFirstOverview/MUC.png" alt="MUC" width="150" height="150" /></p>
+<div>&nbsp;</div>
+<div>&nbsp;</div>
+<div class="css-1dbjc4n r-xoduu5"><span class="css-901oao css-16my406 r-1qd0xha r-ad9z0x r-bcqeeo r-qvutc0">Help us fight social isolation and join us next Thursday for our first-ever virtual meetup! <a href="https://twitter.com/rainer_grimm">@rainer_grimm</a> will be talking about Concepts in C++20. March 26, 19:00 (CET).</span></div>
+<div class="css-1dbjc4n r-xoduu5"><span class="css-901oao css-16my406 r-1qd0xha r-ad9z0x r-bcqeeo r-qvutc0">Check out the full event description at&nbsp;<a href="https://www.meetup.com/de-DE/MUCplusplus/events/269530229/">meetup.com/MUCplusplus</a>. The stream is open for everyone, you don't need to register on meetup for this one.</span></div>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Meeting C++, Matt Braun, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Marko, </strong><span class="sc-kpOJdX fDWXFa" title="Emyr Williams"><strong>G Prvulovic, Reinhold Dröge, Abernitzke,</strong> </span><strong><span title="Emyr Williams">Richard Ohnemus, Frank Grimm</span></strong><span title="Emyr Williams"><strong>, Sakib, Broeserl, </strong></span><strong><span title="Emyr Williams">António Pina, Markus Falkner, Darshan Mody, Sergey Agafyin, <span class="sc-gZMcBi hdSbOl" data-tag="user-details-full-name">Андрей Бурмистров, Jake, GS, Lawton Shoemake, Animus24, Jozo Leko, John Breland, espkk, and Wolfgang Gärtner.</span></span><span title="Emyr Williams"><span class="sc-htpNat dEZjR" style="color: #241e12; font-family: aktiv-grotesk, sans-serif; margin: 0px; position: relative; font-weight: 400; font-size: 1rem; line-height: 1.5;"><span class="sc-htpNat ebhhXb" style="color: #241e12; font-family: aktiv-grotesk, sans-serif; margin: 0px; position: relative; font-weight: bold; font-size: 1rem; line-height: 1.5;"><br /></span></span></span></strong></p>
+<p>&nbsp;</p>
+<table style="width: 490px; height: 103px;">
+<tbody>
+<tr>
+<td><strong>Thanks in particular to:</strong></td>
+<td>&nbsp;</td>
+<td><a href="https://cranepay.io/"><img src="images/patreon/crp4.png" alt="crp4" width="150" height="96" /></a></td>
+</tr>
+</tbody>
+</table>
+<p><strong>&nbsp;</strong></p>
+<p><strong>&nbsp;&nbsp;<a href="https://www.takeupcode.com/">&nbsp; </a></strong></p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at Leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages. I also included more than 120 source files.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight into the current and upcoming concurrency in C++. This insight includes the theory and a lot of practice with more than 140 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 700 pages full of modern C++ and more than 260 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
+<p></p>
+<table style="width: 800px;">
+<tbody>
+<tr>
+<td colspan="2">
+<h2>Get your interactive course</h2>
+&nbsp;</td>
+</tr>
+<tr>
+<td>
+<h4 class="_3fBEwsM053hx2mPd0uV0nT" style="text-align: center;">Modern C++ Concurrency in Practice</h4>
+</td>
+<td>
+<h4>C++ Standard Library including C++14 &amp; C++17</h4>
+</td>
+</tr>
+<tr>
+<td><a href="https://goo.gl/2qWUkK"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseConcurrency/educative.png" alt="educative" width="300" height="152" /></a></td>
+<td><a href="https://www.educative.io/collection/10370001/5712008708096000?authorName=Rainer%20Grimm"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseLibrary/CLibrary.png" alt="CLibrary" width="300" height="150" /></a></td>
+</tr>
+<tr>
+<td>
+<p>Based on my book "Concurrency with Modern C++" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>140 lessons</li>
+<li>110 code playgrounds =&gt; Runs in the browser</li>
+<li>78 code snippets</li>
+<li>55 illustrations</li>
+</ul>
+</td>
+<td>
+<p>Based on my book "The C++ Standard Library" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>149 lessons</li>
+<li>111 code playgrounds =&gt; Runs in the browser</li>
+<li>164 code snippets</li>
+<li>25 illustrations</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
