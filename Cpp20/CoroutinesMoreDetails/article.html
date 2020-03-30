@@ -1,0 +1,194 @@
+<p>After I gave you in my last post (<a href="https://bit.ly/3dl4VGE">C++20: Coroutines - A First Overview</a>) the first impression of coroutines, I want to provide today more details.&nbsp;Once more, we get in C++20 not coroutines but a framework for building coroutines.&nbsp;</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/CoroutinesMoreDetails/TimelineCpp20.png" alt="TimelineCpp20" width="650" height="233" /></p>
+<p>My job in this and further posts is to explain the framework for building coroutines. On the end, you can create your own or using an existing implementation of coroutines such as the excellent one&nbsp;<a href="https://github.com/lewissbaker/cppcoro">cppcoro</a>&nbsp;from Lewis Baker.</p>
+<p>Today's post is in-between: This post is not an overview but also not in-depth dive into the coroutines framework that follows in the next posts.</p>
+<p>The first question you may have is: When should I use coroutines?</p>
+<h2>Typical Use-Cases</h2>
+<p>Coroutines are the usual way to write <a href="https://en.wikipedia.org/wiki/Event-driven_programming">event-driven applications</a>. The event-driven application can&nbsp;be simulations, games, servers, user interfaces, or even algorithms. For example, I wrote a few years ago a simulator for a defibrillator in Python. This simulator helped us, in particular, to make clinical usability studies. A defibrillator is an event-driven application, and I implemented it, consequentially, based on the event-driven Python framework <a href="https://twistedmatrix.com/trac/">twisted</a>.&nbsp;</p>
+<p>Coroutines are also typically used for&nbsp;cooperative multitasking. The key to cooperative multitasking is that each task takes as much time&nbsp;as it needs. Cooperative <a href="https://en.wikipedia.org/wiki/Computer_multitasking">multitasking</a> stands in contrast to preemptive multitasking, for which we have&nbsp;a scheduler that decides how long each task gets the CPU. Cooperative multitasking makes concurrency often easier because a concurrent job can not be interrupted in a critical region. If you are still puzzled with the terms cooperative and preemptive, I found an excellent overview and read here:&nbsp;<a href="https://medium.com/traveloka-engineering/cooperative-vs-preemptive-a-quest-to-maximize-concurrency-power-3b10c5a920fe">Cooperative vs. Preemptive: a quest to maximize concurrency power</a></p>
+<p><span style="color: inherit; font-size: 35px;">Underlying Ideas</span></p>
+<p>Coroutines in C++20 are asymmetric, first-class, and stackless.</p>
+<ul>
+<li>The workflow of an <strong>asymmetric</strong> coroutine goes back to the caller.&nbsp;</li>
+<li><strong>First-class</strong> coroutines behave like data. Behaving like data means&nbsp;you can use them as an argument to or return value from a function,&nbsp;or store them in a variable.</li>
+<li>A <strong>stackless</strong> coroutine enables it to suspend and resume the top-level coroutine. The execution of&nbsp;the coroutine and the yielding from the coroutine comes back to the caller.&nbsp;In contrast, a stackful coroutine reserves a default stack for 1MB on Windows, and 2MB<br />on Linux.</li>
+</ul>
+<h2>Design Goals</h2>
+<p>Gor Nishanov, how was responsible for the standardization of coroutines in C++,&nbsp; described the design goals of coroutines.&nbsp;Coroutines should</p>
+<ul>
+<li>be highly scalable (to billions of concurrent coroutines).</li>
+<li>have highly efficient resume and suspend operations comparable in cost to the overhead of a&nbsp;function.</li>
+<li>seamlessly interact with existing facilities with no overhead.</li>
+<li>have open-ended coroutine machinery allowing library designers to develop coroutine libraries.</li>
+<li>exposing various high-level semantics such as generators, goroutines, tasks and more.</li>
+<li>usable in environments where exceptions are forbidden or not available.</li>
+</ul>
+<h2>Becoming a Coroutine</h2>
+<p>A function that uses the keywords <span style="font-family: 'courier new', courier;">co_return, co_yield, or co_await</span>&nbsp;becomes a coroutine implicitly.</p>
+<ul>
+<li><span style="font-family: 'courier new', courier;"><strong>co_return</strong>: </span>a coroutine uses <span style="font-family: 'courier new', courier;">co_return</span> as return statement.&nbsp;</li>
+<li><span style="font-family: 'courier new', courier;"><strong>co_yield</strong>:&nbsp;</span>thanks to <span style="font-family: 'courier new', courier;">co_yield</span>, you can implement a generator that generates an infinite data stream&nbsp;from which you can successively query values. The return type of the function call&nbsp;<span style="font-family: 'courier new', courier;">generatorForNumbers(int begin, int inc= 1)</span>&nbsp;such as in the last post (<a href="https://bit.ly/3dl4VGE">C++20: Coroutines - A First Overview</a>) is a generator. A generator internally holds&nbsp;a special promise <span style="font-family: 'courier new', courier;">pro</span> so that a call <span style="font-family: 'courier new', courier;">co_yield i</span> is equivalent to a call <span style="font-family: 'courier new', courier;">co_await pro.yield_value(i)</span>. Immediately after the call, the coroutine is paused.</li>
+<li><strong><span style="font-family: 'courier new', courier;">co_await:</span></strong><span style="font-family: 'courier new', courier;">co_await</span> eventually causes the execution of the coroutine to be suspended or resumed.&nbsp;The expression <span style="font-family: 'courier new', courier;">exp</span> in <span style="font-family: 'courier new', courier;">co_await</span> exp has to be a so-called awaitable expression. <span style="font-family: 'courier new', courier;">exp</span> has to implement&nbsp;a specific interface. This interface consists of the three functions <span style="font-family: 'courier new', courier;">await_ready</span>, <span style="font-family: 'courier new', courier;">await_suspend</span>,&nbsp;and <span style="font-family: 'courier new', courier;">await_resume</span>.&nbsp;</li>
+</ul>
+<h3>Two Awaitables</h3>
+<p>&nbsp;The C++20 standard already defines two awaitables as basic-building blocks: <span style="font-family: 'courier new', courier;">std::suspend_always</span>, and <span style="font-family: 'courier new', courier;">std::suspend_never</span>.&nbsp;</p>
+<ul>
+<li><span style="font-family: 'courier new', courier;">std::suspend_always</span></li>
+</ul>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">struct</span> suspend_always {
+    constexpr <span style="color: #007788; font-weight: bold;">bool</span> await_ready() <span style="color: #006699; font-weight: bold;">const</span> noexcept { <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #336666;">false</span>; }
+    constexpr <span style="color: #007788; font-weight: bold;">void</span> await_suspend(coroutine_handle<span style="color: #555555;">&lt;&gt;</span>) <span style="color: #006699; font-weight: bold;">const</span> noexcept {}
+    constexpr <span style="color: #007788; font-weight: bold;">void</span> await_resume() <span style="color: #006699; font-weight: bold;">const</span> noexcept {}
+};
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The awaitable <span style="font-family: 'courier new', courier;">std::suspend_always</span> suspends always because of&nbsp;<span style="font-family: 'courier new', courier;">await_ready</span> returns <span style="font-family: 'courier new', courier;">false</span>. The opposite holds for <span style="font-family: 'courier new', courier;">std::suspend_never.</span></p>
+<ul>
+<li><span style="font-family: 'courier new', courier;">std::suspend_never</span></li>
+</ul>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">struct</span> suspend_never {</pre>
+</div>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">    constexpr <span style="color: #007788; font-weight: bold;">bool</span> await_ready() <span style="color: #006699; font-weight: bold;">const</span> noexcept { <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #336666;">true</span>; }
+    constexpr <span style="color: #007788; font-weight: bold;">void</span> await_suspend(coroutine_handle<span style="color: #555555;">&lt;&gt;</span>) <span style="color: #006699; font-weight: bold;">const</span> noexcept {}
+    constexpr <span style="color: #007788; font-weight: bold;">void</span> await_resume() <span style="color: #006699; font-weight: bold;">const</span> noexcept {}
+};
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>I hope a small example helps to make the theory easier to digest. A server is the hello world example for coroutines.</p>
+<h3>A Blocking and a Waiting Server&nbsp;</h3>
+<p>A server is an event-driven application. It typically waits in an event-loop for an indication event of a client.</p>
+<p>The following code snippet shows the structure of a straightforward server.&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">Acceptor acceptor{<span style="color: #ff6600;">443</span>};               <span style="color: #0099ff; font-style: italic;">// (1)</span>
+ 
+<span style="color: #006699; font-weight: bold;">while</span> (<span style="color: #336666;">true</span>){
+    Socket socket<span style="color: #555555;">=</span> acceptor.accept(); <span style="color: #0099ff; font-style: italic;">// blocking (2)</span>
+    <span style="color: #006699; font-weight: bold;">auto</span> request<span style="color: #555555;">=</span> socket.read();      <span style="color: #0099ff; font-style: italic;">// blocking (3)</span>
+    <span style="color: #006699; font-weight: bold;">auto</span> response<span style="color: #555555;">=</span> handleRequest(request);
+    socket.write(response);           <span style="color: #0099ff; font-style: italic;">// blocking (4)</span>
+}
+</pre>
+</div>
+<p></p>
+<p>The sequential server answers each request in the same thread. It&nbsp;listens on port 443 (line 1), accepts its connections (line 2), reads the incoming data from the&nbsp;client (line 3), and writes its answer to the client (line 4). The calls in lines 2, 3, and 4 are blocking.</p>
+<p>Thanks to <span style="font-family: 'courier new', courier;">co_await,&nbsp;</span>the blocking calls can now be suspended and resumed. The resources consuming blocking server becomes, therefore, a resource sparing waiting server.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">Acceptor acceptor{<span style="color: #ff6600;">443</span>};
+
+<span style="color: #006699; font-weight: bold;">while</span> (<span style="color: #336666;">true</span>){
+    Socket socket<span style="color: #555555;">=</span> co_await acceptor.accept();
+    <span style="color: #006699; font-weight: bold;">auto</span> request<span style="color: #555555;">=</span> co_await socket.read();
+    <span style="color: #006699; font-weight: bold;">auto</span> response<span style="color: #555555;">=</span> handleRequest(request);
+    co_await socket.write(response);
+}
+</pre>
+</div>
+<p></p>
+<p>You may guess. The crucial part to understand this coroutine are the awaitable expressions <span style="font-family: 'courier new', courier;">expr</span> in the&nbsp;<span style="font-family: 'courier new', courier;">co_await expr&nbsp;</span>calls. These expressions have to implement the functions <span style="font-family: 'courier new', courier;">await_ready</span>, <span style="font-family: 'courier new', courier;">await_suspend</span>, and <span style="font-family: 'courier new', courier;">await_resume</span>.&nbsp;</p>
+<h2>What's next?</h2>
+<p>The framework for writing a coroutine consists of more than 20 functions that you partially have to implement and partially could overwrite. My next post dives deeper into this framework.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Meeting C++, Matt Braun, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Marko, </strong><span class="sc-kpOJdX fDWXFa" title="Emyr Williams"><strong>G Prvulovic, Reinhold Dröge, Abernitzke,</strong> </span><strong><span title="Emyr Williams">Richard Ohnemus, Frank Grimm</span></strong><span title="Emyr Williams"><strong>, Sakib, Broeserl, </strong></span><strong><span title="Emyr Williams">António Pina, Markus Falkner, Darshan Mody, Sergey Agafyin, <span class="sc-gZMcBi hdSbOl" data-tag="user-details-full-name">Андрей Бурмистров, Jake, GS, Lawton Shoemake, Animus24, Jozo Leko, John Breland, espkk, and Wolfgang Gärtner.</span></span></strong></p>
+<p>&nbsp;</p>
+<table style="width: 490px; height: 103px;">
+<tbody>
+<tr>
+<td><strong>Thanks in particular to:</strong></td>
+<td>&nbsp;</td>
+<td><a href="https://cranepay.io/"><img src="images/patreon/crp4.png" alt="crp4" width="150" height="96" /></a></td>
+</tr>
+</tbody>
+</table>
+<p><strong>&nbsp;</strong></p>
+<p><strong>&nbsp;&nbsp;<a href="https://www.takeupcode.com/">&nbsp; </a></strong></p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at Leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages. I also included more than 120 source files.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight into the current and upcoming concurrency in C++. This insight includes the theory and a lot of practice with more than 140 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 700 pages full of modern C++ and more than 260 source files presenting concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
+<p></p>
+<table style="width: 800px;">
+<tbody>
+<tr>
+<td colspan="2">
+<h2>Get your interactive course</h2>
+&nbsp;</td>
+</tr>
+<tr>
+<td>
+<h4 class="_3fBEwsM053hx2mPd0uV0nT" style="text-align: center;">Modern C++ Concurrency in Practice</h4>
+</td>
+<td>
+<h4>C++ Standard Library including C++14 &amp; C++17</h4>
+</td>
+</tr>
+<tr>
+<td><a href="https://goo.gl/2qWUkK"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseConcurrency/educative.png" alt="educative" width="300" height="152" /></a></td>
+<td><a href="https://www.educative.io/collection/10370001/5712008708096000?authorName=Rainer%20Grimm"><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/news/InteractiveCourseLibrary/CLibrary.png" alt="CLibrary" width="300" height="150" /></a></td>
+</tr>
+<tr>
+<td>
+<p>Based on my book "Concurrency with Modern C++" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>140 lessons</li>
+<li>110 code playgrounds =&gt; Runs in the browser</li>
+<li>78 code snippets</li>
+<li>55 illustrations</li>
+</ul>
+</td>
+<td>
+<p>Based on my book "The C++ Standard Library" educative.io created an interactive course.</p>
+<p>What's Inside?</p>
+<ul>
+<li>149 lessons</li>
+<li>111 code playgrounds =&gt; Runs in the browser</li>
+<li>164 code snippets</li>
+<li>25 illustrations</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
