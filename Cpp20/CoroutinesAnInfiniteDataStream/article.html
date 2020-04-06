@@ -1,0 +1,259 @@
+<p>My story to coroutines in C++20 goes on. Today I dive deep into the coroutines framework to create an infinite data stream. Consequentially, you have to read the two previous posts "<a href="https://bit.ly/3dl4VGE">C++20: Coroutines - A First Overview</a>", and "<a href="https://bit.ly/CoroutinesMoreDetails">C++20: More Details to Coroutines</a>" to be prepared.&nbsp;</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/CoroutinesAnInfiniteDataStream/TimelineCpp20.png" alt="TimelineCpp20" width="650" height="233" /></p>
+<p>The framework for writing coroutines consists of more than 20 functions that you partially have&nbsp;to implement and partially could overwrite. Therefore, you can tailor the coroutine to your needs. On the end, you can, for example, create a generator <span style="font-family: 'courier new', courier;">Generator&lt;int&gt;</span> for an infinite data stream such as the following one:&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">Generator<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> getNext(<span style="color: #007788; font-weight: bold;">int</span> start <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>, <span style="color: #007788; font-weight: bold;">int</span> step <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span>) {
+    <span style="color: #006699; font-weight: bold;">auto</span> value <span style="color: #555555;">=</span> start;
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #007788; font-weight: bold;">int</span> i <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>;; <span style="color: #555555;">++</span>i) {
+        co_yield value;
+        value <span style="color: #555555;">+=</span> step;
+    }
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Now, we know the destiny of our job. Let's start.</p>
+<h2>The Framework</h2>
+<p>A coroutine consists of three parts: the promise object, the coroutine handle, and the coroutine frame.</p>
+<ul>
+<li><strong>Promise object</strong>: The promise object is manipulated from inside the coroutine, and it delivers its&nbsp;result via the promise object.</li>
+<li><strong>Coroutine handle</strong>: The coroutine handle is a non-owning handle to resume or to destroy the&nbsp;coroutine frame from outside.</li>
+<li><strong>Coroutine frame</strong>: The coroutine frame is an internal, typically heap-allocated state. It consists of&nbsp;the already mentioned promise object, the copied parameters of the coroutine, the representation of&nbsp;the suspension points, local variables which lifetime ends before the current suspension point, and&nbsp;local variables which lifetime exceeds the current suspension point.</li>
+</ul>
+<h3>The Simplified Workflow</h3>
+<p>When you use <span style="font-family: 'courier new', courier;">co_yield</span>, <span style="font-family: 'courier new', courier;">co_await</span>, or <span style="font-family: 'courier new', courier;">co_return</span> in a function, the function becomes a coroutine,&nbsp;and the compiler transforms its body to something equivalent to the following lines.&nbsp;</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">{
+  Promise promise;
+  co_await promise.initial_suspend();
+  try
+  {
+    <span style="color: #555555;">&lt;</span>function body<span style="color: #555555;">&gt;</span>
+  }
+  <span style="color: #006699; font-weight: bold;">catch</span> (...)
+  {
+    promise.unhandled_exception();
+  }
+  <span style="color: #9999ff;">FinalSuspend:</span>
+    co_await promise.final_suspend();
+}
+</pre>
+</div>
+<p></p>
+<p><span style="font-family: 'courier new', courier;">&lt;function body&gt;</span> stands for&nbsp; the original function body. The simplified workflow of the coroutine consists of the following phases.</p>
+<p>The coroutine begins execution</p>
+<ul>
+<li>Allocates the coroutine frame</li>
+<li>Copies all functions parameters to the coroutine frame</li>
+<li>Creates the promise object <span style="font-family: 'courier new', courier;">promise</span></li>
+<li>Calls <span style="font-family: 'courier new', courier;">promise.get_return_object()</span>&nbsp;to create the coroutine handle and keeps it in a local variable. The result of the call will be returned to the caller when the coroutine first suspends.&nbsp;</li>
+<li>Calls <span style="font-family: 'courier new', courier;">promise.initial_suspend()</span>&nbsp;and <span style="font-family: 'courier new', courier;">co_await</span>'s its result. The promise type typically returns <span style="font-family: 'courier new', courier;">std::suspend_never</span>&nbsp;for eagerly-started coroutines or <span style="font-family: 'courier new', courier;">std::suspend_always</span>&nbsp;for lazily-started coroutines.&nbsp;</li>
+<li>The body of the coroutine is executed, when <span style="font-family: 'courier new', courier;">co_await promise.initial_suspend()</span>&nbsp;resumes</li>
+</ul>
+<p>The coroutine reaches a suspension point</p>
+<ul>
+<li>The coroutine handle (<span style="font-family: 'courier new', courier;">promise.get_return_object()</span>) is returned to the caller, which resumed the coroutine</li>
+</ul>
+<p>The coroutine reaches <span style="font-family: 'courier new', courier;">co_return</span></p>
+<ul>
+<li>Calls <span style="font-family: 'courier new', courier;">promise.return_void()</span>&nbsp;for <span style="font-family: 'courier new', courier;">co_return</span>&nbsp;or <span style="font-family: 'courier new', courier;">co_return expression</span>, where <span style="font-family: 'courier new', courier;">expression</span>&nbsp;has type <span style="font-family: 'courier new', courier;">void</span></li>
+<li>Calls <span style="font-family: 'courier new', courier;">promise.return_value(expression)</span>&nbsp;for <span style="font-family: 'courier new', courier;">co_return expression</span>, where <span style="font-family: 'courier new', courier;">expression</span>&nbsp;has non-type <span style="font-family: 'courier new', courier;">void</span></li>
+<li>Destroys all stack created variables</li>
+<li>Calls <span style="font-family: 'courier new', courier;">promise.final_suspend()</span>&nbsp;and <span style="font-family: 'courier new', courier;">co_await</span>'s its result</li>
+</ul>
+<p>The coroutine is destroyed (by terminating via <span style="font-family: 'courier new', courier;">co_retur</span>n, an uncaught exception, or via the coroutine handle)</p>
+<ul>
+<li>Calls the destruction of the promise object</li>
+<li>Calls the destructor of the function parameters</li>
+<li>Frees the memory used by the coroutine frame</li>
+<li>Transfers control back to the caller</li>
+</ul>
+<p>&nbsp;Let's put the theory into praxis.</p>
+<h3>An Infinite Data Stream with <span style="font-family: 'courier new', courier;">co_yield</span></h3>
+<p>The following program produces an infinite data stream. The coroutine <span style="font-family: 'courier new', courier;">getNext</span> uses <span style="font-family: 'courier new', courier;">co_yield</span> to&nbsp;create a data stream that starts at <span style="font-family: 'courier new', courier;">start</span> and gives on request the next value, incremented by <span style="font-family: 'courier new', courier;">step</span>.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// infiniteDataStream.cpp</span>
+
+<span style="color: #009999;">#include &lt;coroutine&gt;</span>
+<span style="color: #009999;">#include &lt;memory&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">struct</span> Generator {
+    
+    <span style="color: #006699; font-weight: bold;">struct</span> promise_type;
+    <span style="color: #006699; font-weight: bold;">using</span> handle_type <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>coroutine_handle<span style="color: #555555;">&lt;</span>promise_type<span style="color: #555555;">&gt;</span>;
+    
+    Generator(handle_type h)<span style="color: #555555;">:</span> coro(h) {}                         <span style="color: #0099ff; font-style: italic;">// (3)</span>
+    handle_type coro;
+    std<span style="color: #555555;">::</span>shared_ptr<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span> value;
+    
+    <span style="color: #555555;">~</span>Generator() {
+        <span style="color: #006699; font-weight: bold;">if</span> ( coro ) coro.destroy();
+    }
+    Generator(<span style="color: #006699; font-weight: bold;">const</span> Generator<span style="color: #555555;">&amp;</span>) <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">delete</span>;
+    Generator<span style="color: #555555;">&amp;</span> <span style="color: #006699; font-weight: bold;">operator</span> <span style="color: #555555;">=</span> (<span style="color: #006699; font-weight: bold;">const</span> Generator<span style="color: #555555;">&amp;</span>) <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">delete</span>;
+    Generator(Generator<span style="color: #555555;">&amp;&amp;</span> oth)<span style="color: #555555;">:</span> coro(oth.coro) {
+        oth.coro <span style="color: #555555;">=</span> nullptr;
+    }
+    Generator<span style="color: #555555;">&amp;</span> <span style="color: #006699; font-weight: bold;">operator</span> <span style="color: #555555;">=</span> (Generator<span style="color: #555555;">&amp;&amp;</span> oth) {
+        coro <span style="color: #555555;">=</span> oth.coro;
+        oth.coro <span style="color: #555555;">=</span> nullptr;
+        <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">this</span>;
+    }
+    <span style="color: #007788; font-weight: bold;">int</span> getValue() {
+        <span style="color: #006699; font-weight: bold;">return</span> coro.promise().current_value;
+    }
+    <span style="color: #007788; font-weight: bold;">bool</span> next() {                                                <span style="color: #0099ff; font-style: italic;">// (5)</span>
+        coro.resume();
+        <span style="color: #006699; font-weight: bold;">return</span> not coro.done();
+    }
+    <span style="color: #006699; font-weight: bold;">struct</span> promise_type {
+        promise_type()  <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">default</span>;                               <span style="color: #0099ff; font-style: italic;">// (1)</span>
+          
+        <span style="color: #555555;">~</span>promise_type() <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">default</span>;
+        
+        <span style="color: #006699; font-weight: bold;">auto</span> <span style="color: #cc00ff;">initial_suspend</span>() {                                 <span style="color: #0099ff; font-style: italic;">// (4)</span>
+            <span style="color: #006699; font-weight: bold;">return</span> std<span style="color: #555555;">::</span>suspend_always{};
+        }
+        <span style="color: #006699; font-weight: bold;">auto</span> <span style="color: #cc00ff;">final_suspend</span>() {
+            <span style="color: #006699; font-weight: bold;">return</span> std<span style="color: #555555;">::</span>suspend_always{};
+        }
+        <span style="color: #006699; font-weight: bold;">auto</span> <span style="color: #cc00ff;">get_return_object</span>() {                               <span style="color: #0099ff; font-style: italic;">// (2)</span>
+            <span style="color: #006699; font-weight: bold;">return</span> Generator{handle_type<span style="color: #555555;">::</span>from_promise(<span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">this</span>)};
+        }
+        <span style="color: #006699; font-weight: bold;">auto</span> <span style="color: #cc00ff;">return_void</span>() {
+            <span style="color: #006699; font-weight: bold;">return</span> std<span style="color: #555555;">::</span>suspend_never{};
+        }
+      
+        <span style="color: #006699; font-weight: bold;">auto</span> <span style="color: #cc00ff;">yield_value</span>(<span style="color: #007788; font-weight: bold;">int</span> value) {                            <span style="color: #0099ff; font-style: italic;">// (6) </span>
+            current_value <span style="color: #555555;">=</span> value;
+            <span style="color: #006699; font-weight: bold;">return</span> std<span style="color: #555555;">::</span>suspend_always{};
+        }
+        <span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">unhandled_exception</span>() {
+            std<span style="color: #555555;">::</span>exit(<span style="color: #ff6600;">1</span>);
+        }
+        T current_value;
+    };
+
+};
+
+Generator<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> getNext(<span style="color: #007788; font-weight: bold;">int</span> start <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>, <span style="color: #007788; font-weight: bold;">int</span> step <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span>){
+    <span style="color: #006699; font-weight: bold;">auto</span> value <span style="color: #555555;">=</span> start;
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #007788; font-weight: bold;">int</span> i <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>;; <span style="color: #555555;">++</span>i){
+        co_yield value;
+        value <span style="color: #555555;">+=</span> step;
+    }
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main() {
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"getNext():"</span>;
+    <span style="color: #006699; font-weight: bold;">auto</span> gen <span style="color: #555555;">=</span> getNext();
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #007788; font-weight: bold;">int</span> i <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>; i <span style="color: #555555;">&lt;=</span> <span style="color: #ff6600;">10</span>; <span style="color: #555555;">++</span>i) {
+        gen.next();
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span> <span style="color: #555555;">&lt;&lt;</span> gen.getValue();                      <span style="color: #0099ff; font-style: italic;">// (7)</span>
+    }
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n\n</span><span style="color: #cc3300;">"</span>;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"getNext(100, -10):"</span>;
+    <span style="color: #006699; font-weight: bold;">auto</span> gen2 <span style="color: #555555;">=</span> getNext(<span style="color: #ff6600;">100</span>, <span style="color: #555555;">-</span><span style="color: #ff6600;">10</span>);
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #007788; font-weight: bold;">int</span> i <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>; i <span style="color: #555555;">&lt;=</span> <span style="color: #ff6600;">20</span>; <span style="color: #555555;">++</span>i) {
+        gen2.next();
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span> <span style="color: #555555;">&lt;&lt;</span> gen2.getValue();
+    }
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The main function creates two coroutines. The first one gen returns the values from 0 to&nbsp;10, and the second one gen2 the values from 100 to -100. Before I dive into the workflow,&nbsp;thanks to the&nbsp;&nbsp;<a href="https://godbolt.org/z/jTS9BR">Compiler Explorer</a> and GCC 10, here is the output of the program.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/CoroutinesAnInfiniteDataStream/infiniteDataStream.png" alt="infiniteDataStream" width="650" height="82" /></p>
+<p></p>
+<p>The numbers in the program<span style="font-family: 'courier new', courier;"> infiniteDataStream.cpp</span> stand for the steps in the first iteration of the workflow.</p>
+<ol>
+<li>Creates the promise</li>
+<li>Calls <span style="font-family: 'courier new', courier;">promise.get_return_object()</span>&nbsp;and keeps the result in a local variable</li>
+<li>Creates the generator</li>
+<li>Calls <span style="font-family: 'courier new', courier;">promise.initial_suspend()</span>. The generator is lazy and, therefore, suspends always.</li>
+<li>Asks for the next value and returns if the generator is consumed</li>
+<li>Triggered by the <span style="font-family: 'courier new', courier;">co_yield</span>&nbsp;call. The next value is afterward available.</li>
+<li>Gets the next value</li>
+</ol>
+<p>In additional iterations, only the steps 5 to 7 are performed.&nbsp;</p>
+<p>It is quite challenging to understand the underlying framework of coroutines. Playing with existing coroutines and observing the changed behavior may be the easiest way to grasp them. The presented coroutine that creates an infinite data stream is a good starting point for your first experiments: just use the link to the executable program on&nbsp;<a href="https://godbolt.org/z/jTS9BR">Compiler Explorer</a>.</p>
+<h2>What's next?</h2>
+<p>In today's post, I used <span style="font-family: 'courier new', courier;">co_yield</span>&nbsp;to create an infinite data stream. My next post is about thread synchronization with <span style="font-family: 'courier new', courier;">co_await</span>.&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Meeting C++, Matt Braun, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Marko, </strong><span class="sc-kpOJdX fDWXFa" title="Emyr Williams"><strong>G Prvulovic, Reinhold Dröge, Abernitzke,</strong> </span><strong><span title="Emyr Williams">Richard Ohnemus, Frank Grimm</span></strong><span title="Emyr Williams"><strong>, Sakib, Broeserl, </strong></span><strong><span title="Emyr Williams">António Pina, Markus Falkner, Darshan Mody, Sergey Agafyin, <span class="sc-gZMcBi hdSbOl" data-tag="user-details-full-name">Андрей Бурмистров, Jake, GS, Lawton Shoemake, Animus24, Jozo Leko, John Breland, espkk, Wolfgang Gärtner, and </span></span><span title="Emyr Williams"><span class="sc-htpNat dEZjR" style="color: #241e12; font-family: aktiv-grotesk, sans-serif; margin: 0px; position: relative; font-weight: 400; font-size: 1rem; line-height: 1.5;"><span class="sc-htpNat ebhhXb" style="color: #241e12; font-family: aktiv-grotesk, sans-serif; margin: 0px; position: relative; font-weight: bold; font-size: 1rem; line-height: 1.5;"></span></span></span>Dendi Suhubdy.</strong></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<table style="width: 490px; height: 103px;">
+<tbody>
+<tr>
+<td><strong>Thanks in particular to:</strong></td>
+<td>&nbsp;</td>
+<td><a href="https://cranepay.io/"><img src="images/patreon/crp4.png" alt="crp4" width="150" height="96" /></a></td>
+</tr>
+</tbody>
+</table>
+<p><strong>&nbsp;</strong></p>
+<p><strong>&nbsp;&nbsp;<a href="https://www.takeupcode.com/">&nbsp; </a></strong></p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at Leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages. I also included more than 120 source files.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight into the current and upcoming concurrency in C++. This insight includes the theory and a lot of practice with more than 140 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 700 pages full of modern C++ and more than 260 source files presenting the standard library and concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
