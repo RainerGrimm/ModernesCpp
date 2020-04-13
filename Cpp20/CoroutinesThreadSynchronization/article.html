@@ -1,0 +1,282 @@
+<p>It's a typical requirement for thread management to synchronize them. One thread prepares, in this case, a work-package another thread is waiting for.&nbsp;</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/CoroutinesThreadSynchronization/TimelineCpp20.png" alt="TimelineCpp20" width="650" height="233" /></p>
+<p>I assume most of you use condition variables for this sender/receiver or producer/consumer workflow. Condition variables have many inherent risks such as spurious wakeup and lost wakeup. Before I implement thread synchronization with coroutines, let me rephrase from a previous post about the inherent challenges of condition variables.</p>
+<h2>The Challenges of Condition Variables&nbsp;</h2>
+<p>Here is the pattern for the correct usage of condition variables.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// conditionVariables.cpp</span>
+
+<span style="color: #009999;">#include &lt;condition_variable&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;thread&gt;</span>
+
+std<span style="color: #555555;">::</span>mutex mutex_;
+std<span style="color: #555555;">::</span>condition_variable condVar; 
+
+<span style="color: #007788; font-weight: bold;">bool</span> dataReady{<span style="color: #336666;">false</span>};
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">waitingForWork</span>(){
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Waiting "</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>unique_lock<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span> lck(mutex_);
+    condVar.wait(lck, []{ <span style="color: #006699; font-weight: bold;">return</span> dataReady; });   <span style="color: #0099ff; font-style: italic;">// (4)</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Running "</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+}
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">setDataReady</span>(){
+    {
+        std<span style="color: #555555;">::</span>lock_guard<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span> lck(mutex_);
+        dataReady <span style="color: #555555;">=</span> <span style="color: #336666;">true</span>;
+    }
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Data prepared"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    condVar.notify_one();                        <span style="color: #0099ff; font-style: italic;">// (3)</span>
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+    
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t1(waitingForWork);               <span style="color: #0099ff; font-style: italic;">// (1)</span>
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t2(setDataReady);                 <span style="color: #0099ff; font-style: italic;">// (2)</span>
+
+  t1.join();
+  t2.join();
+  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>How does the synchronization work? The program has two child threads:<span style="font-family: 'courier new', courier;"> t1</span> and <span style="font-family: 'courier new', courier;">t2</span>. They get their work package<span style="font-family: 'courier new', courier;">&nbsp;waitingForWork</span>&nbsp;and <span style="font-family: 'courier new', courier;">setDataRead</span>&nbsp;in lines (1 and 2). <span style="font-family: 'courier new', courier;">setDataReady</span>&nbsp;notifies - using the condition variable <span style="font-family: 'courier new', courier;">condVar</span>&nbsp;- that it is done with the preparation of the work: <span style="font-family: 'courier new', courier;">condVar.notify_one()</span>(line 3). While holding the lock, thread <span style="font-family: 'courier new', courier;">t1</span>&nbsp;waits for its notification: <span style="font-family: 'courier new', courier;">condVar.wait(lck, []{ return dataReady; })</span>( line 4). The sender and receiver need a lock. In the case of the sender a <span style="font-family: 'courier new', courier;">std::lock_guard</span>&nbsp;is sufficient, because it calls lock and unlock only once. In the case of the receiver, a <span style="font-family: 'courier new', courier;">std::unique_lock</span>&nbsp;is necessary because it usually frequently locks and unlocks its mutex.</p>
+<p>Finally, the output of the program.</p>
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelines/conditionVariable.png" alt="conditionVariable" width="400" height="197" /></p>
+<p>Maybe you are wondering: Why do you need a predicate for the <span style="font-family: 'courier new', courier;">wait</span> call because you can invoke <span style="font-family: 'courier new', courier;">wait</span>&nbsp;without a predicate? This workflow seems quite too complicated for such a simple synchronization of threads.&nbsp;</p>
+<p>Now we are back to the missing memory condition variables have and the two phenomena called lost wakeup and spurious wakeup.</p>
+<h3>Lost Wakeup and Spurious Wakeup</h3>
+<ul>
+<li><strong>Lost wakeup</strong>:&nbsp;The sender sends its notification before the receiver is the wait state. The consequence is that the notification is lost.&nbsp;</li>
+<li><strong>Spurious wakeup</strong>:&nbsp;It may happen that the receiver wakes up, although no notification happened.</li>
+</ul>
+<p>To become not the victim of these two issues, you have to use an additional predicate as memory. If not you have in this example a 50/50 chance for a lost wakeup. A lost wakeup is essentially a deadlock because a thread waits for something that never happens.&nbsp;</p>
+<p>This is not the end of the traps you can fall into with condition variables. Read the details in the previous post: <a style="background-color: #ffffff; color: #00466e; text-decoration: underline; outline: 0px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 14px; font-style: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: left; text-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing: 0px;" href="index.php/c-core-guidelines-be-aware-of-the-traps-of-condition-variables">C++ Core Guidelines: Be Aware of the Traps of Condition Variables</a>.</p>
+<p>Thanks to coroutines, thread synchronization is quite easy&nbsp;without the inherent risks of condition variables such as spurious wakeups and lost wakeups.</p>
+<h2>Thread Synchronization with <span style="font-family: 'courier new', courier;">co_await</span></h2>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// senderReceiver.cpp</span>
+
+<span style="color: #009999;">#include &lt;coroutine&gt;</span>
+<span style="color: #009999;">#include &lt;chrono&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;functional&gt;</span>
+<span style="color: #009999;">#include &lt;string&gt;</span>
+<span style="color: #009999;">#include &lt;stdexcept&gt;</span>
+<span style="color: #009999;">#include &lt;atomic&gt;</span>
+<span style="color: #009999;">#include &lt;thread&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Event</span> {
+ <span style="color: #9999ff;">public:</span>
+
+    Event() <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">default</span>;
+
+    Event(<span style="color: #006699; font-weight: bold;">const</span> Event<span style="color: #555555;">&amp;</span>) <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">delete</span>;
+    Event(Event<span style="color: #555555;">&amp;&amp;</span>) <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">delete</span>;
+    Event<span style="color: #555555;">&amp;</span> <span style="color: #006699; font-weight: bold;">operator</span><span style="color: #555555;">=</span>(<span style="color: #006699; font-weight: bold;">const</span> Event<span style="color: #555555;">&amp;</span>) <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">delete</span>;
+    Event<span style="color: #555555;">&amp;</span> <span style="color: #006699; font-weight: bold;">operator</span><span style="color: #555555;">=</span>(Event<span style="color: #555555;">&amp;&amp;</span>) <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">delete</span>;
+
+    <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Awaiter</span>;
+    Awaiter <span style="color: #006699; font-weight: bold;">operator</span> co_await() <span style="color: #006699; font-weight: bold;">const</span> noexcept;
+
+    <span style="color: #007788; font-weight: bold;">void</span> notify() noexcept;
+
+ <span style="color: #9999ff;">private:</span>
+
+    <span style="color: #006699; font-weight: bold;">friend</span> <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Awaiter</span>;
+  
+    <span style="color: #006699; font-weight: bold;">mutable</span> std<span style="color: #555555;">::</span>atomic<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">void</span><span style="color: #555555;">*&gt;</span> suspendedWaiter{nullptr};
+    <span style="color: #006699; font-weight: bold;">mutable</span> std<span style="color: #555555;">::</span>atomic<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">bool</span><span style="color: #555555;">&gt;</span> notified{<span style="color: #336666;">false</span>};
+
+};
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Event</span><span style="color: #555555;">::</span>Awaiter {
+ <span style="color: #9999ff;">public:</span>
+  Awaiter(<span style="color: #006699; font-weight: bold;">const</span> Event<span style="color: #555555;">&amp;</span> eve)<span style="color: #555555;">:</span> event(eve) {}
+
+  <span style="color: #007788; font-weight: bold;">bool</span> await_ready() <span style="color: #006699; font-weight: bold;">const</span>;
+  <span style="color: #007788; font-weight: bold;">bool</span> await_suspend(std<span style="color: #555555;">::</span>coroutine_handle<span style="color: #555555;">&lt;&gt;</span> corHandle) noexcept;
+  <span style="color: #007788; font-weight: bold;">void</span> await_resume() noexcept {}
+
+ <span style="color: #9999ff;">private:</span>
+    <span style="color: #006699; font-weight: bold;">friend</span> <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Event</span>;
+
+    <span style="color: #006699; font-weight: bold;">const</span> Event<span style="color: #555555;">&amp;</span> event;
+    std<span style="color: #555555;">::</span>coroutine_handle<span style="color: #555555;">&lt;&gt;</span> coroutineHandle;
+};
+
+<span style="color: #007788; font-weight: bold;">bool</span> Event<span style="color: #555555;">::</span>Awaiter<span style="color: #555555;">::</span>await_ready() <span style="color: #006699; font-weight: bold;">const</span> {                            <span style="color: #0099ff; font-style: italic;">// (7)</span>
+  
+    <span style="color: #0099ff; font-style: italic;">// allow at most one waiter</span>
+    <span style="color: #006699; font-weight: bold;">if</span> (event.suspendedWaiter.load() <span style="color: #555555;">!=</span> nullptr){
+        <span style="color: #006699; font-weight: bold;">throw</span> std<span style="color: #555555;">::</span>runtime_error(<span style="color: #cc3300;">"More than one waiter is not valid"</span>);
+    }
+  
+    <span style="color: #0099ff; font-style: italic;">// event.notified == false; suspends the coroutine</span>
+    <span style="color: #0099ff; font-style: italic;">// event.notified == true; the coroutine is executed such as a usual function</span>
+    <span style="color: #006699; font-weight: bold;">return</span> event.notified;
+}
+<span style="color: #0099ff; font-style: italic;">                                                                     // (8)</span>
+<span style="color: #007788; font-weight: bold;">bool</span> Event<span style="color: #555555;">::</span>Awaiter<span style="color: #555555;">::</span>await_suspend(std<span style="color: #555555;">::</span>coroutine_handle<span style="color: #555555;">&lt;&gt;</span> corHandle) noexcept {
+
+    coroutineHandle <span style="color: #555555;">=</span> corHandle;                                    
+  
+    <span style="color: #006699; font-weight: bold;">if</span> (event.notified) <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #336666;">false</span>;
+  
+    <span style="color: #0099ff; font-style: italic;">// store the waiter for later notification</span>
+    event.suspendedWaiter.store(<span style="color: #006699; font-weight: bold;">this</span>);
+
+    <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #336666;">true</span>;
+}
+
+<span style="color: #007788; font-weight: bold;">void</span> Event<span style="color: #555555;">::</span>notify() noexcept {                                        <span style="color: #0099ff; font-style: italic;">// (6)</span>
+    notified <span style="color: #555555;">=</span> <span style="color: #336666;">true</span>;
+  
+    <span style="color: #0099ff; font-style: italic;">// try to load the waiter</span>
+    <span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">*</span> waiter <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">static_cast</span><span style="color: #555555;">&lt;</span>Awaiter<span style="color: #555555;">*&gt;</span>(suspendedWaiter.load());
+ 
+    <span style="color: #0099ff; font-style: italic;">// check if a waiter is available</span>
+    <span style="color: #006699; font-weight: bold;">if</span> (waiter <span style="color: #555555;">!=</span> nullptr) {
+        <span style="color: #0099ff; font-style: italic;">// resume the coroutine =&gt; await_resume</span>
+        waiter<span style="color: #555555;">-&gt;</span>coroutineHandle.resume();
+    }
+}
+
+Event<span style="color: #555555;">::</span>Awaiter Event<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">operator</span> co_await() <span style="color: #006699; font-weight: bold;">const</span> noexcept {
+    <span style="color: #006699; font-weight: bold;">return</span> Awaiter{ <span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">this</span> };
+}
+
+<span style="color: #006699; font-weight: bold;">struct</span> Task {
+    <span style="color: #006699; font-weight: bold;">struct</span> promise_type {
+        Task get_return_object() { <span style="color: #006699; font-weight: bold;">return</span> {}; }
+        std<span style="color: #555555;">::</span>suspend_never initial_suspend() { <span style="color: #006699; font-weight: bold;">return</span> {}; }
+        std<span style="color: #555555;">::</span>suspend_never final_suspend() { <span style="color: #006699; font-weight: bold;">return</span> {}; }
+        <span style="color: #007788; font-weight: bold;">void</span> return_void() {}
+        <span style="color: #007788; font-weight: bold;">void</span> unhandled_exception() {}
+    };
+};
+
+Task <span style="color: #cc00ff;">receiver</span>(Event<span style="color: #555555;">&amp;</span> event) {                                        <span style="color: #0099ff; font-style: italic;">// (3)</span>
+    <span style="color: #006699; font-weight: bold;">auto</span> start <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>high_resolution_clock<span style="color: #555555;">::</span>now();
+    co_await event;                                                 
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Got the notification! "</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    <span style="color: #006699; font-weight: bold;">auto</span> end <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>high_resolution_clock<span style="color: #555555;">::</span>now();
+    std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>duration<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">double</span><span style="color: #555555;">&gt;</span> elapsed <span style="color: #555555;">=</span> end <span style="color: #555555;">-</span> start;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Waited "</span> <span style="color: #555555;">&lt;&lt;</span> elapsed.count() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" seconds."</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+}
+
+<span style="color: #006699; font-weight: bold;">using</span> <span style="color: #006699; font-weight: bold;">namespace</span> std<span style="color: #555555;">::</span>chrono_literals;
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Notification before waiting"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    Event event1{};
+    <span style="color: #006699; font-weight: bold;">auto</span> senderThread1 <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span>([<span style="color: #555555;">&amp;</span>event1]{ event1.notify(); });  <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    <span style="color: #006699; font-weight: bold;">auto</span> receiverThread1 <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span>(receiver, std<span style="color: #555555;">::</span>ref(event1));   <span style="color: #0099ff; font-style: italic;">// (4)</span>
+    
+    receiverThread1.join();
+    senderThread1.join();
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Notification after 2 seconds waiting"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    Event event2{};
+    <span style="color: #006699; font-weight: bold;">auto</span> receiverThread2 <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span>(receiver, std<span style="color: #555555;">::</span>ref(event2));  <span style="color: #0099ff; font-style: italic;">// (5)</span>
+    <span style="color: #006699; font-weight: bold;">auto</span> senderThread2 <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span>([<span style="color: #555555;">&amp;</span>event2]{
+      std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>sleep_for(<span style="color: #ff6600;">2</span>s);
+      event2.notify();                                               <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    });
+    
+    receiverThread2.join();
+    senderThread2.join();
+     
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Thread synchronization with coroutines is straightforward from the user's perspective. Let’s have a look at&nbsp;the program <span style="font-family: 'courier new', courier;">senderReiver.cpp</span>. The threads<span style="font-family: 'courier new', courier;"> senderThread1</span> (line 1) and senderThread2 (line 2)&nbsp;use an event to send its notification. The function receiver in line (3) is the coroutine which is executed in the thread <span style="font-family: 'courier new', courier;">receiverThread1</span> (line 4) and <span style="font-family: 'courier new', courier;">receiverThread2</span>&nbsp;(line 5). I measured the time between the begin and the end of the coroutine and displayed it.&nbsp;This number shows how long the coroutine waits. The following screenshot displays the output of the&nbsp;program with the&nbsp;<a href="https://wandbox.org/permlink/qClEIVff0OXp51Av">Wandbox</a>.&nbsp; The Compiler Explorer does not support thread creation but Matt is "on it".&nbsp;</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/CoroutinesThreadSynchronization/senderReceiver.png" alt="senderReceiver" width="500" height="293" /></p>
+<p><br />The output displays that the execution of the second coroutine takes about two seconds. The reason&nbsp;is that&nbsp;<span style="font-family: 'courier new', courier;">event1</span> sends its notification (line 1) before the coroutine is suspended, but the <span style="font-family: 'courier new', courier;">event2</span>&nbsp;sends its notification after a time duration of 2 seconds (line 2).</p>
+<p>Now, I put the implementer's hat on and give you a rough idea of the workflow of the coroutine framework.&nbsp;</p>
+<h3>The simplified workflow</h3>
+<p>If you compare the class <span style="font-family: 'courier new', courier;">Generator</span> in the last post (<a href="https://bit.ly/InfiniteDataStream">C++20: An Infinite Data Stream with Coroutines</a>) with the class <span style="font-family: 'courier new', courier;">Event</span> in this example, there is a subtle difference. In the first case, the <span style="font-family: 'courier new', courier;">Generator</span> is the awaitable and the awaiter, in the&nbsp;second case, the Event uses the operator <span style="font-family: 'courier new', courier;">co_await</span> to return the awaiter. This separation of concerns&nbsp;into the awaitable and the awaiter improves the structure of the code.</p>
+<p>In my explanation to both workflows, I assume, the in the first case the event&nbsp;notification happens before the coroutine awaits the events. For the second case,&nbsp;I assume it the other way around.&nbsp;</p>
+<p>Let’s first look at <span style="font-family: 'courier new', courier;">event1</span> and the first workflow. <span style="font-family: 'courier new', courier;">event1</span> send its notification before <span style="font-family: 'courier new', courier;">receiverThread1&nbsp;</span>is started. The call <span style="font-family: 'courier new', courier;">event1</span> (line 1) triggers the member function&nbsp;<span style="font-family: 'courier new', courier;">notify</span> (line 6). First the notification&nbsp;flag is set and then, the call <span style="font-family: 'courier new', courier;">auto* waiter = static_cast&lt;awaiter*&gt;(suspendedWaiter.load());&nbsp;</span>loads the potential waiter. In this case, the waiter is a <span style="font-family: 'courier new', courier;">nullptr</span> because it was not set before. This&nbsp;means the following resume call on the waiter is not executed. The subsequentially&nbsp;performed function <span style="font-family: 'courier new', courier;">await_ready</span> (line 7) checks first if there is more than one waiter. In&nbsp;this case, I throw for simplicity reasons a <span style="font-family: 'courier new', courier;">std::runtime</span> exception. The crucial part of this member function is the return value.&nbsp;<span style="font-family: 'courier new', courier;">event.notification</span> was already set to true in the notify method. <span style="font-family: 'courier new', courier;">true</span> means in this case that the&nbsp;coroutine is not suspended and executes such as a usual function.</p>
+<p>In the second workflow, the <span style="font-family: 'courier new', courier;">co_await event2</span> call happens before <span style="font-family: 'courier new', courier;">event2</span> sends its notification.&nbsp;<span style="font-family: 'courier new', courier;">co_wait event2</span> triggers the call <span style="font-family: 'courier new', courier;">await_ready</span> (line 7). The big difference to the first workflow is now&nbsp;that <span style="font-family: 'courier new', courier;">event.notified</span> is <span style="font-family: 'courier new', courier;">false</span>. This <span style="font-family: 'courier new', courier;">false</span> value causes the suspension of the coroutine. Technically&nbsp;the member function&nbsp;<span style="font-family: 'courier new', courier;">await_suspend</span> (lines 8) is executed. <span style="font-family: 'courier new', courier;">await_suspend</span> gets the coroutine handle&nbsp;<span style="font-family: 'courier new', courier;">corHandle</span> and stores it for later invocation in the variable <span style="font-family: 'courier new', courier;">coroutineHandle</span>. Of course,&nbsp;later invocation means resumption. Secondly, the waiter is stored in the variable <span style="font-family: 'courier new', courier;">suspendedWaiter</span>.&nbsp;When later <span style="font-family: 'courier new', courier;">event2.notify</span> triggers its notification, the method <span style="font-family: 'courier new', courier;">notify</span> (line 6) is executed. The&nbsp;difference to the first workflow is that the condition <span style="font-family: 'courier new', courier;">waiter != nullptr</span> evaluates to <span style="font-family: 'courier new', courier;">true</span>. The&nbsp;consequence is that the waiter uses the <span style="font-family: 'courier new', courier;">coroutineHandle</span> to resume the coroutine.</p>
+<h2>What's next?</h2>
+<p>If I have one conclusion to this and my last post&nbsp;(<a href="https://bit.ly/InfiniteDataStream">C++20: An Infinite Data Stream with Coroutines</a>) then this one: <strong>Don't implement your coroutines</strong>. Use existing coroutines such as the one available with&nbsp;<a href="https://github.com/lewissbaker/cppcoro">cppcoro</a> from Lewis Baker. I exactly follow this advice in my next post.</p>
+<h2>Four Voucher for Educative</h2>
+<p>There are four vouchers for <a href="https://www.educative.io/">educative</a> to win: <a href="https://bit.ly/VoucherEducative">https://bit.ly/VoucherEducative</a>. The vouchers allow you to access all <a href="https://www.educative.io/">educative.io </a>courses for a quarter of a year.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Meeting C++, Matt Braun, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Marko, </strong><span class="sc-kpOJdX fDWXFa" title="Emyr Williams"><strong>G Prvulovic, Reinhold Dröge, Abernitzke,</strong> </span><strong><span title="Emyr Williams">Richard Ohnemus, Frank Grimm</span></strong><span title="Emyr Williams"><strong>, Sakib, Broeserl, </strong></span><strong><span title="Emyr Williams">António Pina, Markus Falkner, Darshan Mody, Sergey Agafyin, <span class="sc-gZMcBi hdSbOl" data-tag="user-details-full-name">Андрей Бурмистров, Jake, GS, Lawton Shoemake, Animus24, Jozo Leko, John Breland, espkk, Wolfgang Gärtner, </span></span><span title="Emyr Williams"><span class="sc-htpNat dEZjR" style="color: #241e12; font-family: aktiv-grotesk, sans-serif; margin: 0px; position: relative; font-weight: 400; font-size: 1rem; line-height: 1.5;"><span class="sc-htpNat ebhhXb" style="color: #241e12; font-family: aktiv-grotesk, sans-serif; margin: 0px; position: relative; font-weight: bold; font-size: 1rem; line-height: 1.5;"></span></span></span>Dendi Suhubdy, and Jon Hess.<br /></strong></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<table style="width: 490px; height: 103px;">
+<tbody>
+<tr>
+<td><strong>Thanks in particular to:</strong></td>
+<td>&nbsp;</td>
+<td><a href="https://cranepay.io/"><img src="images/patreon/crp4.png" alt="crp4" width="150" height="96" /></a></td>
+</tr>
+</tbody>
+</table>
+<p><strong>&nbsp;</strong></p>
+<p><strong>&nbsp;&nbsp;<a href="https://www.takeupcode.com/">&nbsp; </a></strong></p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at Leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages. I also included more than 120 source files.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight into the current and upcoming concurrency in C++. This insight includes the theory and a lot of practice with more than 140 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 700 pages full of modern C++ and more than 260 source files presenting the standard library and concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
