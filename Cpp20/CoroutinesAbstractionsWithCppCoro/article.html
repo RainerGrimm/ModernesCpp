@@ -1,0 +1,229 @@
+<p>I gave in my last post "<a href="https://bit.ly/CoroutinesCppcoro">C++20: Coroutines with cppcoro</a>", a basic introduction to the coroutines library from Lewis Baker. This introduction covered the elementary coroutines task and generator. Today, I add threads to tasks and get powerful abstractions.&nbsp;</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/CoroutintesAbstractionsWithCppCoro/TimelineCpp20.png" alt="TimelineCpp20" width="650" height="233" /></p>
+<p>Do you remember the previous post "<a href="https://bit.ly/ThreadSynchronizationCoroutines">C++20: Thread Synchronization with Coroutines</a>"? If no, I presented the challenges of a condition variable. A condition variable is a classical way for thread synchronization such as in a sender/receiver or a producer/consumer workflow. Condition variables have a big design flaw, they may be invoked without a notification (spurious wakeup), or they may overhear the notification (lost wakeup). In both cases, you may get a deadlock.&nbsp;My following example on thread synchronization based on coroutines didn't have the inherent risk of condition variables such as spurious wakeup or lost wakeup; but the example had another issue. It was too complicated.</p>
+<p>Thanks to <a href="https://github.com/lewissbaker/cppcoro">cppcoro</a>, we can have the best of both worlds.: a straightforward event mechanism, which does not have the design flaws of condition variables.<span style="color: #444444; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 14px; font-style: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing: 0px; background-color: #ffffff; float: none;"><br /></span></p>
+<h2><span style="font-family: 'courier new', courier;">single_consumer_event</span></h2>
+<p>&nbsp;</p>
+<p><span style="font-family: 'courier new', courier;">single_consumer_event</span>&nbsp;is according to the documentation a simple manual-reset event type that supports only a single coroutine awaiting it at a time. This is exactly, what I need:</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// cppcororProducerConsumer.cpp</span>
+
+<span style="color: #009999;">#include &lt;cppcoro/single_consumer_event.hpp&gt;</span>
+<span style="color: #009999;">#include &lt;cppcoro/sync_wait.hpp&gt;</span>
+<span style="color: #009999;">#include &lt;cppcoro/task.hpp&gt;</span>
+
+<span style="color: #009999;">#include &lt;future&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;string&gt;</span>
+<span style="color: #009999;">#include &lt;thread&gt;</span>
+<span style="color: #009999;">#include &lt;chrono&gt;</span>
+
+cppcoro<span style="color: #555555;">::</span>single_consumer_event event;  
+
+cppcoro<span style="color: #555555;">::</span>task<span style="color: #555555;">&lt;&gt;</span> consumer() {
+    
+    <span style="color: #006699; font-weight: bold;">auto</span> start <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>high_resolution_clock<span style="color: #555555;">::</span>now();
+    
+    co_await event;  <span style="color: #0099ff; font-style: italic;">// suspended until some thread calls event.set()</span>
+    
+    <span style="color: #006699; font-weight: bold;">auto</span> end <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>high_resolution_clock<span style="color: #555555;">::</span>now();
+    std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>duration<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">double</span><span style="color: #555555;">&gt;</span> elapsed <span style="color: #555555;">=</span> end <span style="color: #555555;">-</span> start;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Consumer waited "</span> <span style="color: #555555;">&lt;&lt;</span> elapsed.count() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" seconds."</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  
+    co_return;
+}
+
+<span style="color: #007788; font-weight: bold;">void</span> producer() {
+
+    <span style="color: #006699; font-weight: bold;">using</span> <span style="color: #006699; font-weight: bold;">namespace</span> std<span style="color: #555555;">::</span>chrono_literals;
+    std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>sleep_for(<span style="color: #ff6600;">2</span>s);
+    
+    event.set();  <span style="color: #0099ff; font-style: italic;">// resumes the consumer  </span>
+    
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main() {
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    <span style="color: #006699; font-weight: bold;">auto</span> con <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>async([]{ cppcoro<span style="color: #555555;">::</span>sync_wait(consumer()); });  <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    <span style="color: #006699; font-weight: bold;">auto</span> res <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>async(producer);                               <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    
+    con.get(), res.get();
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+}
+</pre>
+</div>
+<p></p>
+<p>The code should be self-explanatory. The consumer (line 1) and the receiver (line 2) run in their thread. The call <span style="font-family: 'courier new', courier;">cppcoro::sync_wait(consumer())</span>&nbsp;(line 1) serves as a top-level task because the <span style="font-family: 'courier new', courier;">main</span> function cannot be a coroutine. The call waits until the coroutine <span style="font-family: 'courier new', courier;">consumer</span> is done. The coroutine <span style="font-family: 'courier new', courier;">consumer</span> waits in the<span style="font-family: 'courier new', courier;"> call co_await event</span> until someone calls<span style="font-family: 'courier new', courier;"> event.set().</span> The function <span style="font-family: 'courier new', courier;">producer</span> sends this event after a sleep of two seconds.&nbsp;</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/CoroutintesAbstractionsWithCppCoro/cppcoroProducerConsumer.png" alt="cppcoroProducerConsumer" width="400" height="173" /></p>
+<p>Thanks to the cppcoro library, threads can be canceled.&nbsp;</p>
+<h2>Cancellation</h2>
+<p>The caller and the callee communicate with the<span style="font-family: 'courier new', courier;"> cppcoro::cancellation_token</span>. The callee of the function that gets the request to cancel can respond in two ways.</p>
+<ol>
+<li>Poll at regular intervals for the request to cancel. The cppcoro::cancellation_token supports two member functions for this purpose: <span style="font-family: 'courier new', courier;">is_cancellation_requested()</span> and <span style="font-family: 'courier new', courier;">throw_if_cancellation_requested()</span>.</li>
+<li>Register a callback that is executed in case of a cancellation request.</li>
+</ol>
+<p>The following example exemplifies the first use-case.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// cppcoroCancellation.cpp</span>
+
+<span style="color: #009999;">#include &lt;chrono&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;future&gt;</span>
+
+<span style="color: #009999;">#include &lt;cppcoro/cancellation_token.hpp&gt;</span>
+<span style="color: #009999;">#include &lt;cppcoro/cancellation_source.hpp&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">using</span> <span style="color: #006699; font-weight: bold;">namespace</span> std<span style="color: #555555;">::</span>chrono_literals; 
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    cppcoro<span style="color: #555555;">::</span>cancellation_source canSource;
+    cppcoro<span style="color: #555555;">::</span>cancellation_token canToken <span style="color: #555555;">=</span> canSource.token();  <span style="color: #0099ff; font-style: italic;">// (1)</span>
+
+    <span style="color: #006699; font-weight: bold;">auto</span> cancelSender <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>async([<span style="color: #555555;">&amp;</span>canSource] { 
+        std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>sleep_for(<span style="color: #ff6600;">2</span>s);
+        canSource.request_cancellation();                      <span style="color: #0099ff; font-style: italic;">// (3)</span>
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"canSource.request_cancellation() "</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    });
+        
+    <span style="color: #006699; font-weight: bold;">auto</span> cancelReceiver <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>async([<span style="color: #555555;">&amp;</span>canToken] { 
+        <span style="color: #006699; font-weight: bold;">while</span>(<span style="color: #336666;">true</span>) {
+            std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Wait for cancellation request"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+            std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>sleep_for(<span style="color: #ff6600;">200</span>ms);
+            <span style="color: #006699; font-weight: bold;">if</span> (canToken.is_cancellation_requested()) <span style="color: #006699; font-weight: bold;">return</span>;  <span style="color: #0099ff; font-style: italic;">// (2)</span>
+        }
+    });
+
+    cancelSender.get(), cancelReceiver.get();
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}
+</pre>
+</div>
+<p></p>
+<p>Line (1) shows the<span style="font-family: 'courier new', courier;"> cancellation_token</span>, created by the <span style="font-family: 'courier new', courier;">cancellation_source</span>. The caller <span style="font-family: 'courier new', courier;">cancelSender</span> gets the cancellation source <span style="font-family: 'courier new', courier;">canSource</span>, and the callee <span style="font-family: 'courier new', courier;">cancelReceiver</span>&nbsp;gets the cancellation token. The callee polls permanently for the cancellation request (line 2), which the caller sends via the cal<span style="font-family: 'courier new', courier;">l call.request_cancellation()</span> (line 3) after two seconds.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/CoroutintesAbstractionsWithCppCoro/cppcoroCancellation.png" alt="cppcoroCancellation" width="400" height="311" /></p>
+<p>I want to make two interesting observations.</p>
+<ol>
+<li>The cancellation is cooperative. If the callee ignores that cancellation request, nothing happens.&nbsp;</li>
+<li>We get with C++20 an improved <span style="font-family: 'courier new', courier;">std::thread: std::jthread. std::jthread</span>&nbsp;joins automatically in its destructor and can be in interrupted via an interrupt token. Read more details to the improved std::thread in my previous post: "<a href="index.php/a-new-thread-with-c-20-std-jthread">A new Thread with C++20: std::jthread</a>".&nbsp;</li>
+</ol>
+<p>cppcoro even supports a mutex.&nbsp;</p>
+<h2><span style="font-family: 'courier new', courier;">async_mutex</span></h2>
+<p></p>
+<p>A mutex such as <span style="font-family: 'courier new', courier;">cppcoro::async_mutex</span> is a synchronization mechanism to protected shared data from being access by multiple threads simultaneously.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// cppcoroMutex.cpp</span>
+
+<span style="color: #009999;">#include &lt;cppcoro/async_mutex.hpp&gt;</span>
+<span style="color: #009999;">#include &lt;cppcoro/sync_wait.hpp&gt;</span>
+<span style="color: #009999;">#include &lt;cppcoro/task.hpp&gt;</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;thread&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+
+
+cppcoro<span style="color: #555555;">::</span>async_mutex mutex;
+
+<span style="color: #007788; font-weight: bold;">int</span> sum{};                                                                  <span style="color: #0099ff; font-style: italic;">// (2)</span>
+
+cppcoro<span style="color: #555555;">::</span>task<span style="color: #555555;">&lt;&gt;</span> addToSum(<span style="color: #007788; font-weight: bold;">int</span> num) {
+    cppcoro<span style="color: #555555;">::</span>async_mutex_lock lockSum <span style="color: #555555;">=</span> co_await mutex.scoped_lock_async(); <span style="color: #0099ff; font-style: italic;">// (3)</span>  
+    sum <span style="color: #555555;">+=</span> num;
+  
+}                                                                           <span style="color: #0099ff; font-style: italic;">// (4)</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> main() {
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span><span style="color: #555555;">&gt;</span> vec(<span style="color: #ff6600;">10</span>);                                       <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    
+    <span style="color: #006699; font-weight: bold;">for</span>(<span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;</span> thr<span style="color: #555555;">:</span> vec) {
+        thr <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span>([]{ <span style="color: #006699; font-weight: bold;">for</span>(<span style="color: #007788; font-weight: bold;">int</span> n <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>; n <span style="color: #555555;">&lt;</span> <span style="color: #ff6600;">10</span>; <span style="color: #555555;">++</span>n) cppcoro<span style="color: #555555;">::</span>sync_wait(addToSum(n)); } );
+    }
+    
+    <span style="color: #006699; font-weight: bold;">for</span>(<span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;</span> thr<span style="color: #555555;">:</span> vec) thr.join();
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"sum: "</span> <span style="color: #555555;">&lt;&lt;</span> sum <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Line (1) creates ten threads. Each thread adds the numbers 0 to 9 to the shared <span style="font-family: 'courier new', courier;">sum</span> (line 2). The function <span style="font-family: 'courier new', courier;">addToSum</span> is the coroutine. The coroutine waits in the expression <span style="font-family: 'courier new', courier;">co_await mutex.scoped_lock_async() (line 3) </span>until the mutex is acquired. The coroutine that waits for the mutex is not be blocked but suspended. The previous lock-holder resumes the waiting coroutine in its <span style="font-family: 'courier new', courier;">unlock</span> call.&nbsp; &nbsp;As its name suggests, the mutex stays locked until the end of the scope (line 4).</p>
+<p>&nbsp;</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/CoroutintesAbstractionsWithCppCoro/cppcoroMutex.png" alt="cppcoroMutex" width="300" height="151" /></p>
+<h2>What's next?&nbsp;</h2>
+<p>Thanks to the function <span style="font-family: 'courier new', courier;">cppcoro::when_all</span>, you can not only wait on one but on more coroutines. I use<span style="font-family: 'courier new', courier;">&nbsp;cppcoro::when_all</span> with<span style="font-family: 'courier new', courier;"> cppcoro::static_thread_pool</span>&nbsp;in my next post to compose powerful workflows.</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Meeting C++, Matt Braun, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Marko, </strong><span class="sc-kpOJdX fDWXFa" title="Emyr Williams"><strong>G Prvulovic, Reinhold Dröge, Abernitzke,</strong> </span><strong><span title="Emyr Williams">Richard Ohnemus, Frank Grimm</span></strong><span title="Emyr Williams"><strong>, Sakib, Broeserl, </strong></span><strong><span title="Emyr Williams">António Pina, Markus Falkner, Darshan Mody, Sergey Agafyin, <span class="sc-gZMcBi hdSbOl" data-tag="user-details-full-name">Андрей Бурмистров, Jake, GS, Lawton Shoemake, Animus24, Jozo Leko, John Breland, espkk, Wolfgang Gärtner,&nbsp; </span></span><span title="Emyr Williams"><span class="sc-htpNat dEZjR" style="color: #241e12; font-family: aktiv-grotesk, sans-serif; margin: 0px; position: relative; font-weight: 400; font-size: 1rem; line-height: 1.5;"><span class="sc-htpNat ebhhXb" style="color: #241e12; font-family: aktiv-grotesk, sans-serif; margin: 0px; position: relative; font-weight: bold; font-size: 1rem; line-height: 1.5;"></span></span></span>Jon Hess, Christian Wittenhorst, and Louis St-Amour.<br /></strong></p>
+<p>&nbsp;</p>
+<p>Thanks in particular to: <a href="https://bitwyre.com/">Bitwyre Technologies </a></p>
+<p>&nbsp;</p>
+<table style="width: 490px; height: 103px;">
+<tbody>
+<tr>
+<td><strong>Thanks in particular to:</strong></td>
+<td>&nbsp;</td>
+<td><a href="https://cranepay.io/"><img src="images/patreon/crp4.png" alt="crp4" width="150" height="96" /></a></td>
+</tr>
+</tbody>
+</table>
+<p><strong>&nbsp;</strong></p>
+<p><strong>&nbsp;&nbsp;<a href="https://www.takeupcode.com/">&nbsp; </a></strong></p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at Leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages. I also included more than 120 source files.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight into the current and upcoming concurrency in C++. This insight includes the theory and a lot of practice with more than 140 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 700 pages full of modern C++ and more than 260 source files presenting the standard library and concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
