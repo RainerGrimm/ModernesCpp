@@ -1,0 +1,272 @@
+<p><span style="font-family: courier new, courier;"></span>This post is the third and final post in my miniseries to <a href="https://github.com/lewissbaker/cppcoro">cppcoro</a>. cppcoro is a library of coroutine abstractions from Lewis Baker. Today, I introduce thread pools.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/CoroutinesThreadPoolsWithCppCoro/TimelineCpp20.png" alt="TimelineCpp20" width="650" height="233" /></p>
+<p>To get the most out of this post, you should know my two previous posts to cppcoro.</p>
+<ul>
+<li><a href="https://bit.ly/CoroutinesCppcoro">C++20: Coroutines with cppcoro</a>: the introduction to cppcoro and the elementary coroutines task and generator</li>
+<li><a href="https://bit.ly/CoroutineAbstractions">C++20: Powerful Coroutines with cppcoro</a>: more powerful coroutines with threads</li>
+</ul>
+<p><span style="font-family: courier new, courier;">Additionally to the cppcoro::sync_wait</span> function which can be used to wait until the specified <em>Awaitable</em> completes, cppcoro offers the quite interesting <span style="font-family: courier new, courier;">cppcoro::when_all</span> function.</p>
+<h2><span style="font-family: courier new, courier;">when_all</span></h2>
+<ul>
+<li><strong><span style="font-family: courier new, courier;">when_all: </span></strong> creates an <em>Awaitable</em>, that waits for all its <em>Input-Awaitables</em>, and returns an aggregate of their individual results.</li>
+</ul>
+<p>I simplified the definition of the function <span style="font-family: courier new, courier;">cpporo::when_all. The following</span>&nbsp;example should help to get the first impression.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// cppcoroWhenAll.cpp</span>
+
+<span style="color: #009999;">#include &lt;chrono&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;thread&gt;</span>
+
+<span style="color: #009999;">#include &lt;cppcoro/sync_wait.hpp&gt;</span>
+<span style="color: #009999;">#include &lt;cppcoro/task.hpp&gt;</span>
+<span style="color: #009999;">#include &lt;cppcoro/when_all.hpp&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">using</span> <span style="color: #006699; font-weight: bold;">namespace</span> std<span style="color: #555555;">::</span>chrono_literals;
+
+cppcoro<span style="color: #555555;">::</span>task<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>string<span style="color: #555555;">&gt;</span> getFirst() {
+    std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>sleep_for(<span style="color: #ff6600;">1</span>s);                       <span style="color: #0099ff; font-style: italic;">// (3)</span>
+    co_return <span style="color: #cc3300;">"First"</span>;
+}
+
+cppcoro<span style="color: #555555;">::</span>task<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>string<span style="color: #555555;">&gt;</span> getSecond() {
+     std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>sleep_for(<span style="color: #ff6600;">1</span>s);                      <span style="color: #0099ff; font-style: italic;">// (3)</span>
+    co_return <span style="color: #cc3300;">"Second"</span>;
+}
+
+cppcoro<span style="color: #555555;">::</span>task<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>string<span style="color: #555555;">&gt;</span> getThird() {
+     std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>sleep_for(<span style="color: #ff6600;">1</span>s);                     <span style="color: #0099ff; font-style: italic;">// (3)</span>
+    co_return <span style="color: #cc3300;">"Third"</span>;
+}
+
+
+cppcoro<span style="color: #555555;">::</span>task<span style="color: #555555;">&lt;&gt;</span> runAll() {
+                                                          <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    <span style="color: #006699; font-weight: bold;">auto</span>[fir, sec, thi] <span style="color: #555555;">=</span> co_await cppcoro<span style="color: #555555;">::</span>when_all(getFirst(), getSecond(), getThird());
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> fir <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span> <span style="color: #555555;">&lt;&lt;</span> sec <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span> <span style="color: #555555;">&lt;&lt;</span> thi <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main() {
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    <span style="color: #006699; font-weight: bold;">auto</span> start <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>steady_clock<span style="color: #555555;">::</span>now();
+    
+    cppcoro<span style="color: #555555;">::</span>sync_wait(runAll());                          <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    <span style="color: #006699; font-weight: bold;">auto</span> end <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>high_resolution_clock<span style="color: #555555;">::</span>now();
+    std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>duration<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">double</span><span style="color: #555555;">&gt;</span> elapsed <span style="color: #555555;">=</span> end <span style="color: #555555;">-</span> start;   <span style="color: #0099ff; font-style: italic;">// (4)</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Execution time "</span> <span style="color: #555555;">&lt;&lt;</span> elapsed.count() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" seconds."</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}
+</pre>
+</div>
+<p></p>
+<p>The top-level task <span style="font-family: courier new, courier;">cppcoro::sync_wait(runAll())</span> (line 1) awaits the Awaitable <span style="font-family: courier new, courier;">runAll. runAll</span> awaits the Awaitables <span style="font-family: courier new, courier;">getFirst</span>, <span style="font-family: courier new, courier;">getSecond</span>, and <span style="font-family: courier new, courier;">getThird</span> (line 2). The Awaitables <span style="font-family: courier new, courier;">runAll</span>, <span style="font-family: courier new, courier;">getFirst</span>, <span style="font-family: courier new, courier;">getSecond</span>, and <span style="font-family: courier new, courier;">getThird</span> are coroutines. Each of the get functions sleeps for one second (line 3). Three times one second makes three seconds. This is the time the call <span style="font-family: courier new, courier;">cppcoro::sync_wait(runAll()) </span>waits for the coroutines. Line 4 displays the time duration.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/CoroutinesThreadPoolsWithCppCoro/cppcoroWhenAll.png" alt="cppcoroWhenAll" width="350" height="197" /></p>
+<p>Now, that you get the basics of the function cppcoro::when_all, let me add threads pools to it.</p>
+<h2><span style="font-family: courier new, courier;">static_thread_pool</span></h2>
+<ul>
+<li><span style="font-family: courier new, courier;"><strong>static_thead_pool</strong></span>: schedule work on a fixed-size pool of threads</li>
+</ul>
+<p><span style="font-family: courier new, courier;">cppcoro::static_thread_pool</span> can be invoked with and without a number. The number stands for the number of threads that are created. If you don't specify a number, the C++11 function <a href="https://en.cppreference.com/w/cpp/thread/thread/hardware_concurrency"><span style="font-family: courier new, courier;">std::thread::hardware_concurrency()</span></a> is used. <span style="font-family: courier new, courier;">std::thread::hardware_concurrency</span> gives you a hint for the number of hardware threads supported by your system. This may be the number of processors or cores you have.</p>
+<p>Let me try it out. The following example based on the previous one, executes the coroutines <span style="font-family: courier new, courier;">getFirst</span>, <span style="font-family: courier new, courier;">getSecond</span>, and <span style="font-family: courier new, courier;">getThird</span> concurrently.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// cppcoroWhenAllOnThreadPool.cpp</span>
+
+<span style="color: #009999;">#include &lt;chrono&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;thread&gt;</span>
+
+<span style="color: #009999;">#include &lt;cppcoro/sync_wait.hpp&gt;</span>
+<span style="color: #009999;">#include &lt;cppcoro/task.hpp&gt;</span>
+<span style="color: #009999;">#include &lt;cppcoro/static_thread_pool.hpp&gt;</span>
+<span style="color: #009999;">#include &lt;cppcoro/when_all.hpp&gt;</span>
+
+
+<span style="color: #006699; font-weight: bold;">using</span> <span style="color: #006699; font-weight: bold;">namespace</span> std<span style="color: #555555;">::</span>chrono_literals;
+
+cppcoro<span style="color: #555555;">::</span>task<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>string<span style="color: #555555;">&gt;</span> getFirst() {
+    std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>sleep_for(<span style="color: #ff6600;">1</span>s);
+    co_return <span style="color: #cc3300;">"First"</span>;
+}
+
+cppcoro<span style="color: #555555;">::</span>task<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>string<span style="color: #555555;">&gt;</span> getSecond() {
+    std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>sleep_for(<span style="color: #ff6600;">1</span>s);
+    co_return <span style="color: #cc3300;">"Second"</span>;
+}
+
+cppcoro<span style="color: #555555;">::</span>task<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>string<span style="color: #555555;">&gt;</span> getThird() {
+    std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>sleep_for(<span style="color: #ff6600;">1</span>s);
+    co_return <span style="color: #cc3300;">"Third"</span>;
+}
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> Func<span style="color: #555555;">&gt;</span>
+cppcoro<span style="color: #555555;">::</span>task<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>string<span style="color: #555555;">&gt;</span> runOnThreadPool(cppcoro<span style="color: #555555;">::</span>static_thread_pool<span style="color: #555555;">&amp;</span> tp, Func func) {
+    co_await tp.schedule();
+    <span style="color: #006699; font-weight: bold;">auto</span> res <span style="color: #555555;">=</span> co_await func();
+    co_return res;
+}
+
+cppcoro<span style="color: #555555;">::</span>task<span style="color: #555555;">&lt;&gt;</span> runAll(cppcoro<span style="color: #555555;">::</span>static_thread_pool<span style="color: #555555;">&amp;</span> tp) {
+    
+    <span style="color: #006699; font-weight: bold;">auto</span>[fir, sec, thi] <span style="color: #555555;">=</span> co_await cppcoro<span style="color: #555555;">::</span>when_all(    <span style="color: #0099ff; font-style: italic;">// (3)</span>
+        runOnThreadPool(tp, getFirst),
+        runOnThreadPool(tp, getSecond), 
+        runOnThreadPool(tp, getThird));
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> fir <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span> <span style="color: #555555;">&lt;&lt;</span> sec <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span> <span style="color: #555555;">&lt;&lt;</span> thi <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+}
+    
+<span style="color: #007788; font-weight: bold;">int</span> main() {
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    <span style="color: #006699; font-weight: bold;">auto</span> start <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>steady_clock<span style="color: #555555;">::</span>now();
+
+    cppcoro<span style="color: #555555;">::</span>static_thread_pool tp;                         <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    cppcoro<span style="color: #555555;">::</span>sync_wait(runAll(tp));                         <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    <span style="color: #006699; font-weight: bold;">auto</span> end <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>high_resolution_clock<span style="color: #555555;">::</span>now();
+    std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>duration<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">double</span><span style="color: #555555;">&gt;</span> elapsed <span style="color: #555555;">=</span> end <span style="color: #555555;">-</span> start;    <span style="color: #0099ff; font-style: italic;">// (4)</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Execution time "</span> <span style="color: #555555;">&lt;&lt;</span> elapsed.count() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" seconds."</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}
+</pre>
+</div>
+<p></p>
+<p>Here are the crucial differences to the previous program <span style="font-family: courier new, courier;">cppcoroWhenAll.cpp</span>. I created in line (1) a thread pool <span style="font-family: courier new, courier;">tp</span> and used it as an argument for the function <span style="font-family: courier new, courier;">runAll(tp)</span> (line 2). The function runAll uses the thread pool to start the coroutines concurrently. Thanks to structured binding (line 3), the values of each coroutine can be easily aggregated and assigned to a variable. On the end, the main function takes one instead of three seconds.</p>
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/CoroutinesThreadPoolsWithCppCoro/cppcoroWhenAllOnThreadPool.png" alt="cppcoroWhenAllOnThreadPool" width="450" height="212" /></p>
+<p>Maybe you know, that we get with C++20 latches and barriers. Latches and barriers are thread synchronization mechanisms that enable some threads to block until a counter becomes zero. cppcoro also supports latches and barriers.</p>
+<h2><span style="font-family: courier new, courier;">async_latch</span></h2>
+<ul>
+<li><strong>async_latch</strong>: allows coroutines to asynchronously wait until a counter becomes zero</li>
+</ul>
+<p>The following program <span style="font-family: courier new, courier;">cppcoroLatch.cpp</span> shows thread synchronization with a <span style="font-family: courier new, courier;">cppcoro::async_latch</span>.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// cppcoroLatch.cpp</span>
+
+<span style="color: #009999;">#include &lt;chrono&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;future&gt;</span>
+
+<span style="color: #009999;">#include &lt;cppcoro/sync_wait.hpp&gt;</span>
+<span style="color: #009999;">#include &lt;cppcoro/async_latch.hpp&gt;</span>
+<span style="color: #009999;">#include &lt;cppcoro/task.hpp&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">using</span> <span style="color: #006699; font-weight: bold;">namespace</span> std<span style="color: #555555;">::</span>chrono_literals; 
+
+cppcoro<span style="color: #555555;">::</span>task<span style="color: #555555;">&lt;&gt;</span> waitFor(cppcoro<span style="color: #555555;">::</span>async_latch<span style="color: #555555;">&amp;</span> latch) {
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Before co_await"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    co_await latch;                              <span style="color: #0099ff; font-style: italic;">// (3)</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"After co_await"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main() {
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+    cppcoro<span style="color: #555555;">::</span>async_latch latch(<span style="color: #ff6600;">3</span>);              <span style="color: #0099ff; font-style: italic;">// (1)<br /><br />                                                <span style="color: #0099ff; font-style: italic;">// (2)</span></span>
+    <span style="color: #006699; font-weight: bold;">auto</span> waiter <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>async([<span style="color: #555555;">&amp;</span>latch]{ cppcoro<span style="color: #555555;">::</span>sync_wait(waitFor(latch)); }); 
+
+    <span style="color: #006699; font-weight: bold;">auto</span> counter1 <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>async([<span style="color: #555555;">&amp;</span>latch] {       <span style="color: #0099ff; font-style: italic;">// (2)</span>
+        std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>sleep_for(<span style="color: #ff6600;">2</span>s);
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"counter1: latch.count_down() "</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+        latch.count_down();
+    });
+        
+    <span style="color: #006699; font-weight: bold;">auto</span> counter2 <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>async([<span style="color: #555555;">&amp;</span>latch] {      <span style="color: #0099ff; font-style: italic;">// (2)</span>
+        std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>sleep_for(<span style="color: #ff6600;">1</span>s);
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"counter2: latch.count_down(2) "</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+        latch.count_down(<span style="color: #ff6600;">2</span>);
+    });
+
+    waiter.get(), counter1.get(), counter2.get();
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>I create the cppcoro::asynch_latch in line (1) and initialize the counter to 3. This time, I use <span style="font-family: courier new, courier;">std::async</span> (line 2) to run the three coroutines concurrently. Each <span style="font-family: courier new, courier;">std::async</span> call gets the <span style="font-family: courier new, courier;">latch</span> per reference. The <span style="font-family: courier new, courier;">waitFor</span> coroutine waits in line 3 until the counter becomes zero. The coroutine <span style="font-family: courier new, courier;">counter1</span> sleeps for 2 seconds before it counts down by 1. In contrast, the <span style="font-family: courier new, courier;">counter2</span> sleeps for 1 second and counts down by 2. The screenshot shows the interleaving of the threads.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/CoroutinesThreadPoolsWithCppCoro/cppcoroLatch.png" alt="cppcoroLatch" width="450" height="251" /></p>
+<h2>What's next?</h2>
+<p>So far, I have written about three of the <a href="index.php/thebigfour">big four of C++20</a>: concepts, ranges, and coroutines. Modules are still missing in my tour through the big four and are the topic of my next posts.</p>
+<p>By the way, if anyone wants to write a post to a C++20 feature I'm going to write about, please contact me. I'm happy to publish it and translate it into English/German if necessary.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Meeting C++, Matt Braun, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Marko, </strong><span class="sc-kpOJdX fDWXFa" title="Emyr Williams"><strong>G Prvulovic, Reinhold Dröge, Abernitzke,</strong> </span><strong><span title="Emyr Williams">Richard Ohnemus, Frank Grimm</span></strong><span title="Emyr Williams"><strong>, Sakib, Broeserl, </strong></span><strong><span title="Emyr Williams">António Pina, Markus Falkner, Darshan Mody, Sergey Agafyin, <span class="sc-gZMcBi hdSbOl" data-tag="user-details-full-name">Андрей Бурмистров, Jake, GS, Lawton Shoemake, Animus24, Jozo Leko, John Breland, espkk, Wolfgang Gärtner, </span></span><span title="Emyr Williams"><span class="sc-htpNat dEZjR" style="color: #241e12; font-family: aktiv-grotesk, sans-serif; margin: 0px; position: relative; font-weight: 400; font-size: 1rem; line-height: 1.5;"><span class="sc-htpNat ebhhXb" style="color: #241e12; font-family: aktiv-grotesk, sans-serif; margin: 0px; position: relative; font-weight: bold; font-size: 1rem; line-height: 1.5;"></span></span></span>Jon Hess, Christian Wittenhorst, Louis St-Amour, and Stephan Roslen.<br /></strong></p>
+<p>&nbsp;</p>
+<p>Thanks in particular to: <a href="https://bitwyre.com/">Bitwyre Technologies </a></p>
+<p>&nbsp;</p>
+<table style="width: 490px; height: 103px;">
+<tbody>
+<tr>
+<td><strong>Thanks in particular to:</strong></td>
+<td>&nbsp;</td>
+<td><a href="https://cranepay.io/"><img src="images/patreon/crp4.png" alt="crp4" width="150" height="96" /></a></td>
+</tr>
+</tbody>
+</table>
+<p><strong>&nbsp;</strong></p>
+<p><strong>&nbsp;&nbsp;<a href="https://www.takeupcode.com/">&nbsp; </a></strong></p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at Leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages. I also included more than 120 source files.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight into the current and upcoming concurrency in C++. This insight includes the theory and a lot of practice with more than 140 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 700 pages full of modern C++ and more than 260 source files presenting the standard library and concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>
