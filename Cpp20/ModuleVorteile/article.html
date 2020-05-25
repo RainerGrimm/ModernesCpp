@@ -1,0 +1,249 @@
+<p>Modules are one of the four big features of C++20: concepts, ranges, coroutines, and modules. Modules promise a lot: compile-time improvement, isolation of macros, the abolition of header files, and ugly workarounds.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/Cpp20Modules/TimelineCpp20.png" alt="TimelineCpp20" width="650" height="223" /></p>
+<p>Why do we need modules? I want to step back and describe which steps are involved in getting an executable.</p>
+<h2>A Simple Executable</h2>
+<p>Of course, I have to start with "Hello World".</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// helloWorld.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Hello World"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Making an executable <span style="font-family: courier new, courier;">helloWorld</span> out of the program <span style="font-family: courier new, courier;">helloWorld.cpp</span> increases its size by factor 130.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/Cpp20Modules/helloWorld.png" alt="helloWorld" width="450" height="180" /></p>
+<p>The number 100 and 12928 in the screenshot stand for the number of bytes.</p>
+<p>We should have a basic understanding of what's happening under the hood.</p>
+<h2>The classical Build Process</h2>
+<p>The build process consists of three steps: preprocessing, compilation, and linking.</p>
+<h3>Preprocessing</h3>
+<p>The preprocessor handles the preprocessor directives such as <span style="font-family: courier new, courier;"><code>#include</code></span> and <span style="font-family: courier new, courier;"><code>#define</code></span>. The preprocessor substitutes <span style="font-family: courier new, courier;">#inlude</span> directives with the corresponding header files, and it substitutes the macros (<span style="font-family: courier new, courier;">#define</span>). Thanks to directives such as <code>#if</code>, <code>#else</code>, <code>#elif</code>, <code>#ifdef</code>, <code>#ifndef,</code> and <code>#endif </code>parts of the source code can be included or excluded.</p>
+<p>This straightforward text substitution process can be observed by using the compiler flag <span style="font-family: courier new, courier;">-E</span> on GCC/Clang, or <span style="font-family: courier new, courier;">/E</span> on Windows.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/Cpp20Modules/preprocessor.png" alt="preprocessor" width="500" height="149" /></p>
+<p>WOW!!! The output of the preprocessing step has more than half a million bytes. I don't want to blame GCC; the other compilers are similar verbose: <a href="https://godbolt.org/z/rtXGFQ">CompilerExplorer</a>.</p>
+<p>The output of the preprocessor is the input for the compiler.</p>
+<h3>Compilation</h3>
+<p>The compilation is separately performed on each output of the preprocessor. The compiler parses the C++ source code and converts it into assembly code. The generated file is called an object file and it contains the compiled code in binary form. The object file can refer to symbols, which don't have a definition. The object files can be put in archives for later reuse. These archives are called static libraries.</p>
+<p>The objects or translation units which the compiler produces are the input for the linker.</p>
+<h3>Linking</h3>
+<p>The output of the linker can be an executable or a static or shared library. It's the job of the linker to resolve the references to undefined symbols. Symbols are defined in object files or in libraries. The typical error in this state is that symbols aren't defined or defined more than once.</p>
+<p>This build process consisting of the three steps is inherited from C. It works sufficiently good enough if you only have one translation unit. But when you have more than one translation unit, many issues can occur.</p>
+<h2>Issues of the Build Process</h2>
+<p>Without any attempt to be complete, here are flaws of the classical build process. Modules overcome these issues.</p>
+<h3>Repeated substitution of Headers</h3>
+<p>The preprocessor substitutes <span style="font-family: courier new, courier;">#inlude</span> directives with the corresponding header files. Let me change my initial <span style="font-family: courier new, courier;">helloWorld.cpp</span> program to make the repetition visible.</p>
+<p>I refactored the program and added two source files <span style="font-family: courier new, courier;">hello.cpp</span> and <span style="font-family: courier new, courier;">world.cpp</span>. The source file <span style="font-family: courier new, courier;">hello.cpp</span> provides the function <span style="font-family: courier new, courier;">hello</span> and the source file <span style="font-family: courier new, courier;">world.cpp</span> provides the function world. Both source files include the corresponding headers. Refactoring means that the program does the same such as the previous program <span style="font-family: courier new, courier;">helloWorld.cpp.</span>&nbsp;Simply, the internal structure is changed. Here are the new files:</p>
+<ul>
+<li><span style="font-family: courier new, courier;">hello.cpp</span> and <span style="font-family: courier new, courier;">hello.h</span></li>
+</ul>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// hello.cpp</span>
+
+<span style="color: #009999;">#include "hello.h"</span>
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">hello</span>() {
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"hello "</span>;
+}
+</pre>
+</div>
+<p></p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// hello.h</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">hello</span>();</pre>
+</div>
+<p>&nbsp;</p>
+<ul>
+<li><span style="font-family: courier new, courier;">world.cpp</span> and <span style="font-family: courier new, courier;">world.h</span></li>
+</ul>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// world.cpp</span>
+
+<span style="color: #009999;">#include "world.h"</span>
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">world</span>() {
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"world"</span>;
+}
+</pre>
+</div>
+<p></p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// world.h</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">world</span>();</pre>
+</div>
+<p>&nbsp;</p>
+<ul>
+<li><span style="font-family: 'courier new', courier;">helloWorld2.cpp</span></li>
+</ul>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// helloWorld2.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #009999;">#include "hello.h"</span>
+<span style="color: #009999;">#include "world.h"</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+    
+    hello(); 
+    world(); 
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>&nbsp;Building and executing the program works as expected:</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/Cpp20Modules/helloWorld2.png" alt="helloWorld2" width="600" height="178" /></p>
+<p>Here is the issue. The preprocessor runs on each source file. This means, that the header file <span style="font-family: courier new, courier;">&lt;iostream&gt;</span> is included three times in each translation unit. Consequently, each source file is blown up to more than half a million lines.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/Cpp20Modules/preprocessorTranslationUnits.png" alt="preprocessorTranslationUnits" width="500" height="209" /></p>
+<p>This is a waste of compile-time.</p>
+<p><strong>In contrast, a module is only imported once and is literally for free.</strong></p>
+<h3>Isolation from Preprocessor Macros</h3>
+<p>If there is one consensus in the C++ community, it's the following one: we should get rid of the preprocessor macros. Why? Using a macro is just text substitution, excluding any C++ semantic. Of course, this has many negative consequences: For example, it may depend on in which sequence you include macros or macros can clash with already defined macros or names in your application.</p>
+<p>Imagine you have to headers<span style="font-family: courier new, courier;"> webcolors.h</span> and <span style="font-family: courier new, courier;">productinfo.h.</span></p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// webcolors.h</span>
+<br /><span style="color: #009999;">#define RED   0xFF0000</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;"><span style="color: #0099ff; font-style: italic;">// productinfo.h<br /></span></span>
+<span style="color: #009999;">#define RED   0</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>When a source file&nbsp;<span style="font-family: courier new, courier;">client.cpp</span> includes both headers, the value of the macro <span style="font-family: courier new, courier;">RED</span> depends on the sequence the headers are included. This dependency is very error-prone.</p>
+<p><strong>In contrast, it makes no difference, in which order you import modules.</strong></p>
+<h3>Multiple Definition of Symbols</h3>
+<p>ODR stands for the One Definition Rule and says in the case of a function.</p>
+<ul>
+<li>A function can have not more than one definition in any translation unit.</li>
+<li>A function can have not more than one definition in the program.</li>
+<li>Inline functions with external linkage can be defined in more than one translation. The definitions have to satisfy the requirement that each definition has to be the same.</li>
+</ul>
+<p>Let see what my linker has to say when I try to link a program breaking the one definition rule. The following code example has two header file <span style="font-family: courier new, courier;">header.h</span> and <span style="font-family: courier new, courier;">header2.h</span>. The main program includes the header file header.h twice and, therefore, break the one definition rule, because two definitions of <span style="font-family: courier new, courier;">func</span> are included.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// header.h</span>
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">func</span>() {}
+</pre>
+</div>
+<p></p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// header2.h</span>
+
+<span style="color: #009999;">#include "header.h"</span>
+</pre>
+</div>
+<p></p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// main.cpp</span>
+
+<span style="color: #009999;">#include "header.h"<br /><span style="color: #009999;">#include "header2.h"</span></span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {}
+</pre>
+</div>
+<p></p>
+<p>The linker complains about the multiple definitions of <span style="font-family: courier new, courier;">func</span>:</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/Cpp20Modules/odr.png" alt="odr" width="500" height="246" /></p>
+<p></p>
+<p>We are used to ugly workarounds such as put an include guard around your header. Adding the include guard&nbsp;<span style="font-family: courier new, courier;">FUNC_H</span> to the header file <span style="font-family: courier new, courier;">header.h</span> solves the issue.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// header.h</span>
+
+<span style="color: #009999;">#ifndef FUNC_H</span>
+<span style="color: #009999;">#define FUNC_H</span>
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">func</span>(){}
+
+<span style="color: #009999;">#endif</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p><strong>In contrast, identical symbols with modules are very unlikely.</strong></p>
+<p>Before I end this post, I want to summarize the advantages of modules.</p>
+<h2>Advantages of Modules</h2>
+<ul>
+<li>Modules are only important once and are literally for free.</li>
+<li>It makes no difference in which order you import a module.</li>
+<li>Identical symbols with modules are very unlikely.</li>
+<li>Modules enable you to express the logical structure of your code. You can explicitly specify names that should be exported or not. Additionally, you can bundle a few modules into a bigger module and provide them to your customer as a logical package.</li>
+<li>Thanks to modules, there is no need to separate your source code into an interface and an implementation part.</li>
+</ul>
+<h2>What's next?</h2>
+<p>Modules promise a lot. In my next post, I define and use my first module.</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Meeting C++, Matt Braun, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Marko, </strong><span class="sc-kpOJdX fDWXFa" title="Emyr Williams"><strong>G Prvulovic, Reinhold Dröge, Abernitzke,</strong> </span><strong><span title="Emyr Williams">Richard Ohnemus, Frank Grimm</span></strong><span title="Emyr Williams"><strong>, Sakib, Broeserl, </strong></span><strong><span title="Emyr Williams">António Pina, Markus Falkner, Darshan Mody, Sergey Agafyin, <span class="sc-gZMcBi hdSbOl" data-tag="user-details-full-name">Андрей Бурмистров, Jake, GS, Lawton Shoemake, Animus24, Jozo Leko, John Breland, espkk, Wolfgang Gärtner, </span></span><span title="Emyr Williams"><span class="sc-htpNat dEZjR" style="color: #241e12; font-family: aktiv-grotesk, sans-serif; margin: 0px; position: relative; font-weight: 400; font-size: 1rem; line-height: 1.5;"><span class="sc-htpNat ebhhXb" style="color: #241e12; font-family: aktiv-grotesk, sans-serif; margin: 0px; position: relative; font-weight: bold; font-size: 1rem; line-height: 1.5;"></span></span></span>Jon Hess, Christian Wittenhorst, Louis St-Amour, Stephan Roslen, Venkat Nandam, and Jose Francisco.<br /></strong></p>
+<p>&nbsp;</p>
+<p>Thanks in particular to: <a href="https://bitwyre.com/">Bitwyre Technologies </a></p>
+<p>&nbsp;</p>
+<table style="width: 490px; height: 103px;">
+<tbody>
+<tr>
+<td><strong>Thanks in particular to:</strong></td>
+<td>&nbsp;</td>
+<td><a href="https://cranepay.io/"><img src="images/patreon/crp4.png" alt="crp4" width="150" height="96" /></a></td>
+</tr>
+</tbody>
+</table>
+<p><strong>&nbsp;</strong></p>
+<p><strong>&nbsp;&nbsp;<a href="https://www.takeupcode.com/">&nbsp; </a></strong></p>
+<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
+<h2>Get your e-book at Leanpub:</h2>
+</caption>
+<tbody>
+<tr>
+<td>
+<h4><strong>The C++ Standard Library</strong></h4>
+</td>
+<td>&nbsp;</td>
+<td>
+<h4><strong>Concurrency With Modern C++</strong></h4>
+</td>
+<td style="width: 5px;">&nbsp;</td>
+<td>
+<h4><strong>Get Both as one Bundle</strong></h4>
+</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
+<td style="text-align: center;">&nbsp;</td>
+<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
+<td style="width: 5px; text-align: center;">&nbsp;</td>
+<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
+</tr>
+<tr>
+<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages. I also included more than 120 source files.</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
+<p style="text-align: justify;">I'll give you a detailed insight into the current and upcoming concurrency in C++. This insight includes the theory and a lot of practice with more than 140 source files.</p>
+</td>
+<td style="width: 15px;">&nbsp;</td>
+<td>
+<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
+<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
+<p>In sum, you get more than 700 pages full of modern C++ and more than 260 source files presenting the standard library and concurrency in practice.</p>
+</div>
+&nbsp;</td>
+</tr>
+</tbody>
+</table>

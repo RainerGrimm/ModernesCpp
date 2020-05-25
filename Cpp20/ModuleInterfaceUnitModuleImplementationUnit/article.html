@@ -1,0 +1,243 @@
+<p>Thanks to the module interface unit and the module implementation unit, you can separate the interface from the implementation when defining a module. Let me show, how.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/ModuleInterfaceUnitModuleImplementationUnit/TimelineCpp20.png" alt="TimelineCpp20" width="650" height="223" /></p>
+<p>As promised in my last post <a href="https://bit.ly/SimpleMathModul">C++20: A Simple math Modul</a>, I want to make a short detour on my Clang Odyssee. My detour is a compact refresher to all I wrote in the referred post.</p>
+<h2>My Clang Odyssey</h2>
+<p>First, I don't want to blame anyone but me. Based on talks from Boris Kolpackov "<a href="https://github.com/CppCon/CppCon2017/blob/master/Presentations/Building%20C%2B%2B%20Modules/Building%20C%2B%2B%20Modules%20-%20Boris%20Kolpackov%20-%20CppCon%202017.pdf">Building C++ Modules</a>" at the CppCon 2017 or Corentin Jabot "<a href="https://cor3ntin.github.io/posts/modules/">Modules are not a tooling opportunity</a>" I had the impression, that the vendors suggested the following extensions for their module definition:</p>
+<ul>
+<li>Windows: ixx</li>
+<li>Clang: cppm</li>
+<li>GCC: no suggestion</li>
+</ul>
+<p>In the case of the Clang compiler, I was totally wrong. This is my simple <span style="font-family: courier new, courier;">math</span> module, which I tried to compile with the Clang compiler.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// math.cppm</span>
+
+<span style="color: #006699; font-weight: bold;">export</span> module math;
+
+<span style="color: #006699; font-weight: bold;">export</span> <span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">add</span>(<span style="color: #007788; font-weight: bold;">int</span> fir, <span style="color: #007788; font-weight: bold;">int</span> sec){
+    <span style="color: #006699; font-weight: bold;">return</span> fir <span style="color: #555555;">+</span> sec;
+} 
+</pre>
+</div>
+<p></p>
+<p>I tried to compile the module with Clang 9 and Clang 10 on Microsoft and Linux. I tried to compile it with the brand-new Clang 11 compiler, built from the sources. Here is one of my many tries.&nbsp;</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/ModuleInterfaceUnitModuleImplementationUnit/ClangError.png" alt="ClangError" width="650" height="166" /></p>
+<p>This command-line should create the module<span style="font-family: courier new, courier;"> math.pcm</span>. I specified in the command-line <strong><span style="font-family: courier new, courier;">-std=c++20 -fmodules-ts</span></strong> and the error message said: <span style="font-family: courier new, courier;">module interface compilation requires '<strong>-std=c++20' or '-fmodules-ts'</strong></span>.&nbsp; I made all variations of the two flags, added the global module fragment to the module definition, invoked the Clang compiler with additional flags, but the result was always the same.</p>
+<p>Then I asked Arthur O'Dwyer and Roland Bock for their help. For Arthur modules worked fine with Clang: "<a href="https://quuxplusone.github.io/blog/2019/11/07/modular-hello-world/">Hello World with C++2a modules</a>". Roland rebuilt its Clang 11 and it worked with my module definition.</p>
+<p>Roland and I&nbsp; literally had the same Clang compiler and the same module definition. Character by character, I compared his command-line with mine, and I noticed something.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">Mine:   clang<span style="color: #555555;">++</span> <span style="color: #555555;">-</span>std<span style="color: #555555;">=</span>c<span style="color: #555555;">++</span><span style="color: #ff6600;">20</span> <span style="color: #555555;">-</span> <span style="color: #555555;">-</span>fmodules<span style="color: #555555;">-</span>ts <span style="color: #555555;">-</span>stdlib<span style="color: #555555;">=</span>libc<span style="color: #555555;">++</span> <span style="color: #555555;">-</span>c math.cppm <span style="color: #555555;">-</span> Xclang <span style="color: #555555;">-</span>emit<span style="color: #555555;">-</span>module<span style="color: #555555;">-</span>interface <span style="color: #555555;">-</span>o math.pcm
+Roland: clang<span style="color: #555555;">++</span> <span style="color: #555555;">-</span>std<span style="color: #555555;">=</span>c<span style="color: #555555;">++</span><span style="color: #ff6600;">20</span> <span style="color: #555555;">-</span> <span style="color: #555555;">-</span>fmodules<span style="color: #555555;">-</span>ts <span style="color: #555555;">-</span>stdlib<span style="color: #555555;">=</span>libc<span style="color: #555555;">++</span> <span style="color: #555555;">-</span>c math.cpp <span style="color: #555555;">-</span> Xclang <span style="color: #555555;">-</span>emit<span style="color: #555555;">-</span>module<span style="color: #555555;">-</span>interface <span style="color: #555555;">-</span>o math.pcm
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Roland gave his module&nbsp;<span style="font-family: courier new, courier;">math.cpp&nbsp;</span><span style="font-family: 'courier new', courier;">cpp</span>, and so did Arthur.<strong> Don't give your module definition the suffix cppm</strong>.</p>
+<p>Now, compiling and using the module was straightforward.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/ModuleInterfaceUnitModuleImplementationUnit/clang.png" alt="clang" width="650" height="119" /></p>
+<p>To end this Odyssey here is the <span style="font-family: courier new, courier;">client.cpp</span> file and a few words to the necessary flags for the Clang command line.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// client.cpp</span>
+
+import math;
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+   
+   add(<span style="color: #ff6600;">2000</span>, <span style="color: #ff6600;">20</span>);
+   
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">clang<span style="color: #555555;">++</span> <span style="color: #555555;">-</span>std<span style="color: #555555;">=</span>c<span style="color: #555555;">++</span><span style="color: #ff6600;">2</span>a <span style="color: #555555;">-</span>stdlib<span style="color: #555555;">=</span>libc<span style="color: #555555;">++</span> <span style="color: #555555;">-</span>c math.cppm <span style="color: #555555;">-</span> Xclang <span style="color: #555555;">-</span>emit<span style="color: #555555;">-</span>module<span style="color: #555555;">-</span>interface <span style="color: #555555;">-</span>o math.pcm <span style="color: #0099ff; font-style: italic;">// (1)</span>
+clang<span style="color: #555555;">++</span> <span style="color: #555555;">-</span>std<span style="color: #555555;">=</span>c<span style="color: #555555;">++</span><span style="color: #ff6600;">2</span>a <span style="color: #555555;">-</span>stdlib<span style="color: #555555;">=</span>libc<span style="color: #555555;">++</span> <span style="color: #555555;">-</span>fprebuilt<span style="color: #555555;">-</span>module<span style="color: #555555;">-</span>path<span style="color: #555555;">=</span>. client.cpp math.pcm <span style="color: #555555;">-</span>o client   <span style="color: #0099ff; font-style: italic;">// (2)</span>
+</pre>
+</div>
+<p></p>
+<ol>
+<li>Creates the module <span style="font-family: courier new, courier;">math.pcm</span>. The suffix <span style="font-family: courier new, courier;">pcm</span> stands for precompiled module. The flag combination<span style="font-family: courier new, courier;"> -Xclang -emit-module-interface</span> is necessary for creating the precompiled module.</li>
+<li>Creates the executable <span style="font-family: courier new, courier;">client</span>, which uses the module <span style="font-family: courier new, courier;">math.pcm</span>. You have to specify the path to the module with the flag <span style="font-family: courier new, courier;">-fprebuilt-module-p</span>ath.</li>
+</ol>
+<p>The module <span style="font-family: courier new, courier;">math</span> was straightforward. Let's be a bit more sophisticated.</p>
+<h2>Guideline for a Module Structure</h2>
+<p>Here is the first guideline for a module structure:</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">module;                      <span style="color: #0099ff; font-style: italic;">// global module fragment</span>
+
+<span style="color: #009999;">#include &lt;headers for libraries not modularized so far&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">export</span> module math;          <span style="color: #0099ff; font-style: italic;">// module declartion </span>
+
+import <span style="color: #555555;">&lt;</span>importing of other modules<span style="color: #555555;">&gt;</span> <span style="color: #0099ff; font-style: italic;"></span>
+
+<span style="color: #555555;">&lt;</span>non<span style="color: #555555;">-</span>exported declarations<span style="color: #555555;">&gt;</span>  <span style="color: #0099ff; font-style: italic;">// names with only visibiliy inside the module</span>
+
+<span style="color: #006699; font-weight: bold;">export</span> <span style="color: #006699; font-weight: bold;">namespace</span> math {
+
+    <span style="color: #555555;">&lt;</span>exported declarations<span style="color: #555555;">&gt;</span>  <span style="color: #0099ff; font-style: italic;">// exported names </span>
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>&nbsp;This guideline serves two purposes. It gives you a simplified structure of a module and also an idea, what I'm going to write about. So, what's new in this module structure?</p>
+<ul>
+<li>You can import modules. The imported modules have module linkage and are not visible outside the module. This observation also applies to the non-exported declarations.</li>
+<li>I put the exported names in namespace <span style="font-family: 'courier new', courier;">math</span>, which has the same name such as the module.</li>
+<li>The module has only declared names. Let's write about the separation of the interface and the implementation of a module.</li>
+</ul>
+<h2>Module Interface Unit, and Module Implementation Unit</h2>
+<p>According to the previously mentioned guideline, I want to refactor the final version of module <span style="font-family: courier new, courier;">math</span> from the previous post <a href="https://bit.ly/SimpleMathModul">C++20: A Simple math Modul.</a></p>
+<h3>Module Interface Unit</h3>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// mathInterfaceUnit.ixx</span>
+
+module;                   
+
+import std.core;                            
+
+<span style="color: #006699; font-weight: bold;">export</span> module math;       
+
+<span style="color: #006699; font-weight: bold;">export</span> <span style="color: #006699; font-weight: bold;">namespace</span> math {
+
+    <span style="color: #007788; font-weight: bold;">int</span> add(<span style="color: #007788; font-weight: bold;">int</span> fir, <span style="color: #007788; font-weight: bold;">int</span> sec);
+ 
+    <span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">getProduct</span>(<span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;&amp;</span> vec);
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<ul>
+<li>The module interface unit contains the exporting module declaration: <span style="font-family: courier new, courier;">export module math</span>.</li>
+<li>The names <span style="font-family: courier new, courier;">add</span> and <span style="font-family: courier new, courier;">getProduct</span> are exported.</li>
+<li>A module can have only one module interface unit.</li>
+</ul>
+<h3>Module Implementation Unit</h3>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// mathImplementationUnit.cpp</span>
+
+module math;
+
+import std.core;
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">add</span>(<span style="color: #007788; font-weight: bold;">int</span> fir, <span style="color: #007788; font-weight: bold;">int</span> sec){
+    <span style="color: #006699; font-weight: bold;">return</span> fir <span style="color: #555555;">+</span> sec;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">getProduct</span>(<span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;&amp;</span> vec) {
+    <span style="color: #006699; font-weight: bold;">return</span> std<span style="color: #555555;">::</span>accumulate(vec.begin(), vec.end(), <span style="color: #ff6600;">1</span>, std<span style="color: #555555;">::</span>multiplies<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span>());
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<ul>
+<li>The module implementation unit contains non-exporting module declarations: <span style="font-family: courier new, courier;">module math;</span></li>
+<li>A module can have more than one module implementation unit.</li>
+</ul>
+<h3>Main Program</h3>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// client3.cpp</span>
+
+import std.core;
+
+import math;
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;   
+   
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"math::add(2000, 20): "</span> <span style="color: #555555;">&lt;&lt;</span> math<span style="color: #555555;">::</span>add(<span style="color: #ff6600;">2000</span>, <span style="color: #ff6600;">20</span>) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> myVec{<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">5</span>, <span style="color: #ff6600;">6</span>, <span style="color: #ff6600;">7</span>, <span style="color: #ff6600;">8</span>, <span style="color: #ff6600;">9</span>, <span style="color: #ff6600;">10</span>};
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"math::getProduct(myVec): "</span> <span style="color: #555555;">&lt;&lt;</span> math<span style="color: #555555;">::</span>getProduct(myVec) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+   
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<ul>
+<li>&nbsp;From the user's perspective, only the namespace <span style="font-family: courier new, courier;">math was added</span>.&nbsp;<span style="font-family: courier new, courier;"><br /></span></li>
+</ul>
+<h3>Building the Executable</h3>
+<p>Manually building the executable includes a few steps.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">cl.exe <span style="color: #555555;">/</span>std<span style="color: #555555;">:</span>c<span style="color: #555555;">++</span>latest <span style="color: #555555;">/</span>c <span style="color: #555555;">/</span>experimental<span style="color: #555555;">:</span>module mathInterface.ixx <span style="color: #555555;">/</span>EHsc <span style="color: #555555;">/</span>MD          <span style="color: #0099ff; font-style: italic;">// (1)</span>
+cl.exe <span style="color: #555555;">/</span>std<span style="color: #555555;">:</span>c<span style="color: #555555;">++</span>latest <span style="color: #555555;">/</span>c <span style="color: #555555;">/</span>experimental<span style="color: #555555;">:</span>module mathImplementationUnit.cpp <span style="color: #555555;">/</span>EHsc <span style="color: #555555;">/</span>MD <span style="color: #0099ff; font-style: italic;">// (2)</span>
+cl.exe <span style="color: #555555;">/</span>std<span style="color: #555555;">:</span>c<span style="color: #555555;">++</span>latest <span style="color: #555555;">/</span>c <span style="color: #555555;">/</span>experimental<span style="color: #555555;">:</span>module client3.cpp <span style="color: #555555;">/</span>EHsc <span style="color: #555555;">/</span>MD                <span style="color: #0099ff; font-style: italic;">// (3)</span>
+cl.exe client3.obj mathInterfaceUnit.obj mathImplementationUnit.obj                <span style="color: #0099ff; font-style: italic;">// (4)</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<ol>
+<li>Creates the object file <span style="font-family: courier new, courier;">mathInterfaceUnit.ob</span>j and the module interface file <span style="font-family: courier new, courier;">math.ifc.</span></li>
+<li>Creates the object file<span style="font-family: courier new, courier;"> mathImplementationUnit.obj.</span></li>
+<li>Creates the object file <span style="font-family: courier new, courier;">client3.obj.</span></li>
+<li>Creates the executable <span style="font-family: courier new, courier;">client3.exe.</span></li>
+</ol>
+<p>For the Microsoft compiler, you have to specify the exception handling model (<a href="https://docs.microsoft.com/en-us/cpp/build/reference/eh-exception-handling-model?view=vs-2019"><span style="font-family: courier new, courier;">/EHsc)</span></a>&nbsp;and the multithreading library (<a href="https://docs.microsoft.com/en-us/cpp/build/reference/md-mt-ld-use-run-time-library?view=vs-2019"><span style="font-family: courier new, courier;">/MD)</span></a>.&nbsp; Additionally, use the flag&nbsp;<a href="https://docs.microsoft.com/en-us/cpp/build/reference/std-specify-language-standard-version?view=vs-2019"><span style="font-family: courier new, courier;">/std:c++latest</span></a>.</p>
+<p>Finally, here is the output of the program:</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/ModuleInterfaceUnitModuleImplementationUnit/client3.png" alt="client3" width="350" height="161" /></p>
+<h2>What's next?</h2>
+<p>In the next post, I extend my module math with new features. First, I import modules and export them in one unit; second, I use names that are only visible inside the module.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Meeting C++, Matt Braun, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Marko, </strong><span class="sc-kpOJdX fDWXFa" title="Emyr Williams"><strong>G Prvulovic, Reinhold Dröge, Abernitzke,</strong> </span><strong><span title="Emyr Williams">Richard Ohnemus, Frank Grimm</span></strong><span title="Emyr Williams"><strong>, Sakib, Broeserl, </strong></span><strong><span title="Emyr Williams">António Pina, Markus Falkner, Darshan Mody, Sergey Agafyin, <span class="sc-gZMcBi hdSbOl" data-tag="user-details-full-name">Андрей Бурмистров, Jake, GS, Lawton Shoemake, Animus24, Jozo Leko, John Breland, espkk, Wolfgang Gärtner, </span></span><span title="Emyr Williams"><span class="sc-htpNat dEZjR" style="color: #241e12; font-family: aktiv-grotesk, sans-serif; margin: 0px; position: relative; font-weight: 400; font-size: 1rem; line-height: 1.5;"><span class="sc-htpNat ebhhXb" style="color: #241e12; font-family: aktiv-grotesk, sans-serif; margin: 0px; position: relative; font-weight: bold; font-size: 1rem; line-height: 1.5;"></span></span></span>Jon Hess, Christian Wittenhorst, Louis St-Amour, Stephan Roslen, Venkat Nandam, Jose Francisco, and Douglas Tinkham.<br /></strong></p>
+<p>&nbsp;</p>
+<p>Thanks in particular to: <a href="https://bitwyre.com/">Bitwyre Technologies </a></p>
+<p>&nbsp;</p>
+<table style="width: 490px; height: 103px;">
+<tbody>
+<tr>
+<td><strong>Thanks in particular to:</strong></td>
+<td>&nbsp;</td>
+<td><a href="https://cranepay.io/"><img src="images/patreon/crp4.png" alt="crp4" width="150" height="96" /></a></td>
+</tr>
+</tbody>
+</table>
+<p><strong>&nbsp;</strong></p>
+<h2>Seminars</h2>
+<p>I'm happy to give online-seminars or face-to-face seminars world-wide. Please call me if you have any questions.</p>
+<h3 class="moz-signature">Bookable Seminars (Online)</h3>
+<ul>
+<li class="moz-signature"><a href="https://www.modernescpp.net/index.php/c/2-c/30-c-11-and-c-14">C++11 and C+14: 13 July 2020 - 17 July 2020 (5 * 1/2 day)</a></li>
+<li class="moz-signature"><a href="https://www.modernescpp.net/index.php/c/2-c/28-clean-code-with-modern-c">Clean Code with modern C++: 03 August 2020 - 07 August 2020 (5 * 1/2 day)</a></li>
+</ul>
+<h3>Standard Seminars&nbsp;</h3>
+<p>Here is a compilation of my standard seminars. These seminars are only meant to give you a first orientation.</p>
+<ul>
+<li>C++ - The Core Language</li>
+<li>C++ - The Standard Library</li>
+<li>C++ Compact</li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/18">C++11 and C++14</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/16">Clean Code with Modern C++</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/19">Concurrency with Modern C++</a></li>
+<li>Design Patterns and Architecture Patterns with C++</li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/17">Embedded Programming with Modern C++</a></li>
+<li>Generic Programming (Templates) with C++</li>
+</ul>
+<h3>Contact Me</h3>
+<ul>
+<li>Tel.: +49 7472 917441</li>
+<li>Mobil: +49 152 31965939</li>
+<li>Mail: <a href="&lt;a href=">schulung@ModernesCpp.de</a></li>
+<li>German Seminar Page: <a href="www.ModernesCpp.de">www.ModernesCpp.de</a></li>
+<li>English Seminar Page: <a href="http://www.ModernesCpp.net">www.ModernesCpp.net</a></li>
+</ul>
+<h3>Modernes C++,</h3>
+<p><img src="images/signatur/RainerGrimmSmall.png" alt="RainerGrimmSmall" /></p>
