@@ -1,0 +1,279 @@
+<p>The three-way comparison operator <span style="font-family: courier new, courier;">&lt;=&gt;</span> is often just called spaceship operator. The spaceship operator determines for two values A&nbsp; and B whether A &lt; B, A = B, or A &gt; B. You can define the spaceship operator or the compiler can auto-generate it for you.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/TheeWayComparisonOperator/TimelineCpp20.png" alt="TimelineCpp20" width="650" height="250" /></p>
+<p>To appreciate the advantages of the three-way comparison operator, let me start classical.</p>
+<h2>Ordering before C++20</h2>
+<p>I implemented a simple <span style="font-family: courier new, courier;">int</span> wrapper <span style="font-family: courier new, courier;">MyInt</span>. Of course, I want to compare <span style="font-family: courier new, courier;">MyInt</span>. Here is my solution using the <span style="font-family: courier new, courier;">isLessThan</span> function template.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// comparisonOperator.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">struct</span> MyInt {
+    <span style="color: #007788; font-weight: bold;">int</span> value;
+    <span style="color: #006699; font-weight: bold;">explicit</span> MyInt(<span style="color: #007788; font-weight: bold;">int</span> val)<span style="color: #555555;">:</span> value{val} { }
+    <span style="color: #007788; font-weight: bold;">bool</span> <span style="color: #006699; font-weight: bold;">operator</span> <span style="color: #555555;">&lt;</span> (<span style="color: #006699; font-weight: bold;">const</span> MyInt<span style="color: #555555;">&amp;</span> rhs) <span style="color: #006699; font-weight: bold;">const</span> {                  
+        <span style="color: #006699; font-weight: bold;">return</span> value <span style="color: #555555;">&lt;</span> rhs.value;
+    }
+};
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+constexpr <span style="color: #007788; font-weight: bold;">bool</span> isLessThan(<span style="color: #006699; font-weight: bold;">const</span> T<span style="color: #555555;">&amp;</span> lhs, <span style="color: #006699; font-weight: bold;">const</span> T<span style="color: #555555;">&amp;</span> rhs) {
+    <span style="color: #006699; font-weight: bold;">return</span> lhs <span style="color: #555555;">&lt;</span> rhs;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>boolalpha <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+    MyInt <span style="color: #cc00ff;">myInt2011</span>(<span style="color: #ff6600;">2011</span>);
+    MyInt <span style="color: #cc00ff;">myInt2014</span>(<span style="color: #ff6600;">2014</span>);
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"isLessThan(myInt2011, myInt2014): "</span>
+              <span style="color: #555555;">&lt;&lt;</span> isLessThan(myInt2011, myInt2014) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+   std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The program works as expected:</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/TheeWayComparisonOperator/comparisonOperator.png" alt="comparisonOperator" width="400" height="179" /></p>
+<p>Honestly, <span style="font-family: courier new, courier;">MyInt</span> is an unintuitive type. When you define one of the six ordering relations, you should define all of them. Intuitive types should be at least semi-regular: "<a href="index.php/c-20-define-the-concept-regular-and-semiregular">C++20: Define the Concept Regular and SemiRegular.</a>"</p>
+<p>Now, I have to write a lot of boilerplate code. Here are the missing five operators:</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">bool</span> <span style="color: #006699; font-weight: bold;">operator</span><span style="color: #555555;">==</span>(<span style="color: #006699; font-weight: bold;">const</span> MyInt<span style="color: #555555;">&amp;</span> rhs) <span style="color: #006699; font-weight: bold;">const</span> { 
+    <span style="color: #006699; font-weight: bold;">return</span> value <span style="color: #555555;">==</span> rhs.value; 
+}
+<span style="color: #007788; font-weight: bold;">bool</span> <span style="color: #006699; font-weight: bold;">operator</span><span style="color: #555555;">!=</span>(<span style="color: #006699; font-weight: bold;">const</span> MyInt<span style="color: #555555;">&amp;</span> rhs) <span style="color: #006699; font-weight: bold;">const</span> { 
+    <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #555555;">!</span>(<span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">this</span> <span style="color: #555555;">==</span> rhs);    
+}
+<span style="color: #007788; font-weight: bold;">bool</span> <span style="color: #006699; font-weight: bold;">operator</span><span style="color: #555555;">&lt;=</span>(<span style="color: #006699; font-weight: bold;">const</span> MyInt<span style="color: #555555;">&amp;</span> rhs) <span style="color: #006699; font-weight: bold;">const</span> { 
+    <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #555555;">!</span>(rhs <span style="color: #555555;">&lt;</span> <span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">this</span>);     
+}
+<span style="color: #007788; font-weight: bold;">bool</span> <span style="color: #006699; font-weight: bold;">operator</span><span style="color: #555555;">&gt;</span>(<span style="color: #006699; font-weight: bold;">const</span> MyInt<span style="color: #555555;">&amp;</span> rhs)  <span style="color: #006699; font-weight: bold;">const</span> { 
+    <span style="color: #006699; font-weight: bold;">return</span> rhs <span style="color: #555555;">&lt;</span> <span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">this</span>;        
+}
+<span style="color: #007788; font-weight: bold;">bool</span> <span style="color: #006699; font-weight: bold;">operator</span><span style="color: #555555;">&gt;=</span>(<span style="color: #006699; font-weight: bold;">const</span> MyInt<span style="color: #555555;">&amp;</span> rhs) <span style="color: #006699; font-weight: bold;">const</span> {   
+    <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #555555;">!</span>(<span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">this</span> <span style="color: #555555;">&lt;</span> rhs);     
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Done? No! I assume you want to compare <span style="font-family: courier new, courier;">MyInt</span> with int's. To support the comparison of an <span style="font-family: courier new, courier;">int</span> and a <span style="font-family: courier new, courier;">MyInt</span>, and a <span style="font-family: courier new, courier;">MyInt</span> and an <span style="font-family: courier new, courier;">int</span>, you have to overload each operator three times because the constructor is declared as <span style="font-family: courier new, courier;">explicit</span>. Thanks to <span style="font-family: courier new, courier;">explicit</span>, no implicit conversion from <span style="font-family: courier new, courier;">int</span> to <span style="font-family: courier new, courier;">MyInt</span> kicks in. For convenience, you make the operators to a friend of the class. If you need more background information for my design decisions, read my previous post: "<a href="index.php/c-core-guidelines-rules-for-overloading-and-overload-operators">C++ Core Guidelines: Rules for Overloading and Overload Operators</a>"</p>
+<p>These are the three overloads for smaller-than.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">friend</span> <span style="color: #007788; font-weight: bold;">bool</span> <span style="color: #006699; font-weight: bold;">operator</span> <span style="color: #555555;">&lt;</span> (<span style="color: #006699; font-weight: bold;">const</span> MyInts<span style="color: #555555;">&amp;</span> lhs, <span style="color: #006699; font-weight: bold;">const</span> MyInt<span style="color: #555555;">&amp;</span> rhs) {                  
+    <span style="color: #006699; font-weight: bold;">return</span> lhs.value <span style="color: #555555;">&lt;</span> rhs.value;
+}
+
+<span style="color: #006699; font-weight: bold;">friend</span> <span style="color: #007788; font-weight: bold;">bool</span> <span style="color: #006699; font-weight: bold;">operator</span> <span style="color: #555555;">&lt;</span> (<span style="color: #007788; font-weight: bold;">int</span> lhs, <span style="color: #006699; font-weight: bold;">const</span> MyInt<span style="color: #555555;">&amp;</span> rhs) {                  
+    <span style="color: #006699; font-weight: bold;">return</span> lhs <span style="color: #555555;">&lt;</span> rhs.value;
+}
+
+<span style="color: #006699; font-weight: bold;">friend</span> <span style="color: #007788; font-weight: bold;">bool</span> <span style="color: #006699; font-weight: bold;">operator</span> <span style="color: #555555;">&lt;</span> (<span style="color: #006699; font-weight: bold;">const</span> MyInts<span style="color: #555555;">&amp;</span> lhs, <span style="color: #007788; font-weight: bold;">int</span> rhs) {                  
+    <span style="color: #006699; font-weight: bold;">return</span> lhs.value <span style="color: #555555;">&lt;</span> rhs;
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>This means in total that you have to implement 18 comparison operators. Is this the end of the story? Maybe not, because you decided that the <span style="font-family: courier new, courier;">MyInt</span> and all operators should become <span style="font-family: courier new, courier;">constexpr</span>. You should also consider making the operators <span style="font-family: courier new, courier;">noexcept.</span></p>
+<p>I assume this is enough motivation for the three-way comparison operators.</p>
+<h2>Ordering with C++20</h2>
+<p>You can define the three-way comparison operator or request it from the compiler with<span style="font-family: courier new, courier;"> =default</span>. In both cases you get all six comparison operators:&nbsp;<span style="font-family: courier new, courier;">==,&nbsp;!=, &lt;, &lt;=, &gt;, </span>and<span style="font-family: courier new, courier;"> &gt;=. </span></p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// threeWayComparison.cpp</span>
+
+<span style="color: #009999;">#include &lt;compare&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">struct</span> MyInt {
+    <span style="color: #007788; font-weight: bold;">int</span> value;
+    <span style="color: #006699; font-weight: bold;">explicit</span> MyInt(<span style="color: #007788; font-weight: bold;">int</span> val)<span style="color: #555555;">:</span> value{val} { }
+    <span style="color: #006699; font-weight: bold;">auto</span> <span style="color: #006699; font-weight: bold;">operator</span><span style="color: #555555;">&lt;=&gt;</span>(<span style="color: #006699; font-weight: bold;">const</span> MyInt<span style="color: #555555;">&amp;</span> rhs) <span style="color: #006699; font-weight: bold;">const</span> {           <span style="color: #0099ff; font-style: italic;">// (1)</span>      
+        <span style="color: #006699; font-weight: bold;">return</span> value <span style="color: #555555;">&lt;=&gt;</span> rhs.value;
+    }
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> MyDouble {
+    <span style="color: #007788; font-weight: bold;">double</span> value;
+    <span style="color: #006699; font-weight: bold;">explicit</span> constexpr MyDouble(<span style="color: #007788; font-weight: bold;">double</span> val)<span style="color: #555555;">:</span> value{val} { }
+    <span style="color: #006699; font-weight: bold;">auto</span> <span style="color: #006699; font-weight: bold;">operator</span><span style="color: #555555;">&lt;=&gt;</span>(<span style="color: #006699; font-weight: bold;">const</span> MyDouble<span style="color: #555555;">&amp;</span>) <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">default</span>;   <span style="color: #0099ff; font-style: italic;">// (2)</span>
+};
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+constexpr <span style="color: #007788; font-weight: bold;">bool</span> isLessThan(<span style="color: #006699; font-weight: bold;">const</span> T<span style="color: #555555;">&amp;</span> lhs, <span style="color: #006699; font-weight: bold;">const</span> T<span style="color: #555555;">&amp;</span> rhs) {
+    <span style="color: #006699; font-weight: bold;">return</span> lhs <span style="color: #555555;">&lt;</span> rhs;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main() {
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>boolalpha <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    MyInt <span style="color: #cc00ff;">myInt1</span>(<span style="color: #ff6600;">2011</span>);
+    MyInt <span style="color: #cc00ff;">myInt2</span>(<span style="color: #ff6600;">2014</span>);
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"isLessThan(myInt1, myInt2): "</span>
+              <span style="color: #555555;">&lt;&lt;</span> isLessThan(myInt1, myInt2) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+              
+    MyDouble <span style="color: #cc00ff;">myDouble1</span>(<span style="color: #ff6600;">2011</span>);
+    MyDouble <span style="color: #cc00ff;">myDouble2</span>(<span style="color: #ff6600;">2014</span>);
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"isLessThan(myDouble1, myDouble2): "</span>
+              <span style="color: #555555;">&lt;&lt;</span> isLessThan(myDouble1, myDouble2) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;          
+              
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+              
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The user-defined (1) and the compiler-generated (2) three-way comparison operator work as expected.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/TheeWayComparisonOperator/threeWayComparison.PNG" alt="threeWayComparison" width="400" height="157" /></p>
+<p>But there are a few subtle differences in this case. The by the compiler deduced return type for <span style="font-family: courier new, courier;">MyInt</span> (1) supports strong ordering, and the by the compiler deduced return type of <span style="font-family: courier new, courier;">MyDouble</span> supports partial ordering. Floating pointer numbers only <span style="font-family: courier new, courier;"></span>support partial ordering because floating-point values such as <a href="https://en.wikipedia.org/wiki/NaN"><span style="font-family: courier new, courier;">NaN</span></a> (Not a Number) can not be ordered. For example <span style="font-family: courier new, courier;">NaN</span> == <span style="font-family: courier new, courier;">NaN</span>&nbsp; is <span style="font-family: courier new, courier;">false</span>.</p>
+<p>Now, I want to focus on this post about the compiler-generated spaceship operator.</p>
+<h3>The Compiler-Generated Spaceship Operator</h3>
+<p>The compiler-generated three-way comparison operator needs the header &lt;<span style="font-family: courier new, courier;">compare&gt;</span>, is implicit <span style="font-family: courier new, courier;">constexpr</span> and <span style="font-family: courier new, courier;">noexcept</span>. Additionally, it performs a lexicographical comparison. What? Let me start with <span style="font-family: courier new, courier;">constexpr</span>.</p>
+<h4>Comparison at Compile-Time</h4>
+<p>The three-way comparison operator is implicit <span style="font-family: courier new, courier;">constexpr</span>. Consequently, I simplify the previous program<span style="font-family: courier new, courier;"> threeWayComparison.cpp</span> and compare <span style="font-family: courier new, courier;">MyDouble</span> in the following program at compile-time.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// threeWayComparisonAtCompileTime.cpp</span>
+
+<span style="color: #009999;">#include &lt;compare&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">struct</span> MyDouble {
+    <span style="color: #007788; font-weight: bold;">double</span> value;
+    <span style="color: #006699; font-weight: bold;">explicit</span> constexpr MyDouble(<span style="color: #007788; font-weight: bold;">double</span> val)<span style="color: #555555;">:</span> value{val} { }
+    <span style="color: #006699; font-weight: bold;">auto</span> <span style="color: #006699; font-weight: bold;">operator</span><span style="color: #555555;">&lt;=&gt;</span>(<span style="color: #006699; font-weight: bold;">const</span> MyDouble<span style="color: #555555;">&amp;</span>) <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">default</span>;    
+};
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+constexpr <span style="color: #007788; font-weight: bold;">bool</span> isLessThan(<span style="color: #006699; font-weight: bold;">const</span> T<span style="color: #555555;">&amp;</span> lhs, <span style="color: #006699; font-weight: bold;">const</span> T<span style="color: #555555;">&amp;</span> rhs) {
+    <span style="color: #006699; font-weight: bold;">return</span> lhs <span style="color: #555555;">&lt;</span> rhs;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main() {
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>boolalpha <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+              
+    constexpr MyDouble <span style="color: #cc00ff;">myDouble1</span>(<span style="color: #ff6600;">2011</span>);
+    constexpr MyDouble <span style="color: #cc00ff;">myDouble2</span>(<span style="color: #ff6600;">2014</span>);
+    
+    constexpr <span style="color: #007788; font-weight: bold;">bool</span> res <span style="color: #555555;">=</span> isLessThan(myDouble1, myDouble2); <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"isLessThan(myDouble1, myDouble2): "</span>
+              <span style="color: #555555;">&lt;&lt;</span> res <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;          
+              
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+              
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>I ask for the result of the comparison at compile-time (1), and I get it.</p>
+<h4><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/TheeWayComparisonOperator/threeWayComparisonAtComileTime.PNG" alt="threeWayComparisonAtComileTime" width="450" height="141" /></h4>
+<p>&nbsp;</p>
+<p>The compiler-generated three-way comparison operator performs a lexicographical comparison.&nbsp;</p>
+<h4>Lexicographical Comparison</h4>
+<p>Lexicographical comparison means in this case that all base classes are compared left to right and all non-static members of the class in their declaration order. I have to qualify: for performance reasons, the compiler-generated <span style="font-family: courier new, courier;">==</span> and <span style="font-family: courier new, courier;">!=</span> operator behave differently in C++20. I will write about this exception to the rule in my next post.</p>
+<p>The post "<a href="https://devblogs.microsoft.com/cppblog/simplify-your-code-with-rocket-science-c20s-spaceship-operator/">Simplify Your Code With Rocket Science: C++20’s Spaceship Operator</a>" Microsoft C++ Team Blog provides an impressive example to the lexicographical comparison.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">struct</span> Basics {
+  <span style="color: #007788; font-weight: bold;">int</span> i;
+  <span style="color: #007788; font-weight: bold;">char</span> c;
+  <span style="color: #007788; font-weight: bold;">float</span> f;
+  <span style="color: #007788; font-weight: bold;">double</span> d;
+  <span style="color: #006699; font-weight: bold;">auto</span> <span style="color: #006699; font-weight: bold;">operator</span><span style="color: #555555;">&lt;=&gt;</span>(<span style="color: #006699; font-weight: bold;">const</span> Basics<span style="color: #555555;">&amp;</span>) <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">default</span>;
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> Arrays {
+  <span style="color: #007788; font-weight: bold;">int</span> ai[<span style="color: #ff6600;">1</span>];
+  <span style="color: #007788; font-weight: bold;">char</span> ac[<span style="color: #ff6600;">2</span>];
+  <span style="color: #007788; font-weight: bold;">float</span> af[<span style="color: #ff6600;">3</span>];
+  <span style="color: #007788; font-weight: bold;">double</span> ad[<span style="color: #ff6600;">2</span>][<span style="color: #ff6600;">2</span>];
+  <span style="color: #006699; font-weight: bold;">auto</span> <span style="color: #006699; font-weight: bold;">operator</span><span style="color: #555555;">&lt;=&gt;</span>(<span style="color: #006699; font-weight: bold;">const</span> Arrays<span style="color: #555555;">&amp;</span>) <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">default</span>;
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> Bases <span style="color: #555555;">:</span> Basics, Arrays {
+  <span style="color: #006699; font-weight: bold;">auto</span> <span style="color: #006699; font-weight: bold;">operator</span><span style="color: #555555;">&lt;=&gt;</span>(<span style="color: #006699; font-weight: bold;">const</span> Bases<span style="color: #555555;">&amp;</span>) <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">default</span>;
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+  constexpr Bases a <span style="color: #555555;">=</span> { { <span style="color: #ff6600;">0</span>, <span style="color: #cc3300;">'c'</span>, <span style="color: #ff6600;">1.f</span>, <span style="color: #ff6600;">1.</span> },    <span style="color: #0099ff; font-style: italic;">// (1)</span>
+                        { { <span style="color: #ff6600;">1</span> }, { <span style="color: #cc3300;">'a'</span>, <span style="color: #cc3300;">'b'</span> }, { <span style="color: #ff6600;">1.f</span>, <span style="color: #ff6600;">2.f</span>, <span style="color: #ff6600;">3.f</span> }, { { <span style="color: #ff6600;">1.</span>, <span style="color: #ff6600;">2.</span> }, { <span style="color: #ff6600;">3.</span>, <span style="color: #ff6600;">4.</span> } } } };
+  constexpr Bases b <span style="color: #555555;">=</span> { { <span style="color: #ff6600;">0</span>, <span style="color: #cc3300;">'c'</span>, <span style="color: #ff6600;">1.f</span>, <span style="color: #ff6600;">1.</span> },   <span style="color: #0099ff; font-style: italic;">// (1)</span>
+                        { { <span style="color: #ff6600;">1</span> }, { <span style="color: #cc3300;">'a'</span>, <span style="color: #cc3300;">'b'</span> }, { <span style="color: #ff6600;">1.f</span>, <span style="color: #ff6600;">2.f</span>, <span style="color: #ff6600;">3.f</span> }, { { <span style="color: #ff6600;">1.</span>, <span style="color: #ff6600;">2.</span> }, { <span style="color: #ff6600;">3.</span>, <span style="color: #ff6600;">4.</span> } } } };
+  static_assert(a <span style="color: #555555;">==</span> b);
+  static_assert(<span style="color: #555555;">!</span>(a <span style="color: #555555;">!=</span> b));
+  static_assert(<span style="color: #555555;">!</span>(a <span style="color: #555555;">&lt;</span> b));
+  static_assert(a <span style="color: #555555;">&lt;=</span> b);
+  static_assert(<span style="color: #555555;">!</span>(a <span style="color: #555555;">&gt;</span> b));
+  static_assert(a <span style="color: #555555;">&gt;=</span> b);
+}
+</pre>
+</div>
+<p></p>
+<p>I assume, the most complex aspect of the program is not the spaceship operator, but the initialization of <span style="font-family: courier new, courier;">Base</span> via aggregate initialization (1). Aggregate initialization enables it to directly initialize the members of a class type (<span style="font-family: courier new, courier;">class, struct, union</span>) when the members are all <span style="font-family: courier new, courier;">public</span>.&nbsp; In this case, you can use brace initialization. If you want to know more about aggregate initialization, <a href="https://en.cppreference.com/w/cpp/language/aggregate_initialization">cppreference.com</a> provides more information. I will write more about aggregate initialization in a future post when I will have a closer look at designated initialization in C++20.</p>
+<h2>What's next?</h2>
+<p>The compiler performs quite a clever job when it generates all operators. On the end, you get the intuitive and efficient comparison operators for free. My next post dives deeper into the magic under the hood.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Meeting C++, Matt Braun, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Marko, </strong><span class="sc-kpOJdX fDWXFa" title="Emyr Williams"><strong>G Prvulovic, Reinhold Dröge, Abernitzke,</strong> </span><strong><span title="Emyr Williams">Frank Grimm</span></strong><span title="Emyr Williams"><strong>, Sakib, Broeserl, </strong></span><strong><span title="Emyr Williams">António Pina, Darshan Mody, Sergey Agafyin, <span class="sc-gZMcBi hdSbOl" data-tag="user-details-full-name">Андрей Бурмистров, Jake, GS, Lawton Shoemake, Animus24, Jozo Leko, John Breland, espkk, Wolfgang Gärtner, </span></span><span title="Emyr Williams"><span class="sc-htpNat dEZjR" style="color: #241e12; font-family: aktiv-grotesk, sans-serif; margin: 0px; position: relative; font-weight: 400; font-size: 1rem; line-height: 1.5;"><span class="sc-htpNat ebhhXb" style="color: #241e12; font-family: aktiv-grotesk, sans-serif; margin: 0px; position: relative; font-weight: bold; font-size: 1rem; line-height: 1.5;"></span></span></span>Jon Hess, Christian Wittenhorst, Louis St-Amour, Stephan Roslen, Venkat Nandam, Jose Francisco, Douglas Tinkham, Lakshman, Kuchlong Kuchlong, and Avi Kohn.<br /></strong></p>
+<p>&nbsp;</p>
+<p>Thanks in particular to: <a href="https://bitwyre.com/">Bitwyre Technologies </a></p>
+<p>&nbsp;</p>
+<table style="width: 490px; height: 103px;">
+<tbody>
+<tr>
+<td><strong>Thanks in particular to:</strong></td>
+<td>&nbsp;</td>
+<td><a href="https://cranepay.io/"><img src="images/patreon/crp4.png" alt="crp4" width="150" height="96" /></a></td>
+</tr>
+</tbody>
+</table>
+<p><strong>&nbsp;</strong></p>
+<h2>Seminars</h2>
+<p>I'm happy to give online-seminars or face-to-face seminars world-wide. Please call me if you have any questions.</p>
+<h3 class="moz-signature">Bookable Seminars (Online)</h3>
+<ul>
+<li class="moz-signature"><a href="https://www.modernescpp.net/index.php/c/2-c/30-c-11-and-c-14">C++11 and C+14: 13 July 2020 - 17 July 2020 (5 * 1/2 day)</a></li>
+<li class="moz-signature"><a href="https://www.modernescpp.net/index.php/c/2-c/28-clean-code-with-modern-c">Clean Code with modern C++: 03 August 2020 - 07 August 2020 (5 * 1/2 day)</a></li>
+</ul>
+<h3>Standard Seminars&nbsp;</h3>
+<p>Here is a compilation of my standard seminars. These seminars are only meant to give you a first orientation.</p>
+<ul>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/22">C++ - The Core Language</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/23">C++ - The Standard Library</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/23">C++ - Compact</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/18">C++11 and C++14</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/16">Clean Code with Modern C++</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/19">Concurrency with Modern C++</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/21">Design Patterns and Architecture Patterns with C++</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/17">Embedded Programming with Modern C++</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/17">Generic Programming (Templates) with C++</a></li>
+</ul>
+<h3>Contact Me</h3>
+<ul>
+<li>Tel.: +49 7472 917441</li>
+<li>Mobil: +49 152 31965939</li>
+<li>Mail: <a href="&lt;a href=">schulung@ModernesCpp.de</a></li>
+<li>German Seminar Page: <a href="https://www.modernescpp.de/">www.ModernesCpp.de</a></li>
+<li>English Seminar Page: <a href="http://www.ModernesCpp.net">www.ModernesCpp.net</a></li>
+</ul>
+<h3>Modernes C++,</h3>
+<p><img src="images/signatur/RainerGrimmSmall.png" alt="RainerGrimmSmall" /></p>
