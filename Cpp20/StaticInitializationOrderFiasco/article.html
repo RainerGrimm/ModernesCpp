@@ -1,0 +1,161 @@
+<p>According to the <a href="https://isocpp.org/wiki/faq/ctors#static-init-order">FAQ of isocpp.org</a>&nbsp;is the static initialization order fiasco "<em>a subtle way to crash your program".&nbsp;</em>The FAQ continues<em>: The static initialization order problem is a very subtle and commonly misunderstood aspect of C++.&nbsp;</em>". Today, I write about this very subtle and misunderstood aspect of C++.&nbsp;&nbsp;<span style="color: #333333; font-family: 'Crimson Text', 'Times New Roman', serif; font-size: 17px; font-style: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing: 0px; background-color: #ffffff; float: none;"><br /></span></p>
+<hr id="system-readmore" />
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/StaticInitializationOrderFiasco/TimelineCpp20.png" alt="TimelineCpp20" width="650" height="234" /></p>
+<h2>My short Disclaimer</h2>
+<p>Before I continue, I want to make a short disclaimer. Today's post is about variables with static storage duration and there dependencies. Variables with static storage duration may be global (namespace) variables, static variables, or static class members. In short, I call them static variables. <strong>Dependencies on static variables in different translation units are, in general, a <a href="https://en.wikipedia.org/wiki/Code_smell">code smell</a> and should be a reason for refactoring.</strong> Consequently, if you follow my advice to refactor, you can skip the rest of this post.&nbsp;</p>
+<h2>Static Initialization Order Fiasco</h2>
+<p>Static variables in one translation unit are initialized according to their definition order.</p>
+<p>In contrast, the initialization of static variables between translation units has a severe issue. When one static variable <span style="font-family: courier new, courier;">staticA</span> is defined in one translation unit and another static variable <span style="font-family: courier new, courier;">staticB</span> is defined in another translation unit and <span style="font-family: courier new, courier;">staticB</span>&nbsp;needs <span style="font-family: courier new, courier;">staticA</span>&nbsp;to initialize itself, you end with the static initialization order fiasco. The program is ill-formed because you have no guarantee which static variable is initialized first at run-time (dynamic).</p>
+<p>Before I talk about the rescue, let me show you the static initialization order fiasco in action.</p>
+<h3>A 50:50 Chance to get it Right</h3>
+<p>What is unique about the initialization of static variables? The initialization of static variables happens in two steps: static and dynamic.&nbsp;</p>
+<p>When a static cannot be <a href="https://en.cppreference.com/w/cpp/language/constant_initialization">const-initialized</a> during compile-time, it is <a href="https://en.cppreference.com/w/cpp/language/zero_initialization">zero-initialized</a>. At run-time, the dynamic initialization happens for these statics that are <a href="https://en.cppreference.com/w/cpp/language/zero_initialization">zero-initialized</a> at compile-time.&nbsp;</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// sourceSIOF1.cpp</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">quad</span>(<span style="color: #007788; font-weight: bold;">int</span> n) {
+    <span style="color: #006699; font-weight: bold;">return</span> n <span style="color: #555555;">*</span> n;
+}
+
+<span style="color: #006699; font-weight: bold;">auto</span> staticA  <span style="color: #555555;">=</span> quad(<span style="color: #ff6600;">5</span>); 
+</pre>
+</div>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// mainSOIF1.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">extern</span> <span style="color: #007788; font-weight: bold;">int</span> staticA;   <span style="color: #0099ff; font-style: italic;">// (1)</span>
+<span style="color: #006699; font-weight: bold;">auto</span> staticB <span style="color: #555555;">=</span> staticA;
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"staticB: "</span> <span style="color: #555555;">&lt;&lt;</span> staticB <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The line (1) declares the static variable <span style="font-family: 'courier new', courier;">staticA</span>.&nbsp;The initialization of <span style="font-family: 'courier new', courier;">staticB</span> depends on the initialization of <span style="font-family: 'courier new', courier;">staticA</span>. <span style="font-family: 'courier new', courier;">staticB</span> is zero-initialized at compile-time and dynamically initialized at run-time. The issue is that there is no guarantee in which order&nbsp;<span style="font-family: 'courier new', courier;">staticA</span> or <span style="font-family: 'courier new', courier;">staticB </span>are initialized.<span style="font-family: 'courier new', courier;"> staticA </span>and<span style="font-family: 'courier new', courier;"> staticB</span>&nbsp;belong to different translation units. You have a 50:50 chance that <span style="font-family: 'courier new', courier;">staticB</span> is 0 or 25.&nbsp;</p>
+<p>To make my observation visible, I change the link order of the object-files. This also changes the value for <span style="font-family: 'courier new', courier;">staticB!</span></p>
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/StaticInitializationOrderFiasco/StaticInitializationOrderFiasco.png" alt="StaticInitializationOrderFiasco" width="500" height="282" /></p>
+<p>What a fiasco!&nbsp; The result of the executable depend on the link-order of the object files. What can we do, when we don't have C++20 to our disposal?&nbsp;</p>
+<h3>Lazy Initialization of a static with local scope</h3>
+<p>Static variables with local scope are created, when they are used the first time. Local scope essentially means that the static variable is surrounded in some way by curly braces. This lazy creation is a guarantee that C++98 provides. With C++11, static variables with local scope are also initialized in a thread-safe way. The thread-safe Meyers Singleton is based on this additional guarantee. I already wrote a post about the "<a href="index.php/thread-safe-initialization-of-a-singleton">Thread-Safe Initialization of a Singleton</a>".&nbsp;</p>
+<p>The lazy initialization can also be used to overcome the static initialization order fiasco.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// sourceSIOF2.cpp</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">quad</span>(<span style="color: #007788; font-weight: bold;">int</span> n) {
+    <span style="color: #006699; font-weight: bold;">return</span> n <span style="color: #555555;">*</span> n;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&amp;</span> staticA() {
+    
+    <span style="color: #006699; font-weight: bold;">static</span> <span style="color: #006699; font-weight: bold;">auto</span> staticA  <span style="color: #555555;">=</span> quad(<span style="color: #ff6600;">5</span>);   <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    <span style="color: #006699; font-weight: bold;">return</span> staticA;
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// mainSOIF2.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&amp;</span> staticA();           <span style="color: #0099ff; font-style: italic;">// (2)</span>
+
+<span style="color: #006699; font-weight: bold;">auto</span> staticB <span style="color: #555555;">=</span> staticA(); <span style="color: #0099ff; font-style: italic;">// (3)</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"staticB: "</span> <span style="color: #555555;">&lt;&lt;</span> staticB <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p><span style="font-family: 'courier new', courier;">staticA</span> is, in this case, a static in a local scope (1). The line (2) declares the function <span style="font-family: 'courier new', courier;">staticA</span>, which is used to initialize in the following line <span style="font-family: 'courier new', courier;">staticB</span>. This local scope of <span style="font-family: 'courier new', courier;">staticA</span> guarantees that <span style="font-family: 'courier new', courier;">staticA</span> is created and initialized during run-time when it is the first time used. Changing the link order can, in this case, not change the value of <span style="font-family: 'courier new', courier;">staticB.</span></p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/StaticInitializationOrderFiasco/StaticInitializationOrderFiascoMeyers.png" alt="StaticInitializationOrderFiascoMeyers" width="500" height="282" /></p>
+<p>Now, I solve the static initialization order fiasco using C++20.</p>
+<h3>Compile-time initialization of a static</h3>
+<p>Let me apply <span style="font-family: 'courier new', courier;">constinit</span> to <span style="font-family: 'courier new', courier;">staticA</span>. <span style="font-family: 'courier new', courier;">constinit</span> guarantees that <span style="font-family: 'courier new', courier;">staticA</span> is initialized during compile-time.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// sourceSIOF3.cpp</span>
+
+constexpr <span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">quad</span>(<span style="color: #007788; font-weight: bold;">int</span> n) {
+    <span style="color: #006699; font-weight: bold;">return</span> n <span style="color: #555555;">*</span> n;
+}
+
+constinit <span style="color: #006699; font-weight: bold;">auto</span> staticA  <span style="color: #555555;">=</span> quad(<span style="color: #ff6600;">5</span>);  <span style="color: #0099ff; font-style: italic;">// (2)</span>
+</pre>
+</div>
+<p></p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// mainSOIF3.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">extern</span> constinit <span style="color: #007788; font-weight: bold;">int</span> staticA;     <span style="color: #0099ff; font-style: italic;">// (1)</span>
+
+<span style="color: #006699; font-weight: bold;">auto</span> staticB <span style="color: #555555;">=</span> staticA;
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"staticB: "</span> <span style="color: #555555;">&lt;&lt;</span> staticB <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+}
+</pre>
+</div>
+<p></p>
+<p>(1) declares the variable <span style="font-family: 'courier new', courier;">staticA</span>. <span style="font-family: 'courier new', courier;">staticA</span>&nbsp;(2) is initialized during compile-time. By the way, using <span style="font-family: 'courier new', courier;">constexpr</span> in (1) instead of <span style="font-family: 'courier new', courier;">constinit</span> is not valid, because <span style="font-family: 'courier new', courier;">constexpr</span> requires a definition and not just a declaration.&nbsp;</p>
+<p>&nbsp;</p>
+<p>Thanks to Clang 10 compiler, I can execute the program.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/StaticInitializationOrderFiasco/StaticInitializationOrderFiascoConstinit.png" alt="StaticInitializationOrderFiascoConstinit" width="500" height="294" /></p>
+<p>As in the case of the lazy initialization with a local static, <span style="font-family: 'courier new', courier;">staticB</span> has the value 25.</p>
+<h2 style="color: #000000;">What's next?</h2>
+<p>C++20 has a few small improvements around Templates and Lambdas. In my next post, I present which ones.</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Meeting C++, Matt Braun, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Marko, </strong><span class="sc-kpOJdX fDWXFa" title="Emyr Williams"><strong>G Prvulovic, Reinhold Dröge, Abernitzke,</strong> </span><strong><span title="Emyr Williams">Frank Grimm</span></strong><span title="Emyr Williams"><strong>, Sakib, Broeserl, </strong></span><strong><span title="Emyr Williams">António Pina, Darshan Mody, Sergey Agafyin, <span class="sc-gZMcBi hdSbOl" data-tag="user-details-full-name">Андрей Бурмистров, Jake, GS, Lawton Shoemake, Animus24, Jozo Leko, John Breland, espkk, Wolfgang Gärtner, </span></span><span title="Emyr Williams"><span class="sc-htpNat dEZjR" style="color: #241e12; font-family: aktiv-grotesk, sans-serif; margin: 0px; position: relative; font-weight: 400; font-size: 1rem; line-height: 1.5;"><span class="sc-htpNat ebhhXb" style="color: #241e12; font-family: aktiv-grotesk, sans-serif; margin: 0px; position: relative; font-weight: bold; font-size: 1rem; line-height: 1.5;"></span></span></span>Jon Hess, Christian Wittenhorst, Louis St-Amour, Stephan Roslen, Venkat Nandam, Jose Francisco, Douglas Tinkham, Lakshman, Kuchlong Kuchlong, Avi Kohn, Serhy Pyton, Robert Blanch, Kuma [], Truels Wissneth, and Kris Kafka.<br /></strong></p>
+<p>&nbsp;</p>
+<p><strong>&nbsp;</strong></p>
+<h2>Seminars</h2>
+<p>I'm happy to give online-seminars or face-to-face seminars world-wide. Please call me if you have any questions.</p>
+<h3>Standard Seminars&nbsp;</h3>
+<p>Here is a compilation of my standard seminars. These seminars are only meant to give you a first orientation.</p>
+<ul>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/22">C++ - The Core Language</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/23">C++ - The Standard Library</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/23">C++ - Compact</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/18">C++11 and C++14</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/16">Clean Code with Modern C++</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/19">Concurrency with Modern C++</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/21">Design Patterns and Architecture Patterns with C++</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/17">Embedded Programming with Modern C++</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/17">Generic Programming (Templates) with C++</a></li>
+</ul>
+<h3>Contact Me</h3>
+<ul>
+<li>Tel.: +49 7472 917441</li>
+<li>Mobil: +49 152 31965939</li>
+<li>Mail: <a href="&lt;a href=">schulung@ModernesCpp.de</a></li>
+<li>German Seminar Page: <a href="https://www.modernescpp.de/">www.ModernesCpp.de</a></li>
+<li>English Seminar Page: <a href="http://www.ModernesCpp.net">www.ModernesCpp.net</a></li>
+</ul>
+<h3>Modernes C++,</h3>
+<p><img src="images/signatur/RainerGrimmSmall.png" alt="RainerGrimmSmall" /></p>
