@@ -1,0 +1,192 @@
+<p>Admittedly, I present in this post a few small improvements to templates and to C++20 in general. Although these improvements may seem not so impressive to you, they make C++20 more consistent and, therefore, less error-prone when you program generic.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/TemplateImprovements/TimelineCpp20CoreLanguage.png" alt="TimelineCpp20CoreLanguage" width="650" height="277" /></p>
+<p>Today's post is about conditionally explicit constructors and new non-type template parameters.</p>
+<h2>Conditionally Explicit Constructors</h2>
+<p>Sometimes, you want to have a class which should have constructors accepting various different types. For example, you have a class <span style="font-family: courier new, courier;">VariantWrapper</span> which holds a <span style="font-family: 'courier new', courier;">std::variant</span> accepting various different types.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">VariantWrapper</span> {
+
+    std<span style="color: #555555;">::</span>variant<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">bool</span>, <span style="color: #007788; font-weight: bold;">char</span>, <span style="color: #007788; font-weight: bold;">int</span>, <span style="color: #007788; font-weight: bold;">double</span>, <span style="color: #007788; font-weight: bold;">float</span>, std<span style="color: #555555;">::</span>string<span style="color: #555555;">&gt;</span> myVariant;
+
+};
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>To initialize the myVariant with <span style="font-family: courier new, courier;">bool, char, int, double, float,</span>&nbsp;or&nbsp;<span style="font-family: courier new, courier;">std::string, </span>the class <span style="font-family: courier new, courier;">VariantWrapper</span> needs constructors for each listed type. Laziness is a virtue - at least for programmer - , therefore, you decide to make the constructor generic.&nbsp;</p>
+<p><span style="font-family: courier new, courier;"></span>The class<span style="font-family: courier new, courier;"> Implicit</span>&nbsp;exemplifies a generic constructor.</p>
+<p><span style="font-family: courier new, courier;"></span></p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// explicitBool.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;string&gt;</span>
+<span style="color: #009999;">#include &lt;type_traits&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">struct</span> Implicit {
+    <span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;        <span style="color: #0099ff; font-style: italic;">// (1)</span></span>
+    Implicit(T t) {
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> t <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    }
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> Explicit {
+    <span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+    <span style="color: #006699; font-weight: bold;">explicit</span> Explicit(T t) {    <span style="color: #555555;"><span style="color: #0099ff; font-style: italic;">// (2)</span></span>
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> t <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    }
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    Implicit imp1 <span style="color: #555555;">=</span> <span style="color: #cc3300;">"implicit"</span>;
+    Implicit imp2(<span style="color: #cc3300;">"explicit"</span>);
+    Implicit imp3 <span style="color: #555555;">=</span> <span style="color: #ff6600;">1998</span>;
+    Implicit imp4(<span style="color: #ff6600;">1998</span>);
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    <span style="color: #0099ff; font-style: italic;">// Explicit exp1 = "implicit";  // (3)</span>
+    Explicit exp2{<span style="color: #cc3300;">"explicit"</span>};      <span style="color: #0099ff; font-style: italic;">// (4)</span>
+    <span style="color: #0099ff; font-style: italic;">// Explicit exp3 = 2011;        // (3)</span>
+    Explicit exp4{<span style="color: #ff6600;">2011</span>};            <span style="color: #0099ff; font-style: italic;">// (4)</span>
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;  
+
+} 
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Now, you have an issue. A generic constructor (1) is a catch-all constructor because you can invoke them with any type. The constructor is way too greedy.&nbsp; By putting an <span style="font-family: courier new, courier;">explicit</span> in front of the constructor (2). the constructor becomes explicit. This means that implicit conversions (3) are not valid anymore. Only the explicit calls (4) are valid.</p>
+<p>Thanks to Clang 10, here is the output of the program:</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/TemplateImprovements/explicitBool.png" alt="explicitBool" width="300" height="236" /></p>
+<p>This is not the and of the story. Maybe, you have a type <span style="font-family: courier new, courier;">MyBool</span> that should only support the implicit conversion from <span style="font-family: courier new, courier;">bool, </span>but no other implicit conversion<span style="font-family: courier new, courier;">.</span> In this case, explicit can be used conditionally.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// myBool.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;type_traits&gt;</span>
+<span style="color: #009999;">#include &lt;typeinfo&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">struct</span> MyBool {
+    <span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+    <span style="color: #006699; font-weight: bold;">explicit</span>(<span style="color: #555555;">!</span>std<span style="color: #555555;">::</span>is_same<span style="color: #555555;">&lt;</span>T, <span style="color: #007788; font-weight: bold;">bool</span><span style="color: #555555;">&gt;::</span>value) MyBool(T t) {  <span style="color: #0099ff; font-style: italic;">// (1)</span>
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #006699; font-weight: bold;">typeid</span>(t).name() <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    }
+};
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">needBool</span>(MyBool b){ }                                 <span style="color: #0099ff; font-style: italic;">// (2)</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    MyBool myBool1(<span style="color: #336666;">true</span>);                              
+    MyBool myBool2 <span style="color: #555555;">=</span> <span style="color: #336666;">false</span>;                                <span style="color: #0099ff; font-style: italic;">// (3)</span>
+    
+    needBool(myBool1);
+    needBool(<span style="color: #336666;">true</span>);                                        <span style="color: #0099ff; font-style: italic;">// (4)</span>
+    <span style="color: #0099ff; font-style: italic;">// needBool(5);</span>
+    <span style="color: #0099ff; font-style: italic;">// needBool("true");</span>
+    
+}
+</pre>
+</div>
+<p></p>
+<p>The <span style="font-family: courier new, courier;">explicit(!std::is_same&lt;T,&nbsp; bool&gt;::value)</span> expression guarantees that <span style="font-family: courier new, courier;">MyBool</span> can only implicitly created from a <span style="font-family: courier new, courier;">bool&nbsp;</span>value. The function <span style="font-family: courier new, courier;">std::is_same is</span> a compile-time predicate from the <a href="https://en.cppreference.com/w/cpp/header/type_traits">type_traits library</a>. Compile-time predicate means, <span style="font-family: courier new, courier;">std::is_same</span> is evaluated at compile-time and returns a boolean. Consequently, the implicit conversion from <span style="font-family: courier new, courier;">bool</span> in (3) and (4) is possible but not the commented out conversions from <span style="font-family: courier new, courier;">int</span> and a C-string.</p>
+<p>You are right when you argue that a conditionally explicit constructor would be possible with <a href="https://en.cppreference.com/w/cpp/language/sfinae">SFINAE</a>. But honestly, I don't like the corresponding SFINAE using constructor, because it would take me a few lines to explain it. Additionally, I only get it right after the third try.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T, std<span style="color: #555555;">::</span><span style="color: #007788; font-weight: bold;">enable_if_t</span><span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>is_same_v<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span><span style="color: #007788; font-weight: bold;">decay_t</span><span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span>, <span style="color: #007788; font-weight: bold;">bool</span><span style="color: #555555;">&gt;</span>, <span style="color: #007788; font-weight: bold;">bool</span><span style="color: #555555;">&gt;</span> <span style="color: #555555;">=</span> <span style="color: #336666;">true</span><span style="color: #555555;">&gt;</span>
+MyBool(T<span style="color: #555555;">&amp;&amp;</span> t) {
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #006699; font-weight: bold;">typeid</span>(t).name() <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>I think I should add a few explaining words. <span style="font-family: courier new, courier;">std::enable_if </span>is a convenient way to use SFINAE. SFINAE stands for <strong>S</strong>ubstitution<strong> F</strong>ailure <strong>I</strong>s <strong>N</strong>ot <strong>A</strong>n <strong>E</strong>rror and applies during overload resolution of a function template. It means when substituting the template parameter fails, the specialisation is discarded from the overload set but cause no compiler error. This exactly happens in this concrete case. The specialization is discarded if<span style="font-family: courier new, courier;"> std::is_same_v&lt;std::decay_t&lt;T&gt;, bool&gt;</span> evaluates to false. <a href="https://en.cppreference.com/w/cpp/types/decay"><span style="font-family: courier new, courier;">std::decay&lt;T&gt;</span></a> applies conversions to <span style="font-family: courier new, courier;">T</span> such as removing <span style="font-family: courier new, courier;">const</span>, <span style="font-family: courier new, courier;">volatile</span> or a reference from <span style="font-family: courier new, courier;">T. std::decay_t&lt;T&gt;</span> is a convenient syntax for <span style="font-family: courier new, courier;">std::decay&lt;T&gt;::type. </span>The same holds for <span style="font-family: courier new, courier;">std::is_same_v&lt;T, bool&gt;</span> which is short for <span style="font-family: courier new, courier;">std::is_same&lt;T, bool&gt;::value. </span></p>
+<p>Beside my longish explanation, there is an additional argument that speaks against SFINAE and for a conditionally explicit constructor: performance. Simon Brand pointed out in his post "<a href="https://devblogs.microsoft.com/cppblog/c20s-conditionally-explicit-constructors/">C++20's Conditionally Explicit Constructors</a>", that <span style="font-family: 'courier new', courier;">explicit(bool)</span> made the template instantiation for Visual Studio 2019 about 15% faster compared to SFINAE.</p>
+<p>With C++20, additional non-type template parameters are supported.</p>
+<h2>New non-type Template Parameter</h2>
+<p>With C++20, floating-points and classes with <span style="font-family: courier new, courier;">constexpr</span> constructors are supported as non-types.</p>
+<p>C++ supports non-types as template parameters. Essentially non-types could be</p>
+<ul>
+<li>integers and enumerators</li>
+<li>pointer&nbsp; or references to objects, functions and to attributes of a class</li>
+<li><span style="font-family: courier new, courier;">std::nullptr_t</span></li>
+</ul>
+<p>When I ask in the students in my class if they ever used a non-type as template parameter they say: No! Of course, I answer my own tricky question and show an often-used example for non-type template parameters:</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">std<span style="color: #555555;">::</span>array<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>, <span style="color: #ff6600;">5</span><span style="color: #555555;">&gt;</span> myVec;
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>5 is a non-type and used as a template argument. We are just used to it. Since the first C++-standard C++98, there is a discussion in the C++ community to support floating points as a template parameter. Now, we C++20 we have it:</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// nonTypeTemplateParameter.cpp</span>
+
+<span style="color: #006699; font-weight: bold;">struct</span> ClassType {
+    constexpr ClassType(<span style="color: #007788; font-weight: bold;">int</span>) {}  <span style="color: #0099ff; font-style: italic;">// (1)</span>
+};
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span>ClassType cl<span style="color: #555555;">&gt;          <span style="color: #0099ff; font-style: italic;">// (2)</span></span>
+<span style="color: #006699; font-weight: bold;">auto</span> getClassType() {
+    <span style="color: #006699; font-weight: bold;">return</span> cl;
+}
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">double</span> d<span style="color: #555555;">&gt;              <span style="color: #0099ff; font-style: italic;">// (3)</span></span>
+<span style="color: #006699; font-weight: bold;">auto</span> getDouble() {
+    <span style="color: #006699; font-weight: bold;">return</span> d;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main() {
+
+    <span style="color: #006699; font-weight: bold;">auto</span> c1 <span style="color: #555555;">=</span> getClassType<span style="color: #555555;">&lt;</span>ClassType(<span style="color: #ff6600;">2020</span>)<span style="color: #555555;">&gt;</span>();
+
+    <span style="color: #006699; font-weight: bold;">auto</span> d1 <span style="color: #555555;">=</span> getDouble<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">5.5</span><span style="color: #555555;">&gt;</span>();  <span style="color: #0099ff; font-style: italic;">// (4)</span><span style="color: #555555;"></span>
+    <span style="color: #006699; font-weight: bold;">auto</span> d2 <span style="color: #555555;">=</span> getDouble<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">6.5</span><span style="color: #555555;">&gt;</span>();  <span style="color: #0099ff; font-style: italic;">// (4)</span><span style="color: #555555;"></span>
+
+}
+</pre>
+</div>
+<p></p>
+<p>ClassType has a constexpr constructor (1) and can, therefore, be used as a template argument (2). The same holds for the function template&nbsp;<span style="font-family: courier new, courier;">getDouble</span> (3) which accepts only doubles. I want to emphasize is explicit, that each call of the function template&nbsp;<span style="font-family: courier new, courier;">getDouble</span> (4) with a new argument triggers the instantiation of a new function <span style="font-family: courier new, courier;">getDouble</span>.&nbsp; This means that there are two instantiations for the doubles 5.5 and 6.5 are created.</p>
+<p>If Clang would already support this feature I could show you with C++ Insights that each instantiation for 5.5 and 6.5 creates a fully specialized function template. At least, thanks to GCC, I can show you the relevant assembler instructions with the <a href="https://godbolt.org/">Compiler Explorer.</a></p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/TemplateImprovements/nonTypeTemplateParameter.png" alt="nonTypeTemplateParameter" width="450" height="287" /></p>
+<p>The screenshot shows, that the compiler created for each template argument a function.</p>
+<h3>What's next?</h3>
+<p>Such as templates, lambdas are also improved in various ways in C++20. My next post is about these various improvements.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Meeting C++, Matt Braun, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Marko, </strong><span class="sc-kpOJdX fDWXFa" title="Emyr Williams"><strong>G Prvulovic, Reinhold Dröge, Abernitzke,</strong> </span><strong><span title="Emyr Williams">Frank Grimm</span></strong><span title="Emyr Williams"><strong>, Sakib, Broeserl, </strong></span><strong><span title="Emyr Williams">António Pina, Darshan Mody, Sergey Agafyin, <span class="sc-gZMcBi hdSbOl" data-tag="user-details-full-name">Андрей Бурмистров, Jake, GS, Lawton Shoemake, Animus24, Jozo Leko, John Breland, espkk, Wolfgang Gärtner, </span></span><span title="Emyr Williams"><span class="sc-htpNat dEZjR" style="color: #241e12; font-family: aktiv-grotesk, sans-serif; margin: 0px; position: relative; font-weight: 400; font-size: 1rem; line-height: 1.5;"><span class="sc-htpNat ebhhXb" style="color: #241e12; font-family: aktiv-grotesk, sans-serif; margin: 0px; position: relative; font-weight: bold; font-size: 1rem; line-height: 1.5;"></span></span></span>Jon Hess, Christian Wittenhorst, Louis St-Amour, Stephan Roslen, Venkat Nandam, Jose Francisco, Douglas Tinkham, Lakshman, Kuchlong Kuchlong, Avi Kohn, Serhy Pyton, Robert Blanch, Kuma [], Truels Wissneth, Kris Kafka, Mario Luoni, and Neil Wang.</strong><strong>&nbsp;</strong></p>
+<h2>Seminars</h2>
+<p>I'm happy to give online-seminars or face-to-face seminars world-wide. Please call me if you have any questions.</p>
+<h3>Standard Seminars&nbsp;</h3>
+<p>Here is a compilation of my standard seminars. These seminars are only meant to give you a first orientation.</p>
+<ul>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/22">C++ - The Core Language</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/23">C++ - The Standard Library</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/23">C++ - Compact</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/18">C++11 and C++14</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/16">Clean Code with Modern C++</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/19">Concurrency with Modern C++</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/21">Design Patterns and Architecture Patterns with C++</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/17">Embedded Programming with Modern C++</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/17">Generic Programming (Templates) with C++</a></li>
+</ul>
+<h3>Contact Me</h3>
+<ul>
+<li>Tel.: +49 7472 917441</li>
+<li>Mobil: +49 152 31965939</li>
+<li>Mail: <a href="&lt;a href=">schulung@ModernesCpp.de</a></li>
+<li>German Seminar Page: <a href="https://www.modernescpp.de/">www.ModernesCpp.de</a></li>
+<li>English Seminar Page: <a href="http://www.ModernesCpp.net">www.ModernesCpp.net</a></li>
+</ul>
+<h3>Modernes C++,</h3>
+<p><img src="images/signatur/RainerGrimmSmall.png" alt="RainerGrimmSmall" /></p>
