@@ -1,0 +1,255 @@
+<p>With C++20, we got new and improved attributes such as <span style="font-family: courier new, courier;">[[nodiscard("reason")]]</span>, <span style="font-family: courier new, courier;">[[likely]]</span>,<span style="font-family: courier new, courier;"> [[unlikely]]</span>, and <span style="font-family: courier new, courier;">[[no_unique_address]]</span>. In particular, <span style="font-family: courier new, courier;">[[nodiscard("reason")]]</span> allows it to express the intention of your interface way more clearer.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/NewAttributes/TimelineCpp20CoreLanguage.png" alt="TimelineCpp20CoreLanguage" width="650" height="249" /></p>
+<p>Attributes allow it to express declarative the intention of your code.</p>
+<h2>New Attributes</h2>
+<p>During the writing of this article, I become a big fan of <span style="font-family: courier new, courier;">[[nodiscard("reason")]]</span>. Consequently, I want to start with my favorite.</p>
+<h3><span style="font-family: courier new, courier;">[[nodiscard("reason")]]</span></h3>
+<p>We have <span style="font-family: courier new, courier;">[[nodiscard]]</span> already since C++17. C++20 added the possibility to add a message to the attribute. Unfortunately, I ignored <span style="font-family: courier new, courier;">[[nodiscard]]</span> in the last years. Let me present it now. Imagine, I have the following program.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// withoutNodiscard.cpp</span>
+
+<span style="color: #009999;">#include &lt;utility&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">struct</span> MyType {
+
+     MyType(<span style="color: #007788; font-weight: bold;">int</span>, <span style="color: #007788; font-weight: bold;">bool</span>) {}
+
+};
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T, <span style="color: #006699; font-weight: bold;">typename</span> ... Args<span style="color: #555555;">&gt;</span>
+T<span style="color: #555555;">*</span> create(Args<span style="color: #555555;">&amp;&amp;</span> ... args){
+  <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #006699; font-weight: bold;">new</span> T(std<span style="color: #555555;">::</span>forward<span style="color: #555555;">&lt;</span>Args<span style="color: #555555;">&gt;</span>(args)...);
+
+<span style="color: #006699; font-weight: bold;">enum</span> <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">ErrorCode</span> {
+    Okay,
+    Warning,
+    Critical,
+    Fatal
+};
+
+ErrorCode <span style="color: #cc00ff;">errorProneFunction</span>() { <span style="color: #006699; font-weight: bold;">return</span> ErrorCode<span style="color: #555555;">::</span>Fatal; }
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    <span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">*</span> val <span style="color: #555555;">=</span> create<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span>(<span style="color: #ff6600;">5</span>);
+    <span style="color: #006699; font-weight: bold;">delete</span> val;
+
+    create<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span>(<span style="color: #ff6600;">5</span>);         <span style="color: #0099ff; font-style: italic;">// (1)</span>
+
+    errorProneFunction();   <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    
+    MyType(<span style="color: #ff6600;">5</span>, <span style="color: #336666;">true</span>);        <span style="color: #0099ff; font-style: italic;">// (3)</span>
+
+} 
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Thanks to perfect forwarding and parameter packs, the factory function <span style="font-family: 'courier new', courier;">create</span> can call all any constructor and return a heap-allocated object.</p>
+<p>The program has many issues. First, line (1) has a memory leak, because the on the heap created <span style="font-family: courier new, courier;">int</span> is never destroyed. Second, the error code of the function <span style="font-family: courier new, courier;">errorPronceFunction</span> (2) is not checked. Last, the constructor call<span style="font-family: courier new, courier;"> MyType(5, true)</span> creates a temporary, which is created and immediately destroyed. This is at least a waste of resources. Now,<span style="font-family: courier new, courier;"> [[nodiscard]]</span> comes into play.</p>
+<p style="padding-left: 30px;"><span style="font-family: Courier New, Courier, monospace;">[[nodiscard]] </span>can be used in a function declaration, enumeration declaration, or class declaration. If you discard the return value from a function declared as nodiscard, the compiler should issue a warning. The same holds for a function returning by copy an enumeration or a class declared as <span style="font-family: courier new, courier;">[[nodiscard]]</span>. A cast to void should not emit a warning.</p>
+<p>Let me see what this means. In the following example, I use the C++17 syntax of the attribute <span style="font-family: courier new, courier;">[[nodiscard]]</span>.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// nodiscard.cpp</span>
+
+<span style="color: #009999;">#include &lt;utility&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">struct</span> MyType {
+
+     MyType(<span style="color: #007788; font-weight: bold;">int</span>, <span style="color: #007788; font-weight: bold;">bool</span>) {}
+
+};
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T, <span style="color: #006699; font-weight: bold;">typename</span> ... Args<span style="color: #555555;">&gt;</span>
+[[nodiscard]]
+T<span style="color: #555555;">*</span> create(Args<span style="color: #555555;">&amp;&amp;</span> ... args){
+  <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #006699; font-weight: bold;">new</span> T(std<span style="color: #555555;">::</span>forward<span style="color: #555555;">&lt;</span>Args<span style="color: #555555;">&gt;</span>(args)...);
+}
+
+<span style="color: #006699; font-weight: bold;">enum</span> <span style="color: #006699; font-weight: bold;">class</span> [[<span>nodiscard</span>]] ErrorCode {
+    Okay,
+    Warning,
+    Critical,
+    Fatal
+};
+
+ErrorCode <span style="color: #cc00ff;">errorProneFunction</span>() { <span style="color: #006699; font-weight: bold;">return</span> ErrorCode<span style="color: #555555;">::</span>Fatal; }
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    <span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">*</span> val <span style="color: #555555;">=</span> create<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span>(<span style="color: #ff6600;">5</span>);
+    <span style="color: #006699; font-weight: bold;">delete</span> val;
+
+    create<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span>(<span style="color: #ff6600;">5</span>);         <span style="color: #0099ff; font-style: italic;">// (1)</span>
+
+    errorProneFunction();   <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    
+    MyType(<span style="color: #ff6600;">5</span>, <span style="color: #336666;">true</span>);        <span style="color: #0099ff; font-style: italic;">// (3)</span>
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The factory function <span style="font-family: courier new, courier;">create</span> and the enum <span style="font-family: courier new, courier;">ErrorCode</span> are declared as<span style="font-family: courier new, courier;"> [[nodiscard]]</span>. Consequently, the calls (1) and (2) create a warning.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/NewAttributes/nodiscard.png" alt="nodiscard" width="650" height="188" /></p>
+<p>&nbsp;</p>
+<p>Way better, but the program still has a few issues.&nbsp; <span style="font-family: courier new, courier;">[[nodiscard]]</span> cannot be used for functions such as a constructor returning nothing. Therefore, the temporary <span style="font-family: courier new, courier;">MyType(5, true)</span> is still created without a warning. Second, the error messages are too general. As a user of the functions, I want to have a reason why discarding the result is an issue.</p>
+<p>Both issues can be solved with C++20. Constructors can be declared as <span style="font-family: courier new, courier;">[[nodiscard]]</span>, and the warning could have additional information.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// nodiscardString.cpp</span>
+
+<span style="color: #009999;">#include &lt;utility&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">struct</span> MyType {
+
+     [[nodiscard(<span style="color: #cc3300;">"Implicit destroying of temporary MyInt."</span>)]] MyType(<span style="color: #007788; font-weight: bold;">int</span>, <span style="color: #007788; font-weight: bold;">bool</span>) {}
+
+};
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T, <span style="color: #006699; font-weight: bold;">typename</span> ... Args<span style="color: #555555;">&gt;</span>
+[[nodiscard(<span style="color: #cc3300;">"You have a memory leak."</span>)]]
+T<span style="color: #555555;">*</span> create(Args<span style="color: #555555;">&amp;&amp;</span> ... args){
+  <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #006699; font-weight: bold;">new</span> T(std<span style="color: #555555;">::</span>forward<span style="color: #555555;">&lt;</span>Args<span style="color: #555555;">&gt;</span>(args)...);
+}
+
+<span style="color: #006699; font-weight: bold;">enum</span> <span style="color: #006699; font-weight: bold;">class </span>[[nodiscard(<span style="color: #cc3300;">"Don't ignore the error code."</span>)]] ErrorCode {
+    Okay,
+    Warning,
+    Critical,
+    Fatal
+};
+
+ErrorCode <span style="color: #cc00ff;">errorProneFunction</span>() { <span style="color: #006699; font-weight: bold;">return</span> ErrorCode<span style="color: #555555;">::</span>Fatal; }
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    <span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">*</span> val <span style="color: #555555;">=</span> create<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span>(<span style="color: #ff6600;">5</span>);
+    <span style="color: #006699; font-weight: bold;">delete</span> val;
+
+    create<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span>(<span style="color: #ff6600;">5</span>);         <span style="color: #0099ff; font-style: italic;">// (1)</span>
+
+    errorProneFunction();   <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    
+    MyType(<span style="color: #ff6600;">5</span>, <span style="color: #336666;">true</span>);        <span style="color: #0099ff; font-style: italic;">// (3)</span>
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Now, the user of the functions gets a specific message. Here is the output of the Microsoft compiler.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/NewAttributes/nodiscardString2.png" alt="nodiscardString2" width="650" height="231" /></p>
+<p>By the way, many existing functions in C++ could benefit from the<span style="font-family: courier new, courier;"> [[nodiscard]]</span> attribute. For example, when you don't use the return value of <span style="font-family: courier new, courier;">std::asnyc,</span> an asynchronously meant <span style="font-family: courier new, courier;">std::async</span> call becomes implicitly synchronously. What should run in separate thread behaves as a blocking function call. Read more about the counterintuitive behavior of <span style="font-family: courier new, courier;">std::async</span> in my blog "<a href="index.php/the-special-futures">The Special Futures</a>".</p>
+<p>While studying the<span style="font-family: courier new, courier;"> [[nodiscard]]</span> syntax on <a href="https://en.cppreference.com/w/cpp/thread/async">cppreference.com</a>, I noticed, that the overload of <span style="font-family: courier new, courier;">std::async</span> changed with C++20. Here is one:</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span> <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Function</span>, class... Args<span style="color: #555555;">&gt;</span>
+[[nodiscard]]
+std<span style="color: #555555;">::</span>future<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span><span style="color: #007788; font-weight: bold;">invoke_result_t</span><span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span><span style="color: #007788; font-weight: bold;">decay_t</span><span style="color: #555555;">&lt;</span>Function<span style="color: #555555;">&gt;</span>,
+                                 std<span style="color: #555555;">::</span><span style="color: #007788; font-weight: bold;">decay_t</span><span style="color: #555555;">&lt;</span>Args<span style="color: #555555;">&gt;</span>...<span style="color: #555555;">&gt;&gt;</span>
+    async( Function<span style="color: #555555;">&amp;&amp;</span> f, Args<span style="color: #555555;">&amp;&amp;</span>... args );
+</pre>
+</div>
+<p></p>
+<p><span style="font-family: courier new, courier;">std::future</span> as return-type of the promise<span style="font-family: courier new, courier;"> std::async</span> is declared as <span style="font-family: courier new, courier;">[[nodiscard]]</span>.</p>
+<p>The next two attributes <span style="font-family: courier new, courier;">[[likely]]</span> and<span style="font-family: courier new, courier;"> [[unlikely]]</span> are about optimization.</p>
+<h3><span style="font-family: courier new, courier;">[[likely]]</span> and <span style="font-family: courier new, courier;">[[unlikely]]</span></h3>
+<p>The proposal P0479R5 for likely and unlikely attributes is the shortest proposal I know of. To give you an idea, this is the interesting note to the proposal. "<em>The use of the <span class="mono"><strong>likely</strong></span> attribute is intended to allow implementations to optimize for the case where paths of execution including it are arbitrarily more likely than any alternative path of execution that does not include such an attribute on a statement or label. The use of the <span class="mono"><strong>unlikely</strong></span> attribute is intended to allow implementations to optimize for the case where paths of execution including it are arbitrarily more unlikely than any alternative path of execution that does not include such an attribute on a statement or label. A path of execution includes a label if and only if it contains a jump to that label. Excessive usage of either of these attributes is liable to result in performance degradation</em>."</p>
+<p>To make it short, both attributes allow it to give the optimizer a hint, which path of execution is more or less likely.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">for</span>(<span style="color: #007788; font-weight: bold;">size_t</span> i<span style="color: #555555;">=</span><span style="color: #ff6600;">0</span>; i <span style="color: #555555;">&lt;</span> v.size(); <span style="color: #555555;">++</span>i){
+    <span style="color: #006699; font-weight: bold;">if</span> (v[i] <span style="color: #555555;">&lt;</span> <span style="color: #ff6600;">0</span>) [[likely]] sum <span style="color: #555555;">-=</span> sqrt(<span style="color: #555555;">-</span>v[i]);
+    <span style="color: #006699; font-weight: bold;">else</span> sum <span style="color: #555555;">+=</span> sqrt(v[i]);
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>&nbsp;The story with optimization goes on with the new attribute <span style="font-family: courier new, courier;">[[no_unique_address]</span>]. This time the optimization addresses space.</p>
+<h3><span style="font-family: courier new, courier;">[[no_unique_address]]</span></h3>
+<p><span style="font-family: 'courier new', courier;">[[no_unique_address]]</span> expresses that this data member of a class&nbsp;<span style="color: #000000; font-family: 'DejaVu Sans', arial, sans-serif; font-size: 12.8px; font-style: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing: 0px; background-color: #ffffff; float: none;">need not have an address distinct from all other non-static data members of its class. Consequently, if the member has an empty type, the compiler can optimize it to occupy no memory.</span></p>
+<p>The following program exemplifies the usage of the new attribute.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// uniqueAddress.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+ 
+<span style="color: #006699; font-weight: bold;">struct</span> Empty {}; 
+ 
+<span style="color: #006699; font-weight: bold;">struct</span> NoUniqueAddress {
+    <span style="color: #007788; font-weight: bold;">int</span> d{};
+    Empty e{};
+};
+ 
+<span style="color: #006699; font-weight: bold;">struct</span> UniqueAddress {
+    <span style="color: #007788; font-weight: bold;">int</span> d{};
+    [[no_unique_address]] Empty e{};                                     <span style="color: #0099ff; font-style: italic;">// (1)</span>
+};
+ 
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>boolalpha;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"sizeof(int) == sizeof(NoUniqueAddress): "</span>              <span style="color: #0099ff; font-style: italic;">// (2)</span>
+              <span style="color: #555555;">&lt;&lt;</span> (<span style="color: #006699; font-weight: bold;">sizeof</span>(<span style="color: #007788; font-weight: bold;">int</span>) <span style="color: #555555;">==</span> <span style="color: #006699; font-weight: bold;">sizeof</span>(NoUniqueAddress)) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+ 
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"sizeof(int) == sizeof(UniqueAddress): "</span>                <span style="color: #0099ff; font-style: italic;">// (3)</span>
+              <span style="color: #555555;">&lt;&lt;</span> (<span style="color: #006699; font-weight: bold;">sizeof</span>(<span style="color: #007788; font-weight: bold;">int</span>) <span style="color: #555555;">==</span> <span style="color: #006699; font-weight: bold;">sizeof</span>(UniqueAddress)) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    NoUniqueAddress NoUnique;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"&amp;NoUnique.d: "</span> <span style="color: #555555;">&lt;&lt;</span>  <span style="color: #555555;">&amp;</span>NoUnique.d <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;           <span style="color: #0099ff; font-style: italic;">// (4)</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"&amp;NoUnique.e: "</span> <span style="color: #555555;">&lt;&lt;</span>  <span style="color: #555555;">&amp;</span>NoUnique.e <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;           <span style="color: #0099ff; font-style: italic;">// (4)</span>
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    UniqueAddress unique;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"&amp;unique.d: "</span> <span style="color: #555555;">&lt;&lt;</span>  <span style="color: #555555;">&amp;</span>unique.d <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;               <span style="color: #0099ff; font-style: italic;">// (5)</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"&amp;unique.e: "</span> <span style="color: #555555;">&lt;&lt;</span>  <span style="color: #555555;">&amp;</span>unique.e <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;               <span style="color: #0099ff; font-style: italic;">// (5)</span>
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The class <span style="font-family: 'courier new', courier;">NoUniqueAddress</span> has another size as an <span style="font-family: 'courier new', courier;">int</span> (2) but not the class <span style="font-family: 'courier new', courier;">UniqueAddress</span> (3). The members <span style="font-family: 'courier new', courier;">d</span> and <span style="font-family: 'courier new', courier;">e</span> of <span style="font-family: 'courier new', courier;">NoUniqueAddress</span> (4) have different addresses but not the members of the class <span style="font-family: 'courier new', courier;">UniqueAddress (5).</span></p>
+<div>&nbsp;</div>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/uniqueAddress.png" alt="uniqueAddress" width="400" height="176" /></p>
+<h2>What's next?</h2>
+<p>The <span style="font-family: 'courier new', courier;">volatile</span> qualifier is one of the darkest corners in C++. Consequently, most of <span style="font-family: 'courier new', courier;">volatile</span> has been deprecated in C++20.</p>
+<div>&nbsp;</div>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Meeting C++, Matt Braun, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Marko, </strong><span class="sc-kpOJdX fDWXFa" title="Emyr Williams"><strong>G Prvulovic, Reinhold Dröge, Abernitzke,</strong> </span><strong><span title="Emyr Williams">Frank Grimm</span></strong><span title="Emyr Williams"><strong>, Sakib, Broeserl, </strong></span><strong><span title="Emyr Williams">António Pina, Darshan Mody, Sergey Agafyin, <span class="sc-gZMcBi hdSbOl" data-tag="user-details-full-name">Андрей Бурмистров, Jake, GS, Lawton Shoemake, Animus24, Jozo Leko, John Breland, espkk, Wolfgang Gärtner, </span></span><span title="Emyr Williams"><span class="sc-htpNat dEZjR" style="color: #241e12; font-family: aktiv-grotesk, sans-serif; margin: 0px; position: relative; font-weight: 400; font-size: 1rem; line-height: 1.5;"><span class="sc-htpNat ebhhXb" style="color: #241e12; font-family: aktiv-grotesk, sans-serif; margin: 0px; position: relative; font-weight: bold; font-size: 1rem; line-height: 1.5;"></span></span></span>Jon Hess, Christian Wittenhorst, Louis St-Amour, Stephan Roslen, Venkat Nandam, Jose Francisco, Douglas Tinkham, Lakshman, Kuchlong Kuchlong, Avi Kohn, Serhy Pyton, Robert Blanch, Kuma [], Truels Wissneth, Kris Kafka, Mario Luoni, Neil Wang, and Friedrich Huber.<br /></strong></p>
+<p>&nbsp;</p>
+<p><strong>&nbsp;</strong></p>
+<h2>Seminars</h2>
+<p>I'm happy to give online-seminars or face-to-face seminars world-wide. Please call me if you have any questions.</p>
+<h3>Standard Seminars&nbsp;</h3>
+<p>Here is a compilation of my standard seminars. These seminars are only meant to give you a first orientation.</p>
+<ul>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/22">C++ - The Core Language</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/23">C++ - The Standard Library</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/23">C++ - Compact</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/18">C++11 and C++14</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/16">Clean Code with Modern C++</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/19">Concurrency with Modern C++</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/21">Design Patterns and Architecture Patterns with C++</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/17">Embedded Programming with Modern C++</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/17">Generic Programming (Templates) with C++</a></li>
+</ul>
+<h3>Contact Me</h3>
+<ul>
+<li>Tel.: +49 7472 917441</li>
+<li>Mobil: +49 152 31965939</li>
+<li>Mail: <a href="&lt;a href=">schulung@ModernesCpp.de</a></li>
+<li>German Seminar Page: <a href="https://www.modernescpp.de/">www.ModernesCpp.de</a></li>
+<li>English Seminar Page: <a href="http://www.ModernesCpp.net">www.ModernesCpp.net</a></li>
+</ul>
+<h3>Modernes C++,</h3>
+<p><img src="images/signatur/RainerGrimmSmall.png" alt="RainerGrimmSmall" /></p>
