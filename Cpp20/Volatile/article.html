@@ -1,0 +1,291 @@
+<p>Today, I complete my tour through the C++20 core language features with a few small improvements. One interesting of these minor improvements is that most of <span style="font-family: 'courier new', courier;">volatile</span> has been deprecated.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/Volatile/TimelineCpp20CoreLanguage.png" alt="TimelineCpp20CoreLanguage" width="650" height="233" /></p>
+<h2><span style="font-family: 'courier new', courier;">volatile</span></h2>
+<p>The abstract in the proposal <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p1152r0.html">P1152R0</a> gives a short description of the changes which <span style="font-family: 'courier new', courier;">volatile </span>undergo: "<em>The proposed deprecation preserves the useful parts of&nbsp;volatile, and removes the dubious / already broken ones. This paper aims at breaking at compile-time code which is today subtly broken at runtime or through a compiler update.</em> "</p>
+<p>Before I show you what semantic of <span style="font-family: 'courier new', courier;">volatile</span> is preserved, I want to start with the deprecated features:</p>
+<ol>
+<li>Deprecate <span style="font-family: 'courier new', courier;">volatile</span> compound assignment, and pre/post increment/decrement</li>
+<li>Deprecate <span style="font-family: 'courier new', courier;">volatile</span> qualification of function parameters or return types</li>
+<li>Deprecate <span style="font-family: 'courier new', courier;">volatile</span> qualifiers in a structured binding declaration</li>
+</ol>
+<p>If you want to know all the sophisticated details, I strongly suggest you watch the CppCon 2019 talk "<a href="https://www.youtube.com/watch?v=KJW_DLaVXIY">Deprecating volatile</a>" from JF Bastien. Here are a few examples from the talk referring to used numbers (1) to (3).</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">(<span style="color: #ff6600;">1</span>)
+<span style="color: #007788; font-weight: bold;">int</span> neck, tail;
+<span style="color: #006699; font-weight: bold;">volatile</span> <span style="color: #007788; font-weight: bold;">int</span> brachiosaur;
+brachiosaur <span style="color: #555555;">=</span> neck;   <span style="color: #0099ff; font-style: italic;">// OK, a volatile store</span>
+tail <span style="color: #555555;">=</span> brachiosaur;    <span style="color: #0099ff; font-style: italic;">// OK, a volatile load</span>
+
+<span style="color: #0099ff; font-style: italic;">// deprecated: does this access brachiosaur once or twice</span>
+tail <span style="color: #555555;">=</span> brachiosaur <span style="color: #555555;">=</span> neck;
+
+<span style="color: #0099ff; font-style: italic;">// deprecated: does this access brachiosaur once or twice</span>
+brachiosaur <span style="color: #555555;">+=</span> neck;
+
+<span style="color: #0099ff; font-style: italic;">// OK, a volatile load, an addition, a volatile store</span>
+brachiosau <span style="color: #555555;">=</span> brachiosaur <span style="color: #555555;">+</span> neck;
+
+<span style="color: #009999;">#########################################</span>
+(<span style="color: #ff6600;">2</span>)
+<span style="color: #0099ff; font-style: italic;">// deprecated: a volatile return type has no meaning</span>
+<span style="color: #006699; font-weight: bold;">volatile</span> <span style="color: #006699; font-weight: bold;">struct</span> amber jurassic();
+
+<span style="color: #0099ff; font-style: italic;">// deprecated: volatile parameters aren't meaningful to the</span>
+<span style="color: #0099ff; font-style: italic;">//             caller, volatile only applies within the function</span>
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">trex</span>(<span style="color: #006699; font-weight: bold;">volatile</span> <span style="color: #007788; font-weight: bold;">short</span> left_arm, <span style="color: #006699; font-weight: bold;">volatile</span> <span style="color: #007788; font-weight: bold;">short</span> right_arm);
+
+<span style="color: #0099ff; font-style: italic;">// OK, the pointer isn't volatile, the data is opints to is</span>
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">fly</span>(<span style="color: #006699; font-weight: bold;">volatile</span> <span style="color: #006699; font-weight: bold;">struct</span> pterosaur<span style="color: #555555;">*</span> pterandon);
+
+<span style="color: #009999;">########################################</span>
+(<span style="color: #ff6600;">3</span>)
+<span style="color: #006699; font-weight: bold;">struct</span> linhenykus { <span style="color: #006699; font-weight: bold;">volatile</span> <span style="color: #007788; font-weight: bold;">short</span> forelimb; };
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">park</span>(linhenykus alvarezsauroid) {
+    <span style="color: #0099ff; font-style: italic;">// deprecated: doe the binding copy the foreelimbs?</span>
+    <span style="color: #006699; font-weight: bold;">auto</span> [what_is_this] <span style="color: #555555;">=</span> alvarezsauroid;
+    <span style="color: #0099ff; font-style: italic;">// ...</span>
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>I didn't answer the crucial question so far: When should you use <span style="font-family: 'courier new', courier;">volatile</span>?&nbsp; A note from the C++ standard says that "<em><span style="font-family: 'courier new', courier;">volatile</span> is a hint to the implementation to avoid aggressive optimization involving the object because the value of the object might be changed by means undetectable by an implementation.</em>" This means for a single thread of execution that the compiler must perform load or store operations in the executable as often as they occur in the source code.&nbsp;<span style="font-family: 'courier new', courier;">volatile</span> operations, therefore, cannot be eliminated or reordered. Consequently, you can use <span style="font-family: 'courier new', courier;">volatile</span> objects for communication with a signal handler but not for communication with another thread of execution.</p>
+<p><strong>To make it short, <span style="font-family: 'courier new', courier;">volatile</span>&nbsp;avoids aggressive optimization and has no multithreading semantic.</strong></p>
+<p>I present the remaining small improvements with a short example that runs in the Compiler Explorer.</p>
+<h2>Range-based for-loop with Initializers</h2>
+<p>With C++20, you can directly use a range-based for-loop with an initializer.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// rangeBasedForLoopInitializer.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> vec <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>vector{<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>}; <span style="color: #006699; font-weight: bold;">auto</span> v <span style="color: #555555;">:</span> vec) {  <span style="color: #0099ff; font-style: italic;">// (1)</span>
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> v <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span>;
+    }
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n\n</span><span style="color: #cc3300;">"</span>;
+    
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> initList <span style="color: #555555;">=</span> {<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>}; <span style="color: #006699; font-weight: bold;">auto</span> e <span style="color: #555555;">:</span> initList) {  <span style="color: #0099ff; font-style: italic;">// (2)</span>
+        e <span style="color: #555555;">*=</span> e;
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> e <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span>;
+    }
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n\n</span><span style="color: #cc3300;">"</span>;
+    
+    <span style="color: #006699; font-weight: bold;">using</span> <span style="color: #006699; font-weight: bold;">namespace</span> std<span style="color: #555555;">::</span>string_literals;
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> str <span style="color: #555555;">=</span> <span style="color: #cc3300;">"Hello World"</span>s; <span style="color: #006699; font-weight: bold;">auto</span> c<span style="color: #555555;">:</span> str) {        <span style="color: #0099ff; font-style: italic;">// (3)</span>
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> c <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span>;
+    }
+     
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The range-based for-loop uses in line (1) a <span style="font-family: 'courier new', courier;">std::vector</span>, in line (2) a <span style="font-family: 'courier new', courier;">std::initializer_list,</span> and in line (3) a <span style="font-family: 'courier new', courier;">std::string</span>. Additionally, in line (1) and line (2) I apply automatic type deduction for class templates which we have since C++17. Instead of <span style="font-family: 'courier new', courier;">std::vector&lt;int&gt;</span> and <span style="font-family: 'courier new', courier;">std::initalizer_list&lt;int&gt;</span>, I just write <span style="font-family: 'courier new', courier;">std::vector</span> and <span style="font-family: 'courier new', courier;">std::initializer_list</span>.&nbsp;</p>
+<p>With GCC 10.2 and the <a href="https://godbolt.org/z/9c3rGs">Compiler Explorer</a>, I get the expected output.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/Volatile/rangeBasedForLoopWithInitializer.png" alt="rangeBasedForLoopWithInitializer" width="200" height="101" />&nbsp;</p>
+<h2><span style="font-family: 'courier new', courier;">virtual constexpr</span> Functions</h2>
+<p>A <span style="font-family: 'courier new', courier;">constexpr</span> function has the potential to run at compile-time but can also be executed at run-time. Consequently, you can make a <span style="font-family: 'courier new', courier;">constexpr</span> function with C++20 <span style="font-family: 'courier new', courier;">virtual</span>. Both directions are possible. Either can a <span style="font-family: 'courier new', courier;">virtual</span> <span style="font-family: 'courier new', courier;">constexpr</span> function override a&nbsp; non-<span style="font-family: 'courier new', courier;">constexpr</span> function, but also can a virtual non-<span style="font-family: 'courier new', courier;">constexpr</span> function override a&nbsp;&nbsp;<span style="font-family: 'courier new', courier;">constexpr</span>&nbsp;<span style="font-family: 'courier new', courier;">virtual</span> function. I want to emphasize, that override implies that the regarding function of a base class is <span style="font-family: 'courier new', courier;">virtual</span>.&nbsp;</p>
+<p>The following program shows both combinations.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// virtualConstexpr.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">struct</span> X1 {
+    <span style="color: #006699; font-weight: bold;">virtual</span> <span style="color: #007788; font-weight: bold;">int</span> f() <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>;
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> X2<span style="color: #555555;">:</span> <span style="color: #006699; font-weight: bold;">public</span> X1 {
+    constexpr <span style="color: #007788; font-weight: bold;">int</span> f() <span style="color: #006699; font-weight: bold;">const</span> override { <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #ff6600;">2</span>; }
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> X3<span style="color: #555555;">:</span> <span style="color: #006699; font-weight: bold;">public</span> X2 {
+    <span style="color: #007788; font-weight: bold;">int</span> f() <span style="color: #006699; font-weight: bold;">const</span> override { <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #ff6600;">3</span>; }
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> X4<span style="color: #555555;">:</span> <span style="color: #006699; font-weight: bold;">public</span> X3 {
+    constexpr <span style="color: #007788; font-weight: bold;">int</span> f() <span style="color: #006699; font-weight: bold;">const</span> override { <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #ff6600;">4</span>; }
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+    
+    X1<span style="color: #555555;">*</span> x1 <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">new</span> X4;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"x1-&gt;f(): "</span> <span style="color: #555555;">&lt;&lt;</span> x1<span style="color: #555555;">-&gt;</span>f() <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    X4 x4;
+    X1<span style="color: #555555;">&amp;</span> x2 <span style="color: #555555;">=</span> x4;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"x2.f(): "</span> <span style="color: #555555;">&lt;&lt;</span> x2.f() <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+}
+</pre>
+</div>
+<p></p>
+<p>Line (1) uses virtual dispatch (late binding) via a pointer, line (2) virtual dispatch via reference. Once more, here is the output with GCC 10.2 and the <a href="https://godbolt.org/z/5qvdvz">Compiler Explorer</a>.</p>
+<h2><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/Volatile/virtualConstexpr.png" alt="virtualConstexpr" /></h2>
+<h2>The new Character Type for UTF-8 Strings:<span style="font-family: 'courier new', courier;"> char8_t</span></h2>
+<p>Additionally, to the character types <span style="font-family: 'courier new', courier;">char16_t</span> and <span style="font-family: 'courier new', courier;">char32_t</span> from C++11, C++20 gets the new character type <span style="font-family: 'courier new', courier;">char8_t.char8_t </span>is large enough to represent any UTF-8 code unit (8 bits). It has the same size, signedness, and alignment as an <span style="font-family: 'courier new', courier;">unsigned char</span>, but is a distinct type.&nbsp;</p>
+<p>Consequently, C++20 has a new typedef for the character type<span style="font-family: 'courier new', courier;"> char8_t</span>&nbsp;(1) and a new UTF-8 string literal (2).</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">std<span style="color: #555555;">::</span>u8string<span style="color: #555555;">:</span> std<span style="color: #555555;">::</span>basic_string<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">char8_t</span><span style="color: #555555;">&gt;</span> (<span style="color: #ff6600;">1</span>)
+u8<span style="color: #cc3300;">"Hello World"</span>                           (<span style="color: #ff6600;">2</span>)
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The following program shows the straightforward usage of <span style="font-family: 'courier new', courier;">char8_t</span>:</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// char8Str.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;string&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">char8_t</span><span style="color: #555555;">*</span> char8Str <span style="color: #555555;">=</span> u8<span style="color: #cc3300;">"Hello world"</span>;
+    std<span style="color: #555555;">::</span>basic_string<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">char8_t</span><span style="color: #555555;">&gt;</span> char8String <span style="color: #555555;">=</span> u8<span style="color: #cc3300;">"helloWorld"</span>;
+    std<span style="color: #555555;">::</span>u8string char8String2 <span style="color: #555555;">=</span> u8<span style="color: #cc3300;">"helloWorld"</span>;
+    
+    char8String2 <span style="color: #555555;">+=</span> u8<span style="color: #cc3300;">"."</span>;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"char8String.size(): "</span> <span style="color: #555555;">&lt;&lt;</span> char8String.size() <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"char8String2.size(): "</span> <span style="color: #555555;">&lt;&lt;</span> char8String2.size() <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    char8String2.replace(<span style="color: #ff6600;">0</span>, <span style="color: #ff6600;">5</span>, u8<span style="color: #cc3300;">"Hello "</span>);
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"char8String2.size(): "</span> <span style="color: #555555;">&lt;&lt;</span> char8String2.size() <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+ 
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<section><span style="color: #242729; font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; font-size: 15px; font-style: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: left; text-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing: 0px; background-color: #ffffff; float: none;"><span style="font-family: arial, helvetica, sans-serif;"></span></span>
+<p>Without further ado. Here is the output of the program on the<span style="color: #242729; font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; font-size: 15px; font-style: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: left; text-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing: 0px; background-color: #ffffff; float: none;"><a href="https://godbolt.org/z/1fYfen"> Compiler Explorer.</a></span></p>
+</section>
+<p>&nbsp;</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/Volatile/char8Str.png" alt="char8Str" width="250" height="84" /></p>
+<h2><span style="font-family: 'courier new', courier;">using enum</span> in Local Scopes&nbsp;</h2>
+<p>A <span style="font-family: courier new, courier;">using enum</span> declaration introduces the enumerators of the named enumeration in the local scope.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// enumUsing.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;string_view&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">enum</span> <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Color</span> {
+    red,
+    green, 
+    blue
+};
+
+std<span style="color: #555555;">::</span>string_view toString(Color col) {
+  <span style="color: #006699; font-weight: bold;">switch</span> (col) {
+    <span style="color: #006699; font-weight: bold;">using</span> <span style="color: #006699; font-weight: bold;">enum</span> Color;                   <span style="color: #0099ff; font-style: italic;">// (1)</span> 
+    <span style="color: #006699; font-weight: bold;">case</span> red:   <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc3300;">"red"</span>;           <span style="color: #0099ff; font-style: italic;">// (2)</span> 
+    <span style="color: #006699; font-weight: bold;">case</span> green: <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc3300;">"green"</span>;         <span style="color: #0099ff; font-style: italic;">// (2)</span> 
+    <span style="color: #006699; font-weight: bold;">case</span> blue:  <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc3300;">"blue"</span>;          <span style="color: #0099ff; font-style: italic;">// (2)</span> 
+  }
+  <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc3300;">"unknown"</span>;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+   
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"toString(Color::red): "</span> <span style="color: #555555;">&lt;&lt;</span> toString(Color<span style="color: #555555;">::</span>red) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    <span style="color: #006699; font-weight: bold;">using</span> <span style="color: #006699; font-weight: bold;">enum</span> Color;                                                    <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"toString(green): "</span> <span style="color: #555555;">&lt;&lt;</span> toString(green) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;    <span style="color: #0099ff; font-style: italic;">// (2)</span> 
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}  
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The <span style="font-family: 'courier new', courier;">using enum</span> declaration in (1) introduces the enumerators of the scoped enumerations <span style="font-family: 'courier new', courier;">Color</span> into the local scope. From that point on, the enumerators can be used unscoped (2). This time, the only C++ compiler supporting<span style="font-family: 'courier new', courier;"> using enum</span> is the Microsoft Compiler 19.24:</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/Volatile/enumUsing.png" alt="enumUsing" width="300" height="158" /></p>
+<h1 style="color: #000000; font-family: 'Times New Roman'; font-style: normal; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing: 0px;">Default member initializers for bit-fields<span style="font-family: 'arial black', 'avant garde';"></span></h1>
+<p>First, what is a bit field? Here is the definition of <a href="https://en.wikipedia.org/wiki/Bit_field">Wikipedia</a>: "<em>A&nbsp;bit field&nbsp;is a&nbsp;<a title="Data structure" href="https://en.wikipedia.org/wiki/Data_structure">data structure</a>&nbsp;used in&nbsp;<a title="Computer programming" href="https://en.wikipedia.org/wiki/Computer_programming">computer programming</a>. It consists of a number of adjacent&nbsp;<a title="Computer memory" href="https://en.wikipedia.org/wiki/Computer_memory">computer memory</a>&nbsp;locations which have been allocated to hold a sequence of&nbsp;<a title="Bit" href="https://en.wikipedia.org/wiki/Bit">bits</a>, stored so that any single bit or group of bits within the set can be addressed.<a href="https://en.wikipedia.org/wiki/Bit_field#cite_note-BrummBrumm1988-1">[1]</a><a href="https://en.wikipedia.org/wiki/Bit_field#cite_note-Oualline1997-2">[2]</a>&nbsp;A bit field is most commonly used to represent&nbsp;<a title="Primitive data type" href="https://en.wikipedia.org/wiki/Primitive_data_type">integral types</a>&nbsp;of known, fixed bit-width."</em></p>
+<p>With C++20, we can default initialize the members of a bit-field:</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// bitField.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">struct</span> Class11 {             <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    <span style="color: #007788; font-weight: bold;">int</span> i <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span>;
+    <span style="color: #007788; font-weight: bold;">int</span> j <span style="color: #555555;">=</span> <span style="color: #ff6600;">2</span>;
+    <span style="color: #007788; font-weight: bold;">int</span> k <span style="color: #555555;">=</span> <span style="color: #ff6600;">3</span>;
+    <span style="color: #007788; font-weight: bold;">int</span> l <span style="color: #555555;">=</span> <span style="color: #ff6600;">4</span>;
+    <span style="color: #007788; font-weight: bold;">int</span> m <span style="color: #555555;">=</span> <span style="color: #ff6600;">5</span>;
+    <span style="color: #007788; font-weight: bold;">int</span> n <span style="color: #555555;">=</span> <span style="color: #ff6600;">6</span>;
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> BitField20 {          <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    <span style="color: #007788; font-weight: bold;">int</span> i <span style="color: #555555;">:</span> <span style="color: #ff6600;">3</span> <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span>;
+    <span style="color: #007788; font-weight: bold;">int</span> j <span style="color: #555555;">:</span> <span style="color: #ff6600;">4</span> <span style="color: #555555;">=</span> <span style="color: #ff6600;">2</span>;
+    <span style="color: #007788; font-weight: bold;">int</span> k <span style="color: #555555;">:</span> <span style="color: #ff6600;">5</span> <span style="color: #555555;">=</span> <span style="color: #ff6600;">3</span>;
+    <span style="color: #007788; font-weight: bold;">int</span> l <span style="color: #555555;">:</span> <span style="color: #ff6600;">6</span> <span style="color: #555555;">=</span> <span style="color: #ff6600;">4</span>;
+    <span style="color: #007788; font-weight: bold;">int</span> m <span style="color: #555555;">:</span> <span style="color: #ff6600;">7</span> <span style="color: #555555;">=</span> <span style="color: #ff6600;">5</span>;
+    <span style="color: #007788; font-weight: bold;">int</span> n <span style="color: #555555;">:</span> <span style="color: #ff6600;">7</span> <span style="color: #555555;">=</span> <span style="color: #ff6600;">6</span>;
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span> () {
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"sizeof(Class11): "</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #006699; font-weight: bold;">sizeof</span>(Class11) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"sizeof(BitField20): "</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #006699; font-weight: bold;">sizeof</span>(BitField20) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>According to the member of a class (1) with C++11, the members of bit-field can have default initializers (2) with C++20. Finally, here is the output of the program with the Clang 10.0 compiler:</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/Volatile/bitField.png" alt="bitField" width="300" height="166" /></p>
+<h2>A Short Writing Break</h2>
+<p>In the next fortnight, I will be in Italy and I will, therefore, not write a regular post.<br />In case you want to read in the meantime one of my more than 300 posts to modern C++; I created a visual tour through my blog. This visual tour explains the TOC, categories, tags, the archive, and the search system and should help you find the post you are looking for.</p>
+<p>Here you go: <a href="https://youtu.be/hrXoVSi0O28">https://youtu.be/hrXoVSi0O28</a>.</p>
+<h2>What's next?</h2>
+<p>After my short break, I continue my journey through C++20 with the new library. In particular, I will write about<span style="font-family: 'courier new', courier;"> std::span</span>.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Meeting C++, Matt Braun, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Marko, </strong><span class="sc-kpOJdX fDWXFa" title="Emyr Williams"><strong>G Prvulovic, Reinhold Dröge, Abernitzke,</strong> </span><strong><span title="Emyr Williams">Frank Grimm</span></strong><span title="Emyr Williams"><strong>, Sakib, Broeserl, </strong></span><strong><span title="Emyr Williams">António Pina, Darshan Mody, Sergey Agafyin, <span class="sc-gZMcBi hdSbOl" data-tag="user-details-full-name">Андрей Бурмистров, Jake, GS, Lawton Shoemake, Animus24, Jozo Leko, John Breland, espkk, Wolfgang Gärtner, </span></span><span title="Emyr Williams"><span class="sc-htpNat dEZjR" style="color: #241e12; font-family: aktiv-grotesk, sans-serif; margin: 0px; position: relative; font-weight: 400; font-size: 1rem; line-height: 1.5;"><span class="sc-htpNat ebhhXb" style="color: #241e12; font-family: aktiv-grotesk, sans-serif; margin: 0px; position: relative; font-weight: bold; font-size: 1rem; line-height: 1.5;"></span></span></span>Jon Hess, Christian Wittenhorst, Louis St-Amour, Stephan Roslen, Venkat Nandam, Jose Francisco, Douglas Tinkham, Lakshman, Kuchlong Kuchlong, Avi Kohn, Serhy Pyton, Robert Blanch, Kuma [], Truels Wissneth, Kris Kafka, Mario Luoni, Neil Wang, and Friedrich Huber.<br /></strong></p>
+<p>&nbsp;</p>
+<p><strong>&nbsp;</strong></p>
+<h2>Seminars</h2>
+<p>I'm happy to give online-seminars or face-to-face seminars world-wide. Please call me if you have any questions.</p>
+<h3>Standard Seminars&nbsp;</h3>
+<p>Here is a compilation of my standard seminars. These seminars are only meant to give you a first orientation.</p>
+<ul>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/22">C++ - The Core Language</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/23">C++ - The Standard Library</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/23">C++ - Compact</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/18">C++11 and C++14</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/16">Clean Code with Modern C++</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/19">Concurrency with Modern C++</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/21">Design Patterns and Architecture Patterns with C++</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/17">Embedded Programming with Modern C++</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/17">Generic Programming (Templates) with C++</a></li>
+</ul>
+<h3>Contact Me</h3>
+<ul>
+<li>Tel.: +49 7472 917441</li>
+<li>Mobil: +49 152 31965939</li>
+<li>Mail: <a href="&lt;a href=">schulung@ModernesCpp.de</a></li>
+<li>German Seminar Page: <a href="https://www.modernescpp.de/">www.ModernesCpp.de</a></li>
+<li>English Seminar Page: <a href="http://www.ModernesCpp.net">www.ModernesCpp.net</a></li>
+</ul>
+<h3>Modernes C++,</h3>
+<p><img src="images/signatur/RainerGrimmSmall.png" alt="RainerGrimmSmall" /></p>
