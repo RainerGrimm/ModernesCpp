@@ -1,0 +1,252 @@
+<p>In my seminar, I often hear the question: How can I safely pass a plain array to a function? With C++20, the answer is quite easy: Use a <span style="font-family: courier new, courier;">std::span</span>.</p>
+<hr id="system-readmore" />
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/stdSpan/TimelineCpp20CoreLanguage.png" alt="TimelineCpp20CoreLanguage" width="650" height="255" /></p>
+<p>&nbsp;</p>
+<p>A <span style="font-family: courier new, courier;">std::span</span> stands for an object than can refer to a contiguous sequence of objects. A <span style="font-family: courier new, courier;">std::span</span>, sometimes also called a view, is never an owner. This contiguous memory can be a plain array, a pointer with a size, a <span style="font-family: courier new, courier;">std::array</span>, a <span style="font-family: courier new, courier;">std::vector, </span>or a <span style="font-family: courier new, courier;">std::string</span>. A typical implementation consists of a pointer to its first element and a size. The main reason for having a <span style="font-family: courier new, courier;">std::span&lt;T&gt;</span> is that a plain array will be decay to a pointer if passed to a function; therefore, the size is lost. This decay is a typical reason for errors in C/C++.</p>
+<h3>Automatically deduces the size of a contiguous sequence of objects</h3>
+<p>In contrast, <span style="font-family: courier new, courier;">std<strong>:</strong>:span&lt;T&gt;</span> automatically deduces the size of contiguous sequences of objects<span style="font-family: courier new, courier;">.</span></p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// printSpan.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+<span style="color: #009999;">#include &lt;array&gt;</span>
+<span style="color: #009999;">#include &lt;span&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">printMe</span>(std<span style="color: #555555;">::</span>span<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> container) {
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"container.size(): "</span> <span style="color: #555555;">&lt;&lt;</span> container.size() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;  <span style="color: #0099ff; font-style: italic;">// (4)</span>
+    <span style="color: #006699; font-weight: bold;">for</span>(<span style="color: #006699; font-weight: bold;">auto</span> e <span style="color: #555555;">:</span> container) std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> e <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">' '</span>;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n\n</span><span style="color: #cc3300;">"</span>;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    <span style="color: #007788; font-weight: bold;">int</span> arr[]{<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>};              <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    printMe(arr);
+    
+    std<span style="color: #555555;">::</span>vector vec{<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">5</span>};     <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    printMe(vec);
+
+    std<span style="color: #555555;">::</span>array arr2{<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">5</span>, <span style="color: #ff6600;">6</span>}; <span style="color: #0099ff; font-style: italic;">// (3)</span>
+    printMe(arr2);
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The C-array (1),<span style="font-family: courier new, courier;"> std::vector&nbsp;</span>(2), and the <span style="font-family: courier new, courier;">std::array</span> (3) have <span style="font-family: courier new, courier;">int</span>'s. Consequently, <span style="font-family: courier new, courier;">std::span</span> also holds<span style="font-family: courier new, courier;"> int'</span>s. There is something more interesting in this simple example. For each container, <span style="font-family: courier new, courier;">std::span</span> can deduce it's size (4).</p>
+<p>All of the big three C++ compilers MSVC, GCC, and Clang, support<span style="font-family: courier new, courier;"> std::span</span>.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/stdSpan/printSpan.PNG" alt="printSpan" width="300" height="257" /></p>
+<p>&nbsp;</p>
+<p>There are more ways to create a <span style="font-family: courier new, courier;">std::span</span>.</p>
+<h3>Create a std::span from a pointer and a size</h3>
+<p>You can create a <span style="font-family: courier new, courier;">std::span</span> from a pointer and a size.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// createSpan.cpp</span>
+
+<span style="color: #009999;">#include &lt;algorithm&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;span&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>boolalpha;
+
+    std<span style="color: #555555;">::</span>vector myVec{<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">5</span>};
+	
+    std<span style="color: #555555;">::</span>span mySpan1{myVec};                                        <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    std<span style="color: #555555;">::</span>span mySpan2{myVec.data(), myVec.size()};                   <span style="color: #0099ff; font-style: italic;">// (2)</span>
+	
+    <span style="color: #007788; font-weight: bold;">bool</span> spansEqual <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>equal(mySpan1.begin(), mySpan1.end(),
+                                 mySpan2.begin(), mySpan2.end());
+	
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"mySpan1 == mySpan2: "</span> <span style="color: #555555;">&lt;&lt;</span> spansEqual <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;  <span style="color: #0099ff; font-style: italic;">// (3)</span>
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+	
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>As you may expect, the from a<span style="font-family: courier new, courier;"> std::vector</span> created <span style="font-family: courier new, courier;">mySpan1</span> (1) and the from a pointer and a size created <span style="font-family: courier new, courier;">mySpan</span> (2)&nbsp; are equal (3).</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/stdSpan/createSpan.PNG" alt="createSpan" width="350" height="153" /></p>
+<p>&nbsp;</p>
+<p>You may remember that a <span style="font-family: courier new, courier;">std::span </span>is sometimes called a view.Don't confuse a<span style="font-family: courier new, courier;"> std::span</span>&nbsp;with a view from the <a href="index.php/c-20-the-ranges-library">ranges library</a>&nbsp;(C++20) or a <span style="font-family: courier new, courier;">std::string_view </span>(C++17).</p>
+<p>A view from the <a href="index.php/c-20-the-ranges-library">ranges library</a> is something that you can apply on a range and performs some operation. A view does not own data, and it's time to copy, move, assignment it's constant. Here is a quote from Eric Nieblers&nbsp;<a style="background-color: transparent; color: #0077bb; text-decoration: none; outline: none;" href="https://github.com/ericniebler/range-v3">range-v3 implementation</a>,&nbsp;which is the base for the C++20 ranges: "<em>Views are composable adaptations of ranges where the adaptation happens lazily as the view is iterated.</em>" These are all my posts to then ranges library: <a href="index.php/tag/ranges-library">category ranges library</a>.&nbsp;</p>
+<p>A view (<span style="font-family: 'courier new', courier;">std::span</span>) and a <span style="font-family: 'courier new', courier;">std::string_view</span> are non-owning views and can deal with strings. The main difference between a <span style="font-family: courier new, courier;">std::span</span> and a <span style="font-family: courier new, courier;">std::string_view</span> is that a <span style="font-family: courier new, courier;">std::span</span> can modify its objects. When you want to read more about <span style="font-family: courier new, courier;">std::string_vie</span>w, read my previous post: "<a href="index.php/c-17-what-s-new-in-the-library">C++17 - What's New in the Library?</a>" and "<a href="index.php/c-17-avoid-copying-with-std-string-view">C++17 - Avoid Copying with<span style="font-family: courier new, courier;"> std::string_view</span></a><span style="font-family: courier new, courier;"></span>".&nbsp;</p>
+<h3>Modifying its objects</h3>
+<p>You can modify the entire span or only a subspan. When you modify the span, you modify the referenced objects..</p>
+<p>The following program shows how a subspan can be used to modify the referenced objects from a<span style="font-family: courier new, courier;"> std::vector</span>.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// spanTransform.cpp</span>
+
+<span style="color: #009999;">#include &lt;algorithm&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+<span style="color: #009999;">#include &lt;span&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">printMe</span>(std<span style="color: #555555;">::</span>span<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> container) {
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"container.size(): "</span> <span style="color: #555555;">&lt;&lt;</span> container.size() <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    <span style="color: #006699; font-weight: bold;">for</span>(<span style="color: #006699; font-weight: bold;">auto</span> e <span style="color: #555555;">:</span> container) std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> e <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">' '</span>;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n\n</span><span style="color: #cc3300;">"</span>;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>vector vec{<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">5</span>, <span style="color: #ff6600;">6</span>, <span style="color: #ff6600;">7</span>, <span style="color: #ff6600;">8</span>, <span style="color: #ff6600;">9</span>, <span style="color: #ff6600;">10</span>};    
+    printMe(vec);
+    
+    std<span style="color: #555555;">::</span>span span1(vec);                                 <span style="color: #0099ff; font-style: italic;">// (1)</span> 
+    std<span style="color: #555555;">::</span>span span2{span1.subspan(<span style="color: #ff6600;">1</span>, span1.size() <span style="color: #555555;">-</span> <span style="color: #ff6600;">2</span>)};  <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    
+                                                 
+    std<span style="color: #555555;">::</span>transform(span2.begin(), span2.end(),            <span style="color: #0099ff; font-style: italic;">// (3)</span>  
+                   span2.begin(), 
+                   [](<span style="color: #007788; font-weight: bold;">int</span> i){ <span style="color: #006699; font-weight: bold;">return</span> i <span style="color: #555555;">*</span> i; });
+    
+    
+    printMe(vec);                                       
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p><span style="font-family: 'courier new', courier;">span1</span> references the <span style="font-family: 'courier new', courier;">std::vector vec&nbsp;</span>(1). In contrast, <span style="font-family: 'courier new', courier;">span2</span> only references all elements of the underlying <span style="font-family: 'courier new', courier;">vec</span> without the first and the last element (2). Consequently, the mapping of each element to its square (3) only addresses these elements.&nbsp;</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/stdSpan/spanTransform.PNG" alt="spanTransform" width="400" height="241" /></p>
+<p>There are many convenience functions to refer to the elements of the span.</p>
+<h3>Addressing the elements of a&nbsp;<span style="font-family: 'courier new', courier;">std::span</span></h3>
+<p>The table presents the functions to refer to the elements of a span.</p>
+<p>&nbsp;</p>
+<table>
+<tbody>
+<tr>
+<td style="border: 1px solid #000000; text-align: center;"><span style="color: #0000ff; font-size: 14pt;"><strong>Function&nbsp;</strong></span></td>
+<td style="border: 1px solid #000000; text-align: center;"><span style="color: #0000ff; font-size: 14pt;"><strong>Description</strong></span></td>
+</tr>
+<tr>
+<td style="border: 1px solid #000000;"><span style="font-family: 'courier new', courier;">&nbsp;span.front()</span></td>
+<td style="border: 1px solid #000000;">Access the first element</td>
+</tr>
+<tr>
+<td style="border: 1px solid #000000;"><span style="font-family: 'courier new', courier;">&nbsp;span.back()</span></td>
+<td style="border: 1px solid #000000;">Access the last element</td>
+</tr>
+<tr>
+<td style="border: 1px solid #000000;"><span style="font-family: 'courier new', courier;">&nbsp;span[i]</span></td>
+<td style="border: 1px solid #000000;">Access the i-th element</td>
+</tr>
+<tr>
+<td style="border: 1px solid #000000;"><span style="font-family: 'courier new', courier;">&nbsp;span.data()</span></td>
+<td style="border: 1px solid #000000;">Returns a pointer to the beginning of the sequence&nbsp;</td>
+</tr>
+<tr>
+<td style="border: 1px solid #000000;"><span style="font-family: 'courier new', courier;">&nbsp;span.size()</span></td>
+<td style="border: 1px solid #000000;">Returns the number of elements of the sequence</td>
+</tr>
+<tr>
+<td style="border: 1px solid #000000;"><span style="font-family: 'courier new', courier;">&nbsp;span.size_bytes()</span></td>
+<td style="border: 1px solid #000000;">Returns the size of the sequence&nbsp;</td>
+</tr>
+<tr>
+<td style="border: 1px solid #000000;"><span style="font-family: 'courier new', courier;">&nbsp;span.empty()</span></td>
+<td style="border: 1px solid #000000;">Returns if the sequence is empty</td>
+</tr>
+<tr>
+<td style="border: 1px solid #000000;">
+<p><span style="font-family: 'courier new', courier;">span&lt;count&gt;.first()</span></p>
+<p><span style="font-family: 'courier new', courier;">span.first(count)</span></p>
+</td>
+<td style="border: 1px solid #000000;">Returns a subspan consisting of the first <span style="font-family: 'courier new', courier;">count</span> elements of the sequence</td>
+</tr>
+<tr>
+<td style="border: 1px solid #000000;">
+<p><span style="font-family: 'courier new', courier;">span&lt;count&gt;last()</span></p>
+<p><span style="font-family: 'courier new', courier;">span.last&lt;count&gt;</span></p>
+</td>
+<td style="border: 1px solid #000000;">Returns a subspan consisting of the last <span style="font-family: 'courier new', courier;">count</span> elements of the sequence</td>
+</tr>
+<tr>
+<td style="border: 1px solid #000000;">
+<p><span style="font-family: 'courier new', courier;">span&lt;first, count&gt;.subspan()</span></p>
+<p><span style="font-family: 'courier new', courier;">span.subspan(first, count)</span></p>
+</td>
+<td style="border: 1px solid #000000;">Returns a subspan consisting of <span style="font-family: 'courier new', courier;">count</span> elements starting at <span style="font-family: 'courier new', courier;">first</span></td>
+</tr>
+</tbody>
+</table>
+<p>&nbsp;</p>
+<p>The small program shows the usage of the function <span style="font-family: 'courier new', courier;">subspan</span>.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// subspan.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;numeric&gt;</span>
+<span style="color: #009999;">#include &lt;span&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+    std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> myVec(<span style="color: #ff6600;">20</span>);
+    std<span style="color: #555555;">::</span>iota(myVec.begin(), myVec.end(), <span style="color: #ff6600;">0</span>);                   <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> v<span style="color: #555555;">:</span> myVec) std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> v <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span>;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n\n</span><span style="color: #cc3300;">"</span>;
+
+    std<span style="color: #555555;">::</span>span<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> mySpan(myVec);                               <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    <span style="color: #006699; font-weight: bold;">auto</span> length <span style="color: #555555;">=</span> mySpan.size();
+
+    <span style="color: #006699; font-weight: bold;">auto</span> count <span style="color: #555555;">=</span> <span style="color: #ff6600;">5</span>;                                             <span style="color: #0099ff; font-style: italic;">// (3)</span>
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #007788; font-weight: bold;">long</span> <span style="color: #007788; font-weight: bold;">unsigned</span> <span style="color: #007788; font-weight: bold;">int</span> first <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>; first <span style="color: #555555;">&lt;=</span> (length <span style="color: #555555;">-</span> count); first <span style="color: #555555;">+=</span> count ) {
+        <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> ele<span style="color: #555555;">:</span> mySpan.subspan(first, count)) std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> ele <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span>;
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    }
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The program fills the vector with all numbers from 0 to 19 (1), and initializes a <span style="font-family: 'courier new', courier;">std::span</span> with it (2). The algorithm&nbsp;<span style="font-family: 'courier new', courier;">std::iota</span> fills <span style="font-family: 'courier new', courier;">myVec</span> with the&nbsp;sequentially increasing values, starting with 0.<span style="color: #000000; font-family: DejaVuSans, 'DejaVu Sans', arial, sans-serif; font-size: 12.8px; font-style: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing: 0px; background-color: #ffffff; float: none;"> Finally</span>, the for-loop (3) uses the function <span style="font-family: 'courier new', courier;">subspan</span> to create all subspans starting at <span style="font-family: 'courier new', courier;">first</span> and having <span style="font-family: 'courier new', courier;">count</span> elements until <span style="font-family: 'courier new', courier;">mySpan</span> is consumed.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/stdSpan/subspan.PNG" alt="subspan" /></p>
+<h2>What's next?&nbsp;</h2>
+<p>Containers of the STL become with C++20 more powerful. For example, a <span style="font-family: 'courier new', courier;">std::string</span> and <span style="font-family: 'courier new', courier;">std::vecto</span>r can be created at modified at compile-time. Further, thanks to the functions <span style="font-family: 'courier new', courier;">std::erase</span> and <span style="font-family: 'courier new', courier;">std::erase_if</span>, the deletion of the elements of a container works like a charm.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Meeting C++, Matt Braun, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Marko, </strong><span class="sc-kpOJdX fDWXFa" title="Emyr Williams"><strong>G Prvulovic, Reinhold Dröge, Abernitzke,</strong> </span><strong><span title="Emyr Williams">Frank Grimm</span></strong><span title="Emyr Williams"><strong>, Sakib, Broeserl, </strong></span><strong><span title="Emyr Williams">António Pina, Darshan Mody, Sergey Agafyin, <span class="sc-gZMcBi hdSbOl" data-tag="user-details-full-name">Андрей Бурмистров, Jake, GS, Lawton Shoemake, Animus24, Jozo Leko, John Breland, espkk, Wolfgang Gärtner, </span></span><span title="Emyr Williams"><span class="sc-htpNat dEZjR" style="color: #241e12; font-family: aktiv-grotesk, sans-serif; margin: 0px; position: relative; font-weight: 400; font-size: 1rem; line-height: 1.5;"><span class="sc-htpNat ebhhXb" style="color: #241e12; font-family: aktiv-grotesk, sans-serif; margin: 0px; position: relative; font-weight: bold; font-size: 1rem; line-height: 1.5;"></span></span></span>Jon Hess, Christian Wittenhorst, Louis St-Amour, Stephan Roslen, Venkat Nandam, Jose Francisco, Douglas Tinkham, Lakshman, Kuchlong Kuchlong, Avi Kohn, Serhy Pyton, Robert Blanch, Kuma [], Truels Wissneth, Kris Kafka, Mario Luoni, Neil Wang, Friedrich Huber, and Kai.<br /></strong></p>
+<p>&nbsp;</p>
+<p><strong>&nbsp;</strong></p>
+<h2>Seminars</h2>
+<p>I'm happy to give online-seminars or face-to-face seminars world-wide. Please call me if you have any questions.</p>
+<h3>Standard Seminars&nbsp;</h3>
+<p>Here is a compilation of my standard seminars. These seminars are only meant to give you a first orientation.</p>
+<ul>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/22">C++ - The Core Language</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/23">C++ - The Standard Library</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/23">C++ - Compact</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/18">C++11 and C++14</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/16">Clean Code with Modern C++</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/19">Concurrency with Modern C++</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/21">Design Patterns and Architecture Patterns with C++</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/17">Embedded Programming with Modern C++</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/17">Generic Programming (Templates) with C++</a></li>
+</ul>
+<h3>Contact Me</h3>
+<ul>
+<li>Tel.: +49 7472 917441</li>
+<li>Mobil: +49 152 31965939</li>
+<li>Mail: <a href="&lt;a href=">schulung@ModernesCpp.de</a></li>
+<li>German Seminar Page: <a href="https://www.modernescpp.de/">www.ModernesCpp.de</a></li>
+<li>English Seminar Page: <a href="http://www.ModernesCpp.net">www.ModernesCpp.net</a></li>
+</ul>
+<h3>Modernes C++,</h3>
+<p><img src="images/signatur/RainerGrimmSmall.png" alt="RainerGrimmSmall" /></p>
