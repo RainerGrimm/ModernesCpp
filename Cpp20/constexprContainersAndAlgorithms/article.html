@@ -1,0 +1,198 @@
+<p>Probably the most viral keyword in modern C++ is <code>constexpr</code>. With C++20, we have a<code> constexpr std::vector</code> and a<code> constexpr std::string</code>. Additionally, both containers can be manipulated with the <code>constexpr</code> algorithms of the Standard Template Library.&nbsp;</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/constexprContainersAndAlgorithms/TimelineCpp20CoreLanguage.png" alt="TimelineCpp20CoreLanguage" width="650" height="243" /></p>
+<p>In this post, I want to calculate the sum and the product of a few numbers at compile time. Depending on the applied C++ standard, this is quite challenging or quite comfortable to achieve. Let's start with C++11.</p>
+<h2>Variadic Templates in C++11</h2>
+<p>A variadic template is a template that can be invoked with an arbitrary number of arguments. By using the ellipse (...)<code>&nbsp;tails</code>&nbsp;becomes a so-called parameter pack. Parameter packs can only be packed and unpacked. If the ellipse is left from <code>tails</code>, the parameter pack is packed. If the ellipse is right from tail<code>s</code>, the parameter pack is unpacked.&nbsp;</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// compiletimeVariadicTemplates.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>...<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">struct</span> sum;
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;&gt;</span>
+<span style="color: #006699; font-weight: bold;">struct</span> sum<span style="color: #555555;">&lt;&gt;</span> {
+  <span style="color: #006699; font-weight: bold;">static</span> constexpr <span style="color: #007788; font-weight: bold;">int</span> value <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>;
+};
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span> i, <span style="color: #007788; font-weight: bold;">int</span>... tail<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">struct</span> sum<span style="color: #555555;">&lt;</span>i, tail...<span style="color: #555555;">&gt;</span> {
+  <span style="color: #006699; font-weight: bold;">static</span> constexpr <span style="color: #007788; font-weight: bold;">int</span> value <span style="color: #555555;">=</span> i <span style="color: #555555;">+</span> sum<span style="color: #555555;">&lt;</span>tail...<span style="color: #555555;">&gt;::</span>value;
+};
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>...<span style="color: #555555;">&gt;                                  <span style="color: #0099ff; font-style: italic;">// (1)</span></span>
+<span style="color: #006699; font-weight: bold;">struct</span> product;
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;&gt;                                        <span style="color: #555555;"><span style="color: #0099ff; font-style: italic;">// (2)</span></span>                                 </span>
+<span style="color: #006699; font-weight: bold;">struct</span> product<span style="color: #555555;">&lt;&gt;</span> {
+  <span style="color: #006699; font-weight: bold;">static</span> constexpr <span style="color: #007788; font-weight: bold;">int</span> value <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span>;
+};
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span> i, <span style="color: #007788; font-weight: bold;">int</span>... tail<span style="color: #555555;">&gt;                      <span style="color: #555555;"><span style="color: #0099ff; font-style: italic;">// (3)</span></span></span>
+<span style="color: #006699; font-weight: bold;">struct</span> product<span style="color: #555555;">&lt;</span>i, tail...<span style="color: #555555;">&gt;</span> {
+  <span style="color: #006699; font-weight: bold;">static</span> constexpr <span style="color: #007788; font-weight: bold;">int</span> value <span style="color: #555555;">=</span> i <span style="color: #555555;">*</span> product<span style="color: #555555;">&lt;</span>tail...<span style="color: #555555;">&gt;::</span>value;
+};
+
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"sum&lt;1, 2, 3, 4, 5&gt;::value: "</span> <span style="color: #555555;">&lt;&lt;</span> sum<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">5</span><span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"product&lt;1, 2, 3, 4, 5&gt;::value: "</span> <span style="color: #555555;">&lt;&lt;</span> product<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">5</span><span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The program calculates the sum and the product of the numbers 1 to 5 at compile time. In the case of the function template <code>product</code>, line (1) declares the primary template, line (2) the full specialization for zero arguments, and line (3) the partial specialization for at least one argument. The definition of the primary template (1) is not necessary if you don't use it. The partial specialization (3) starts a recursive instantiation, which ends when all template arguments are consumed. In this case, the full specialization for zero arguments kicks in as the boundary condition. If you want to know how this pack expansion is performed, study the example <span style="font-family: courier new, courier;">compileTimeVariadicTemplates.cpp</span> at<a href="https://cppinsights.io/s/33f60630"> C++ Insights</a>. <span style="color: #555555;"><span style="color: #0099ff; font-style: italic;"></span></span></p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/constexprContainersAndAlgorithms/compileTimeVariadicTemplate.png" alt="compileTimeVariadicTemplate" width="450" height="191" /></p>
+<p>Thanks to fold expression, calculating at compile-time becomes way easier.</p>
+<h2>Fold Expressions in C++17</h2>
+<p>With C++17 we can directly reduce a parameter pack with a binary operator.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// compiletimeFoldExpressions.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span>... Args<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">auto</span> sum(<span style="color: #006699; font-weight: bold;">const</span> Args<span style="color: #555555;">&amp;</span>... args)
+{
+  <span style="color: #006699; font-weight: bold;">return</span> (args <span style="color: #555555;">+</span> ...);
+}
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span>... Args<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">auto</span> product(<span style="color: #006699; font-weight: bold;">const</span> Args<span style="color: #555555;">&amp;</span>... args)
+{
+  <span style="color: #006699; font-weight: bold;">return</span> (args <span style="color: #555555;">*</span> ...);
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"sum(1, 2, 3, 4, 5): "</span> <span style="color: #555555;">&lt;&lt;</span> sum(<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">5</span>) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"product(1, 2, 3, 4, 5): "</span> <span style="color: #555555;">&lt;&lt;</span> product(<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">5</span>) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The program <code>compiletimeFoldExpressions.cpp</code> produces the same result at compile-time, such as the previous program&nbsp;&nbsp;<span style="font-family: courier new, courier;">compileTimeVariadicTemplates.cpp</span>.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/constexprContainersAndAlgorithms/compiletimeFoldExpressions.png" alt="compiletimeFoldExpressions" width="450" height="185" /></p>
+<p>Of course, there is more to write about fold expression. Read the details in my previous post to <a href="index.php/component/content/article/42-blog/functional/268-fold-expressions?Itemid=239">Fold Expressions</a>.</p>
+<p>Now I want to dive into C++20.</p>
+<h2>constexpr Containers and Algorithms in C++20</h2>
+<p>C++20 supports the <code>constexpr</code> containers<code> std::vector</code> and <code>std::string. constexpr</code> means in this case, that the member functions of both containers can be applied at compile-time.</p>
+<p>Before I write about both containers<code></code><code></code>, I have to make a short detour to C++17. The reason is simple: No compiler so far supports the <code>constexpr</code> <code>std::vector</code> and<code> std::string</code>. In contrast, the GCC and the Microsoft Compiler support the&nbsp;<code>constexpr</code> algorithms of the STL.</p>
+<p>In my following example, I use instead of a <code>constexpr std::vector</code> a <code>constexpr std::array. </code>Since&nbsp;C++17<code> std::array</code> can be declared as <code>constexpr: constexpr std::array myArray{1, 2, 3}. </code></p>
+<p><code>N</code>ow starts the fun part. With C++20, you can use a<code> std::array</code> at compile-time.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// constexprArray.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;numeric&gt;</span>
+<span style="color: #009999;">#include &lt;array&gt;</span>
+
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+    constexpr std<span style="color: #555555;">::</span>array myArray{<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">5</span>};                                     <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    constexpr <span style="color: #006699; font-weight: bold;">auto</span> sum <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>accumulate(myArray.begin(), myArray.end(), <span style="color: #ff6600;">0</span>);         <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"sum: "</span>  <span style="color: #555555;">&lt;&lt;</span> sum <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+    constexpr <span style="color: #006699; font-weight: bold;">auto</span> product <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>accumulate(myArray.begin(), myArray.end(), <span style="color: #ff6600;">1</span>,      <span style="color: #0099ff; font-style: italic;">// (3)</span><br />                                             std<span style="color: #555555;">::</span>multiplies<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span>());
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"product: "</span>  <span style="color: #555555;">&lt;&lt;</span> product <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+    constexpr <span style="color: #006699; font-weight: bold;">auto</span> product2 <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>accumulate(myArray.begin(), myArray.end(), <span style="color: #ff6600;">1</span>,     <span style="color: #0099ff; font-style: italic;">// (4)</span><br />                                              [](<span style="color: #006699; font-weight: bold;">auto</span> a, <span style="color: #006699; font-weight: bold;">auto</span> b) { <span style="color: #006699; font-weight: bold;">return</span> a <span style="color: #555555;">*</span> b;});
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"product2: "</span>  <span style="color: #555555;">&lt;&lt;</span> product2 <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The<code> std::array</code> (1) and all results of the calculations are declared as <code>constexpr</code>. Line (2) calculates the sum of all elements, and the lines (3) and (4) calculate the product of all elements of<code> myArray</code>. Line 2 is valid because <code>myArray</code> is a <code>constexpr</code> container, and the algorithm <code>std::accumulate</code> is declared as <code>constexpr</code>. Line (3) and (4) are more interesting. The call operator of <a href="https://en.cppreference.com/w/cpp/utility/functional/multiplies"><code>std::multiplies</code></a> is <code>constexpr</code> and since C++17 lambda expression can be <code>constexpr</code>.</p>
+<p>Here is the output of the program:</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/constexprContainersAndAlgorithms/constexprArray.PNG" alt="constexprArray" width="400" height="196" /></p>
+<p>Thanks to the<a href="https://godbolt.org/z/ezv7Po"> Compiler Explorer</a>, I can present to you the results way more impressive. Here are the relevant assembler instructions of GCC.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/constexprContainersAndAlgorithms/constexprArrayCompilerExplorer.PNG" alt="constexprArrayCompilerExplorer" /></p>
+<p>&nbsp;</p>
+<p>Lines 19, 29, and 39 show that the results of the array calculations become values in the assembler instructions.&nbsp; This means <code>std::accumulate</code> is performed at compile-time and the result of the calculation is just available at run-time.</p>
+<p>As I already mentioned it, no compiler so far supports a <code>constexpr std::vector</code> or a<code> constexpr std::string</code>. Consequently, I have to cheat and assume that my compiler fully supports both <code>constexpr</code> containers.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// constexprVectorString.cpp</span>
+
+<span style="color: #009999;">#include &lt;algorithm&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;string&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+    constexpr std<span style="color: #555555;">::</span>vector myVec {<span style="color: #ff6600;">15</span>, <span style="color: #555555;">-</span><span style="color: #ff6600;">5</span>, <span style="color: #ff6600;">0</span>, <span style="color: #ff6600;">5</span>, <span style="color: #ff6600;">10</span>};
+    constexpr std<span style="color: #555555;">::</span>sort(myVec.begin(), myVec.end());
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> v<span style="color: #555555;">:</span> myVec) std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> v <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span>;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n\n</span><span style="color: #cc3300;">"</span>;
+
+    <span style="color: #006699; font-weight: bold;">using</span> <span style="color: #006699; font-weight: bold;">namespace</span> std<span style="color: #555555;">::</span>string_literals;
+    constexpr std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>string<span style="color: #555555;">&gt;</span> myStringVec{<span style="color: #cc3300;">"Stroustrup"</span>s, <span style="color: #cc3300;">"Vandevoorde"</span>s, <br />                                                   <span style="color: #cc3300;">"Sutter"</span>s, <span style="color: #cc3300;">"Josuttis"</span>s, <span style="color: #cc3300;">"Wong"</span>s };
+    constexpr std<span style="color: #555555;">::</span>sort(myStringVec.begin(), myStringVec.end());
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> s<span style="color: #555555;">:</span> myStringVec) std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> s <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span>;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n\n</span><span style="color: #cc3300;">"</span>;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>With C++20, you can sort a <code>std::vector</code> or a <code>std::string</code> at compile-time.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/constexprContainersAndAlgorithms/constexprVectorString.png" alt="constexprVectorString" /></p>
+<h2>What's next?</h2>
+<p>C++20 adds many convenience functions to make it easier to work with containers of the Standard Template Library. For example, due to the functions <span style="font-family: 'courier new', courier;">std::erase</span> and <span style="font-family: 'courier new', courier;">std::erase_if</span>, deletion of elements of a container works like a charm. When you want to know if a specific element is in an associative container, the member function <code>contains</code> is quite handy.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Matt Braun, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Marko, </strong><span class="sc-kpOJdX fDWXFa" title="Emyr Williams"><strong>G Prvulovic, Reinhold Dröge, Abernitzke,</strong> </span><strong><span title="Emyr Williams">Frank Grimm</span></strong><span title="Emyr Williams"><strong>, Sakib, Broeserl, </strong></span><strong><span title="Emyr Williams">António Pina, Darshan Mody, Sergey Agafyin, <span class="sc-gZMcBi hdSbOl" data-tag="user-details-full-name">Андрей Бурмистров, Jake, GS, Lawton Shoemake, Animus24, Jozo Leko, John Breland, espkk, Wolfgang Gärtner, </span></span><span title="Emyr Williams"><span class="sc-htpNat dEZjR" style="color: #241e12; font-family: aktiv-grotesk, sans-serif; margin: 0px; position: relative; font-weight: 400; font-size: 1rem; line-height: 1.5;"><span class="sc-htpNat ebhhXb" style="color: #241e12; font-family: aktiv-grotesk, sans-serif; margin: 0px; position: relative; font-weight: bold; font-size: 1rem; line-height: 1.5;"></span></span></span>Jon Hess, Christian Wittenhorst, Louis St-Amour, Stephan Roslen, Venkat Nandam, Jose Francisco, Douglas Tinkham, Lakshman, Kuchlong Kuchlong, Avi Kohn, Serhy Pyton, Robert Blanch, Kuma [], Truels Wissneth, Kris Kafka, Mario Luoni, Neil Wang, Friedrich Huber, Kai, and Sudhakar Balagurusamy.<br /></strong></p>
+<p>&nbsp;</p>
+<p><strong>&nbsp;</strong></p>
+<h2>Seminars</h2>
+<p>I'm happy to give online-seminars or face-to-face seminars world-wide. Please call me if you have any questions.</p>
+<h3>Standard Seminars&nbsp;</h3>
+<p>Here is a compilation of my standard seminars. These seminars are only meant to give you a first orientation.</p>
+<ul>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/22">C++ - The Core Language</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/23">C++ - The Standard Library</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/23">C++ - Compact</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/18">C++11 and C++14</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/16">Clean Code with Modern C++</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/19">Concurrency with Modern C++</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/21">Design Patterns and Architecture Patterns with C++</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/17">Embedded Programming with Modern C++</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/17">Generic Programming (Templates) with C++</a></li>
+</ul>
+<h3>Contact Me</h3>
+<ul>
+<li>Tel.: +49 7472 917441</li>
+<li>Mobil: +49 152 31965939</li>
+<li>Mail: <a href="&lt;a href=">schulung@ModernesCpp.de</a></li>
+<li>German Seminar Page: <a href="https://www.modernescpp.de/">www.ModernesCpp.de</a></li>
+<li>English Seminar Page: <a href="http://www.ModernesCpp.net">www.ModernesCpp.net</a></li>
+</ul>
+<h3>Modernes C++,</h3>
+<p><img src="images/signatur/RainerGrimmSmall.png" alt="RainerGrimmSmall" /></p>
