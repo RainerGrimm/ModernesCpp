@@ -1,0 +1,178 @@
+<p>Today, I'm happy to present Peter Gottschling's guest post to the new formatting library in C++20: <code>std::format</code>. &nbsp;Thanks to&nbsp;<code>std::format</code>, text formatting becomes in C++20 as easy as in Python.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/FormatLibrary/TimelineCpp20CoreLanguage.png" alt="TimelineCpp20CoreLanguage" width="650" height="267" /></p>
+<p>Peter is the author of the must-read book "<a href="https://www.pearson.com/us/higher-education/program/Gottschling-Discovering-Modern-C-2nd-Edition/PGM2775899.html">Discovering Modern C++</a>"&nbsp; for professional C++ developers.</p>
+<h2>New Formatting</h2>
+<p>Traditional stream formatting&nbsp;requires a fair amount of typing.&nbsp;Format strings in <code>printf</code> and alike&nbsp;are clearly more expressive and allow us to declare with few symbols what&nbsp;we've written with multiple I/O manipulators before.&nbsp;</p>
+<p>Nonetheless, we advise against using <code>printf</code>.&nbsp;For two reasons: it can't be used with user types and it is not type-safe.&nbsp;The format string is parsed at run time and the following arguments are treated&nbsp;with an obscure macro mechanism.&nbsp;If the arguments don't match the format string, the behavior is undefined&nbsp;and can cause program crashes.&nbsp;For instance, a string is passed as a pointer and from the pointed address on&nbsp;the bytes are read and printed as <code>char</code> until a binary <code>0</code> is&nbsp;found in memory.&nbsp;If we accidentally try printing an <code>int</code> as a string, the <code>int</code> value&nbsp;is misinterpreted as an address from which a sequence of <code>char</code> shall be&nbsp;printed. This will result in either absolute nonsensical output or (more likely) in a&nbsp;memory error if the address is inaccessible.&nbsp;We have to admit that recent compilers parse format strings (when known at compile time) and warn&nbsp;about argument mismatches.</p>
+<p>The new <a href="https://en.cppreference.com/w/cpp/utility/format/format">format&nbsp;</a>library {By the time of writing, no compiler supported the&nbsp;library and the examples were implemented with its prototype version: the <a href="https://github.com/fmtlib/fmt">fmt </a>library. The format library combines the expressibility of the format string&nbsp;with the type safety and the user-extensibility of stream I/O&nbsp;and adds the opportunity to reorder the arguments in the output.</p>
+<h3>Integrals</h3>
+<p>Instead of a formal specification,&nbsp;we port some <code>printf</code> examples from <a href="https://en.cppreference.com/w/cpp/io/c/fprintf">cppreference.com</a>&nbsp;to the new format:</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">print(<span style="color: #cc3300;">"Decimal:</span><span style="color: #cc3300; font-weight: bold;">\t</span><span style="color: #cc3300;">{} {} {:06} {} {:0} {:+} {:d}</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>, <span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">0</span>, <span style="color: #ff6600;">0</span>, <span style="color: #ff6600;">4</span>, <span style="color: #555555;">-</span><span style="color: #ff6600;">1</span>);
+
+print(<span style="color: #cc3300;">"Hexadecimal:</span><span style="color: #cc3300; font-weight: bold;">\t</span><span style="color: #cc3300;">{:x} {:x} {:X} {:#x}</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>, <span style="color: #ff6600;">5</span>, <span style="color: #ff6600;">10</span>, <span style="color: #ff6600;">10</span>, <span style="color: #ff6600;">6</span>);
+
+print(<span style="color: #cc3300;">"Octal:</span><span style="color: #cc3300; font-weight: bold;">\t\t</span><span style="color: #cc3300;">{:o} {:#o} {:#o}</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>, <span style="color: #ff6600;">10</span>, <span style="color: #ff6600;">10</span>, <span style="color: #ff6600;">4</span>);
+
+print(<span style="color: #cc3300;">"Binary:</span><span style="color: #cc3300; font-weight: bold;">\t\t</span><span style="color: #cc3300;">{:b} {:#b} {:#b}</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>, <span style="color: #ff6600;">10</span>, <span style="color: #ff6600;">10</span>, <span style="color: #ff6600;">4</span>);
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>This snippet prints:</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">Decimal:        1 2 000003 0 0 +4 -1
+
+Hexadecimal:    5 a A 0x6
+
+Octal:          12 012 04
+
+Binary:         1010 0b1010 0b100<br />
+</pre>
+</div>
+<p>The first two numbers were just printed without giving any format information. The same output is generated when we ask for a decimal number with the format specifier <code>:d. </code>The third number shall be printed (minimally) 6~characters wide and filled with <code>0</code>s. The specifier <code>+</code> allows us to force printing the sign for all numbers. <code>printf</code> allows for specifying <code>unsigned</code> output of numbers. That leads to incorrect large numbers when the value to print is negative. The <code>format</code> library refrains from user declarations of&nbsp; <code>unsigned </code>output since this information is already contained in the type of the according argument. If somebody feels the urge to print a negative value as a large positive one, he must convert it explicitly.</p>
+<p>The second line demonstrates that we can&nbsp; print values hexadecimally--both with lower and upper case for the digits larger than 9. The specifier <code>#</code> generates the prefix <code>0x</code> used in hexadecimal literals.</p>
+<p>Likewise, we can print the values as octals and binaries, optionally with the according literal prefix.</p>
+<h3>Floating-Point Numbers</h3>
+<p>With floating-point numbers we have more formatting options:</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">print(<span style="color: #cc3300;">"Default:</span><span style="color: #cc3300; font-weight: bold;">\t</span><span style="color: #cc3300;">{} {:g} {:g}</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>, <span style="color: #ff6600;">1.5</span>, <span style="color: #ff6600;">1.5</span>, <span style="color: #ff6600;">1e20</span>);
+
+print(<span style="color: #cc3300;">"Rounding:</span><span style="color: #cc3300; font-weight: bold;">\t</span><span style="color: #cc3300;">{:f} {:.0f} {:.22f}</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>, <span style="color: #ff6600;">1.5</span>, <span style="color: #ff6600;">1.5</span>, <span style="color: #ff6600;">1.3</span>);
+
+print(<span style="color: #cc3300;">"Padding:</span><span style="color: #cc3300; font-weight: bold;">\t</span><span style="color: #cc3300;">{:05.2f} {:.2f} {:5.2f}</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>, <span style="color: #ff6600;">1.5</span>, <span style="color: #ff6600;">1.5</span>, <span style="color: #ff6600;">1.5</span>);
+
+print(<span style="color: #cc3300;">"Scientific:</span><span style="color: #cc3300; font-weight: bold;">\t</span><span style="color: #cc3300;">{:E} {:e}</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>, <span style="color: #ff6600;">1.5</span>, <span style="color: #ff6600;">1.5</span>);
+
+print(<span style="color: #cc3300;">"Hexadecimal:</span><span style="color: #cc3300; font-weight: bold;">\t</span><span style="color: #cc3300;">{:a} {:A}</span><span style="color: #cc3300; font-weight: bold;">\n\n</span><span style="color: #cc3300;">"</span>, <span style="color: #ff6600;">1.5</span>, <span style="color: #ff6600;">1.3</span>);
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Then we get:</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">Default:        1.5 1.5 1e+20
+
+Rounding:       1.500000 2 1.3000000000000000444089
+
+Padding:        01.50 1.50  1.50
+
+Scientific:     1.500000E+00 1.500000e+00
+
+Hexadecimal:    0x1.8p+0 0X1.4CCCCCCCCCCCDP+0
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>With empty braces or only containing a colon, we get the default output. This corresponds to the format specifier<code>&nbsp;:g</code>&nbsp;and yields the same output as streams without the manipulators. The number of fractional digits can be given between a dot and the format specifier<code> f</code>. Then the value is rounded to that precision. If the requested number is larger than what is representable by the value's type, the last digits aren't very meaningful. A digit in front of the dot specifies the (minimal) width of the output. As with integers we can request leading<code> 0</code>s. Floating-point numbers can be printed in the scientific notation with either upper or lower case <code>e</code> to start the exponential part. The hexadecimal output can be used to initialize a variable in another program with precisely the same bits.</p>
+<h3>Redirecting Output</h3>
+<p>The output can be redirected to any other <code>std::ostream (</code>Requires including <code>ostream.h</code> with the fmt library.):</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">print(std<span style="color: #555555;">::</span>cerr, <span style="color: #cc3300;">"System error code = {}</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>, <span style="color: #ff6600;">7</span>);
+
+ofstream <span style="color: #cc00ff;">error_file</span>(<span style="color: #cc3300;">"error_file.txt"</span>);
+
+print(error_file, <span style="color: #cc3300;">"System error code = {}</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>, <span style="color: #ff6600;">7</span>);</pre>
+</div>
+<h3>Reordering Arguments and Name them</h3>
+<p>In contrast to <code>printf</code>, arguments can now be reordered:</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">print(<span style="color: #cc3300;">"I'd rather be {1} than {0}.</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>, <span style="color: #cc3300;">"right"</span>, <span style="color: #cc3300;">"happy"</span>);
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>In addition to referring the arguments by their positions, we can give them names:</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">print(<span style="color: #cc3300;">"Hello, {name}! The answer is {number}. Goodbye, {name}.</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>,
+      arg(<span style="color: #cc3300;">"name"</span>, name), arg(<span style="color: #cc3300;">"number"</span>, number));
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Or more concisely:</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">print(<span style="color: #cc3300;">"Hello, {name}! The answer is {number}. Goodbye, {name}.</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>,
+      <span style="color: #cc3300;">"name"</span>_a<span style="color: #555555;">=</span>name, <span style="color: #cc3300;">"number"</span>_a<span style="color: #555555;">=</span>number);
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The example also demonstrates that we can print an argument multiple times.</p>
+<p>Reordering arguments is very important in multi-lingual software to provide a natural phrasing.</p>
+<p>Now, we want to print the average of two values in five languages:</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">print_average</span>(<span style="color: #007788; font-weight: bold;">float</span> v1, <span style="color: #007788; font-weight: bold;">float</span> v2, <span style="color: #007788; font-weight: bold;">int</span> language)
+
+{   
+
+    <span style="color: #006699; font-weight: bold;">using</span> <span style="color: #006699; font-weight: bold;">namespace</span> fmt;
+
+    string formats[]<span style="color: #555555;">=</span> {<span style="color: #cc3300;">"The average of {v1} and {v2} is {result}.</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>,
+
+                       <span style="color: #cc3300;">"{result:.6f} ist der Durchschnitt von {v1} und {v2}.</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>,
+
+                       <span style="color: #cc3300;">"La moyenne de {v1} et {v2} est {result}.</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>,
+
+                       <span style="color: #cc3300;">"El promedio de {v1} y {v2} es {result}.</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>,
+
+                       <span style="color: #cc3300;">"{result} corrisponde alla media di {v1} e {v2}.</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>};
+
+    print (formats[language], <span style="color: #cc3300;">"v1"</span>_a<span style="color: #555555;">=</span> v1, <span style="color: #cc3300;">"v2"</span>_a<span style="color: #555555;">=</span> v2, <span style="color: #cc3300;">"result"</span>_a<span style="color: #555555;">=</span> (v1<span style="color: #555555;">+</span>v2)<span style="color: #555555;">/</span><span style="color: #ff6600;">2.0f</span>);
+
+}   
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Of course, the German version is the most pedantic one, requesting 6 decimal digits no matter what:</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">The average of 3.5 and 7.3 is 5.4.
+
+5.400000 ist der Durchschnitt von 3.5 und 7.3.
+
+La moyenne de 3.5 et 7.3 est 5.4.
+
+El promedio de 3.5 y 7.3 es 5.4.
+
+5.4 corrisponde alla media di 3.5 e 7.3.<br />
+</pre>
+</div>
+<p>Admittedly, this example would have worked without reordering the arguments but it nicely demonstrates the important possibility to separate the text and the formatting from the values. To store formatted text in a string we don't need a <code>stringstream</code> any longer but can do it directly with the function format.</p>
+<h2>What's next?</h2>
+<p>In the next post, Peter continues his introduction to <code>std::format</code>. He writes about user-defined formatting.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Matt Braun, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Marko, </strong><span class="sc-kpOJdX fDWXFa" title="Emyr Williams"><strong>G Prvulovic, Reinhold Dröge, Abernitzke,</strong> </span><strong><span title="Emyr Williams">Frank Grimm</span></strong><span title="Emyr Williams"><strong>, Sakib, Broeserl, </strong></span><strong><span title="Emyr Williams">António Pina, Darshan Mody, Sergey Agafyin, <span class="sc-gZMcBi hdSbOl" data-tag="user-details-full-name">Андрей Бурмистров, Jake, GS, Lawton Shoemake, Animus24, Jozo Leko, John Breland, espkk, Wolfgang Gärtner, </span></span><span title="Emyr Williams"><span class="sc-htpNat dEZjR" style="color: #241e12; font-family: aktiv-grotesk, sans-serif; margin: 0px; position: relative; font-weight: 400; font-size: 1rem; line-height: 1.5;"><span class="sc-htpNat ebhhXb" style="color: #241e12; font-family: aktiv-grotesk, sans-serif; margin: 0px; position: relative; font-weight: bold; font-size: 1rem; line-height: 1.5;"></span></span></span>Jon Hess, Christian Wittenhorst, Louis St-Amour, Stephan Roslen, Venkat Nandam, Jose Francisco, Douglas Tinkham, Lakshman, Kuchlong Kuchlong, Avi Kohn, Serhy Pyton, Robert Blanch, Truels Wissneth, Kris Kafka, Mario Luoni, Neil Wang, Friedrich Huber, Kai, and Sudhakar Balagurusamy.<br /></strong></p>
+<p><strong>Thanks in particular to Kuma Dev.</strong></p>
+<p>&nbsp;</p>
+<p><strong>&nbsp;</strong></p>
+<h2>Seminars</h2>
+<p>I'm happy to give online-seminars or face-to-face seminars world-wide. Please call me if you have any questions.</p>
+<h3>Standard Seminars&nbsp;</h3>
+<p>Here is a compilation of my standard seminars. These seminars are only meant to give you a first orientation.</p>
+<ul>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/22">C++ - The Core Language</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/23">C++ - The Standard Library</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/23">C++ - Compact</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/18">C++11 and C++14</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/16">Clean Code with Modern C++</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/19">Concurrency with Modern C++</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/21">Design Patterns and Architecture Patterns with C++</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/17">Embedded Programming with Modern C++</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/17">Generic Programming (Templates) with C++</a></li>
+</ul>
+<h3>Contact Me</h3>
+<ul>
+<li>Tel.: +49 7472 917441</li>
+<li>Mobil: +49 152 31965939</li>
+<li>Mail: <a href="&lt;a href=">schulung@ModernesCpp.de</a></li>
+<li>German Seminar Page: <a href="https://www.modernescpp.de/">www.ModernesCpp.de</a></li>
+<li>English Seminar Page: <a href="http://www.ModernesCpp.net">www.ModernesCpp.net</a></li>
+</ul>
+<h3>Modernes C++,</h3>
+<p><img src="images/signatur/RainerGrimmSmall.png" alt="RainerGrimmSmall" /></p>
