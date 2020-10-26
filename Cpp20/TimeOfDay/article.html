@@ -1,0 +1,148 @@
+<p>With C++20, the <a href="https://en.cppreference.com/w/cpp/chrono" target="_blank" rel="noopener nofollow">chrono </a>library from C++11 becomes important additions. The most prominent ones are a calendar and time zones support. But this is by far not all. C++20 gets new clocks, powerful formatting functionality for time durations, and a time of day type.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/TimeOfDay/TimelineCpp20CoreLanguage.png" alt="TimelineCpp20CoreLanguage" width="650" height="278" /></p>
+<p>Before I dive into the extended <a href="https://en.cppreference.com/w/cpp/chrono">chrono </a>library and, in particular, in this post into the new type<span style="font-family: courier new, courier;"> std::chrono::time_of_day,</span> I have to make a few remarks. In short, I call all date and time utilities provided by <a href="https://en.cppreference.com/w/cpp/chrono">chrono</a> the time library.</p>
+<h2>The time library in C++11</h2>
+<p>To get the most out of this post, a basic understanding of the chrono library is essential. C++11 introduced three main components to deal with time:</p>
+<ul>
+<li>A<strong> time point</strong> is defined by a starting point, the so-called epoch, and additional time duration.</li>
+<li>A<strong> time duration&nbsp;</strong> which is the difference between two time-points. It is given by the number of ticks.</li>
+<li>A <strong>clock</strong> consists of a starting point (epoch) and a tick so that the current time point can be calculated.</li>
+</ul>
+<p>Honestly, time is for me a mysterium. On one hand, each of us has an intuitive idea of time, on the other hand, defining it formally is extremely challenging. For example, the three components time point, time duration, and clock depend on each other. If you want to know more about the time functionality in C++11, read my previous posts: <a href="index.php/tag/time">time</a>.</p>
+<h2>The <code>chrono</code> Extensions in C++20</h2>
+<p>C++20 adds new components to the chrono library:</p>
+<ul>
+<li>The<strong> time of day</strong> is the time duration since midnight split into hours, minutes, seconds, and fractional seconds.</li>
+<li><strong>Calendar</strong> stands for various calendar dates such as year, a month, a weekday, or the n-th day of a week.</li>
+<li>A <strong>time-zone</strong> represents time specific to a geographic area.</li>
+</ul>
+<p>Essentially, the time-zone functionality (C++20) is based on the calendar functionality (C++20) and the calendar functionality (C++20) is based on the original chrono functionality (C++11).</p>
+<p>But that is not all. The extension includes new clocks. Thanks to the <a href="https://en.cppreference.com/w/cpp/utility/format">formatting library</a> in C++20, time durations can be read or written.</p>
+<h2>The <code>date</code> Prototype Library</h2>
+<p>While writing this post, no C++ compiler supports the chrono extensions in C++20 so far. Thanks to the prototype library <a href="https://github.com/HowardHinnant/date">date&nbsp;</a>from Howard Hinnant, which is essentially a superset of the extended time functionality in C++20, I can experiment with it. The library is hosted on GitHub. There are various ways to use the <a href="https://github.com/HowardHinnant/date">date</a> prototype:</p>
+<ol>
+<li>You can try it out on wandbox. Howard has uploaded the <code>date.h</code> header which is sufficient to play with the new type <code>std::time_of_day</code> and the calendar. Here is Howard's link: <strong><a href="https://wandbox.org/permlink/L8MwjzSSC3fXXrMd" rel="nofollow">Try it out on wandbox!</a></strong></li>
+<li>Copy the header&nbsp;<code>date.h</code>&nbsp;into the search path of your C++ compiler.</li>
+<li>Download the project and build it. The already mentioned GitHub page <a href="https://github.com/HowardHinnant/date">date</a> gives you more information.</li>
+</ol>
+<p>I made my first steps with the online compiler wandbox but switched to the strategy 2.</p>
+<h3>Required C++ standard</h3>
+<p>In general, a C++14 compiler is sufficient to use the date library. There is one exception to this rule which I experienced with the following call:</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">auto</span> timeOfDay <span style="color: #555555;">=</span> date<span style="color: #555555;">::</span>time_of_day(<span style="color: #ff6600;">10.</span>h <span style="color: #555555;">+</span> <span style="color: #ff6600;">98</span>min <span style="color: #555555;">+</span> <span style="color: #ff6600;">2020</span>s <span style="color: #555555;">+</span> <span style="color: #ff6600;">0.5</span>s); <span style="color: #0099ff; font-style: italic;">// C++20</span>
+
+<span style="color: #006699; font-weight: bold;">auto</span> timeOfDay <span style="color: #555555;">=</span> date<span style="color: #555555;">::</span>hh_mm_ss(<span style="color: #ff6600;">10.</span>h <span style="color: #555555;">+</span> <span style="color: #ff6600;">98</span>min <span style="color: #555555;">+</span> <span style="color: #ff6600;">2020</span>s <span style="color: #555555;">+</span> <span style="color: #ff6600;">0.5</span>s);    <span style="color: #0099ff; font-style: italic;">// C++17</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>I used in my first tries the first call. The first line requires class template argument deduction for alias templates.<code> time_of_day</code> is an alias for <code>hh_mm_ss: using time_of_day_day = hh_mm_ss&lt;Duration&gt;. </code>When you now replace the alias with the class template such as in the second line (C++17), you need a C++17. Class template argument deduction is a C++17.</p>
+<p>Read more details to class template argument deduction here: <a href="index.php/cpp17-core">C++17: What's new in the Core Language?</a></p>
+<h4>Issue Solved</h4>
+<p>With C++20<code> time_of_day</code>&nbsp;was renamed to <code>hh_mm_ss. </code>Howard Hinnant, the creator of the date library and designer of the chrono addition, gave me the crucial hint: "<em>Prefer to use <code>hh_mm_ss</code> in place of <code>time_of_day</code>. <code>time_of_day</code> got renamed to <code>hh_mm_ss</code> during the standardization process for C++20, and so <code>time_of_day</code> remains strictly as a backwards compatible shim for current and past users of this lib.</em>"</p>
+<p>This are typcial Odysses you have, when you are an early adpoter.&nbsp;</p>
+<h3>Porting to C++20</h3>
+<p>When you only use the content of the date prototype that is part of C++20, porting it to C++ 20 is no big deal. Replace the <a href="https://github.com/HowardHinnant/date">date&nbsp;</a>header files with the header file <code>&lt;chrono&gt;</code> and the namespace <code>date</code> with the namespace <code>std::chrono</code>:</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #009999;">#include "date.h"    </span>
+<span style="color: #0099ff; font-style: italic;">//#include &lt;chrono&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {<br />
+     <span style="color: #006699; font-weight: bold;">using</span> <span style="color: #006699; font-weight: bold;">namespace</span> std<span style="color: #555555;">::</span>chrono_literals;
+    
+     <span style="color: #006699; font-weight: bold;">auto</span> am <span style="color: #555555;">=</span> date<span style="color: #555555;">::is_am</span>(<span style="color: #ff6600;">10</span>h);   
+     <span style="color: #0099ff; font-style: italic;">// auto am = std::chrono::is_am(10h);  </span>
+
+} 
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Now, I write about the chrono extensions in C++20.</p>
+<h2>Time of Day</h2>
+<p><code>std::chrono::hh_mm_ss</code> is the duration since midnight split into hours, minutes, seconds, and fractional seconds. This type is typically used as a formatting tool. First, the following table gives you a concise overview of <code>std::chrono::hh_mm_ss</code> instance<code> tOfDay.</code></p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/TimeOfDay/timeOfDayTable2.png" alt="timeOfDayTable2" width="550" height="234" /></p>
+<p>&nbsp;</p>
+<p>The following program uses the functions:</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// timeOfDay.cpp</span>
+
+<span style="color: #009999;">#include "date.h"</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+     <span style="color: #006699; font-weight: bold;">using</span> <span style="color: #006699; font-weight: bold;">namespace</span> date;                                                            <span style="color: #0099ff; font-style: italic;">// (3)</span>
+     <span style="color: #006699; font-weight: bold;">using</span> <span style="color: #006699; font-weight: bold;">namespace</span> std<span style="color: #555555;">::</span>chrono_literals; 
+
+     std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>boolalpha <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+     <span style="color: #006699; font-weight: bold;">auto</span> timeOfDay <span style="color: #555555;">=</span> date<span style="color: #555555;">::</span>hh_mm_ss(<span style="color: #ff6600;">10.5</span>h <span style="color: #555555;">+</span> <span style="color: #ff6600;">98</span>min <span style="color: #555555;">+</span> <span style="color: #ff6600;">2020</span>s <span style="color: #555555;">+</span> <span style="color: #ff6600;">0.5</span>s);                    <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    
+     std<span style="color: #555555;">::</span>cout<span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"timeOfDay: "</span> <span style="color: #555555;">&lt;&lt;</span> timeOfDay <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;                              <span style="color: #0099ff; font-style: italic;">// (2)</span>
+
+     std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+     std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"timeOfDay.hours(): "</span> <span style="color: #555555;">&lt;&lt;</span> timeOfDay.hours() <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;             <span style="color: #0099ff; font-style: italic;">// (4)</span>
+     std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"timeOfDay.minutes(): "</span> <span style="color: #555555;">&lt;&lt;</span> timeOfDay.minutes() <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;         <span style="color: #0099ff; font-style: italic;">// (4)</span>
+     std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"timeOfDay.seconds(): "</span> <span style="color: #555555;">&lt;&lt;</span> timeOfDay.seconds() <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;         <span style="color: #0099ff; font-style: italic;">// (4)</span>
+     std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"timeOfDay.subseconds(): "</span> <span style="color: #555555;">&lt;&lt;</span> timeOfDay.subseconds() <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;   <span style="color: #0099ff; font-style: italic;">// (4)</span>
+     std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"timeOfDay.to_duration(): "</span> <span style="color: #555555;">&lt;&lt;</span> timeOfDay.to_duration() <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl; <span style="color: #0099ff; font-style: italic;">// (5)</span>
+
+     std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+     std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"date::hh_mm_ss(45700.5s): "</span> <span style="color: #555555;">&lt;&lt;</span> date<span style="color: #555555;">::</span>hh_mm_ss(<span style="color: #ff6600;">45700.5</span>s) <span style="color: #555555;">&lt;&lt;</span> '\n'<span style="color: #555555;"></span>;  <span style="color: #0099ff; font-style: italic;">// (6)</span>
+
+     std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+     std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"date::is_am(5h): "</span> <span style="color: #555555;">&lt;&lt;</span> date<span style="color: #555555;">::</span>is_am(<span style="color: #ff6600;">5</span>h) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;                 <span style="color: #0099ff; font-style: italic;">// (7)</span>    
+     std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"date::is_am(15h): "</span> <span style="color: #555555;">&lt;&lt;</span> date<span style="color: #555555;">::</span>is_am(<span style="color: #ff6600;">15</span>h) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;               <span style="color: #0099ff; font-style: italic;">// (7)</span>
+
+     std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+     <span style="color: #555555;"></span><span style="color: #555555;"></span><span style="color: #555555;"></span><span style="color: #555555;"></span><span style="color: #ff6600;"></span><span style="color: #555555;"></span><span style="color: #555555;"></span><span style="color: #555555;"></span><span style="color: #555555;"></span><span style="color: #ff6600;"></span>
+     std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"date::make12(5h): "</span> <span style="color: #555555;">&lt;&lt;</span> date<span style="color: #555555;">::</span>make12(<span style="color: #ff6600;">5</span>h) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;               <span style="color: #0099ff; font-style: italic;">// (7)</span>   
+     std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"date::make12(15h): "</span> <span style="color: #555555;">&lt;&lt;</span> date<span style="color: #555555;">::</span>make12(<span style="color: #ff6600;">15</span>h) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;             <span style="color: #0099ff; font-style: italic;">// (7)</span> 
+
+}
+</pre>
+</div>
+<p></p>
+<p>In line (1), I create a new instance of std::chrono::hh_mm_ss: <code>timeOfDay</code>. Thanks to the chrono literals from C++14, I just can add a few time durations to initialize a time of day object. With C++20, you can directly output<code> timeOfDay</code> (line 2). This is the reason I have to introduce the namespace <code>date</code> in line 3. The rest should be straightforward to read. The lines (4) display the components of the time since midnight in hours, minutes, seconds, and fractional seconds. Line (5) returns the time duration since midnight in seconds. Line (6) is more interesting: the given seconds correspond to the time displayed in line (2). Line (7) returns if the given hour is a.m. Line (8) finally returns the 12-hour equivalent of the given hour.</p>
+<p>Thanks to the <a href="https://github.com/HowardHinnant/date">date</a> library, here is the output of the program:</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/TimeOfDay/timeOfDay2.png" alt="timeOfDay2" width="440" height="376" /></p>
+<h2>What's next?</h2>
+<p>My next post presents the next component of the extended chrono library: calendar.</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Matt Braun, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Marko, </strong><span class="sc-kpOJdX fDWXFa" title="Emyr Williams"><strong>G Prvulovic, Reinhold Dröge, Abernitzke,</strong> </span><strong><span title="Emyr Williams">Frank Grimm</span></strong><span title="Emyr Williams"><strong>, Sakib, Broeserl, </strong></span><strong><span title="Emyr Williams">António Pina, Darshan Mody, Sergey Agafyin, <span class="sc-gZMcBi hdSbOl" data-tag="user-details-full-name">Андрей Бурмистров, Jake, GS, Lawton Shoemake, Animus24, Jozo Leko, John Breland, espkk, Wolfgang Gärtner</span></span><span title="Emyr Williams"><span class="sc-htpNat dEZjR" style="color: #241e12; font-family: aktiv-grotesk, sans-serif; margin: 0px; position: relative; font-weight: 400; font-size: 1rem; line-height: 1.5;"><span class="sc-htpNat ebhhXb" style="color: #241e12; font-family: aktiv-grotesk, sans-serif; margin: 0px; position: relative; font-weight: bold; font-size: 1rem; line-height: 1.5;"></span></span></span>,&nbsp; Louis St-Amour, Stephan Roslen, Venkat Nandam, Jose Francisco, Douglas Tinkham, Kuchlong Kuchlong, Avi Kohn, Robert Blanch, Truels Wissneth, Kris Kafka, Mario Luoni, Neil Wang, Friedrich Huber, Sudhakar Balagurusamy, and lennonli.</strong><a href="https://www.patreon.com/user?u=43746726" target="_blank" rel="noopener"></a></p>
+<p>&nbsp;</p>
+<p><strong>Thanks in particular to Jon Hess, Lakshman,</strong> <strong>Christian Wittenhorst, Sherhy Pyton, and Dendi Suhubdy<br /></strong></p>
+<p>&nbsp;</p>
+<p><strong>&nbsp;</strong></p>
+<h2>Seminars</h2>
+<p>I'm happy to give online-seminars or face-to-face seminars world-wide. Please call me if you have any questions.</p>
+<h3>Standard Seminars&nbsp;</h3>
+<p>Here is a compilation of my standard seminars. These seminars are only meant to give you a first orientation.</p>
+<ul>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/22">C++ - The Core Language</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/23">C++ - The Standard Library</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/23">C++ - Compact</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/18">C++11 and C++14</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/16">Clean Code with Modern C++</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/19">Concurrency with Modern C++</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/21">Design Patterns and Architecture Patterns with C++</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/17">Embedded Programming with Modern C++</a></li>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/17">Generic Programming (Templates) with C++</a></li>
+</ul>
+<h3>Contact Me</h3>
+<ul>
+<li>Tel.: +49 7472 917441</li>
+<li>Mobil: +49 152 31965939</li>
+<li>Mail: <a href="&lt;a href=">schulung@ModernesCpp.de</a></li>
+<li>German Seminar Page: <a href="https://www.modernescpp.de/">www.ModernesCpp.de</a></li>
+<li>English Seminar Page: <a href="http://www.ModernesCpp.net">www.ModernesCpp.net</a></li>
+</ul>
+<h3>Modernes C++,</h3>
+<p><img src="images/signatur/RainerGrimmSmall.png" alt="RainerGrimmSmall" /></p>
+<div id="simple-translate">&nbsp;</div>
