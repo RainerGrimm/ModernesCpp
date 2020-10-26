@@ -1,0 +1,234 @@
+<p>Peter Gottschling presented in his last post "<a href="https://bit.ly/stdFormat">std::format in C++20</a>" the basics to the new formatting library in C++20. In today's post Peter writes about the formatting of user-defined types.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/ExtendStdFormatUserDefined/TimelineCpp20CoreLanguage.png" alt="TimelineCpp20CoreLanguage" width="650" height="267" /></p>
+<p>Our first example of template specialization is the customization of the new format library introduced in order to support user types.</p>
+<h2>Formatting User-Defined Types</h2>
+<p>As example, we choose the<code> dmc::vector</code> (<code>dmc</code> is the namespace from the book "Discovering Modern C++" by the author) class for which we like to specify the formatting of the single values. In addition, we want to replace the enclosing brackets by curly braces when the format string contains the letter <code>'c'</code>. To this end, we have to specialize the class <a href="https://en.cppreference.com/w/cpp/utility/format/formatter"><code>std::formatter </code></a>(or<code> fmt::formatter</code> for the prototype library <code><a href="https://github.com/fmtlib/fmt">fmt</a></code>). Our specialization shall contain the methods <code>parse</code> and <code>format</code>.</p>
+<p>Let's start with the former:</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> Value<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">struct</span> formatter<span style="color: #555555;">&lt;</span>dmc<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span>Value<span style="color: #555555;">&gt;&gt;</span>
+{
+    constexpr <span style="color: #006699; font-weight: bold;">auto</span> parse(format_parse_context<span style="color: #555555;">&amp;</span> ctx)
+    {
+        value_format<span style="color: #555555;">=</span> <span style="color: #cc3300;">"{:"</span>;        
+        <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> it<span style="color: #555555;">=</span> begin(ctx); it <span style="color: #555555;">!=</span> end(ctx); <span style="color: #555555;">++</span>it) {
+            <span style="color: #007788; font-weight: bold;">char</span> c<span style="color: #555555;">=</span> <span style="color: #555555;">*</span>it;
+            <span style="color: #006699; font-weight: bold;">if</span> (c <span style="color: #555555;">==</span> <span style="color: #cc3300;">'c'</span>)
+                curly<span style="color: #555555;">=</span> <span style="color: #336666;">true</span>;
+            <span style="color: #006699; font-weight: bold;">else</span>
+                value_format<span style="color: #555555;">+=</span> c;
+            <span style="color: #006699; font-weight: bold;">if</span> (c <span style="color: #555555;">==</span> <span style="color: #cc3300;">'}'</span>)
+                <span style="color: #006699; font-weight: bold;">return</span> it;
+        }
+        <span style="color: #006699; font-weight: bold;">return</span> end(ctx);
+    }
+    <span style="color: #0099ff; font-style: italic;">// ...</span>
+    <span style="color: #007788; font-weight: bold;">bool</span>        curly{<span style="color: #336666;">false</span>};
+    std<span style="color: #555555;">::</span>string value_format;
+};
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>As an argument, the parse context is given whose <code>begin</code> iterator points to the first character of the format specification, i.e.~the first character after the colon and in its absence the first character after the opening brace. We copy the format specification almost identically to our local <code>value_format,</code> only our special character <code>'c'</code> is skipped. For simplicity, we assume that the format doesn't contain any opening or closing brace so that the next closing brace terminates our format string. Finally, we return the iterator pointing to the closing brace or the end iterator.</p>
+<p class="PreformattedText"><span lang="DE" style="color: black;">With this information we can output our </span><span lang="DE" style="color: maroon;"></span><span lang="DE" style="color: black;"><code>vector</code> in the method </span><span lang="DE" style="color: maroon;"></span><span lang="DE" style="color: black;"><code>format</code>:</span><span lang="DE"></span></p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> Value<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">struct</span> formatter<span style="color: #555555;">&lt;</span>dmc<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span>Value<span style="color: #555555;">&gt;&gt;</span>
+{
+    <span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> FormatContext<span style="color: #555555;">&gt;</span>
+    <span style="color: #006699; font-weight: bold;">auto</span> format(<span style="color: #006699; font-weight: bold;">const</span> dmc<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span>Value<span style="color: #555555;">&gt;&amp;</span> v, FormatContext<span style="color: #555555;">&amp;</span> ctx)
+    {
+        <span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;&amp;</span> out<span style="color: #555555;">=</span> ctx.out();
+        format_to(out, curly <span style="color: #555555;">?</span> <span style="color: #cc3300;">"{{"</span> <span style="color: #555555;">:</span> <span style="color: #cc3300;">"["</span>);
+        <span style="color: #006699; font-weight: bold;">if</span> (v.size() <span style="color: #555555;">&gt;</span> <span style="color: #ff6600;">0</span>)
+            format_to(out, value_format, v[<span style="color: #ff6600;">0</span>]);
+        <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #007788; font-weight: bold;">int</span> i<span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span>; i <span style="color: #555555;">&lt;</span> v.size(); <span style="color: #555555;">++</span>i)
+            format_to(out, <span style="color: #cc3300;">", "</span> <span style="color: #555555;">+</span> value_format, v[i]);
+        <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc00ff;">format_to</span>(out, curly <span style="color: #555555;">?</span> <span style="color: #cc3300;">"}}"</span> <span style="color: #555555;">:</span> <span style="color: #cc3300;">"]"</span>);
+    }
+    <span style="color: #0099ff; font-style: italic;">// ...</span>
+};
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>First, we take a reference to the output buffer. Then we write the opening brace or bracket to it. Since braces have a special meaning in the <code>format</code> library, we need an escape sequence of double braces. The remaining output is equivalent to the <code>ostream</code> output. Finally, we return the output buffer.</p>
+<p class="PreformattedText"><span lang="DE" style="color: black;">Now we can try various formats:</span></p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">dmc<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">double</span><span style="color: #555555;">&gt;</span> v{<span style="color: #ff6600;">1.394</span>, <span style="color: #ff6600;">1e9</span>, <span style="color: #ff6600;">1.0</span><span style="color: #555555;">/</span><span style="color: #ff6600;">3.0</span>, <span style="color: #ff6600;">1e-20</span>};
+print(<span style="color: #cc3300;">"v with empty format = {}.</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>, v);
+print(<span style="color: #cc3300;">"v with f = {:f}.</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>, v);
+print(<span style="color: #cc3300;">"v curly with f = {:fc}.</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>, v);
+print(<span style="color: #cc3300;">"v width 9, 4 digits = {:9.4f}.</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>, v);
+print(<span style="color: #cc3300;">"v scient. = {:ec}.</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>, v);
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>and see the according outputs:</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">v with empty format = [1.394, 1000000000.0, 0.3333333333333333, 1e-20].
+v with f = [1.394000, 1000000000.000000, 0.333333, 0.000000].
+v curly with f = {1.394000, 1000000000.000000, 0.333333, 0.000000}.
+v width 9, 4 digits = [   1.3940, 1000000000.0000,    0.3333,    0.0000].
+v scient. = {1.394000e+00, 1.000000e+09, 3.333333e-01, 1.000000e-20}.
+</pre>
+</div>
+<p></p>
+<p>Altogether, since the new formatting is:</p>
+<ul>
+<li><strong>Compact</strong>: demonstrated in the examples above</li>
+<li><strong>Adaptable:</strong> to various output orders</li>
+<li><strong>Type-safe</strong>: an exception is thrown when an argument doesn't match</li>
+<li><strong>Extensible</strong>: can be extended to user-defined types</li>
+</ul>
+<p>For those reasons, it is superior to the preceding techniques, and we therefor strongly advise to use it as soon as sufficient compiler support is available.</p>
+<p>Thanks once more to Peter Gottschling for providing a compact introduction to <code>std::format</code>. Let me add a few words to complete his introduction to the formatting library.</p>
+<h2>Try It Out</h2>
+<p>As Peter already mentioned it, the GitHub hosted <code><a href="https://github.com/fmtlib/fmt">fmt </a></code>library is a prototype for the new formatting library in C++20. The front page of the <code>fmt</code> project includes a few straightforward examples and performance numbers. These examples include a direct link to the compiler explorer for executing the example.</p>
+<p>Thanks to the new formatting library, you can display time durations of the<a href="https://en.cppreference.com/w/cpp/chrono">&nbsp;<code>chrono</code></a> library:</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #009999;">#include &lt;fmt/chrono.h&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+  <span style="color: #006699; font-weight: bold;">using</span> <span style="color: #006699; font-weight: bold;">namespace</span> std<span style="color: #555555;">::</span>literals<span style="color: #555555;">::</span>chrono_literals;
+  fmt<span style="color: #555555;">::</span>print(<span style="color: #cc3300;">"Default format: {} {}</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>, <span style="color: #ff6600;">42</span>s, <span style="color: #ff6600;">100</span>ms);
+  fmt<span style="color: #555555;">::</span>print(<span style="color: #cc3300;">"strftime-like format: {:%H:%M:%S}</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>, <span style="color: #ff6600;">3</span>h <span style="color: #555555;">+</span> <span style="color: #ff6600;">15</span>min <span style="color: #555555;">+</span> <span style="color: #ff6600;">30</span>s);
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Executing the program on the compiler explorer gives you the following output:</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/ExtendStdFormatUserDefined/formatChrono.PNG" alt="formatChrono" width="300" height="55" /></p>
+<h2>Porting to C++20</h2>
+<p>Porting the previous program from <code>fmt</code> to the C++20 format library is a piece of cake. You have to use the C++ standard header <code>chrono</code> and <code>iostream</code>. Additionally, replace the call <code>fmt::print</code> with the function <code>std::format </code>and push the result to <code>std::cout</code>. <code>std::format</code> returns a string according to the given format string and an optional local.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// formatChrono.cpp</span>
+
+<span style="color: #009999;">#include &lt;chrono&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+  <span style="color: #006699; font-weight: bold;">using</span> <span style="color: #006699; font-weight: bold;">namespace</span> std<span style="color: #555555;">::</span>literals<span style="color: #555555;">::</span>chrono_literals;
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>format(<span style="color: #cc3300;">"Default format: {} {}</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>, <span style="color: #ff6600;">42</span>s, <span style="color: #ff6600;">100</span>ms) <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>;
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>format(<span style="color: #cc3300;">"strftime-like format: {:%H:%M:%S}</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>, <span style="color: #ff6600;">3</span>h <span style="color: #555555;">+</span> <span style="color: #ff6600;">15</span>min <span style="color: #555555;">+</span> <span style="color: #ff6600;">30</span>s) <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>;
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<h2>What's next?</h2>
+<p>In my next post, I continue with the convenience functions. With C++20, you can calculate the midpoint of two values, check if a <code>std::string</code> start or ends with a substring, and create callables with<code> std::bind_front</code>.</p>
+<p>&nbsp;</p>
+<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Matt Braun, Roman Postanciuc, Venkata Ramesh Gudpati, Tobias Zindl, Marko, </strong><span class="sc-kpOJdX fDWXFa" title="Emyr Williams"><strong>G Prvulovic, Reinhold Dröge, Abernitzke,</strong> </span><strong><span title="Emyr Williams">Frank Grimm</span></strong><span title="Emyr Williams"><strong>, Sakib, Broeserl, </strong></span><strong><span title="Emyr Williams">António Pina, Darshan Mody, Sergey Agafyin, <span class="sc-gZMcBi hdSbOl" data-tag="user-details-full-name">Андрей Бурмистров, Jake, GS, Lawton Shoemake, Animus24, Jozo Leko, John Breland, espkk, Wolfgang Gärtner</span></span><span title="Emyr Williams"><span class="sc-htpNat dEZjR" style="color: #241e12; font-family: aktiv-grotesk, sans-serif; margin: 0px; position: relative; font-weight: 400; font-size: 1rem; line-height: 1.5;"><span class="sc-htpNat ebhhXb" style="color: #241e12; font-family: aktiv-grotesk, sans-serif; margin: 0px; position: relative; font-weight: bold; font-size: 1rem; line-height: 1.5;"></span></span></span>,&nbsp; Louis St-Amour, Stephan Roslen, Venkat Nandam, Jose Francisco, Douglas Tinkham, Kuchlong Kuchlong, Avi Kohn, Robert Blanch, Truels Wissneth, Kris Kafka, Mario Luoni, Neil Wang, Friedrich Huber, Kai, and Sudhakar Balagurusamy.<br /></strong></p>
+<p></p>
+<p>&nbsp;</p>
+<p></p>
+<p><strong>Thanks in particular to Jon Hess, Lakshman,</strong> <strong>Christian Wittenhorst, Sherhy Pyton, and Dendi Suhubdy<br /></strong></p>
+<p></p>
+<p>&nbsp;</p>
+<p></p>
+<p><strong>&nbsp;</strong></p>
+<p></p>
+<h2>Seminars</h2>
+<p></p>
+<p>I'm happy to give online-seminars or face-to-face seminars world-wide. Please call me if you have any questions.</p>
+<p></p>
+<h3>Standard Seminars&nbsp;</h3>
+<p></p>
+<p>Here is a compilation of my standard seminars. These seminars are only meant to give you a first orientation.</p>
+<p><br /><br /></p>
+<ul>
+<ul>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/22">C++ - The Core Language</a></li>
+</ul>
+</ul>
+<p></p>
+<ul>
+<ul>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/23">C++ - The Standard Library</a></li>
+</ul>
+</ul>
+<p></p>
+<ul>
+<ul>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/23">C++ - Compact</a></li>
+</ul>
+</ul>
+<p></p>
+<ul>
+<ul>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/18">C++11 and C++14</a></li>
+</ul>
+</ul>
+<p></p>
+<ul>
+<ul>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/16">Clean Code with Modern C++</a></li>
+</ul>
+</ul>
+<p></p>
+<ul>
+<ul>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/19">Concurrency with Modern C++</a></li>
+</ul>
+</ul>
+<p></p>
+<ul>
+<ul>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/21">Design Patterns and Architecture Patterns with C++</a></li>
+</ul>
+</ul>
+<p></p>
+<ul>
+<ul>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/17">Embedded Programming with Modern C++</a></li>
+</ul>
+</ul>
+<p></p>
+<ul>
+<ul>
+<li><a href="https://www.modernescpp.net/index.php/c/plan/2-c/17">Generic Programming (Templates) with C++</a></li>
+</ul>
+</ul>
+<p><br /><br /></p>
+<h3>Contact Me</h3>
+<p><br /><br /></p>
+<ul>
+<ul>
+<li>Tel.: +49 7472 917441</li>
+</ul>
+</ul>
+<p></p>
+<ul>
+<ul>
+<li>Mobil: +49 152 31965939</li>
+</ul>
+</ul>
+<p></p>
+<ul>
+<ul>
+<li>Mail: <a href="&lt;a href=">schulung@ModernesCpp.de</a></li>
+</ul>
+</ul>
+<p></p>
+<ul>
+<ul>
+<li>German Seminar Page: <a href="https://www.modernescpp.de/">www.ModernesCpp.de</a></li>
+</ul>
+</ul>
+<p></p>
+<ul>
+<ul>
+<li>English Seminar Page: <a href="http://www.ModernesCpp.net">www.ModernesCpp.net</a></li>
+</ul>
+</ul>
+<p><br /><br /></p>
+<h3>Modernes C++,</h3>
+<p></p>
+<p><img src="images/signatur/RainerGrimmSmall.png" alt="RainerGrimmSmall" /></p>
