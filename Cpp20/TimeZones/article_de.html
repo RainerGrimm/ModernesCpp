@@ -1,0 +1,161 @@
+<p>This post concludes my introduction to the chrono extension in C++20. Today I present the time-zones functionality.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/Times_Zones/TimelineCpp20CoreLanguage.png" alt="TimelineCpp20CoreLanguage" width="650" height="278" /></p>
+<p>I should have written, today I mainly present the time-zones functionality in C++20. Before I write about the time-zones in C++20, I want to present the online resource <a href="https://github.com/HowardHinnant/date/wiki/Examples-and-Recipes">Examples and Recipes </a>from Howard Hinnant, which has about 40 examples of the new chrono functionality. Presumably, the chrono extension in C++20 is not easy to get; therefore it's quite important to have so many examples. You should use these examples as a starting point for further experiments and, therefore, sharpen your understanding. You can also add your recipes.</p>
+<p>To get an idea of&nbsp;<a href="https://github.com/HowardHinnant/date/wiki/Examples-and-Recipes">Examples and Recipes</a> I want to present a program for<a href="https://github.com/rbock"> Roland Bock</a> that calculates ordinal dates.</p>
+<h2>Calculating Ordinal Dates</h2>
+<p>"<em>An <a href="https://en.wikipedia.org/wiki/Ordinal_date" rel="nofollow">ordinal date</a> consists of a year and a day of year (1st of January being day 1, 31st of December being day 365 or day 366). The year can be obtained directly from year_month_day. And calculating the day is wonderfully easy. In the code below we make us of the fact that year_month_day can deal with invalid dates like the 0th of January</em>:" (Roland Bock)</p>
+<p>I added the necessary headers to Roland's program.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// ordinalDate.cpp</span>
+
+<span style="color: #009999;">#include "date.h"</span>
+<span style="color: #009999;">#include &lt;iomanip&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>()
+{
+   <span style="color: #006699; font-weight: bold;">using</span> <span style="color: #006699; font-weight: bold;">namespace</span> date;
+   
+   <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #006699; font-weight: bold;">auto</span> time <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>system_clock<span style="color: #555555;">::</span>now();
+   <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #006699; font-weight: bold;">auto</span> daypoint <span style="color: #555555;">=</span> floor<span style="color: #555555;">&lt;</span>days<span style="color: #555555;">&gt;</span>(time);                    <span style="color: #0099ff; font-style: italic;">// (1)</span> 
+   <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #006699; font-weight: bold;">auto</span> ymd <span style="color: #555555;">=</span> year_month_day{daypoint};         
+   
+   <span style="color: #0099ff; font-style: italic;">// calculating the year and the day of the year</span>
+   <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #006699; font-weight: bold;">auto</span> year <span style="color: #555555;">=</span> ymd.year();
+   <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #006699; font-weight: bold;">auto</span> year_day <span style="color: #555555;">=</span> daypoint <span style="color: #555555;">-</span> sys_days{year<span style="color: #555555;">/</span>January<span style="color: #555555;">/</span><span style="color: #ff6600;">0</span>}; <span style="color: #0099ff; font-style: italic;">// (2)</span> 
+                                                              <span style="color: #0099ff; font-style: italic;">// (3)</span>
+   std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> year <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'-'</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>setfill(<span style="color: #cc3300;">'0'</span>) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>setw(<span style="color: #ff6600;">3</span>) <span style="color: #555555;">&lt;&lt;</span> year_day.count() <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+   
+   <span style="color: #0099ff; font-style: italic;">// inverse calculation and check</span>
+   assert(ymd <span style="color: #555555;">==</span> year_month_day{sys_days{year<span style="color: #555555;">/</span>January<span style="color: #555555;">/</span><span style="color: #ff6600;">0</span>} <span style="color: #555555;">+</span> year_day});
+}
+</pre>
+</div>
+<p></p>
+<p>I want to add a few remarks to the program. Line (1) truncates the current time point. The value is used in the following line to initialize a calendar date. Line (2) calculates the time duration between the two time points. Both time points have the resolution day. Finally, <code>year_day.count()</code> in line (3) returns the time duration in days.<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/Times_Zones/ordinalDate2.png" alt="ordinalDate2" width="350" height="181" /></p>
+<p>My following examples to time-zones are also inspired by the already mentioned web resource <a href="https://github.com/HowardHinnant/date/wiki/Examples-and-Recipes">Examples and Recipes</a>.</p>
+<h2>Times-Zones</h2>
+<p>First of all, a time-zone is a region and its full history of the date such as daylight saving time or leap seconds. The time-zone library in C++20 is a complete parser of the<a href="https://www.iana.org/time-zones"> IANA timezone database</a>. The following table should give you a first idea of the new functionality.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/Times_Zones/timeZone.png" alt="timeZone" width="600" height="277" /></p>
+<p>I use in my examples the function <code>std::chrono::zones_time</code> which is essentially a time-zone combined with a time point.</p>
+<p>Before I show you two examples I want to make a short remark. To compile a program using the time-zone library, you have to compile the<code> tz.cpp</code> file and link against the <code>curl</code> library. The curl library is necessary to get the current <a href="https://www.iana.org/time-zones"> IANA timezone database</a>. The following command line for g++ should give you the idea:</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">g<span style="color: #555555;">++</span> localTime.cpp <span style="color: #555555;">-</span>I <span style="color: #555555;">&lt;</span>Path to data<span style="color: #555555;">/</span>tz.h<span style="color: #555555;">&gt;</span> tz.cpp <span style="color: #555555;">-</span>std<span style="color: #555555;">=</span>c<span style="color: #555555;">++</span><span style="color: #ff6600;">17</span> <span style="color: #555555;">-</span>lcurl <span style="color: #555555;">-</span>o localTime
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>My first program is straightforward. It displays the UTC time and the local time.</p>
+<h3>UTC Time and Local Time</h3>
+<p>The<a href="https://en.wikipedia.org/wiki/Coordinated_Universal_Time"> UTC time or Coordinated Univeral Time</a> is the primary time standard worldwide. A computer uses <a href="https://en.wikipedia.org/wiki/Unix_time">Unix time</a> which is a very close approximation of UTC. The UNIX time is the number of seconds since the Unix epoch. The Unix epoch is 00:00:00 UTC on 1 January 1970.</p>
+<p><code></code><code>std::chrono::system_clock::now()</code> in line (1) returns in the following program<code> localTime.cpp </code> the Unix time.<code><br /></code></p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// localTime.cpp</span>
+
+<span style="color: #009999;">#include "date/tz.h"</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+    <span style="color: #006699; font-weight: bold;">using</span> <span style="color: #006699; font-weight: bold;">namespace</span> date;
+ 
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"UTC  time"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;             <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    <span style="color: #006699; font-weight: bold;">auto</span> utcTime <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>system_clock<span style="color: #555555;">::</span>now();
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"  "</span> <span style="color: #555555;">&lt;&lt;</span> utcTime <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"  "</span> <span style="color: #555555;">&lt;&lt;</span> date<span style="color: #555555;">::</span>floor<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>seconds<span style="color: #555555;">&gt;</span>(utcTime) <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span><span style="color: #555555;">:</span>
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Local time"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;            <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    <span style="color: #006699; font-weight: bold;">auto</span> localTime <span style="color: #555555;">=</span> date<span style="color: #555555;">::</span>make_zoned(date<span style="color: #555555;">::</span>current_zone(), utcTime);
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"  "</span> <span style="color: #555555;">&lt;&lt;</span> localTime <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"  "</span> <span style="color: #555555;">&lt;&lt;</span> date<span style="color: #555555;">::</span>floor<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>seconds<span style="color: #555555;">&gt;</span>(localTime.get_local_time()) 
+            <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+    <span style="color: #006699; font-weight: bold;">auto</span> offset <span style="color: #555555;">=</span> localTime.get_info().offset;         <span style="color: #0099ff; font-style: italic;">// (3)</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"  UTC offset: "</span>  <span style="color: #555555;">&lt;&lt;</span> offset <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>I have not to add too much to the program. The code block beginning with line (1) gets the current time point, truncates it to seconds, and displays it. The call<code> date::make_zoned</code> creates a <code>std::chrono::zoned_time localTime. T</code>he following call<code> localTime.get_local_time() </code>returns the stored time point as a local time. This time point is also truncated to seconds. <code>localTime</code> (line 3) can also be used to get information about the time-zone. In this case, I'm interested in the offset to the UTC time.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/Times_Zones/localTime.png" alt="localTime" width="400" height="297" /></p>
+<p>My last program answers a crucial question when I teach in a different time-zone: When should I start my online class?</p>
+<h3>Various Time-Zones for Online Classes</h3>
+<p>The program <code>onlineClass.cpp</code> answers the following question: How late is it in given time-zones, when I start an online class at the <code>7h, 13h,</code> or <code>17h</code> local time (Germany)?</p>
+<p>The online class should start on the 1st of February 2021 and should take 4 hours. Because of the daylight saving time, the calendar date is essential to get the correct answer.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// onlineClass.cpp</span>
+
+<span style="color: #009999;">#include "date/tz.h"</span>
+<span style="color: #009999;">#include &lt;algorithm&gt;</span>
+<span style="color: #009999;">#include &lt;iomanip&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> ZonedTime<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">auto</span> getMinutes(<span style="color: #006699; font-weight: bold;">const</span> ZonedTime<span style="color: #555555;">&amp;</span> zonedTime) {                         <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    <span style="color: #006699; font-weight: bold;">return</span> date<span style="color: #555555;">::</span>floor<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>minutes<span style="color: #555555;">&gt;</span>(zonedTime.get_local_time());
+}
+
+<span style="color: #007788; font-weight: bold;">void</span> printStartEndTimes(<span style="color: #006699; font-weight: bold;">const</span> date<span style="color: #555555;">::</span>local_days<span style="color: #555555;">&amp;</span> localDay,    <span style="color: #0099ff; font-style: italic;">        // (2)</span>
+                        <span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>hours<span style="color: #555555;">&amp;</span> h, 
+                        <span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>hours<span style="color: #555555;">&amp;</span> durationClass,
+                        <span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span>initializer_list<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>string<span style="color: #555555;">&gt;&amp;</span> timeZones ){
+    
+    date<span style="color: #555555;">::</span>zoned_time startDate{date<span style="color: #555555;">::</span>current_zone(), localDay <span style="color: #555555;">+</span> h}; <span style="color: #0099ff; font-style: italic;"> // (4)</span>
+    date<span style="color: #555555;">::</span>zoned_time endDate{date<span style="color: #555555;">::</span>current_zone(), localDay <span style="color: #555555;">+</span> h <span style="color: #555555;">+</span> durationClass};
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Local time: ["</span>  <span style="color: #555555;">&lt;&lt;</span> getMinutes(startDate) <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">", "</span> 
+                                  <span style="color: #555555;">&lt;&lt;</span> getMinutes(endDate) <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"]"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;<br /><span style="color: #0099ff; font-style: italic;">                                                                    // (5)</span><br />   <span style="color: #0099ff; font-style: italic;"></span>longestStringSize <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>max(timeZones, [](<span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span>string<span style="color: #555555;">&amp;</span> a, <span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span>string<span style="color: #555555;">&amp;</span> b) { <span style="color: #006699; font-weight: bold;">return</span> a.size() <span style="color: #555555;">&lt;</span> b.size(); }).size();
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> timeZone<span style="color: #555555;">:</span> timeZones) {                                <span style="color: #0099ff; font-style: italic;">// (6)</span>
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"  "</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>setw(longestStringSize <span style="color: #555555;">+</span> <span style="color: #ff6600;">1</span>) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>left 
+                  <span style="color: #555555;">&lt;&lt;</span> timeZone 
+                  <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"["</span> <span style="color: #555555;">&lt;&lt;</span> getMinutes(date<span style="color: #555555;">::</span>zoned_time(timeZone, startDate))
+                  <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">", "</span> <span style="color: #555555;">&lt;&lt;</span> getMinutes(date<span style="color: #555555;">::</span>zoned_time(timeZone, endDate)) 
+                  <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"]"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+    }
+ }
+
+<span style="color: #007788; font-weight: bold;">int</span> main() {
+
+    <span style="color: #006699; font-weight: bold;">using</span> <span style="color: #006699; font-weight: bold;">namespace</span> std<span style="color: #555555;">::</span>string_literals;
+    <span style="color: #006699; font-weight: bold;">using</span> <span style="color: #006699; font-weight: bold;">namespace</span> std<span style="color: #555555;">::</span>chrono;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+    constexpr <span style="color: #006699; font-weight: bold;">auto</span> classDay{date<span style="color: #555555;">::</span>year(<span style="color: #ff6600;">2021</span>)<span style="color: #555555;">/</span><span style="color: #ff6600;">2</span><span style="color: #555555;">/</span><span style="color: #ff6600;">1</span>};
+    constexpr <span style="color: #006699; font-weight: bold;">auto</span> durationClass <span style="color: #555555;">=</span> <span style="color: #ff6600;">4</span>h;
+    <span style="color: #006699; font-weight: bold;">auto</span> timeZones <span style="color: #555555;">=</span> {<span style="color: #cc3300;">"America/Los_Angeles"</span>s, <span style="color: #cc3300;">"America/Denver"</span>s, <span style="color: #cc3300;">"America/New_York"</span>s, 
+                      <span style="color: #cc3300;">"Europe/London"</span>s, <span style="color: #cc3300;">"Europe/Minsk"</span>s, <span style="color: #cc3300;">"Europe/Moscow"</span>s, 
+                      <span style="color: #cc3300;">"Asia/Kolkata"</span>s, <span style="color: #cc3300;">"Asia/Novosibirsk"</span>s, <span style="color: #cc3300;">"Asia/Singapore"</span>s,
+                      <span style="color: #cc3300;">"Australia/Perth"</span>s, <span style="color: #cc3300;">"Australia/Sydney"</span>s};
+
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> startTime<span style="color: #555555;">:</span> {<span style="color: #ff6600;">7</span>h, <span style="color: #ff6600;">13</span>h, <span style="color: #ff6600;">17</span>h}) {    <span style="color: #0099ff; font-style: italic;">// (3)</span>
+        printStartEndTimes(date<span style="color: #555555;">::</span>local_days{classDay}, startTime, 
+                           durationClass, timeZones);
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    }
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Before I dive into the functions<code> getMinutes</code> (line 1) and <code>printStartEndTimes</code> (line 2), let me say a view words about the <code>main</code> function. The <code>main</code> function defines the day of the class, the duration of the class, and all time-zones. Finally, the range-based for-loop (line 3) iterates through all potential starting points for an online class. Thanks to the function <code>printStartEndTimes</code> (line 2) all necessary information is displayed.</p>
+<p>The few lines beginning with line (4) calculate the<code> startDate</code> and <code>endDate</code> of my training by adding the start time and the duration of the class to the calendar date. Both values are displayed with the help of the function <code>getMinutes</code> (line 1). <code>date<span style="color: #555555;">::</span>floor<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>minutes<span style="color: #555555;">&gt;</span>(zonedTime.get_local_time())</code> gets the stored time point out of the<code> std::chrono::zoned_time</code> and truncates the value to the minute resolution. To properly align the output of the program, line (5) <code> </code><code></code>determines the size of the longest of all time-zone names. Line (6) iterates through all time-zones and displays the name of the time-zone, and the beginning and end of each online-class. A few calendar dates even cross the day boundaries.<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/Times_Zones/onlineClass.png" alt="onlineClass" width="600" height="760" /></p>
+<p>There is more to write about the extended chrono library. For example, C++20 offers new clocks such as<code> std::chrono::utc_clock</code> that include leap seconds, or the<code> std::chrono::tai_clock</code> that represents the International Atomic Time (TAI). Additional, thanks to the new formatting library in C++20, time durations can be nicely formatted. This feature is not available so far. If you want to study the formating rules for time durations, here are they: <a href="https://en.cppreference.com/w/cpp/chrono/system_clock/formatter#Format_specification">std::formatter</a>.</p>
+<h2>What's next?</h2>
+<p>If you want to compare signed and unsigned integrals, you may have a lot of fun. This fun ends with C++20.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>{loadmoduleid 153}</p>
