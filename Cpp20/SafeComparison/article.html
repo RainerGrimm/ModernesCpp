@@ -1,0 +1,222 @@
+<p>&nbsp;When you compare signed and unsigned integers, you may not get the result you expect. Thanks to the six <code>std::cmp_</code>* functions, there is a cure in C++20.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/SafeComparison/TimelineCpp20CoreLanguage.png" alt="TimelineCpp20CoreLanguage" width="650" height="262" /></p>
+<p>Maybe, you remember the rule "<a href="https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Res-mix">ES.100 Don't mix signed and unsigned arithmetic" </a>from the C++ Core Guidelines. I wrote a few words about it in my previous post to "<a href="index.php/c-core-guidelines-rules-to-statements-and-arithmetic-rules">Arithmetic Rules</a>". Today, I want to dig deeper into this issue and compare signed and unsigned integers.</p>
+<p>Let's start with an unsafe comparison.</p>
+<h2>Unsafe Comparison of Integrals</h2>
+<p>&nbsp;Of course, there is a reason for the program name <code>unsafeComparison.cpp</code>.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// unsafeComparison.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>boolalpha;
+
+    <span style="color: #007788; font-weight: bold;">int</span> x <span style="color: #555555;">=</span> <span style="color: #555555;">-</span><span style="color: #ff6600;">3</span>;                  <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    <span style="color: #007788; font-weight: bold;">unsigned</span> <span style="color: #007788; font-weight: bold;">int</span> y <span style="color: #555555;">=</span> <span style="color: #ff6600;">7</span>;          <span style="color: #0099ff; font-style: italic;">// (2)</span>
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"-3 &lt; 7:  "</span> <span style="color: #555555;">&lt;&lt;</span> (x <span style="color: #555555;">&lt;</span> y) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"-3 &lt;= 7: "</span> <span style="color: #555555;">&lt;&lt;</span> (x <span style="color: #555555;">&lt;=</span> y) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"-3 &gt; 7:  "</span> <span style="color: #555555;">&lt;&lt;</span> (x <span style="color: #555555;">&gt;</span> y) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"-3 =&gt; 7: "</span> <span style="color: #555555;">&lt;&lt;</span> (x <span style="color: #555555;">&gt;=</span> y) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+   
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>When I execute the program, the output may not meet your expectations.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/SafeComparison/unsafeComparison.png" alt="unsafeComparison" width="400" height="234" /></p>
+<p>When you read the output of the program, you recognize -3 should be bigger than 7. You presumably know the reason. I compared a <code>signed x</code> (line (1)) with an<code> unsigned y</code> (line (2)). What is happening under the hood? The following program provides the answer.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// unsafeComparison2.cpp</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+    <span style="color: #007788; font-weight: bold;">int</span> x <span style="color: #555555;">=</span> <span style="color: #555555;">-</span><span style="color: #ff6600;">3</span>;
+    <span style="color: #007788; font-weight: bold;">unsigned</span> <span style="color: #007788; font-weight: bold;">int</span> y <span style="color: #555555;">=</span> <span style="color: #ff6600;">7</span>;
+
+    <span style="color: #007788; font-weight: bold;">bool</span> val <span style="color: #555555;">=</span> x <span style="color: #555555;">&lt;</span> y;              <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    static_assert(<span style="color: #006699; font-weight: bold;">static_cast</span><span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">unsigned</span> <span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span>(<span style="color: #555555;">-</span><span style="color: #ff6600;">3</span>) <span style="color: #555555;">==</span> <span style="color: #ff6600;">4'294'967'293</span>);
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>In the example, I'm focusing on the less-than operator. <a href="https://cppinsights.io/s/62732a01">C++ Insights</a> gives me the following output:</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/SafeComparison/unsafeComparison2.png" alt="unsafeComparison2" width="650" height="140" /></p>
+<p>Here is what's happening:</p>
+<ol>
+<li>The compiler transforms the expression<code> x &lt; y </code>(line 1) into <code>static_cast&lt;unsigned int&gt;(x) &lt; y</code>. In particular, the <code>signed</code> <code>x</code> is converted to an unsigned int.</li>
+<li>Due to the conversion,<code> -3 </code>becomes 4'294'967'293.&nbsp;</li>
+<li><code> 4'294'967'293</code> is equal to (-3) modulo (2 to the power of 32).</li>
+<li>32 is the number of bits of an unsigned<code> int</code> on C++ Insights.<br /><br /></li>
+</ol>
+<p>Thanks to C++20, we have a safe comparison of integrals.</p>
+<h2>Safe Comparison of Integrals</h2>
+<p>C++20 supports the six comparison functions for integrals:</p>
+<p>&nbsp;</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/SafeComparison/compareFunctionsEng1.png" alt="compareFunctionsEng1" width="568" height="294" /></p>
+<p>Thanks to the six comparison functions, I can easily transform the previous program<code> unsafeComparison.cpp</code> into the program <code>safeComparison.cpp. </code>The new comparison functions require the header <code>&lt;utility</code>&gt;.<code><br /></code></p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// safeComparison.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;utility&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>boolalpha;
+
+    <span style="color: #007788; font-weight: bold;">int</span> x <span style="color: #555555;">=</span> <span style="color: #555555;">-</span><span style="color: #ff6600;">3</span>;
+    <span style="color: #007788; font-weight: bold;">unsigned</span> <span style="color: #007788; font-weight: bold;">int</span> y <span style="color: #555555;">=</span> <span style="color: #ff6600;">7</span>;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"3 == 7:  "</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>cmp_equal(x, y) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"3 != 7:  "</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>cmp_not_equal(x, y) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"-3 &lt; 7:  "</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>cmp_less(x, y) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"-3 &lt;= 7: "</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>cmp_less_equal(x, y) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"-3 &gt; 7:  "</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>cmp_greater(x, y) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"-3 =&gt; 7: "</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>cmp_greater_equal(x, y) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+   
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>I also used in this program the equal and not equal operator.</p>
+<p>Thanks to GCC 10, here is the expected result:</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/SafeComparison/safeComparison.png" alt="safeComparison" width="200" height="176" /></p>
+<p>Invoking a comparison function a non-integral value would causes a compile-time error.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// safeComparison2.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;utility&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    <span style="color: #007788; font-weight: bold;">double</span> x <span style="color: #555555;">=</span> <span style="color: #555555;">-</span><span style="color: #ff6600;">3.5</span>;             <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    <span style="color: #007788; font-weight: bold;">unsigned</span> <span style="color: #007788; font-weight: bold;">int</span> y <span style="color: #555555;">=</span> <span style="color: #ff6600;">7</span>;          <span style="color: #0099ff; font-style: italic;">// (2)</span>
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"-3.5 &lt; 7:  "</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>cmp_less(x, y) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Trying to compare a <code>double</code> (line (1)) and an <code>unsigned int</code> (line (2)) gives with the GCC 10 compiler a lengthy error message. Here is the crucial line of the error message:</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/SafeComparison/safeComparison2.png" alt="safeComparison2" width="650" height="56" />The internal type-traits&nbsp; __is_standard_integer failed. I was curious about what that means and looked it up in the GCC <a href="https://github.com/gcc-mirror/gcc/blob/master/libstdc%2B%2B-v3/include/std/type_traits">type-traits implementation on GitHub</a>. Here are the relevant lines from the header<code> type-traits:</code></p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// Check if a type is one of the signed or unsigned integer types.</span>
+  <span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> _Tp<span style="color: #555555;">&gt;</span>
+    <span style="color: #006699; font-weight: bold;">using</span> __is_standard_integer
+      <span style="color: #555555;">=</span> __or_<span style="color: #555555;">&lt;</span>__is_signed_integer<span style="color: #555555;">&lt;</span>_Tp<span style="color: #555555;">&gt;</span>, __is_unsigned_integer<span style="color: #555555;">&lt;</span>_Tp<span style="color: #555555;">&gt;&gt;</span>;
+
+<span style="color: #0099ff; font-style: italic;">// Check if a type is one of the signed integer types.</span>
+  <span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> _Tp<span style="color: #555555;">&gt;</span>
+    <span style="color: #006699; font-weight: bold;">using</span> __is_signed_integer <span style="color: #555555;">=</span> __is_one_of<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">__remove_cv_t</span><span style="color: #555555;">&lt;</span>_Tp<span style="color: #555555;">&gt;</span>,
+	  <span style="color: #007788; font-weight: bold;">signed</span> <span style="color: #007788; font-weight: bold;">char</span>, <span style="color: #007788; font-weight: bold;">signed</span> <span style="color: #007788; font-weight: bold;">short</span>, <span style="color: #007788; font-weight: bold;">signed</span> <span style="color: #007788; font-weight: bold;">int</span>, <span style="color: #007788; font-weight: bold;">signed</span> <span style="color: #007788; font-weight: bold;">long</span>,
+	  <span style="color: #007788; font-weight: bold;">signed</span> <span style="color: #007788; font-weight: bold;">long</span> <span style="color: #007788; font-weight: bold;">long</span>
+
+<span style="color: #0099ff; font-style: italic;">// Check if a type is one of the unsigned integer types.</span>
+  <span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> _Tp<span style="color: #555555;">&gt;</span>
+    <span style="color: #006699; font-weight: bold;">using</span> __is_unsigned_integer <span style="color: #555555;">=</span> __is_one_of<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">__remove_cv_t</span><span style="color: #555555;">&lt;</span>_Tp<span style="color: #555555;">&gt;</span>,
+	  <span style="color: #007788; font-weight: bold;">unsigned</span> <span style="color: #007788; font-weight: bold;">char</span>, <span style="color: #007788; font-weight: bold;">unsigned</span> <span style="color: #007788; font-weight: bold;">short</span>, <span style="color: #007788; font-weight: bold;">unsigned</span> <span style="color: #007788; font-weight: bold;">int</span>, <span style="color: #007788; font-weight: bold;">unsigned</span> <span style="color: #007788; font-weight: bold;">long</span>,
+	  <span style="color: #007788; font-weight: bold;">unsigned</span> <span style="color: #007788; font-weight: bold;">long</span> <span style="color: #007788; font-weight: bold;">long</span>
+</pre>
+</div>
+<p></p>
+<p><code>__remove_cv_t</code> is the internal function of GCC to remove <code>const</code> or <code>volatile</code> from a type.</p>
+<p>Maybe, you are now curious what happens when you compare a <code>double</code> and an <code>unsigned int</code> the classical way.</p>
+<p>Here is the modified program <code>safeComparison2.cpp.</code></p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// classicalComparison.cpp</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    <span style="color: #007788; font-weight: bold;">double</span> x <span style="color: #555555;">=</span> <span style="color: #555555;">-</span><span style="color: #ff6600;">3.5</span>;             
+    <span style="color: #007788; font-weight: bold;">unsigned</span> <span style="color: #007788; font-weight: bold;">int</span> y <span style="color: #555555;">=</span> <span style="color: #ff6600;">7</span>;          
+
+    <span style="color: #006699; font-weight: bold;">auto</span> res <span style="color: #555555;">=</span> x <span style="color: #555555;">&lt;</span> y;     <span style="color: #0099ff; font-style: italic;">// true</span>
+    
+}
+</pre>
+</div>
+<p></p>
+<p>It works. The crucial <code>unsigned int</code> is <a href="https://en.cppreference.com/w/cpp/language/implicit_conversion">floating-point promoted</a> to <code>double</code>. <a href="https://cppinsights.io/s/62c279f7">C++ Insights</a> shows the truth:</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/SafeComparison/classicalComparision.png" alt="classicalComparision" width="400" height="158" /></p>
+<p>After so many comparisons, I want to end this post with the new mathematical constants we have with C++20.</p>
+<h2>Mathematical Constants</h2>
+<p>&nbsp;First, the constants require the header <code>&lt;numbers&gt;</code> and the namespace <code>std::numbers</code>. The following tables give you the first overview. <code></code><code></code></p>
+<p>&nbsp;<img style="float: right;" src="images/blog/Cpp20/SafeComparison/constantsEng2.png" alt="constantsEng2" width="350" height="280" /><img style="float: left;" src="images/blog/Cpp20/SafeComparison/constantsEng1.png" alt="constantsEng1" width="250" height="273" /></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>The program <code>mathematicConstants.cpp</code> applies the mathematical constants.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// mathematicConstants.cpp</span>
+
+<span style="color: #009999;">#include &lt;iomanip&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;numbers&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>cout<span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>setprecision(<span style="color: #ff6600;">10</span>);
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"std::numbers::e: "</span> <span style="color: #555555;">&lt;&lt;</span>  std<span style="color: #555555;">::</span>numbers<span style="color: #555555;">::</span>e <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl; 
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"std::numbers::log2e: "</span> <span style="color: #555555;">&lt;&lt;</span>  std<span style="color: #555555;">::</span>numbers<span style="color: #555555;">::</span>log2e <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl; 
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"std::numbers::log10e: "</span> <span style="color: #555555;">&lt;&lt;</span>  std<span style="color: #555555;">::</span>numbers<span style="color: #555555;">::</span>log10e <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl; 
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"std::numbers::pi: "</span> <span style="color: #555555;">&lt;&lt;</span>  std<span style="color: #555555;">::</span>numbers<span style="color: #555555;">::</span>pi <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl; 
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"std::numbers::inv_pi: "</span> <span style="color: #555555;">&lt;&lt;</span>  std<span style="color: #555555;">::</span>numbers<span style="color: #555555;">::</span>inv_pi <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"std::numbers::inv_sqrtpi: "</span> <span style="color: #555555;">&lt;&lt;</span>  std<span style="color: #555555;">::</span>numbers<span style="color: #555555;">::</span>inv_sqrtpi <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl; 
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"std::numbers::ln2: "</span> <span style="color: #555555;">&lt;&lt;</span>  std<span style="color: #555555;">::</span>numbers<span style="color: #555555;">::</span>ln2 <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl; 
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"std::numbers::sqrt2: "</span> <span style="color: #555555;">&lt;&lt;</span>  std<span style="color: #555555;">::</span>numbers<span style="color: #555555;">::</span>sqrt2 <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl; 
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"std::numbers::sqrt3: "</span> <span style="color: #555555;">&lt;&lt;</span>  std<span style="color: #555555;">::</span>numbers<span style="color: #555555;">::</span>sqrt3 <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl; 
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"std::numbers::inv_sqrt3: "</span> <span style="color: #555555;">&lt;&lt;</span>  std<span style="color: #555555;">::</span>numbers<span style="color: #555555;">::</span>inv_sqrt3 <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"std::numbers::egamma: "</span> <span style="color: #555555;">&lt;&lt;</span>  std<span style="color: #555555;">::</span>numbers<span style="color: #555555;">::</span>egamma <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"std::numbers::phi: "</span> <span style="color: #555555;">&lt;&lt;</span>  std<span style="color: #555555;">::</span>numbers<span style="color: #555555;">::</span>phi <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+}
+</pre>
+</div>
+<p></p>
+<p>Here is the output of the program with the MSVC compiler 19.27.</p>
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/SafeComparison/mathematicalConstants.png" alt="mathematicalConstants" width="400" height="333" /></p>
+<p>&nbsp;</p>
+<p>The mathematical constants are available for <code>float</code>, <code>double</code>, and <code>long double</code>. Per-default <code>double</code> is used but you can also specify <code>float</code> (<code>std::numbers::pi_v&lt;float&gt;</code>) or<code> long double</code> (<code>std::numbers::pi_v&lt;long double&gt;</code>).</p>
+<h2>What's next?</h2>
+<p>C++20 offers more useful utilities. For example, you can ask your compiler which C++ feature it supports, can easily create function objects with <code>std::bind_front, </code>or perform different actions in a function whether the function runs a compile-time or at runtime.</p>
+<p>{loadmoduleid 153}</p>
+<p>&nbsp;</p>
