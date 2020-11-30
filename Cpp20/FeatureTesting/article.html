@@ -1,0 +1,473 @@
+<p>When your program's compilation broke with a brand-new C++20 feature, you often end with a few questions: Did I something wrong? Did I found a compiler bug? Does my compiler not yet support this feature? Thanks to the feature testing in C++20, the last question is easy to answer.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/FeatureTesting/TimelineCpp20CoreLanguage.png" alt="TimelineCpp20CoreLanguage" width="650" height="262" /></p>
+<p>When I experiment with brand-new C++ features, I check which compiler implements the feature I'm interested in. This is the time I visit<a href="https://en.cppreference.com/w/cpp/compiler_support"> cppreference.com</a>, search for the feature I want to try out, and hope that at least one compiler of the big three (GCC, Clang, MSCV) implements the new feature.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/FeatureTesting/cpp20Support.png" alt="cpp20Support" width="600" height="395" /></p>
+<p>&nbsp;</p>
+<p>When I get the answer partial, it is not satisfying. In the end, I don't know who is guilty when the compilation of the brand-new feature failed. There is a smarter way in C++20 to detect if your compiler supports a requested feature.</p>
+<h2>Feature Testing</h2>
+<p>The header<span style="font-family: courier new, courier;"> &lt;version&gt;</span> allows you to ask your compiler for it's C++11 or later support. You can ask for attributes, features of the core language, or the library. <span style="font-family: courier new, courier;">&lt;version&gt;</span> has about 200 macros defined, which expand to a number when the feature is implemented. The number stands for the year and the month, in which the feature was added to the C++ standard. These are the numbers for<span style="font-family: courier new, courier;"> static_assert,</span> lambdas, and concepts.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">__cpp_static_assert  <span style="color: #ff6600;">200410L</span>
+__cpp_lambdas  <span style="color: #ff6600;">200907L</span>
+__cpp_concepts <span style="color: #ff6600;">201907L</span>
+</pre>
+</div>
+<p></p>
+<p>The cppreference.com page to<a href="https://en.cppreference.com/w/cpp/feature_test"> feature testing</a> put all macros together in a long, long source file.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// featureTest.cpp<br />// from cppreference.com</span>
+
+<span style="color: #009999;">#if __cplusplus &lt; 201100</span>
+<span style="color: #009999;">#  error "C++11 or better is required"</span>
+<span style="color: #009999;">#endif</span>
+ 
+<span style="color: #009999;">#include &lt;algorithm&gt;</span>
+<span style="color: #009999;">#include &lt;cstring&gt;</span>
+<span style="color: #009999;">#include &lt;iomanip&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;string&gt;</span>
+ 
+<span style="color: #009999;">#ifdef __has_include</span>
+<span style="color: #009999;"># if __has_include(&lt;version&gt;)</span>
+<span style="color: #009999;">#   include &lt;version&gt;</span>
+<span style="color: #009999;"># endif</span>
+<span style="color: #009999;">#endif</span>
+ 
+<span style="color: #009999;">#define COMPILER_FEATURE_VALUE(value) #value</span>
+<span style="color: #009999;">#define COMPILER_FEATURE_ENTRY(name) { #name, COMPILER_FEATURE_VALUE(name) },</span>
+ 
+<span style="color: #009999;">#ifdef __has_cpp_attribute</span>
+<span style="color: #009999;"># define COMPILER_ATTRIBUTE_VALUE_AS_STRING(s) #s</span>
+<span style="color: #009999;"># define COMPILER_ATTRIBUTE_AS_NUMBER(x) COMPILER_ATTRIBUTE_VALUE_AS_STRING(x)</span>
+<span style="color: #009999;"># define COMPILER_ATTRIBUTE_ENTRY(attr) \</span>
+<span style="color: #009999;">  { #attr, COMPILER_ATTRIBUTE_AS_NUMBER(__has_cpp_attribute(attr)) },</span>
+<span style="color: #009999;">#else</span>
+<span style="color: #009999;"># define COMPILER_ATTRIBUTE_ENTRY(attr) { #attr, "_" },</span>
+<span style="color: #009999;">#endif</span>
+ 
+<span style="color: #0099ff; font-style: italic;">// Change these options to print out only necessary info.</span>
+<span style="color: #006699; font-weight: bold;">static</span> <span style="color: #006699; font-weight: bold;">struct</span> PrintOptions {
+    constexpr <span style="color: #006699; font-weight: bold;">static</span> <span style="color: #007788; font-weight: bold;">bool</span> titles               <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span>;
+    constexpr <span style="color: #006699; font-weight: bold;">static</span> <span style="color: #007788; font-weight: bold;">bool</span> attributes           <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span>;
+    constexpr <span style="color: #006699; font-weight: bold;">static</span> <span style="color: #007788; font-weight: bold;">bool</span> general_features     <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span>;
+    constexpr <span style="color: #006699; font-weight: bold;">static</span> <span style="color: #007788; font-weight: bold;">bool</span> core_features        <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span>;
+    constexpr <span style="color: #006699; font-weight: bold;">static</span> <span style="color: #007788; font-weight: bold;">bool</span> lib_features         <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span>;
+    constexpr <span style="color: #006699; font-weight: bold;">static</span> <span style="color: #007788; font-weight: bold;">bool</span> supported_features   <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span>;
+    constexpr <span style="color: #006699; font-weight: bold;">static</span> <span style="color: #007788; font-weight: bold;">bool</span> unsupported_features <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span>;
+    constexpr <span style="color: #006699; font-weight: bold;">static</span> <span style="color: #007788; font-weight: bold;">bool</span> sorted_by_value      <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>;
+    constexpr <span style="color: #006699; font-weight: bold;">static</span> <span style="color: #007788; font-weight: bold;">bool</span> cxx11                <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span>;
+    constexpr <span style="color: #006699; font-weight: bold;">static</span> <span style="color: #007788; font-weight: bold;">bool</span> cxx14                <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span>;
+    constexpr <span style="color: #006699; font-weight: bold;">static</span> <span style="color: #007788; font-weight: bold;">bool</span> cxx17                <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span>;
+    constexpr <span style="color: #006699; font-weight: bold;">static</span> <span style="color: #007788; font-weight: bold;">bool</span> cxx20                <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span>;
+    constexpr <span style="color: #006699; font-weight: bold;">static</span> <span style="color: #007788; font-weight: bold;">bool</span> cxx23                <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>;
+}   print;
+ 
+<span style="color: #006699; font-weight: bold;">struct</span> CompilerFeature {
+    CompilerFeature(<span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">char</span><span style="color: #555555;">*</span> name <span style="color: #555555;">=</span> nullptr, <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">char</span><span style="color: #555555;">*</span> value <span style="color: #555555;">=</span> nullptr)
+        <span style="color: #555555;">:</span> name(name), value(value) {}
+    <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">char</span><span style="color: #555555;">*</span> name; <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">char</span><span style="color: #555555;">*</span> value;
+};
+ 
+<span style="color: #006699; font-weight: bold;">static</span> CompilerFeature cxx[] <span style="color: #555555;">=</span> {
+COMPILER_FEATURE_ENTRY(__cplusplus)
+COMPILER_FEATURE_ENTRY(__cpp_exceptions)
+COMPILER_FEATURE_ENTRY(__cpp_rtti)
+<span style="color: #009999;">#if 0</span><span style="color: #0099ff; font-style: italic;"></span>
+<span style="color: #0099ff; font-style: italic;">COMPILER_FEATURE_ENTRY(__GNUC__)</span>
+<span style="color: #0099ff; font-style: italic;">COMPILER_FEATURE_ENTRY(__GNUC_MINOR__)</span>
+<span style="color: #0099ff; font-style: italic;">COMPILER_FEATURE_ENTRY(__GNUC_PATCHLEVEL__)</span>
+<span style="color: #0099ff; font-style: italic;">COMPILER_FEATURE_ENTRY(__GNUG__)</span>
+<span style="color: #0099ff; font-style: italic;">COMPILER_FEATURE_ENTRY(__clang__)</span>
+<span style="color: #0099ff; font-style: italic;">COMPILER_FEATURE_ENTRY(__clang_major__)</span>
+<span style="color: #0099ff; font-style: italic;">COMPILER_FEATURE_ENTRY(__clang_minor__)</span>
+<span style="color: #0099ff; font-style: italic;">COMPILER_FEATURE_ENTRY(__clang_patchlevel__)</span>
+<span style="color: #009999;">#endif</span>
+};
+<span style="color: #006699; font-weight: bold;">static</span> CompilerFeature cxx11[] <span style="color: #555555;">=</span> {
+COMPILER_FEATURE_ENTRY(__cpp_alias_templates)
+COMPILER_FEATURE_ENTRY(__cpp_attributes)
+COMPILER_FEATURE_ENTRY(__cpp_constexpr)
+COMPILER_FEATURE_ENTRY(__cpp_decltype)
+COMPILER_FEATURE_ENTRY(__cpp_delegating_constructors)
+COMPILER_FEATURE_ENTRY(__cpp_inheriting_constructors)
+COMPILER_FEATURE_ENTRY(__cpp_initializer_lists)
+COMPILER_FEATURE_ENTRY(__cpp_lambdas)
+COMPILER_FEATURE_ENTRY(__cpp_nsdmi)
+COMPILER_FEATURE_ENTRY(__cpp_range_based_for)
+COMPILER_FEATURE_ENTRY(__cpp_raw_strings)
+COMPILER_FEATURE_ENTRY(__cpp_ref_qualifiers)
+COMPILER_FEATURE_ENTRY(__cpp_rvalue_references)
+COMPILER_FEATURE_ENTRY(__cpp_static_assert)
+COMPILER_FEATURE_ENTRY(__cpp_threadsafe_static_init)
+COMPILER_FEATURE_ENTRY(__cpp_unicode_characters)
+COMPILER_FEATURE_ENTRY(__cpp_unicode_literals)
+COMPILER_FEATURE_ENTRY(__cpp_user_defined_literals)
+COMPILER_FEATURE_ENTRY(__cpp_variadic_templates)
+};
+<span style="color: #006699; font-weight: bold;">static</span> CompilerFeature cxx14[] <span style="color: #555555;">=</span> {
+COMPILER_FEATURE_ENTRY(__cpp_aggregate_nsdmi)
+COMPILER_FEATURE_ENTRY(__cpp_binary_literals)
+COMPILER_FEATURE_ENTRY(__cpp_constexpr)
+COMPILER_FEATURE_ENTRY(__cpp_decltype_auto)
+COMPILER_FEATURE_ENTRY(__cpp_generic_lambdas)
+COMPILER_FEATURE_ENTRY(__cpp_init_captures)
+COMPILER_FEATURE_ENTRY(__cpp_return_type_deduction)
+COMPILER_FEATURE_ENTRY(__cpp_sized_deallocation)
+COMPILER_FEATURE_ENTRY(__cpp_variable_templates)
+};
+<span style="color: #006699; font-weight: bold;">static</span> CompilerFeature cxx14lib[] <span style="color: #555555;">=</span> {
+COMPILER_FEATURE_ENTRY(__cpp_lib_chrono_udls)
+COMPILER_FEATURE_ENTRY(__cpp_lib_complex_udls)
+COMPILER_FEATURE_ENTRY(__cpp_lib_exchange_function)
+COMPILER_FEATURE_ENTRY(__cpp_lib_generic_associative_lookup)
+COMPILER_FEATURE_ENTRY(__cpp_lib_integer_sequence)
+COMPILER_FEATURE_ENTRY(__cpp_lib_integral_constant_callable)
+COMPILER_FEATURE_ENTRY(__cpp_lib_is_final)
+COMPILER_FEATURE_ENTRY(__cpp_lib_is_null_pointer)
+COMPILER_FEATURE_ENTRY(__cpp_lib_make_reverse_iterator)
+COMPILER_FEATURE_ENTRY(__cpp_lib_make_unique)
+COMPILER_FEATURE_ENTRY(__cpp_lib_null_iterators)
+COMPILER_FEATURE_ENTRY(__cpp_lib_quoted_string_io)
+COMPILER_FEATURE_ENTRY(__cpp_lib_result_of_sfinae)
+COMPILER_FEATURE_ENTRY(__cpp_lib_robust_nonmodifying_seq_ops)
+COMPILER_FEATURE_ENTRY(__cpp_lib_shared_timed_mutex)
+COMPILER_FEATURE_ENTRY(__cpp_lib_string_udls)
+COMPILER_FEATURE_ENTRY(__cpp_lib_transformation_trait_aliases)
+COMPILER_FEATURE_ENTRY(__cpp_lib_transparent_operators)
+COMPILER_FEATURE_ENTRY(<span style="color: #007788; font-weight: bold;">__cpp_lib_tuple_element_t</span>)
+COMPILER_FEATURE_ENTRY(__cpp_lib_tuples_by_type)
+};
+ 
+<span style="color: #006699; font-weight: bold;">static</span> CompilerFeature cxx17[] <span style="color: #555555;">=</span> {
+COMPILER_FEATURE_ENTRY(__cpp_aggregate_bases)
+COMPILER_FEATURE_ENTRY(__cpp_aligned_new)
+COMPILER_FEATURE_ENTRY(__cpp_capture_star_this)
+COMPILER_FEATURE_ENTRY(__cpp_constexpr)
+COMPILER_FEATURE_ENTRY(__cpp_deduction_guides)
+COMPILER_FEATURE_ENTRY(__cpp_enumerator_attributes)
+COMPILER_FEATURE_ENTRY(__cpp_fold_expressions)
+COMPILER_FEATURE_ENTRY(__cpp_guaranteed_copy_elision)
+COMPILER_FEATURE_ENTRY(__cpp_hex_float)
+COMPILER_FEATURE_ENTRY(__cpp_if_constexpr)
+COMPILER_FEATURE_ENTRY(__cpp_inheriting_constructors)
+COMPILER_FEATURE_ENTRY(__cpp_inline_variables)
+COMPILER_FEATURE_ENTRY(__cpp_namespace_attributes)
+COMPILER_FEATURE_ENTRY(__cpp_noexcept_function_type)
+COMPILER_FEATURE_ENTRY(__cpp_nontype_template_args)
+COMPILER_FEATURE_ENTRY(__cpp_nontype_template_parameter_auto)
+COMPILER_FEATURE_ENTRY(__cpp_range_based_for)
+COMPILER_FEATURE_ENTRY(__cpp_static_assert)
+COMPILER_FEATURE_ENTRY(__cpp_structured_bindings)
+COMPILER_FEATURE_ENTRY(__cpp_template_template_args)
+COMPILER_FEATURE_ENTRY(__cpp_variadic_using)
+};
+<span style="color: #006699; font-weight: bold;">static</span> CompilerFeature cxx17lib[] <span style="color: #555555;">=</span> {
+COMPILER_FEATURE_ENTRY(__cpp_lib_addressof_constexpr)
+COMPILER_FEATURE_ENTRY(__cpp_lib_allocator_traits_is_always_equal)
+COMPILER_FEATURE_ENTRY(__cpp_lib_any)
+COMPILER_FEATURE_ENTRY(__cpp_lib_apply)
+COMPILER_FEATURE_ENTRY(__cpp_lib_array_constexpr)
+COMPILER_FEATURE_ENTRY(__cpp_lib_as_const)
+COMPILER_FEATURE_ENTRY(__cpp_lib_atomic_is_always_lock_free)
+COMPILER_FEATURE_ENTRY(__cpp_lib_bool_constant)
+COMPILER_FEATURE_ENTRY(__cpp_lib_boyer_moore_searcher)
+COMPILER_FEATURE_ENTRY(__cpp_lib_byte)
+COMPILER_FEATURE_ENTRY(__cpp_lib_chrono)
+COMPILER_FEATURE_ENTRY(__cpp_lib_clamp)
+COMPILER_FEATURE_ENTRY(__cpp_lib_enable_shared_from_this)
+COMPILER_FEATURE_ENTRY(__cpp_lib_execution)
+COMPILER_FEATURE_ENTRY(__cpp_lib_filesystem)
+COMPILER_FEATURE_ENTRY(__cpp_lib_gcd_lcm)
+COMPILER_FEATURE_ENTRY(__cpp_lib_hardware_interference_size)
+COMPILER_FEATURE_ENTRY(__cpp_lib_has_unique_object_representations)
+COMPILER_FEATURE_ENTRY(__cpp_lib_hypot)
+COMPILER_FEATURE_ENTRY(__cpp_lib_incomplete_container_elements)
+COMPILER_FEATURE_ENTRY(__cpp_lib_invoke)
+COMPILER_FEATURE_ENTRY(__cpp_lib_is_aggregate)
+COMPILER_FEATURE_ENTRY(__cpp_lib_is_invocable)
+COMPILER_FEATURE_ENTRY(__cpp_lib_is_swappable)
+COMPILER_FEATURE_ENTRY(__cpp_lib_launder)
+COMPILER_FEATURE_ENTRY(__cpp_lib_logical_traits)
+COMPILER_FEATURE_ENTRY(__cpp_lib_make_from_tuple)
+COMPILER_FEATURE_ENTRY(__cpp_lib_map_try_emplace)
+COMPILER_FEATURE_ENTRY(__cpp_lib_math_special_functions)
+COMPILER_FEATURE_ENTRY(__cpp_lib_memory_resource)
+COMPILER_FEATURE_ENTRY(__cpp_lib_node_extract)
+COMPILER_FEATURE_ENTRY(__cpp_lib_nonmember_container_access)
+COMPILER_FEATURE_ENTRY(__cpp_lib_not_fn)
+COMPILER_FEATURE_ENTRY(__cpp_lib_optional)
+COMPILER_FEATURE_ENTRY(__cpp_lib_parallel_algorithm)
+COMPILER_FEATURE_ENTRY(__cpp_lib_raw_memory_algorithms)
+COMPILER_FEATURE_ENTRY(__cpp_lib_sample)
+COMPILER_FEATURE_ENTRY(__cpp_lib_scoped_lock)
+COMPILER_FEATURE_ENTRY(__cpp_lib_shared_mutex)
+COMPILER_FEATURE_ENTRY(__cpp_lib_shared_ptr_arrays)
+COMPILER_FEATURE_ENTRY(__cpp_lib_shared_ptr_weak_type)
+COMPILER_FEATURE_ENTRY(__cpp_lib_string_view)
+COMPILER_FEATURE_ENTRY(__cpp_lib_to_chars)
+COMPILER_FEATURE_ENTRY(__cpp_lib_transparent_operators)
+COMPILER_FEATURE_ENTRY(__cpp_lib_type_trait_variable_templates)
+COMPILER_FEATURE_ENTRY(__cpp_lib_uncaught_exceptions)
+COMPILER_FEATURE_ENTRY(__cpp_lib_unordered_map_try_emplace)
+COMPILER_FEATURE_ENTRY(__cpp_lib_variant)
+COMPILER_FEATURE_ENTRY(<span style="color: #007788; font-weight: bold;">__cpp_lib_void_t</span>)
+};
+ 
+<span style="color: #006699; font-weight: bold;">static</span> CompilerFeature cxx20[] <span style="color: #555555;">=</span> {
+COMPILER_FEATURE_ENTRY(__cpp_aggregate_paren_init)
+COMPILER_FEATURE_ENTRY(<span style="color: #007788; font-weight: bold;">__cpp_char8_t</span>)
+COMPILER_FEATURE_ENTRY(__cpp_concepts)
+COMPILER_FEATURE_ENTRY(__cpp_conditional_explicit)
+COMPILER_FEATURE_ENTRY(__cpp_consteval)
+COMPILER_FEATURE_ENTRY(__cpp_constexpr)
+COMPILER_FEATURE_ENTRY(__cpp_constexpr_dynamic_alloc)
+COMPILER_FEATURE_ENTRY(__cpp_constexpr_in_decltype)
+COMPILER_FEATURE_ENTRY(__cpp_constinit)
+COMPILER_FEATURE_ENTRY(__cpp_deduction_guides)
+COMPILER_FEATURE_ENTRY(__cpp_designated_initializers)
+COMPILER_FEATURE_ENTRY(__cpp_generic_lambdas)
+COMPILER_FEATURE_ENTRY(__cpp_impl_coroutine)
+COMPILER_FEATURE_ENTRY(__cpp_impl_destroying_delete)
+COMPILER_FEATURE_ENTRY(__cpp_impl_three_way_comparison)
+COMPILER_FEATURE_ENTRY(__cpp_init_captures)
+COMPILER_FEATURE_ENTRY(__cpp_modules)
+COMPILER_FEATURE_ENTRY(__cpp_nontype_template_args)
+COMPILER_FEATURE_ENTRY(__cpp_using_enum)
+};
+<span style="color: #006699; font-weight: bold;">static</span> CompilerFeature cxx20lib[] <span style="color: #555555;">=</span> {
+COMPILER_FEATURE_ENTRY(__cpp_lib_array_constexpr)
+COMPILER_FEATURE_ENTRY(__cpp_lib_assume_aligned)
+COMPILER_FEATURE_ENTRY(__cpp_lib_atomic_flag_test)
+COMPILER_FEATURE_ENTRY(__cpp_lib_atomic_float)
+COMPILER_FEATURE_ENTRY(__cpp_lib_atomic_lock_free_type_aliases)
+COMPILER_FEATURE_ENTRY(__cpp_lib_atomic_ref)
+COMPILER_FEATURE_ENTRY(__cpp_lib_atomic_shared_ptr)
+COMPILER_FEATURE_ENTRY(__cpp_lib_atomic_value_initialization)
+COMPILER_FEATURE_ENTRY(__cpp_lib_atomic_wait)
+COMPILER_FEATURE_ENTRY(__cpp_lib_barrier)
+COMPILER_FEATURE_ENTRY(__cpp_lib_bind_front)
+COMPILER_FEATURE_ENTRY(__cpp_lib_bit_cast)
+COMPILER_FEATURE_ENTRY(__cpp_lib_bitops)
+COMPILER_FEATURE_ENTRY(__cpp_lib_bounded_array_traits)
+COMPILER_FEATURE_ENTRY(<span style="color: #007788; font-weight: bold;">__cpp_lib_char8_t</span>)
+COMPILER_FEATURE_ENTRY(__cpp_lib_chrono)
+COMPILER_FEATURE_ENTRY(__cpp_lib_concepts)
+COMPILER_FEATURE_ENTRY(__cpp_lib_constexpr_algorithms)
+COMPILER_FEATURE_ENTRY(__cpp_lib_constexpr_complex)
+COMPILER_FEATURE_ENTRY(__cpp_lib_constexpr_dynamic_alloc)
+COMPILER_FEATURE_ENTRY(__cpp_lib_constexpr_functional)
+COMPILER_FEATURE_ENTRY(__cpp_lib_constexpr_iterator)
+COMPILER_FEATURE_ENTRY(__cpp_lib_constexpr_memory)
+COMPILER_FEATURE_ENTRY(__cpp_lib_constexpr_numeric)
+COMPILER_FEATURE_ENTRY(__cpp_lib_constexpr_string)
+COMPILER_FEATURE_ENTRY(__cpp_lib_constexpr_string_view)
+COMPILER_FEATURE_ENTRY(__cpp_lib_constexpr_tuple)
+COMPILER_FEATURE_ENTRY(__cpp_lib_constexpr_utility)
+COMPILER_FEATURE_ENTRY(__cpp_lib_constexpr_vector)
+COMPILER_FEATURE_ENTRY(__cpp_lib_coroutine)
+COMPILER_FEATURE_ENTRY(__cpp_lib_destroying_delete)
+COMPILER_FEATURE_ENTRY(__cpp_lib_endian)
+COMPILER_FEATURE_ENTRY(__cpp_lib_erase_if)
+COMPILER_FEATURE_ENTRY(__cpp_lib_execution)
+COMPILER_FEATURE_ENTRY(__cpp_lib_format)
+COMPILER_FEATURE_ENTRY(__cpp_lib_generic_unordered_lookup)
+COMPILER_FEATURE_ENTRY(__cpp_lib_int_pow2)
+COMPILER_FEATURE_ENTRY(__cpp_lib_integer_comparison_functions)
+COMPILER_FEATURE_ENTRY(__cpp_lib_interpolate)
+COMPILER_FEATURE_ENTRY(__cpp_lib_is_constant_evaluated)
+COMPILER_FEATURE_ENTRY(__cpp_lib_is_layout_compatible)
+COMPILER_FEATURE_ENTRY(__cpp_lib_is_nothrow_convertible)
+COMPILER_FEATURE_ENTRY(__cpp_lib_is_pointer_interconvertible)
+COMPILER_FEATURE_ENTRY(__cpp_lib_jthread)
+COMPILER_FEATURE_ENTRY(__cpp_lib_latch)
+COMPILER_FEATURE_ENTRY(__cpp_lib_list_remove_return_type)
+COMPILER_FEATURE_ENTRY(__cpp_lib_math_constants)
+COMPILER_FEATURE_ENTRY(__cpp_lib_polymorphic_allocator)
+COMPILER_FEATURE_ENTRY(__cpp_lib_ranges)
+COMPILER_FEATURE_ENTRY(__cpp_lib_remove_cvref)
+COMPILER_FEATURE_ENTRY(__cpp_lib_semaphore)
+COMPILER_FEATURE_ENTRY(__cpp_lib_shared_ptr_arrays)
+COMPILER_FEATURE_ENTRY(__cpp_lib_shift)
+COMPILER_FEATURE_ENTRY(__cpp_lib_smart_ptr_for_overwrite)
+COMPILER_FEATURE_ENTRY(__cpp_lib_source_location)
+COMPILER_FEATURE_ENTRY(__cpp_lib_span)
+COMPILER_FEATURE_ENTRY(__cpp_lib_ssize)
+COMPILER_FEATURE_ENTRY(__cpp_lib_starts_ends_with)
+COMPILER_FEATURE_ENTRY(__cpp_lib_string_view)
+COMPILER_FEATURE_ENTRY(__cpp_lib_syncbuf)
+COMPILER_FEATURE_ENTRY(__cpp_lib_three_way_comparison)
+COMPILER_FEATURE_ENTRY(__cpp_lib_to_address)
+COMPILER_FEATURE_ENTRY(__cpp_lib_to_array)
+COMPILER_FEATURE_ENTRY(__cpp_lib_type_identity)
+COMPILER_FEATURE_ENTRY(__cpp_lib_unwrap_ref)
+};
+ 
+<span style="color: #006699; font-weight: bold;">static</span> CompilerFeature cxx23[] <span style="color: #555555;">=</span> {
+COMPILER_FEATURE_ENTRY(__cpp_cxx23_stub) <span style="color: #0099ff; font-style: italic;">//&lt; Populate eventually</span>
+};
+<span style="color: #006699; font-weight: bold;">static</span> CompilerFeature cxx23lib[] <span style="color: #555555;">=</span> {
+COMPILER_FEATURE_ENTRY(__cpp_lib_cxx23_stub) <span style="color: #0099ff; font-style: italic;">//&lt; Populate eventually</span>
+};
+ 
+<span style="color: #006699; font-weight: bold;">static</span> CompilerFeature attributes[] <span style="color: #555555;">=</span> {
+COMPILER_ATTRIBUTE_ENTRY(carries_dependency)
+COMPILER_ATTRIBUTE_ENTRY(deprecated)
+COMPILER_ATTRIBUTE_ENTRY(fallthrough)
+COMPILER_ATTRIBUTE_ENTRY(likely)
+COMPILER_ATTRIBUTE_ENTRY(maybe_unused)
+COMPILER_ATTRIBUTE_ENTRY(nodiscard)
+COMPILER_ATTRIBUTE_ENTRY(noreturn)
+COMPILER_ATTRIBUTE_ENTRY(no_unique_address)
+COMPILER_ATTRIBUTE_ENTRY(unlikely)
+};
+ 
+constexpr <span style="color: #007788; font-weight: bold;">bool</span> <span style="color: #cc00ff;">is_feature_supported</span>(<span style="color: #006699; font-weight: bold;">const</span> CompilerFeature<span style="color: #555555;">&amp;</span> x) {
+    <span style="color: #006699; font-weight: bold;">return</span> x.value[<span style="color: #ff6600;">0</span>] <span style="color: #555555;">!=</span> <span style="color: #cc3300;">'_'</span> <span style="color: #555555;">&amp;&amp;</span> x.value[<span style="color: #ff6600;">0</span>] <span style="color: #555555;">!=</span> <span style="color: #cc3300;">'0'</span> ;
+}
+ 
+<span style="color: #006699; font-weight: bold;">inline</span> <span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">print_compiler_feature</span>(<span style="color: #006699; font-weight: bold;">const</span> CompilerFeature<span style="color: #555555;">&amp;</span> x) {
+    constexpr <span style="color: #006699; font-weight: bold;">static</span> <span style="color: #007788; font-weight: bold;">int</span> max_name_length <span style="color: #555555;">=</span> <span style="color: #ff6600;">44</span>; <span style="color: #0099ff; font-style: italic;">//&lt; Update if necessary</span>
+    std<span style="color: #555555;">::</span>string value{ is_feature_supported(x) <span style="color: #555555;">?</span> x.value <span style="color: #555555;">:</span> <span style="color: #cc3300;">"------"</span> };
+    <span style="color: #006699; font-weight: bold;">if</span> (value.back() <span style="color: #555555;">==</span> <span style="color: #cc3300;">'L'</span>) value.pop_back(); <span style="color: #0099ff; font-style: italic;">//~ 201603L -&gt; 201603</span>
+    <span style="color: #0099ff; font-style: italic;">// value.insert(4, 1, '-'); //~ 201603 -&gt; 2016-03</span>
+    <span style="color: #006699; font-weight: bold;">if</span> ( (print.supported_features <span style="color: #555555;">&amp;&amp;</span> is_feature_supported(x))
+        <span style="color: #555555;">||</span> (print.unsupported_features <span style="color: #555555;">&amp;&amp;</span> <span style="color: #555555;">!</span>is_feature_supported(x))) {
+            std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>left <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>setw(max_name_length)
+                      <span style="color: #555555;">&lt;&lt;</span> x.name <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span> <span style="color: #555555;">&lt;&lt;</span> value <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    }
+}
+ 
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">size_t</span> N<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">inline</span> <span style="color: #007788; font-weight: bold;">void</span> show(<span style="color: #007788; font-weight: bold;">char</span> <span style="color: #006699; font-weight: bold;">const</span><span style="color: #555555;">*</span> title, CompilerFeature (<span style="color: #555555;">&amp;</span>features)[N]) {
+    <span style="color: #006699; font-weight: bold;">if</span> (print.titles) {
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>left <span style="color: #555555;">&lt;&lt;</span> title <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    }
+    <span style="color: #006699; font-weight: bold;">if</span> (print.sorted_by_value) {
+        std<span style="color: #555555;">::</span>sort(std<span style="color: #555555;">::</span>begin(features), std<span style="color: #555555;">::</span>end(features),
+            [](CompilerFeature <span style="color: #006699; font-weight: bold;">const</span><span style="color: #555555;">&amp;</span> lhs, CompilerFeature <span style="color: #006699; font-weight: bold;">const</span><span style="color: #555555;">&amp;</span> rhs) {
+                <span style="color: #006699; font-weight: bold;">return</span> std<span style="color: #555555;">::</span>strcmp(lhs.value, rhs.value) <span style="color: #555555;">&lt;</span> <span style="color: #ff6600;">0</span>;
+            });
+    }
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">const</span> CompilerFeature<span style="color: #555555;">&amp;</span> x <span style="color: #555555;">:</span> features) {
+        print_compiler_feature(x);
+    }
+}
+ 
+<span style="color: #007788; font-weight: bold;">int</span> main() {
+    <span style="color: #006699; font-weight: bold;">if</span> (print.general_features) show(<span style="color: #cc3300;">"C++ GENERAL"</span>, cxx);
+    <span style="color: #006699; font-weight: bold;">if</span> (print.cxx11 <span style="color: #555555;">&amp;&amp;</span> print.core_features) show(<span style="color: #cc3300;">"C++11 CORE"</span>, cxx11);
+    <span style="color: #006699; font-weight: bold;">if</span> (print.cxx14 <span style="color: #555555;">&amp;&amp;</span> print.core_features) show(<span style="color: #cc3300;">"C++14 CORE"</span>, cxx14);
+    <span style="color: #006699; font-weight: bold;">if</span> (print.cxx14 <span style="color: #555555;">&amp;&amp;</span> print.lib_features ) show(<span style="color: #cc3300;">"C++14 LIB"</span> , cxx14lib);
+    <span style="color: #006699; font-weight: bold;">if</span> (print.cxx17 <span style="color: #555555;">&amp;&amp;</span> print.core_features) show(<span style="color: #cc3300;">"C++17 CORE"</span>, cxx17);
+    <span style="color: #006699; font-weight: bold;">if</span> (print.cxx17 <span style="color: #555555;">&amp;&amp;</span> print.lib_features ) show(<span style="color: #cc3300;">"C++17 LIB"</span> , cxx17lib);
+    <span style="color: #006699; font-weight: bold;">if</span> (print.cxx20 <span style="color: #555555;">&amp;&amp;</span> print.core_features) show(<span style="color: #cc3300;">"C++20 CORE"</span>, cxx20);
+    <span style="color: #006699; font-weight: bold;">if</span> (print.cxx20 <span style="color: #555555;">&amp;&amp;</span> print.lib_features ) show(<span style="color: #cc3300;">"C++20 LIB"</span> , cxx20lib);
+    <span style="color: #006699; font-weight: bold;">if</span> (print.cxx23 <span style="color: #555555;">&amp;&amp;</span> print.core_features) show(<span style="color: #cc3300;">"C++23 CORE"</span>, cxx23);
+    <span style="color: #006699; font-weight: bold;">if</span> (print.cxx23 <span style="color: #555555;">&amp;&amp;</span> print.lib_features ) show(<span style="color: #cc3300;">"C++23 LIB"</span> , cxx23lib);
+    <span style="color: #006699; font-weight: bold;">if</span> (print.attributes) show(<span style="color: #cc3300;">"ATTRIBUTES"</span>, attributes);
+}
+</pre>
+</div>
+<p></p>
+<p>Of course, the length of the source file is overwhelming. When you want to know more about each macro, visit the page to <a href="https://en.cppreference.com/w/cpp/feature_test">feature testing</a>. In particular, they provide to each macro a link that can use to get more information about a feature. For example, here is the table on attributes:</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/FeatureTesting/attributes.png" alt="attributes" width="400" height="211" /></p>
+<p>To finish my presentation of the <code>&lt;version&gt;</code> header and its macros, I execute the program on the brand-new GCC, Clang, and MSVC compiler. I used the<a href="https://godbolt.org/"> Compiler Explorer</a> for the GCC and Clang compiler. On Windows, I had to enable preprocessor macros with the flag<code> /Zc:__cplusplus</code>. Additionally, I compiled on all three platforms with C++20 support.</p>
+<p>For obvious reasons, I only display the support of the C++20 core language.</p>
+<ul>
+<li><strong>GCC 10.2</strong></li>
+</ul>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/FeatureTesting/gccCoreCpp20.png" alt="gccCoreCpp20" width="400" height="367" /></p>
+<ul>
+<li><strong>Clang 11.0</strong></li>
+</ul>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/FeatureTesting/clangCoreCpp20.png" alt="clangCoreCpp20" width="400" height="380" /></p>
+<ul>
+<li><strong>MSVC 19.27</strong></li>
+</ul>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/FeatureTesting/msvc2CoreCpp20.png" alt="msvc2CoreCpp20" width="500" height="385" /></p>
+<p>The three screenshots speak a clear message about the big three. Their C++20 core language support is quite good at this early stage.</p>
+<p>The<a href="https://en.cppreference.com/w/cpp/header/type_traits"> type-traits library </a>gets a quite interesting function.</p>
+<h2><code>std::is_constant_evaluated</code></h2>
+<p>The function <code>std::is_constant_evaluted</code> determines whether the function is executed at compile-time or runtime. Why do we need this function from the <a href="https://en.cppreference.com/w/cpp/header/type_traits">type-traits library</a>? In C++20, we have roughly spoken three kinds of functions:</p>
+<ul>
+<li><a href="index.php/c-20-consteval-and-constinit"><code>consteval</code></a> declared functions execute at compile-time:<code> consteval int alwaysCompiletime</code></li>
+<li><code>constexpr</code> declared functions can be executed at compile-time or runtime: <code>constexpr int itDepends</code></li>
+<li>usual functions execute at runtime:<code> int alwaysRuntime</code></li>
+</ul>
+<p>Now, I have to write about the complicated case: <code>constexpr</code>. A <code>constexpr</code> functions can be executed at compile-time or runtime. Sometimes these functions should behave differently whether the function is executed at compile-time or runtime. A <code>constexpr</code> function such as<code> getSum</code> has the potential to run at compile-time.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">constexpr <span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">getSum</span>(<span style="color: #007788; font-weight: bold;">int</span> l, <span style="color: #007788; font-weight: bold;">int</span> r) {
+    <span style="color: #006699; font-weight: bold;">return</span> l <span style="color: #555555;">+</span> r;
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>How can be sure that the function is actually executed at compile-time? Essentially, there are three possibilities.</p>
+<ol>
+<li>A <code>constexpr</code> function is executed at compile-time:
+<ul>
+<li>The function is used in a so-called constant-evaluated context. A constant-evaluated context could be inside a <code>constexpr</code> function or inside a<code> static_assert</code>.</li>
+<li>The client of the function explicitly wants to have the result at compile-time:<code> constexpr auto res = getSum(2000, 11)</code>. Now, <code>getSum()</code> has to run at compile-time.</li>
+</ul>
+</li>
+<li>A <code>constexpr </code>function can only be performed at runtime if the arguments are not <code>constexpr</code>. This would be the case if the function <code>getSum(a, 11)</code> is invoked with a&nbsp; variable, which was not declared as constexpr: <code>int a = 2000</code>.</li>
+<li>A <code>constexpr</code> function can be executed at compile-time or runtime when neither rule 1 nor rule 2 applies. In this case, both options are valid and the decision is up to the compiler.</li>
+</ol>
+<p>Exactly in point 3, the power of <code>std::is_constant_evaluated</code> kicks in. You can detect if the program runs at compile-time or runtime and perform different operations. <a href="https://en.cppreference.com/w/cpp/types/is_constant_evaluated">cppreference.com</a> shows a smart use-case.&nbsp;At compile-time you calculate the power of two numbers manually; at runtime, you use <code>std::pow</code>.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// constantEvaluated.cpp</span>
+
+<span style="color: #009999;">#include &lt;type_traits&gt;</span>
+<span style="color: #009999;">#include &lt;cmath&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+ 
+constexpr <span style="color: #007788; font-weight: bold;">double</span> <span style="color: #cc00ff;">power</span>(<span style="color: #007788; font-weight: bold;">double</span> b, <span style="color: #007788; font-weight: bold;">int</span> x) {
+    <span style="color: #006699; font-weight: bold;">if</span> (std<span style="color: #555555;">::</span>is_constant_evaluated() <span style="color: #555555;">&amp;&amp;</span> <span style="color: #555555;">!</span>(b <span style="color: #555555;">==</span> <span style="color: #ff6600;">0.0</span> <span style="color: #555555;">&amp;&amp;</span> x <span style="color: #555555;">&lt;</span> <span style="color: #ff6600;">0</span>)) {
+        
+        <span style="color: #006699; font-weight: bold;">if</span> (x <span style="color: #555555;">==</span> <span style="color: #ff6600;">0</span>)
+            <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #ff6600;">1.0</span>;
+        <span style="color: #007788; font-weight: bold;">double</span> r <span style="color: #555555;">=</span> <span style="color: #ff6600;">1.0</span>, p <span style="color: #555555;">=</span> x <span style="color: #555555;">&gt;</span> <span style="color: #ff6600;">0</span> <span style="color: #555555;">?</span> b <span style="color: #555555;">:</span> <span style="color: #ff6600;">1.0</span> <span style="color: #555555;">/</span> b;
+        <span style="color: #006699; font-weight: bold;">auto</span> u <span style="color: #555555;">=</span> <span style="color: #007788; font-weight: bold;">unsigned</span>(x <span style="color: #555555;">&gt;</span> <span style="color: #ff6600;">0</span> <span style="color: #555555;">?</span> x <span style="color: #555555;">:</span> <span style="color: #555555;">-</span>x);
+        <span style="color: #006699; font-weight: bold;">while</span> (u <span style="color: #555555;">!=</span> <span style="color: #ff6600;">0</span>) {
+            <span style="color: #006699; font-weight: bold;">if</span> (u <span style="color: #555555;">&amp;</span> <span style="color: #ff6600;">1</span>) r <span style="color: #555555;">*=</span> p;
+            u <span style="color: #555555;">/=</span> <span style="color: #ff6600;">2</span>;
+            p <span style="color: #555555;">*=</span> p;
+        }
+        <span style="color: #006699; font-weight: bold;">return</span> r;
+    } 
+    <span style="color: #006699; font-weight: bold;">else</span> {
+        <span style="color: #006699; font-weight: bold;">return</span> std<span style="color: #555555;">::</span>pow(b, <span style="color: #007788; font-weight: bold;">double</span>(x));
+    }
+}
+ 
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    constexpr <span style="color: #007788; font-weight: bold;">double</span> kilo1 <span style="color: #555555;">=</span> power(<span style="color: #ff6600;">10.0</span>, <span style="color: #ff6600;">3</span>);
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"kilo1: "</span> <span style="color: #555555;">&lt;&lt;</span> kilo1 <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    <span style="color: #007788; font-weight: bold;">int</span> n <span style="color: #555555;">=</span> <span style="color: #ff6600;">3</span>;
+    <span style="color: #007788; font-weight: bold;">double</span> kilo2 <span style="color: #555555;">=</span> power(<span style="color: #ff6600;">10.0</span>, n);
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"kilo2: "</span> <span style="color: #555555;">&lt;&lt;</span> kilo2 <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>There is one interesting observation I want to share. It is possible to use <code>std::is_constant_evaluted</code> in an as <code>consteval</code> declared function or in a function that can only run at runtime. Of course, the result of these calls is always <code>true</code> or <code>false</code>.</p>
+<h2>What's next?</h2>
+<p>I'm nearly done with my presentation of the C++20 library. Only two features are still missing bevor I dive into concurrency in C++20: the bit manipulation library and <code>std::source_location</code>.</p>
+<p>&nbsp;{loadmoduleid 153}</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
