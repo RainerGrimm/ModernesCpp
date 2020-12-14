@@ -1,0 +1,192 @@
+<p>Atomics receives a few important extensions in C++20. Today, I start with the new data type<code> std::atomic_ref.</code></p>
+<hr id="system-readmore" />
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/NewAndImprovedAtomics/TimelineCpp20CoreLanguage.png" alt="TimelineCpp20CoreLanguage" width="650" height="265" /></p>
+<p>The type<code>&nbsp;std::atomic_ref</code> applies atomic operations to its referenced object.</p>
+<h2><code>std::atomic_ref</code></h2>
+<p>Concurrent writing and reading using a <code>std::atomic_ref</code> is no data race. The lifetime of the referenced object must exceed the lifetime of the <code>std::atomic_ref</code>. Accessing a subobject of the referenced object with a <code>std::atomic_ref</code> is not well-defined.</p>
+<h3>Motivation</h3>
+<p>You may think that using a reference inside an atomic would do the job. Unfortunately not.</p>
+<p>In the following program, I have a class <code>ExpensiveToCopy</code>, which includes a <code>counter</code>. The <code>counter</code> is concurrently incremented by a few threads. Consequently, <code>counter</code> has to be protected.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// atomicReference.cpp</span>
+
+<span style="color: #009999;">#include &lt;atomic&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;random&gt;</span>
+<span style="color: #009999;">#include &lt;thread&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">struct</span> ExpensiveToCopy {
+    <span style="color: #007788; font-weight: bold;">int</span> counter{};
+};
+ 
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">getRandom</span>(<span style="color: #007788; font-weight: bold;">int</span> begin, <span style="color: #007788; font-weight: bold;">int</span> end) {            <span style="color: #0099ff; font-style: italic;">// (6)</span>
+
+    std<span style="color: #555555;">::</span>random_device seed;        <span style="color: #0099ff; font-style: italic;">// initial seed</span>
+    std<span style="color: #555555;">::</span>mt19937 engine(seed());    <span style="color: #0099ff; font-style: italic;">// generator</span>
+    std<span style="color: #555555;">::</span>uniform_int_distribution<span style="color: #555555;">&lt;&gt;</span> uniformDist(begin, end);
+
+    <span style="color: #006699; font-weight: bold;">return</span> uniformDist(engine);
+}
+ 
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">count</span>(ExpensiveToCopy<span style="color: #555555;">&amp;</span> exp) {                 <span style="color: #0099ff; font-style: italic;">     // (2)</span>
+    
+    std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span><span style="color: #555555;">&gt;</span> v;
+    std<span style="color: #555555;">::</span>atomic<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> counter{exp.counter};              <span style="color: #0099ff; font-style: italic;">// (3)</span>
+    
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #007788; font-weight: bold;">int</span> n <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>; n <span style="color: #555555;">&lt;</span> <span style="color: #ff6600;">10</span>; <span style="color: #555555;">++</span>n) {                      <span style="color: #0099ff; font-style: italic;">// (4)</span>
+        v.emplace_back([<span style="color: #555555;">&amp;</span>counter] {
+            <span style="color: #006699; font-weight: bold;">auto</span> randomNumber <span style="color: #555555;">=</span> getRandom(<span style="color: #ff6600;">100</span>, <span style="color: #ff6600;">200</span>);    <span style="color: #0099ff; font-style: italic;">// (5)</span>
+            <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #007788; font-weight: bold;">int</span> i <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>; i <span style="color: #555555;">&lt;</span> randomNumber; <span style="color: #555555;">++</span>i) { <span style="color: #555555;">++</span>counter; }
+        });
+    }
+    
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;</span> t <span style="color: #555555;">:</span> v) t.join();
+
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+    ExpensiveToCopy exp;              <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    count(exp);
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"exp.counter: "</span> <span style="color: #555555;">&lt;&lt;</span> exp.counter <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p><code>exp</code> (1) is the expensive-to-copy object. For performance reasons, the function <code>count</code> (2) takes <code>exp</code> by reference. <code>count</code> initializes the <code>std::atomic&lt;int&gt;</code> with <code>exp.counter (</code>3). The following lines create 10 threads (4), each performing the lambda expression, which takes <code>counter</code> by reference. The lambda expression gets a random number between 100 and 200 (5) and increments the counter exactly as often. The function <code>getRandom</code> (6) start with an initial seed and creates via the random number generator <a href="https://en.wikipedia.org/wiki/Mersenne_Twister">Mersenne Twister</a> a uniform distributed number.</p>
+<p>In the end, the <code>exp.counter</code> (7) should have an approximate value of 1500 because of the ten threads increments on average 150 times. Executing the program on the <a href="https://wandbox.org/">Wandbox </a>online compiler gives me a surprising result.</p>
+<p>&nbsp;</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/NewAndImprovedAtomics/atomicReference.png" alt="atomicReference" width="150" height="166" /></p>
+<p>The counter is 0. What is happening? The issue is in line (3). The initialization in the expression <code>std::atomic&lt;int&gt; counter{exp.counter}</code> creates a copy. The following small program exemplifies the issue.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// atomicRefCopy.cpp</span>
+
+<span style="color: #009999;">#include &lt;atomic&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+    <span style="color: #007788; font-weight: bold;">int</span> val{<span style="color: #ff6600;">5</span>};
+    <span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&amp;</span> ref <span style="color: #555555;">=</span> val;                     <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    std<span style="color: #555555;">::</span>atomic<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> atomicRef(ref);
+    <span style="color: #555555;">++</span>atomicRef;                        <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"ref: "</span> <span style="color: #555555;">&lt;&lt;</span> ref <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"atomicRef.load(): "</span> <span style="color: #555555;">&lt;&lt;</span> atomicRef.load() <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}
+</pre>
+</div>
+<p></p>
+<p>The increment operation (1) does not address the reference<code> ref</code> (2). The value of <code>ref</code> is not changed.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/NewAndImprovedAtomics/atomicRefCopy.png" alt="atomicRefCopy" width="350" height="190" /></p>
+<p>&nbsp;</p>
+<p>Replacing the <code>std::atomic&lt;int&gt; counter{exp.counter}</code> with <code>std::atomic_ref&lt;int&gt; counter{exp.counter</code>} solves the issue:</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// atomicReference.cpp</span>
+
+<span style="color: #009999;">#include &lt;atomic&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;random&gt;</span>
+<span style="color: #009999;">#include &lt;thread&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">struct</span> ExpensiveToCopy {
+    <span style="color: #007788; font-weight: bold;">int</span> counter{};
+};
+ 
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">getRandom</span>(<span style="color: #007788; font-weight: bold;">int</span> begin, <span style="color: #007788; font-weight: bold;">int</span> end) {
+
+    std<span style="color: #555555;">::</span>random_device seed;        <span style="color: #0099ff; font-style: italic;">// initial randomness</span>
+    std<span style="color: #555555;">::</span>mt19937 engine(seed());    <span style="color: #0099ff; font-style: italic;">// generator</span>
+    std<span style="color: #555555;">::</span>uniform_int_distribution<span style="color: #555555;">&lt;&gt;</span> uniformDist(begin, end);
+
+    <span style="color: #006699; font-weight: bold;">return</span> uniformDist(engine);
+}
+ 
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">count</span>(ExpensiveToCopy<span style="color: #555555;">&amp;</span> exp) {
+    
+    std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span><span style="color: #555555;">&gt;</span> v;
+    std<span style="color: #555555;">::</span>atomic_ref<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> counter{exp.counter};
+    
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #007788; font-weight: bold;">int</span> n <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>; n <span style="color: #555555;">&lt;</span> <span style="color: #ff6600;">10</span>; <span style="color: #555555;">++</span>n) {
+        v.emplace_back([<span style="color: #555555;">&amp;</span>counter] {
+            <span style="color: #006699; font-weight: bold;">auto</span> randomNumber <span style="color: #555555;">=</span> getRandom(<span style="color: #ff6600;">100</span>, <span style="color: #ff6600;">200</span>);
+            <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #007788; font-weight: bold;">int</span> i <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>; i <span style="color: #555555;">&lt;</span> randomNumber; <span style="color: #555555;">++</span>i) { <span style="color: #555555;">++</span>counter; }
+        });
+    }
+    
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;</span> t <span style="color: #555555;">:</span> v) t.join();
+
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+    ExpensiveToCopy exp;
+    count(exp);
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"exp.counter: "</span> <span style="color: #555555;">&lt;&lt;</span> exp.counter <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Now, the value of <code>counter</code> is as expected:</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/NewAndImprovedAtomics/atomicRef.png" alt="atomicRef" width="200" height="173" /></p>
+<h3>To be Atomic or Not to be Atomic</h3>
+<p>You may ask me why I didn't make the counter atomic in the first place:</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">struct</span> ExpensiveToCopy {
+    std<span style="color: #555555;">::</span>atomic<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> counter{};
+};
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Of course, this is a valid approach, but this approach has a big downside. Each access of the counter is synchronized, and synchronization is not for free. On the contrary, using a s<code>td::atomic_ref&lt;int&gt; counter</code> lets you explicitly control when you need atomic access to the counter. Maybe, most of the time, you only want to read the value of the counter. Consequently, defining it as an atomic is pessimization.</p>
+<p>Let me conclude my post with a few more details to the class template&nbsp;<code>std::atomic_ref</code>.</p>
+<h2>Specializations of <code>std::atomic_ref</code></h2>
+<p>You can specialize <code>std::atomic_ref</code> for user-defined type, use partially specializations for pointer types or full specializations for arithmetic types such as integral or floating-point types.</p>
+<h3>Primary Template</h3>
+<p>The primary template <code>std::atomic_ref</code> can be instantiated with a <a href="https://en.cppreference.com/w/cpp/types/is_trivially_copyable">trivially copyable</a> type T. Trivially copyable types are either scalar types (arithmetic types, <code>enum'</code>s, pointers, member pointers, or <code>std::nullptr_t</code>'s), or trivially copyable classes and arrays of scalar types</p>
+<h3>Partial Specializations for Pointer Types</h3>
+<p>The standard provides partial specializations for a pointer type:<code> std::atomic_ref&lt;t*&gt;</code>.</p>
+<h3>Specializations for Arithmetic Types</h3>
+<p>The standard provides specialization for the integral and floating-point types: <code>std::atomic_ref&lt;arithmetic type&gt;</code>.</p>
+<ul>
+<li>Character types: <code>char, char8_t</code> (C++20), char16_t, char32_t, and <code>wchar_t</code></li>
+<li>Standard signed integer types: <code>signed char, short, int, long,</code> and long long</li>
+<li>Standard unsigned integer types: <code>unsigned char, unsigned short, unsigned int, unsigned long</code>, and <code>unsigned long long</code></li>
+<li>Additional integer types, defined in the header <code>&lt;cstdint&gt;</code></li>
+<li>Standard floating-point types: <code>float</code>, <code>double</code>, and<code> long double</code></li>
+</ul>
+<h2>All Atomic Operations</h2>
+<p>First, here is the list of all operations on <code>std::atomic_ref</code>.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/NewAndImprovedAtomics/atomicRefFunctions.PNG" alt="atomicRefFunctions" width="650" height="265" /></p>
+<p>The composite assignment operators (<code>+=, -=, |=, &amp;=</code>, or<code> ^=</code> ) return the new value; the <code>fetch</code> variations return the old value.&nbsp;The <code>compare_exchange_strong</code> and <code>compare_exchange_weak</code> perform an atomic <code>exchange</code> if equal and an atomic <code>load</code> if not. They return <code>true</code> in the success case, otherwise <code>false</code>. Each function supports an additional <a href="https://en.cppreference.com/w/cpp/atomic/memory_order">memory-ordering argument</a>. The default is sequential consistency.</p>
+<p>Of course, not all operations are available on all types referenced by <code>std::atomic_ref.</code> The table shows the list of all atomic operations depending on the type referenced by <code>std::atomic_ref</code>.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/NewAndImprovedAtomics/operationsAtomicRef.png" alt="operationsAtomicRef" width="650" height="289" /></p>
+<h2></h2>
+<p>When you study the last two tables carefully, you notice that you can use <code>std::atomic_ref</code> to synchronize threads.</p>
+<h2>What's next?</h2>
+<p><code>std::atomic</code> and <code>std::atomic_ref</code> support in C++20 member functions <code>notify_one</code>, <code>notify_all</code>, and <code>wait.</code> The three functions provide a convenient way to synchronize threads. In my next post, I will have a closer look at <code>std::atomic</code>&nbsp;and, in particular, the thread synchronisation with <code>std::atomic</code>'s&nbsp;</p>
+<p>{loadmoduleid 153}&nbsp;</p>
