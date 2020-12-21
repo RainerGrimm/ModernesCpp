@@ -1,0 +1,192 @@
+<p>Sender/receiver workflows are quite common for threads. In such a workflow, the receiver is waiting for the sender's notification before it continues to work. There are various ways to implement these workflows. With C++11, you can use condition variables or promise/future pairs; with C++20, you can use atomics.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/AtomicWait/TimelineCpp20CoreLanguage.png" alt="TimelineCpp20CoreLanguage" width="650" height="265" /></p>
+<p>There are various ways to synchronize threads. Each way has its pros and cons. Consequently,&nbsp; I want to compare them. I assume you don't know the details to condition variables or promise and futures. Therefore, I give a short refresher.</p>
+<h2>Condition Variables</h2>
+<p>A condition variable can fulfill the role of a sender or a receiver. As a sender, it can notify one or more receivers.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// threadSynchronisationConditionVariable.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;condition_variable&gt;</span>
+<span style="color: #009999;">#include &lt;mutex&gt;</span>
+<span style="color: #009999;">#include &lt;thread&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+
+std<span style="color: #555555;">::</span>mutex mutex_;
+std<span style="color: #555555;">::</span>condition_variable condVar;
+
+std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> myVec{};
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">prepareWork</span>() {                                       <span style="color: #0099ff; font-style: italic;">// (1)</span>
+
+    {
+        std<span style="color: #555555;">::</span>lock_guard<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span> lck(mutex_);
+        myVec.insert(myVec.end(), {<span style="color: #ff6600;">0</span>, <span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">0</span>, <span style="color: #ff6600;">3</span>});           <span style="color: #0099ff; font-style: italic;">// (3)</span>
+    }
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Sender: Data prepared."</span>  <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    condVar.notify_one();
+}
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">completeWork</span>() {                                       <span style="color: #0099ff; font-style: italic;">// (2)</span>
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Worker: Waiting for data."</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>unique_lock<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span> lck(mutex_);
+    condVar.wait(lck, [] { <span style="color: #006699; font-weight: bold;">return</span> not myVec.empty(); });
+    myVec[<span style="color: #ff6600;">2</span>] <span style="color: #555555;">=</span> <span style="color: #ff6600;">2</span>;                                           <span style="color: #0099ff; font-style: italic;">// (4)</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Waiter: Complete the work."</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> i<span style="color: #555555;">:</span> myVec) std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> i <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span>;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+    std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t1(prepareWork);
+    std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t2(completeWork);
+
+    t1.join();
+    t2.join();
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The program has two child threads:<span style="font-family: courier new, courier;"></span><code>t1</code> and <code>t2</code>. They get their payload <code>prepareWork</code> and <code>completeWork</code>&nbsp;in lines (1) and (3). The function <code>prepareWork</code> notifies that it is done with the preparation of the work: <code>condVar.notify_one()</code>. While holding the lock, the thread<code> t2</code> is waiting for its notification: <code>condVar.wait(lck, []{ return not myVec.empty(); })</code>. The waiting thread always performs the same steps. When it is waked up, it checks the predicate while holding the lock (<code>[]{ return not myVec.empty();</code>). If the predicate does not hold, it puts itself back to sleep. If the predicate holds,&nbsp; it continues with its work. In the concrete workflow, the sending thread puts the initial values into the <code>std::vector</code>(3),&nbsp; which the receiving thread completes (4).</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/AtomicWait/threadSynchronisationConditionVariable.png" alt="threadSynchronisationConditionVariable" width="500" height="579" /></p>
+<p>Condition variables have many inherent issues. For example, the receiver could be awakened without notification or could lose the notification. The first issue is known as spurious wakeup and the second as lost wakeup. The predicate protects against both flaws. The notification would be lost when the sender sends its notification before the receiver is in the wait state and does not use a predicate. Consequently, the receiver waits for something that never happens. This is a deadlock. When you study the output of the program, you see, that each second run would cause a deadlock if I would not use a predicate. Of course, it is possible to use condition variables without a predicate.</p>
+<p>If you want to know the details of the sender/receiver workflow and the traps of condition variables, read my previous posts "<a href="index.php/c-core-guidelines-be-aware-of-the-traps-of-condition-variables">C++ Core Guidelines: Be Aware of the Traps of Condition Variables</a>".</p>
+<p>When you only need a one-time notification such as in the previous program, promises and futures are a better choice than condition variables. Promise and futures cannot be victims of spurious or lost wakeups.</p>
+<h2>Promises and Futures</h2>
+<p>A promise can send a value, an exception, or a notification to its associated future. Let me use a promise and a future to refactor the previous workflow. Here is the same workflow using a promise/future pair.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// threadSynchronisationPromiseFuture.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;future&gt;</span>
+<span style="color: #009999;">#include &lt;thread&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+
+std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> myVec{};
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">prepareWork</span>(std<span style="color: #555555;">::</span>promise<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">void</span><span style="color: #555555;">&gt;</span> prom) {
+
+    myVec.insert(myVec.end(), {<span style="color: #ff6600;">0</span>, <span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">0</span>, <span style="color: #ff6600;">3</span>});
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Sender: Data prepared."</span>  <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    prom.set_value();                                     <span style="color: #0099ff; font-style: italic;">// (1)</span>
+
+}
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">completeWork</span>(std<span style="color: #555555;">::</span>future<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">void</span><span style="color: #555555;">&gt;</span> fut){
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Worker: Waiting for data."</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    fut.wait();<span style="color: #0099ff; font-style: italic;">                                           // (2)</span>
+    myVec[<span style="color: #ff6600;">2</span>] <span style="color: #555555;">=</span> <span style="color: #ff6600;">2</span>;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Waiter: Complete the work."</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> i<span style="color: #555555;">:</span> myVec) std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> i <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span>;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+    std<span style="color: #555555;">::</span>promise<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">void</span><span style="color: #555555;">&gt;</span> sendNotification;
+    <span style="color: #006699; font-weight: bold;">auto</span> waitForNotification <span style="color: #555555;">=</span> sendNotification.get_future();
+
+    std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t1(prepareWork, std<span style="color: #555555;">::</span>move(sendNotification));
+    std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t2(completeWork, std<span style="color: #555555;">::</span>move(waitForNotification));
+
+    t1.join();
+    t2.join();
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>When you study the workflow, you recognize, that the synchronization is reduced to its essential parts: <code>prom.set_value()</code> (1)&nbsp; and<code> fut.wait() (2). </code>There is neither a need to use locks or mutexes, nor is there a need to use a predicate to protect against spurious or lost wakeups. I skip the screen-shot to this run because it is essentially the same such in the case of the previous run with condition variables.</p>
+<p>There is only one downside to using promises and futures: they can only be used once. Here are my previous posts to <a href="index.php/tag/tasks">promises and futures</a>, often just called tasks.</p>
+<p>If you want to communicate more than once, you have to use condition variables or atomics.</p>
+<h2>std::atomic_flag</h2>
+<p><span style="font-family: courier new, courier;">std::atomic_flag</span>&nbsp;in C++11 has a simple interface. It's member function <span style="font-family: courier new, courier;">clear</span> enables you to set its value to <span style="font-family: courier new, courier;">false,</span> with <span style="font-family: courier new, courier;">test_and_set</span> to <span style="font-family: courier new, courier;">true. </span>In case you use <span style="font-family: courier new, courier;">test_and_set</span> you get the old value back. <code>ATOMIC_FLAG_INIT</code> enables it to initialize the <code>std::atomic_flag</code> to <code>false</code>. <span style="font-family: courier new, courier;">std::atomic_flag</span> has two very interesting properties.&nbsp;</p>
+<p><strong><span style="font-family: courier new, courier;">std::atomic_flag</span></strong> is</p>
+<ul>
+<li>the only lock-free atomic.</li>
+<li>the building block for higher thread abstractions.</li>
+</ul>
+<p>The remaining more powerful atomics can provide their functionality by using a mutex. That is according to the C++ standard. So these atomics have a member function&nbsp;<span style="font-family: courier new, courier;">is_lock_free</span>&nbsp;.On the popular platforms, I always get the answer <span style="font-family: courier new, courier;">false.</span> But you should be aware of that. Here are more details on the capabilities of <a href="index.php/the-atomic-flag"><code>std::atomic_flag</code></a> in C++11.</p>
+<p>Now, I jump directly from C++11 to C++20. With C++20,<code> std::atomic_flag</code> <code>atomicFlag</code> support new member functions:&nbsp;<code>atomicFlag.wait(</code>), <code>atomicFlag.notify_one()</code>, and <code>atomicFlag.notify_all()</code>. The member functions <code>notify_one</code>&nbsp;or <code>notify_all</code> notify one or all of the waiting atomic flags. <code>atomicFlag.wait(boo)</code> needs a boolean <code>boo</code>. The call <code>atomicFlag.wait(boo)</code> blocks until the next notification or spurious wakeup. It checks then if the value of <code>atomicFlag</code> is equal to <code>boo</code> and unblocks if not. The value <code>boo</code> serves as a kind of predicate.</p>
+<p>Additionally to C++11, default-construction of a <code>std::atomic_flag</code> sets it in its <code>false</code> state and you can ask for the value of the <code>std::atomic flag</code> via <code>atomicFlag.test()</code>. With this knowledge, it's quite easy to refactor to previous programs using a <code>std::atomic_flag</code>.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// threadSynchronisationAtomicFlag.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;atomic&gt;</span>
+<span style="color: #009999;">#include &lt;thread&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+
+std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> myVec{};
+
+std<span style="color: #555555;">::</span>atomic_flag atomicFlag{};
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">prepareWork</span>() {
+
+    myVec.insert(myVec.end(), {<span style="color: #ff6600;">0</span>, <span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">0</span>, <span style="color: #ff6600;">3</span>});
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Sender: Data prepared."</span>  <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    atomicFlag.test_and_set();                             <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    atomicFlag.notify_one();   
+
+}
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">completeWork</span>() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Worker: Waiting for data."</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    atomicFlag.wait(<span style="color: #336666;">false</span>);                                <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    myVec[<span style="color: #ff6600;">2</span>] <span style="color: #555555;">=</span> <span style="color: #ff6600;">2</span>;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Waiter: Complete the work."</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> i<span style="color: #555555;">:</span> myVec) std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> i <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span>;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+    std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t1(prepareWork);
+    std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t2(completeWork);
+
+    t1.join();
+    t2.join();
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  
+}</pre>
+</div>
+<p>&nbsp;</p>
+<p>The thread preparing the work (1) sets the <code>atomicFlag</code> to <code>true</code> and sends the notification. The thread completing the work waits for the notification. It is only unblocked if <code>atomicFlag</code> is equal to <code>true</code>.</p>
+<p>Here are a few runs of the program with the Microsoft Compiler.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/AtomicWait/threadSynchronisationAtomicFlag.png" alt="threadSynchronisationAtomicFlag" width="500" height="549" /></p>
+<p>I'm not sure if I would use a future/promise pair or a <code>std::atomic_flag</code> for such a simple thread synchronization workflow. Both are thread-safe by design and require no protection mechanism so far. Promise and promise are easier to use but <code>std::atomic_flag</code> is probably faster. I'm only sure that I would not use a condition variable if possible.</p>
+<h2>What's next?</h2>
+<p>When you create a more complicated thread synchronization workflow such as a ping/pong game, a promise/future pair is no option. You have to use condition variables or atomics for multiple synchronizations. In my next post, I implement a ping/pong game using condition variables and a <code>std::atomic_flag</code> and measure their performance.</p>
+<h2>Short Break</h2>
+<p>I make a short Christmas break and publish the next post on the 11.th of January. In case you want to know more about C++20, read my new book at <a href="https://leanpub.com/c20">Leanpub to C++20</a>.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>{loadmoduleid 153}</p>
+<p></p>
