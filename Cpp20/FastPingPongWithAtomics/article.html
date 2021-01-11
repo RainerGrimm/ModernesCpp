@@ -1,0 +1,270 @@
+<p>After the introduction to <code>std::atomic_flag</code> in my last post Synchronisation with Atomics in C++20, I want to dive deeper. Today, I create a ping-pong game using condition variables,<code> std::atomic_flag</code>, and <code>std::atomic&lt;bool&gt;</code>. Let's play.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/PerformanceComparisonConditionVariablesAtomics/TimelineCpp20CoreLanguage.png" alt="TimelineCpp20CoreLanguage" width="650" height="265" /></p>
+<p>The key question I want to answer in this post is the following: What is the fastest way to synchronize threads in C++20? I use in this post three different data types: <code>std::condition_variable</code>, <code>std::atomic_flag</code>, and <code>std::atomic&lt;bool&gt;</code>.</p>
+<p>To get comparable numbers, I implement a ping-pong game. One thread executes a <code>ping</code> function and the other thread a <code>pong</code> function. For simplicity reasons, I call the thread executing the <code>ping</code> function the ping thread and the other thread the pong thread. The ping thread waits for the notification of the pong threads and sends the notification back to the pong thread. The game stops after 1,000,000 ball changes. I perform each game five times to get comparable performance numbers.</p>
+<p>I made my performance test with the brand new Visual Studio compiler because it already supports synchronization with atomics. Additionally, I compiled the examples with maximum optimization (<code>/Ox</code>).</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/PerformanceComparisonConditionVariablesAtomics/windowsCompiler.png" alt="windowsCompiler" width="500" height="139" /></p>
+<p>Let me start with the C++11.</p>
+<h2>Condition Variables</h2>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// pingPongConditionVariable.cpp</span>
+
+<span style="color: #009999;">#include &lt;condition_variable&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;atomic&gt;</span>
+<span style="color: #009999;">#include &lt;thread&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">bool</span> dataReady{<span style="color: #336666;">false</span>};
+
+std<span style="color: #555555;">::</span>mutex mutex_;
+std<span style="color: #555555;">::</span>condition_variable condVar1;          <span style="color: #0099ff; font-style: italic;">// (1)</span>
+std<span style="color: #555555;">::</span>condition_variable condVar2;         <span style="color: #0099ff; font-style: italic;"> // (2)</span>
+
+std<span style="color: #555555;">::</span>atomic<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> counter{};
+constexpr <span style="color: #007788; font-weight: bold;">int</span> countlimit <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span><span style="color: #aa0000; background-color: #ffaaaa;">'</span><span style="color: #ff6600;">000</span><span style="color: #aa0000; background-color: #ffaaaa;">'</span><span style="color: #ff6600;">000</span>;
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">ping</span>() {
+
+    <span style="color: #006699; font-weight: bold;">while</span>(counter <span style="color: #555555;">&lt;=</span> countlimit) {
+        {
+            std<span style="color: #555555;">::</span>unique_lock<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span> lck(mutex_);
+            condVar1.wait(lck, []{<span style="color: #006699; font-weight: bold;">return</span> dataReady <span style="color: #555555;">==</span> <span style="color: #336666;">false</span>;});
+            dataReady <span style="color: #555555;">=</span> <span style="color: #336666;">true</span>;
+        }
+        <span style="color: #555555;">++</span>counter;                         <span style="color: #0099ff; font-style: italic;"> </span>
+        condVar2.notify_one();              <span style="color: #0099ff; font-style: italic;">// (3)</span>
+  }
+}
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">pong</span>() {
+
+    <span style="color: #006699; font-weight: bold;">while</span>(counter <span style="color: #555555;">&lt;</span> countlimit) {  
+        {
+            std<span style="color: #555555;">::</span>unique_lock<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span> lck(mutex_);
+            condVar2.wait(lck, []{<span style="color: #006699; font-weight: bold;">return</span> dataReady <span style="color: #555555;">==</span> <span style="color: #336666;">true</span>;});
+            dataReady <span style="color: #555555;">=</span> <span style="color: #336666;">false</span>;
+        }
+        condVar1.notify_one();           <span style="color: #0099ff; font-style: italic;"> // (3)</span>
+  }
+
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+
+    <span style="color: #006699; font-weight: bold;">auto</span> start <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>system_clock<span style="color: #555555;">::</span>now();  
+
+    std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t1(ping);
+    std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t2(pong);
+
+    t1.join();
+    t2.join();
+  
+    std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>duration<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">double</span><span style="color: #555555;">&gt;</span> dur <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>system_clock<span style="color: #555555;">::</span>now() <span style="color: #555555;">-</span> start;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Duration: "</span> <span style="color: #555555;">&lt;&lt;</span> dur.count() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" seconds"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>I use two condition variables in the program: <code>condVar1</code> and <code>condVar2 </code>(line 1 and 2). The ping thread wait for the notification of <code>condVar1</code> and sends its notification with <code>condVar2</code>. <code>dataReady</code> protects against spurious and lost wakeups (see "<a href="index.php/c-core-guidelines-be-aware-of-the-traps-of-condition-variables">C++ Core Guidelines: Be Aware of the Traps of Condition Variables</a>"). The ping-pong game ends when <code>counter</code> reaches the <code>countlimit</code>. The <code>nofication_one</code> calls (lines 3) and the counter are thread-safe and are, therefore, outside the critical region.</p>
+<p>Here are the numbers:</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/PerformanceComparisonConditionVariablesAtomics/pingPongConditionVariable.png" alt="pingPongConditionVariable" width="400" height="294" /></p>
+<p>The average execution time is 0.52 seconds.</p>
+<p>Porting this play to <code>std::atomic_flags</code>'s in C++20 is straightforward.</p>
+<h2><code>std::atomic_flag</code></h2>
+<p>Here is the play using two atomic flags.</p>
+<h3>Two Atomic Flags</h3>
+<p>In the following program, I replace the waiting on the condition variable with the waiting on the atomic flag and the notification of the condition variable with the setting of the atomic flag followed by the notification.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// pingPongAtomicFlags.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;atomic&gt;</span>
+<span style="color: #009999;">#include &lt;thread&gt;</span>
+
+std<span style="color: #555555;">::</span>atomic_flag condAtomicFlag1{};
+std<span style="color: #555555;">::</span>atomic_flag condAtomicFlag2{};
+
+std<span style="color: #555555;">::</span>atomic<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> counter{};
+constexpr <span style="color: #007788; font-weight: bold;">int</span> countlimit <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span><span style="color: #aa0000; background-color: #ffaaaa;">'</span><span style="color: #ff6600;">000</span><span style="color: #aa0000; background-color: #ffaaaa;">'</span><span style="color: #ff6600;">000</span>;
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">ping</span>() {
+    <span style="color: #006699; font-weight: bold;">while</span>(counter <span style="color: #555555;">&lt;=</span> countlimit) {
+        condAtomicFlag1.wait(<span style="color: #336666;">false</span>);               <span style="color: #0099ff; font-style: italic;">// (1)</span>
+        condAtomicFlag1.clear();                   <span style="color: #0099ff; font-style: italic;">// (2)</span>
+
+        <span style="color: #555555;">++</span>counter;
+        
+        condAtomicFlag2.test_and_set();           <span style="color: #0099ff; font-style: italic;">// (4)</span>
+        condAtomicFlag2.notify_one();             <span style="color: #0099ff; font-style: italic;">// (3)</span>
+    }
+}
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">pong</span>() {
+    <span style="color: #006699; font-weight: bold;">while</span>(counter <span style="color: #555555;">&lt;</span> countlimit) {
+        condAtomicFlag2.wait(<span style="color: #336666;">false</span>);
+        condAtomicFlag2.clear();
+        
+        condAtomicFlag1.test_and_set();
+        condAtomicFlag1.notify_one();
+    }
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+     <span style="color: #006699; font-weight: bold;">auto</span> start <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>system_clock<span style="color: #555555;">::</span>now();  
+
+    condAtomicFlag1.test_and_set();                    <span style="color: #0099ff; font-style: italic;">// (5)</span>
+    std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t1(ping);
+    std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t2(pong);
+
+    t1.join();
+    t2.join();
+
+    std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>duration<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">double</span><span style="color: #555555;">&gt;</span> dur <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>system_clock<span style="color: #555555;">::</span>now() <span style="color: #555555;">-</span> start;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Duration: "</span> <span style="color: #555555;">&lt;&lt;</span> dur.count() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" seconds"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>A call <code>condAtomicFlag1.wait(false)</code> (1) blocks, if the value of the atomic flag is <code>false</code>. On the contrary, it returns if <code>condAtomicFlag1</code> has the value <code>true</code>. The boolean value serves as a kind of predicate and must, therefore, set back to <code>false</code> (2). Before the notification (3) is sent to the pong thread,&nbsp;<code>condAtomicFlag1</code> is set to <code>true </code>(4). The initial setting of<code> condAtomicFlag1</code> to <code>true</code> (5) starts the game. <span style="color: #0099ff; font-style: italic;"></span></p>
+<p>Thanks to <code>std::atomic_flag</code> the game ends earlier.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/PerformanceComparisonConditionVariablesAtomics/pingPongAtomicFlags.png" alt="pingPongAtomicFlags" width="400" height="310" /></p>
+<p>On average, a game takes 0.32 seconds.</p>
+<p>When you analyze the program, you may recognize, that one atomics flag is sufficient for the play.</p>
+<h3>One Atomic Flag</h3>
+<p>Using one atomic flag makes the play easier to understand.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// pingPongAtomicFlag.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;atomic&gt;</span>
+<span style="color: #009999;">#include &lt;thread&gt;</span>
+
+std<span style="color: #555555;">::</span>atomic_flag condAtomicFlag{};
+
+std<span style="color: #555555;">::</span>atomic<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> counter{};
+constexpr <span style="color: #007788; font-weight: bold;">int</span> countlimit <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span><span style="color: #aa0000; background-color: #ffaaaa;">'</span><span style="color: #ff6600;">000</span><span style="color: #aa0000; background-color: #ffaaaa;">'</span><span style="color: #ff6600;">000</span>;
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">ping</span>() {
+    <span style="color: #006699; font-weight: bold;">while</span>(counter <span style="color: #555555;">&lt;=</span> countlimit) {
+        condAtomicFlag.wait(<span style="color: #336666;">true</span>);
+        condAtomicFlag.test_and_set();
+        
+        <span style="color: #555555;">++</span>counter;
+        
+        condAtomicFlag.notify_one();
+    }
+}
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">pong</span>() {
+    <span style="color: #006699; font-weight: bold;">while</span>(counter <span style="color: #555555;">&lt;</span> countlimit) {
+        condAtomicFlag.wait(<span style="color: #336666;">false</span>);
+        condAtomicFlag.clear();
+        condAtomicFlag.notify_one();
+    }
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+     <span style="color: #006699; font-weight: bold;">auto</span> start <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>system_clock<span style="color: #555555;">::</span>now();  
+
+    
+    condAtomicFlag.test_and_set();
+    std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t1(ping);
+    std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t2(pong);
+
+    t1.join();
+    t2.join();
+
+    std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>duration<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">double</span><span style="color: #555555;">&gt;</span> dur <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>system_clock<span style="color: #555555;">::</span>now() <span style="color: #555555;">-</span> start;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Duration: "</span> <span style="color: #555555;">&lt;&lt;</span> dur.count() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" seconds"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>In this case, the ping thread blocks on <code>true</code> but the pong thread blocks on <code>false</code>. From the performance perspective, using one or two atomic flags makes no difference.</p>
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/PerformanceComparisonConditionVariablesAtomics/pingPongAtomicFlag.png" alt="pingPongAtomicFlag" width="400" height="309" /></p>
+<p>The average execution time is 0.31 seconds.</p>
+<p>&nbsp;I used in this example <code>std::atomic_flag</code> such as an atomic boolean. Let's give it another try with<code> std::atomic&lt;bool&gt;</code>.</p>
+<h2><code>std::atomic&lt;bool&gt;</code></h2>
+<p>From the readability perspective, I prefer the following C++20 implementation based on <code>std::atomic&lt;bool&gt;.</code></p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// pingPongAtomicBool.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;atomic&gt;</span>
+<span style="color: #009999;">#include &lt;thread&gt;</span>
+
+std<span style="color: #555555;">::</span>atomic<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">bool</span><span style="color: #555555;">&gt;</span> atomicBool{};
+
+std<span style="color: #555555;">::</span>atomic<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> counter{};
+constexpr <span style="color: #007788; font-weight: bold;">int</span> countlimit <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span><span style="color: #aa0000; background-color: #ffaaaa;">'</span><span style="color: #ff6600;">000</span><span style="color: #aa0000; background-color: #ffaaaa;">'</span><span style="color: #ff6600;">000</span>;
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">ping</span>() {
+    <span style="color: #006699; font-weight: bold;">while</span>(counter <span style="color: #555555;">&lt;=</span> countlimit) {
+        atomicBool.wait(<span style="color: #336666;">true</span>);
+        atomicBool.store(<span style="color: #336666;">true</span>);
+
+        <span style="color: #555555;">++</span>counter;
+        
+        atomicBool.notify_one();
+    }
+}
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">pong</span>() {
+    <span style="color: #006699; font-weight: bold;">while</span>(counter <span style="color: #555555;">&lt;</span> countlimit) {
+        atomicBool.wait(<span style="color: #336666;">false</span>);
+        atomicBool.store(<span style="color: #336666;">false</span>);
+        atomicBool.notify_one();
+    }
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>boolalpha <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"atomicBool.is_lock_free(): "</span>              <span style="color: #0099ff; font-style: italic;">// (1)</span>
+              <span style="color: #555555;">&lt;&lt;</span> atomicBool.is_lock_free()  <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl; 
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+    <span style="color: #006699; font-weight: bold;">auto</span> start <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>system_clock<span style="color: #555555;">::</span>now();
+
+    atomicBool.store(<span style="color: #336666;">true</span>);
+    std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t1(ping);
+    std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t2(pong);
+
+    t1.join();
+    t2.join();
+
+    std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>duration<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">double</span><span style="color: #555555;">&gt;</span> dur <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>system_clock<span style="color: #555555;">::</span>now() <span style="color: #555555;">-</span> start;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Duration: "</span> <span style="color: #555555;">&lt;&lt;</span> dur.count() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" seconds"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}
+</pre>
+</div>
+<p></p>
+<p><code>std::atomic&lt;bool&gt;</code> can internally use a locking mechanism such as a mutex. As I assumed it, my Windows runtime is lock-free (1).</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/PerformanceComparisonConditionVariablesAtomics/pingPongAtomicBool.png" alt="pingPongAtomicBool" width="400" height="539" /></p>
+<p>On average, the execution time is 0.38 seconds.</p>
+<h2>All Numbers</h2>
+<p>As expected, condition variables are the slowest way, and atomic flag the fastest way to synchronize threads. The performance of a<code> std::atomic&lt;bool&gt;</code> is in-between. But there is one downside with <code>std:.atomic&lt;bool&gt;. std::atomic_flag i</code>s the only atomic data type which is lock-free.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/PerformanceComparisonConditionVariablesAtomics/PerformanceComparison.png" alt="PerformanceComparison" width="500" height="51" /></p>
+<h2>What's next?</h2>
+<p>With C++20, we have a few new mechanisms for thread coordination. In my next post, I will take a deeper view into latches, barriers, and semaphores. They also allow it to play Ping-Pong.</p>
+<p>&nbsp;</p>
+<p>{loadmoduleid 153}</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
