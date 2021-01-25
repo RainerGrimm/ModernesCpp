@@ -1,0 +1,219 @@
+<p>Latches and barriers are coordination types that enable some threads to wait until a counter becomes zero. You can use a <code>std::latch</code> only once, but you can use a <code>std::barrier</code> more than once. Today, I have a closer look at latches.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/LatchesAndBarriers/TimelineCpp20.png" alt="TimelineCpp20" width="650" height="224" /></p>
+<p>Concurrent invocations of the member functions of a <code>std::latch</code> or a <code>std::barrier</code> are no data race. A data race is such a crucial term in concurrency that I want to write more words to it.</p>
+<h2>Data Race</h2>
+<p>A data race is a situation, in which at least two threads access a shared variable at the same time and at least one thread tries to modify the variable. If your program has a data race, it has undefined behavior. This means all outcomes are possible and therefore, reasoning about the program makes no sense anymore.</p>
+<p>Let me show you a program with a data race.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// addMoney.cpp</span>
+
+<span style="color: #009999;">#include &lt;functional&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;thread&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">struct</span> Account{
+  <span style="color: #007788; font-weight: bold;">int</span> balance{<span style="color: #ff6600;">100</span>};                                                 <span style="color: #0099ff; font-style: italic;">// (3)</span>               
+};
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">addMoney</span>(Account<span style="color: #555555;">&amp;</span> to, <span style="color: #007788; font-weight: bold;">int</span> amount){                             <span style="color: #0099ff; font-style: italic;">// (2)</span> 
+  to.balance <span style="color: #555555;">+=</span> amount;                                             <span style="color: #0099ff; font-style: italic;">// (1)</span>       
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+  Account account;
+  
+  std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span><span style="color: #555555;">&gt;</span> vecThreads(<span style="color: #ff6600;">100</span>);
+                                           
+  <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;</span> thr<span style="color: #555555;">:</span> vecThreads) thr <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span>(addMoney, std<span style="color: #555555;">::</span>ref(account), <span style="color: #ff6600;">50</span>); <span style="color: #0099ff; font-style: italic;"></span>
+  
+  <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;</span> thr<span style="color: #555555;">:</span> vecThreads) thr.join();
+                                                 
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"account.balance: "</span> <span style="color: #555555;">&lt;&lt;</span> account.balance <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;     <span style="color: #0099ff; font-style: italic;">// (4)</span>
+  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>100 threads adding 50 euros to the same account (1) using the function <code>addMoney</code> (2). The initial account is 100 (3). The crucial observation is that the writing to the account is done without synchronization. Therefore&nbsp;we have a data race and, consequently, undefined behavior. The final balance is between 5000 and 5100 euro (4).</p>
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/LatchesAndBarriers/addMoney.png" alt="addMoney" /></p>
+<p>What is happening? Why are a few additions missing? The update process <code>to.balance <span style="color: #555555;">+=</span> amount; </code>in line (1) is a so-called read-modify-write operation. As such, first, the old value of <code>to.balance</code> is read, then it is updated, and finally is written. What may happen under the hood is the following. I use numbers to make my argumentation more obvious</p>
+<ul>
+<li>Thread A reads the value 500 euro and then Thread B kicks in.</li>
+<li>Thread B read also the value 500 euro, adds 50 euro to it, and updates <code>to.balance</code> to 550 euro.</li>
+<li>Now Thread A finished its execution by adding 50 euro to <code>to.balance</code> and also writes 550 euro.</li>
+<li>Essential the value 550 euro is written twice and instead of two additions of 50 euro, we only observe one.</li>
+<li>This means, that one modification is lost and we get the wrong final sum.</li>
+</ul>
+<p>First, there are two questions to answer before I present <code>std::latch</code> and <code>std::barrier</code> in detail.</p>
+<h2>Two Questions<code><br /></code></h2>
+<ol>
+<li><strong>What is the difference between these two mechanisms to coordinate threads?</strong> You can use a <code>std::latch</code> only once, but you can use a <code>std::barrier</code> more than once. A <code>std::latch</code> is useful for managing one task by multiple threads; a<code> std::barrier</code> is helpful for managing repeated tasks by multiple threads. Additionally, a <code>std::barrier</code> enables you to execute a function in the so-called completion step. The completion step is the state when the counter becomes zero.</li>
+<li><strong>What use cases do latches and barriers support that cannot be done in C++11 with futures, threads, or condition variables combined with locks?</strong> Latches and barriers address no new use cases, but they are a lot easier to use. They are also more performant because they often use a&nbsp;<a href="https://en.wikipedia.org/wiki/Non-blocking_algorithm">lock-free </a>mechanism internally.</li>
+</ol>
+<p>Let me continue my post with the simpler data type of both.</p>
+<h2><code>std::latch</code></h2>
+<p>Now, let us have a closer look at the interface of a <code>std::latch</code>.</p>
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/LatchesAndBarriers/memberFunctionsLatch.png" alt="memberFunctionsLatch" width="600" height="161" /></p>
+<p>The default value for <code>upd</code> is <code>1</code>. When <code>upd</code> is greater than the counter or negative, the behavior is undefined. The call <code>lat.try_wait()</code> does never wait as its name suggests.</p>
+<p>The following program <code>bossWorkers.cpp</code> uses two <code>std::latch</code> to build a boss-workers workflow. I synchronized the output to <code>std::cout</code> using the function <code>synchronizedOut</code> (1). This synchronization makes it easier to follow the workflow.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// bossWorkers.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;mutex&gt;</span>
+<span style="color: #009999;">#include &lt;latch&gt;</span>
+<span style="color: #009999;">#include &lt;thread&gt;</span>
+
+std<span style="color: #555555;">::</span>latch workDone(<span style="color: #ff6600;">6</span>);
+std<span style="color: #555555;">::</span>latch goHome(<span style="color: #ff6600;">1</span>);                                       <span style="color: #0099ff; font-style: italic;">// (4)</span>
+
+std<span style="color: #555555;">::</span>mutex coutMutex;
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">synchronizedOut</span>(<span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span>string s) {                <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    std<span style="color: #555555;">::</span>lock_guard<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span> lo(coutMutex);
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> s;
+}
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Worker</span> {
+ <span style="color: #9999ff;">public:</span>
+     Worker(std<span style="color: #555555;">::</span>string n)<span style="color: #555555;">:</span> name(n) { };
+  
+      <span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">operator</span>() (){
+          <span style="color: #0099ff; font-style: italic;">// notify the boss when work is done</span>
+          synchronizedOut(name <span style="color: #555555;">+</span> <span style="color: #cc3300;">": "</span> <span style="color: #555555;">+</span> <span style="color: #cc3300;">"Work done!</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>);
+          workDone.count_down();                          <span style="color: #0099ff; font-style: italic;">// (2)</span>
+
+          <span style="color: #0099ff; font-style: italic;">// waiting before going home</span>
+          goHome.wait();                                  <span style="color: #0099ff; font-style: italic;">// (5)</span>
+          synchronizedOut(name <span style="color: #555555;">+</span> <span style="color: #cc3300;">": "</span> <span style="color: #555555;">+</span> <span style="color: #cc3300;">"Good bye!</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>);
+      }
+ <span style="color: #9999ff;">private:</span>
+    std<span style="color: #555555;">::</span>string name;
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"BOSS: START WORKING! "</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  
+    Worker herb(<span style="color: #cc3300;">"  Herb"</span>);
+    std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> herbWork(herb);
+  
+    Worker scott(<span style="color: #cc3300;">"    Scott"</span>);
+    std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> scottWork(scott);
+  
+    Worker bjarne(<span style="color: #cc3300;">"      Bjarne"</span>);
+    std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> bjarneWork(bjarne);
+  
+    Worker andrei(<span style="color: #cc3300;">"        Andrei"</span>);
+    std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> andreiWork(andrei);
+  
+    Worker andrew(<span style="color: #cc3300;">"          Andrew"</span>);
+    std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> andrewWork(andrew);
+  
+    Worker david(<span style="color: #cc3300;">"            David"</span>);
+    std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> davidWork(david);
+    
+    workDone.wait();                                       <span style="color: #0099ff; font-style: italic;">// (3)</span>
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    goHome.count_down();
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"BOSS: GO HOME!"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    herbWork.join();
+    scottWork.join();
+    bjarneWork.join();
+    andreiWork.join();
+    andrewWork.join();
+    davidWork.join();
+  
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The idea of the workflow is straightforward. The six workers <code>herb</code>, <code>scott</code>, <code>bjarne</code>, <code>andrei</code>, <code>andrew</code>, and <code>david</code> in the <code>main</code>-program have to fulfill their job. When they finished their job, they count down the <code>std::latch workDone</code> (2). The boss (<code>main</code>-thread) is blocked in line (3) until the counter becomes 0. When the counter is 0, the boss uses the second <code>std::latch goHome</code> to signal its workers to go home. In this case, the initial counter is <code>1</code> (4). The call g<code>oHome.wait</code> (5) blocks until the counter becomes 0.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/LatchesAndBarriers/bossWorkers.png" alt="bossWorkers" width="300" height="314" /></p>
+<p>When you think about this workflow, you may notice that it can be performed without a boss. Here is the modern variant:</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// workers.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;latch&gt;</span>
+<span style="color: #009999;">#include &lt;mutex&gt;</span>
+<span style="color: #009999;">#include &lt;thread&gt;</span>
+
+std<span style="color: #555555;">::</span>latch workDone(<span style="color: #ff6600;">6</span>);
+std<span style="color: #555555;">::</span>mutex coutMutex;
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">synchronizedOut</span>(<span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span>string<span style="color: #555555;">&amp;</span> s) {
+    std<span style="color: #555555;">::</span>lock_guard<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span> lo(coutMutex);
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> s;
+}
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Worker</span> {
+ <span style="color: #9999ff;">public:</span>
+    Worker(std<span style="color: #555555;">::</span>string n)<span style="color: #555555;">:</span> name(n) { };
+  
+    <span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">operator</span>() () {
+        synchronizedOut(name <span style="color: #555555;">+</span> <span style="color: #cc3300;">": "</span> <span style="color: #555555;">+</span> <span style="color: #cc3300;">"Work done!</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>);
+        workDone.arrive_and_wait();  <span style="color: #0099ff; font-style: italic;">// wait until all work is done  (1)</span>
+        synchronizedOut(name <span style="color: #555555;">+</span> <span style="color: #cc3300;">": "</span> <span style="color: #555555;">+</span> <span style="color: #cc3300;">"See you tomorrow!</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>);
+    }
+ <span style="color: #9999ff;">private:</span>
+    std<span style="color: #555555;">::</span>string name;
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    Worker herb(<span style="color: #cc3300;">"  Herb"</span>);
+    std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> herbWork(herb);
+  
+    Worker scott(<span style="color: #cc3300;">"    Scott"</span>);
+    std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> scottWork(scott);
+  
+    Worker bjarne(<span style="color: #cc3300;">"      Bjarne"</span>);
+    std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> bjarneWork(bjarne);
+  
+    Worker andrei(<span style="color: #cc3300;">"        Andrei"</span>);
+    std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> andreiWork(andrei);
+  
+    Worker andrew(<span style="color: #cc3300;">"          Andrew"</span>);
+    std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> andrewWork(andrew);
+  
+    Worker david(<span style="color: #cc3300;">"            David"</span>);
+    std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> davidWork(david);
+
+    herbWork.join();
+    scottWork.join();
+    bjarneWork.join();
+    andreiWork.join();
+    andrewWork.join();
+    davidWork.join();
+  
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>There is not much to add to this simplified workflow. The call <code>workDone.arrive_and_wait(1)</code> (1) is equivalent to the calls <code>count_down(upd); wait();</code>. This means the workers coordinate themself and the boss is no longer necessary such as in the previous program <code>bossWorkers.cpp</code>.</p>
+<h2><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/LatchesAndBarriers/workers.png" alt="workers" /></h2>
+<h2>What's next?</h2>
+<p>A <code>std::barrier i</code>s quite similar to a <code>std::latch</code>. <code>std::barrier</code>'s strength is it to perform a job more than once. In my next post, I will have a closer look at barriers.</p>
+<p>{loadmoduleid 153}</p>
+<p>&nbsp;</p>
