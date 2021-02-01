@@ -1,0 +1,116 @@
+<p>In my last post, I introduced latches in C++20. A latch enables it threads to wait until a counter becomes zero. Additionally to a latch, its big sibling barrier can be used more than once. Today, I write about barriers and present atomic smart pointers.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/Barrier/TimelineCpp20.png" alt="TimelineCpp20" width="650" height="224" /></p>
+<p>If you are not familiar with std::latch, read my last post: <a href="https://bit.ly/39eH23G">Latches in C++20</a>.</p>
+<h2><code>std::barrier</code></h2>
+<p>There are two differences between a <code>std::latch</code> and a <code>std::barrier</code>. A <code>std::latch</code> is useful for managing one task by multiple threads; a<code> std::barrier</code> is helpful for managing repeated tasks by multiple threads.&nbsp;Additionally, a <code>std::barrier</code> enables you to execute a function in the so-called completion step. The completion step is the state when the counter becomes zero. Immediately after the counter becomes zero, the so-called completion step starts. In this completion step, a callable is invoked. The <code>std::barrier</code> gets its callable in its constructor. A callable unit (short callable) is something that behaves like a function. Not only are these named functions, but also function objects or lambda expressions.</p>
+<p>The completion step performs the following steps:</p>
+<ol>
+<li>All threads are blocked.</li>
+<li>An arbitrary thread is unblocked and executes the callable.</li>
+<li>If the completion step is done, all threads are unblocked.</li>
+</ol>
+<p>The following table presents you the interface of a <code>std::barrier bar.</code></p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/Barrier/barrier.png" alt="barrier" width="650" height="222" /></p>
+<p>&nbsp;</p>
+<p>The<code> call bar.arrive_and_drop()</code> call means essentially, that the counter is decremented by one for the next phase. The following program<code> fullTimePartTimeWorkers.cpp</code> halves the number of workers in the second phase.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// fullTimePartTimeWorkers.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;barrier&gt;</span>
+<span style="color: #009999;">#include &lt;mutex&gt;</span>
+<span style="color: #009999;">#include &lt;string&gt;</span>
+<span style="color: #009999;">#include &lt;thread&gt;</span>
+
+std<span style="color: #555555;">::</span>barrier workDone(<span style="color: #ff6600;">6</span>);
+std<span style="color: #555555;">::</span>mutex coutMutex;
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">synchronizedOut</span>(<span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span>string<span style="color: #555555;">&amp;</span> s) noexcept {
+    std<span style="color: #555555;">::</span>lock_guard<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span> lo(coutMutex);
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> s;
+}
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">FullTimeWorker</span> {                                                   <span style="color: #0099ff; font-style: italic;">// (1)</span>
+ <span style="color: #9999ff;">public:</span>
+    FullTimeWorker(std<span style="color: #555555;">::</span>string n)<span style="color: #555555;">:</span> name(n) { };
+  
+    <span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">operator</span>() () {
+        synchronizedOut(name <span style="color: #555555;">+</span> <span style="color: #cc3300;">": "</span> <span style="color: #555555;">+</span> <span style="color: #cc3300;">"Morning work done!</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>);
+        workDone.arrive_and_wait();  <span style="color: #0099ff; font-style: italic;">// Wait until morning work is done     (3)</span>
+        synchronizedOut(name <span style="color: #555555;">+</span> <span style="color: #cc3300;">": "</span> <span style="color: #555555;">+</span> <span style="color: #cc3300;">"Afternoon work done!</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>);
+        workDone.arrive_and_wait();  <span style="color: #0099ff; font-style: italic;">// Wait until afternoon work is done   (4)</span>
+        
+    }
+ <span style="color: #9999ff;">private:</span>
+    std<span style="color: #555555;">::</span>string name;
+};
+  
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">PartTimeWorker</span> {                                                   <span style="color: #0099ff; font-style: italic;">// (2)</span>
+ <span style="color: #9999ff;">public:</span>
+    PartTimeWorker(std<span style="color: #555555;">::</span>string n)<span style="color: #555555;">:</span> name(n) { };
+  
+    <span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">operator</span>() () {
+        synchronizedOut(name <span style="color: #555555;">+</span> <span style="color: #cc3300;">": "</span> <span style="color: #555555;">+</span> <span style="color: #cc3300;">"Morning work done!</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>);
+        workDone.arrive_and_drop();  <span style="color: #0099ff; font-style: italic;">// Wait until morning work is done  // (5)</span>
+    }
+ <span style="color: #9999ff;">private:</span>
+    std<span style="color: #555555;">::</span>string name;
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    FullTimeWorker herb(<span style="color: #cc3300;">"  Herb"</span>);
+    std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> herbWork(herb);
+  
+    FullTimeWorker scott(<span style="color: #cc3300;">"    Scott"</span>);
+    std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> scottWork(scott);
+  
+    FullTimeWorker bjarne(<span style="color: #cc3300;">"      Bjarne"</span>);
+    std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> bjarneWork(bjarne);
+  
+    PartTimeWorker andrei(<span style="color: #cc3300;">"        Andrei"</span>);
+    std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> andreiWork(andrei);
+  
+    PartTimeWorker andrew(<span style="color: #cc3300;">"          Andrew"</span>);
+    std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> andrewWork(andrew);
+  
+    PartTimeWorker david(<span style="color: #cc3300;">"            David"</span>);
+    std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> davidWork(david);
+
+    herbWork.join();
+    scottWork.join();
+    bjarneWork.join();
+    andreiWork.join();
+    andrewWork.join();
+    davidWork.join();
+  
+}
+</pre>
+</div>
+<p></p>
+<p>This workflow consists of two kinds of workers: full-time workers (1) and part-time workers (2). The part-time worker work in the morning, the full-time worker in the morning and the afternoon. Consequently, the full time workers call<code> workDone.arrive_and_wait()</code> (lines (3) and (4)) two times. On the contrary, the part-time works call <code>workDone.arrive_and_drop()</code> (5) only once. This <code>workDone.arrive_and_drop()</code> call causes the part-time worker to skip the afternoon work. Accordingly, the counter has in the first phase (morning) the value 6, and in the second phase (afternoon) the value 3.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/Barrier/fullTimePartTimeWorkers.png" alt="fullTimePartTimeWorkers" width="500" height="328" /></p>
+<p>Now to something, I missed in my posts to atomics.</p>
+<h2>Atomic Smart Pointers</h2>
+<p>A <code>std::shared_ptr</code> consists of a control block and its resource. The control block is thread-safe, but access to the resource is not. This means modifying the reference counter is an atomic operation and you have the guarantee that the resource is deleted exactly once. These are the guarantees <code>std::shared_ptr</code> gives you.</p>
+<p>On the contrary, it is crucial that a <code>std::shared_ptr</code> has well-defined multithreading semantics. At first glance, the use of a <code>std::shared_ptr</code> does not appear to be a sensible choice for multithreaded code. It is by definition shared and mutable and is the ideal candidate for non-synchronized read and write operations and hence for undefined behavior. On the other hand, there is the guideline in modern C++: <strong>Don't use raw pointers</strong>. This means, consequently, that you should use smart pointers in multithreading programs when you want to model shared ownership.</p>
+<p>The proposal <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2014/n4162">N4162</a> for atomic smart pointers directly addresses the deficiencies of the current implementation. The deficiencies boil down to these three points: consistency, correctness, and performance.</p>
+<ul>
+<li><strong>Consistency</strong>: the atomic operations for <code>std::shared_ptr</code> are the only atomic operations for a non-atomic data type.</li>
+<li><strong>Correctness</strong>: the usage of the global atomic operations is quite error-prone because the correct usage is based on discipline. It is easy to forget to use an atomic operation - such as using <code>ptr = localPtr</code> instead of <code>std::atomic_store(&amp;ptr, localPt</code>r). The result is undefined behavior because of a data race. If we used an atomic smart pointer instead, the type-system would not allow it.</li>
+<li><strong>Performance</strong>: the atomic smart pointers have a big advantage compared to the free <code>atomic_</code>* functions. The atomic versions are designed for the special use case and can internally have a<code> std::atomic_flag</code> as a kind of cheap <a href="https://en.wikipedia.org/wiki/Spinlock">spinlock</a>. Designing the non-atomic versions of the pointer functions to be thread-safe would be overkill if they are used in a single-threaded scenario. They would have a performance penalty.</li>
+</ul>
+<p>The correctness argument is probably the most important one. Why? The answer lies in the proposal. The proposal presents a thread-safe singly linked list that supports insertion, deletion, and searching of elements. This singly linked list is implemented in a lock-free way.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/Barrier/AtomicSinglyLinkedList.png" alt="AtomicSinglyLinkedList" /></p>
+<p>&nbsp;</p>
+<p>All changes that are required to compile the program with a C++11 compiler are marked in red. The implementation with atomic smart pointers is a lot easier and hence less error-prone. C++20's type system does not permit it to use a non-atomic operation on an atomic smart pointer.</p>
+<p>The proposal <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2014/n4162">N4162</a> proposed the new types <code>std::atomic_shared_ptr</code> and <code>std::atomic_weak_ptr</code> as atomic smart pointers. By merging them in the mainline ISO C++ standard, they became partial template specialization of <a href="https://en.cppreference.com/w/cpp/atomic/atomic">std::atomic</a>: <code>std::atomic&lt;std::shared_ptr&gt;</code>, and <code>std::atomic&lt;std::weak_ptr&gt;</code>.</p>
+<p>Consequently, the atomic operations for <code>std::shared_ptr&lt;T&gt;</code> are deprecated with C++20.</p>
+<h2>What's next?</h2>
+<p>With C++20, threads can be cooperatively interrupted.&nbsp; Let me show you in my next, what that means.</p>
+<p>&nbsp;</p>
+<p>{loadmoduleid 153}</p>
