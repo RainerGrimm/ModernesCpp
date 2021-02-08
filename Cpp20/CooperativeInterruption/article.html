@@ -1,0 +1,93 @@
+<p>A typical question in my C++ seminars is: Can A&nbsp; thread be killed?. Before C++20, my answer is no. With C++20, you can ask a thread politely for its interruption.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/CooperativeInterruption/TimelineCpp20Interruption.png" alt="TimelineCpp20Interruption" width="650" height="229" /></p>
+<p>First of all. Why is it no good idea to kill a thread? The answer is quite easy. You don't know in which state the thread is when you kill it. Here are two possible malicious outcomes.</p>
+<ul>
+<li>The thread is only half-done with its job. Consequently, you don't know the state of that job and, hence, the state of your program. You end with undefined behavior, and all bets are open.</li>
+<li>The thread may be in a critical section and locks a mutex. Killing a thread while it locks a mutex ends with a high probability in a deadlock.</li>
+</ul>
+<p>Okay, killing a thread is not a good idea. Maybe, you can ask a thread friendly if it is willing to stop. This is exactly what cooperative interruption in C++20 means. You ask the thread, and the thread can accept or ignore your wish for the interruption.</p>
+<h2>Cooperative Interruption</h2>
+<p>The additional functionality of the cooperative interruption thread in C++20 is based on the <code>std::stop_token</code>, the <code>std::stop_callback</code>, and the <code>std::stop_source</code>&nbsp;data types.</p>
+<h3><code>std::stop_token</code>, <code>std::stop_callback</code>, and <code>std::stop_source</code></h3>
+<p>A <code>std::stop_token</code>, a<code> std::stop_callback</code>, or a <code>std::stop_source</code>&nbsp;allows a thread to asynchronously request an execution to stop or ask if an execution got a stop signal. The <code>std::stop_token</code> can be passed to an operation and afterward be used to poll the token for a stop request actively or to register a callback via <code>std::stop_callback</code>. The stop request is sent by a <code>std::stop_source</code>. This signal affects all associated<code> std::stop_token</code>. The three classes <code>std::stop_source</code>, <code>std::stop_token</code>, and <code>std::stop_callback</code> share the ownership of an associated stop state. The calls <code>request_stop()</code>, <code>stop_requested()</code>, and <code>stop_possible()</code> are atomic.</p>
+<p>You can construct a <code>std::stop_source</code> in two ways:</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">stop_source();                                      <span style="color: #0099ff; font-style: italic;">// (1)</span>
+<span style="color: #006699; font-weight: bold;">explicit</span> stop_source(std<span style="color: #555555;">::</span><span style="color: #007788; font-weight: bold;">nostopstate_t</span>) noexcept;  <span style="color: #0099ff; font-style: italic;">// (2)</span>
+</pre>
+</div>
+<p></p>
+<p>The default constructor (1) constructs a <code>std::stop_source</code> with a new stop state. The constructor taking<code> std::nostopstate_t</code> (2) constructs an empty<code> std::stop_source</code> without associated stop state.<br />The component&nbsp;<code>std::stop_source src</code>&nbsp;provides the following member functions for handling stop requests.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/CooperativeInterruption/stopSource.png" alt="stopSource" width="650" height="208" /></p>
+<p></p>
+<p><code>src.stop_possible()</code> means that<code> src</code> has an associated stop state. <code>src.stop_requested()</code> returns <code>true</code> when <code>src</code> has an associated stop state and was not asked to stop earlier. <code>src.request_stop()</code> is successful and returns <code>true</code> if <code>src</code> has an associated stop state, and it was not requested to stop before.</p>
+<p>The call <code>src.get_token()</code> returns the stop token<code> stoken</code>. Thanks to <code>stoken</code> you can check if a stop request has been made or can be made for its associated stop source <code>src</code>. The stop token <code>stoken</code> observes the stop source <code>src</code>.</p>
+<p>The following table presents the member functions of a <code>std::stop_token stoken</code>.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/CooperativeInterruption/stopToken.png" alt="stopToken" width="650" height="127" /></p>
+<p></p>
+<p>A default-constructed token that has no associated stop state.<code> stoken.stop_possible</code> also returns <code>true</code> if <code>stoken</code> has an associated stop state.&nbsp;<code>stoken.stop_requested()</code> returns <code>true</code> when stop token has an associated stop state and has already received a stop request.</p>
+<p><br />If the <code>std::stop_token</code> should be temporarily disabled, you can replace it with a default constructed token. A default constructed token has no associated stop-state. The following code snippet shows how to disable and enable a thread's capability to accept stop requests.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">std<span style="color: #555555;">::</span>jthread jthr([](std<span style="color: #555555;">::</span>stop_token stoken) {
+    ...
+    std<span style="color: #555555;">::</span>stop_token interruptDisabled;
+    std<span style="color: #555555;">::</span>swap(stoken, interruptDisabled);  <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    ...                                    <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    std<span style="color: #555555;">::</span>swap(stoken, interruptDisabled);
+    ...
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p><code>std::stop_token interruptDisabled</code> has no associated stop state. This means the thread<code> jthr</code> can in all lines except line (1) and (2) accept stop requests.</p>
+<p>When you study the code snippet carefully, you may wonder about the used <code>std::jthread. std::jthread</code> in C++20 is an extend <code>std::thread</code> in C++11. The <strong>j</strong> in <code>jthread</code> stands for joinable because it joins automatically in its destructor. Its first name was <code>ithread</code>. You may guess why: <strong>i</strong> stands for interruptable. I present <code>std::jthread</code> in my next post.</p>
+<p>My next example shows the use of callbacks using a <code>std::jthread.</code></p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// invokeCallback.cpp</span>
+
+<span style="color: #009999;">#include &lt;chrono&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;thread&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">using</span> <span style="color: #006699; font-weight: bold;">namespace</span><span style="color: #555555;">::</span>std<span style="color: #555555;">::</span>literals;
+
+<span style="color: #006699; font-weight: bold;">auto</span> func <span style="color: #555555;">=</span> [](std<span style="color: #555555;">::</span>stop_token stoken) {                             <span style="color: #0099ff; font-style: italic;">// (1)</span>
+        <span style="color: #007788; font-weight: bold;">int</span> counter{<span style="color: #ff6600;">0</span>};
+        <span style="color: #006699; font-weight: bold;">auto</span> thread_id <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>get_id();
+        std<span style="color: #555555;">::</span>stop_callback callBack(stoken, [<span style="color: #555555;">&amp;</span>counter, thread_id] {  <span style="color: #0099ff; font-style: italic;">// (2)</span>
+            std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Thread id: "</span> <span style="color: #555555;">&lt;&lt;</span> thread_id 
+                      <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"; counter: "</span> <span style="color: #555555;">&lt;&lt;</span> counter <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+        });
+        <span style="color: #006699; font-weight: bold;">while</span> (counter <span style="color: #555555;">&lt;</span> <span style="color: #ff6600;">10</span>) {
+            std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>sleep_for(<span style="color: #ff6600;">0.2</span>s);
+            <span style="color: #555555;">++</span>counter;
+        }
+    };
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    
+    std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>jthread<span style="color: #555555;">&gt;</span> vecThreads(<span style="color: #ff6600;">10</span>);
+    <span style="color: #006699; font-weight: bold;">for</span>(<span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;</span> thr<span style="color: #555555;">:</span> vecThreads) thr <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>jthread(func);
+    
+    std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>sleep_for(<span style="color: #ff6600;">1</span>s);                              <span style="color: #0099ff; font-style: italic;">// (3)</span>
+    
+    <span style="color: #006699; font-weight: bold;">for</span>(<span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;</span> thr<span style="color: #555555;">:</span> vecThreads) thr.request_stop();                <span style="color: #0099ff; font-style: italic;">// (4)</span>
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Each of the ten threads invokes the lambda function<code> func</code> (1). The callback (2) displays the thread <code>id</code> and the <code>counter</code>. Due to the one-second sleeping of the main-thread (3) and the sleeping of the child threads, the counter is 4 when the callbacks are invoked. The call <code>thr.request_stop()</code> triggers the callback on each thread.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/CooperativeInterruption/invokeCallback.png" alt="invokeCallback" width="500" height="347" /></p>
+<h2>What's next?</h2>
+<p>As mentioned,&nbsp; <code>std::thread</code> from C++11 has one big weakness. When you forget to join it, its destructor calls <code>std::terminate</code>, and your program crashed.&nbsp;<code>std::jthread</code> (C++20) overcomes this counter-intuitive weakness and is also interruptable.</p>
+<p>{loadmoduleid 153}</p>
