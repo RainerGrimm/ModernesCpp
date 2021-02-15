@@ -1,0 +1,217 @@
+<p><code>std::jthread</code> stands for joining thread. In addition to <code>std::thread</code> (C++11),<code> std::jthread</code> automatically joins in its destructor and can cooperatively be interrupted. Read in this post to know, why <code>std::jthread</code> should be your first choice.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/jthread/TimelineCpp20.png" alt="TimelineCpp20" width="650" height="227" /></p>
+<p>The following table gives you a concise overview of the functionality of <code>std::jthread</code>.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/jthread/jthread.png" alt="jthread" width="650" height="572" /></p>
+<p>&nbsp;</p>
+<p>For additional details, please refer to <a href="https://en.cppreference.com/w/cpp/thread/jthread">cppreference.com</a>. When you want to read more post about <code>std::thread</code>, here are they: <a href="index.php/der-einstieg-in-modernes-c#h1-2-the-threading-interface">my post about std::thread.</a></p>
+<p>First, why do we need an improved thread in C++20? Here is the first reason.</p>
+<h2>Automatically Joining</h2>
+<p>This is the <strong>non-intuitive</strong> behavior of <code>std::thread</code>. If a <code>std::thread</code> is still joinable, <a href="https://en.cppreference.com/w/cpp/error/terminate">std::terminate</a> is called in its destructor. A thread<code> thr</code> is joinable if neither <code>thr.join()</code> nor <code>thr.detach()</code> was called. Let me show, what that means.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// threadJoinable.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;thread&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>boolalpha;
+    
+    std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> thr{[]{ std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Joinable std::thread"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>; }};
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"thr.joinable(): "</span> <span style="color: #555555;">&lt;&lt;</span> thr.joinable() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    
+}
+</pre>
+</div>
+<p></p>
+<p>When executed, the program terminates when the local object <code>thr</code> goes out of scope.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/jthread/threadJoinable.png" alt="threadJoinable" width="500" height="279" /></p>
+<p>Both executions of<code> std::thread</code> terminate. In the second run, the thread <code>thr</code> has enough time to display its message:&nbsp;<code>Joinable std::thread</code>.</p>
+<p>In the next example, I use <code>std::jthread</code> from the C++20 standard.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// jthreadJoinable.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;thread&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>boolalpha;
+    
+    std<span style="color: #555555;">::</span>jthread thr{[]{ std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Joinable std::thread"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>; }};
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"thr.joinable(): "</span> <span style="color: #555555;">&lt;&lt;</span> thr.joinable() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    
+}
+</pre>
+</div>
+<p></p>
+<p>Now, the thread<code> thr</code> automatically joins in its destructor if it's still joinable such as in this case.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/jthread/jthreadJoinable.png" alt="jthreadJoinable" width="350" height="177" /></p>
+<p>But this is not all that<code> std::jthread</code>&nbsp; provides additionally to <code>std::thread</code>. A <code>std::jthread</code> can be cooperatively interrupted. I already presented the general ideas of cooperative interruption in my last post: <a href="index.php/cooperative-interruption-of-a-thread-in-c-20">Cooperative Interruption of a Thread in C++20</a>.</p>
+<h2>Cooperative Interruption of a<code> std::jthread</code></h2>
+<p>To get a general idea, let me present a simple example.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// interruptJthread.cpp</span>
+
+<span style="color: #009999;">#include &lt;chrono&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;thread&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">using</span> <span style="color: #006699; font-weight: bold;">namespace</span><span style="color: #555555;">::</span>std<span style="color: #555555;">::</span>literals;
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    
+    std<span style="color: #555555;">::</span>jthread nonInterruptable([]{                           <span style="color: #0099ff; font-style: italic;">// (1)</span>
+        <span style="color: #007788; font-weight: bold;">int</span> counter{<span style="color: #ff6600;">0</span>};
+        <span style="color: #006699; font-weight: bold;">while</span> (counter <span style="color: #555555;">&lt;</span> <span style="color: #ff6600;">10</span>){
+            std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>sleep_for(<span style="color: #ff6600;">0.2</span>s);
+            std<span style="color: #555555;">::</span>cerr <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"nonInterruptable: "</span> <span style="color: #555555;">&lt;&lt;</span> counter <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>; 
+            <span style="color: #555555;">++</span>counter;
+        }
+    });
+    
+    std<span style="color: #555555;">::</span>jthread interruptable([](std<span style="color: #555555;">::</span>stop_token stoken){     <span style="color: #0099ff; font-style: italic;">// (2)</span>
+        <span style="color: #007788; font-weight: bold;">int</span> counter{<span style="color: #ff6600;">0</span>};
+        <span style="color: #006699; font-weight: bold;">while</span> (counter <span style="color: #555555;">&lt;</span> <span style="color: #ff6600;">10</span>){
+            std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>sleep_for(<span style="color: #ff6600;">0.2</span>s);
+            <span style="color: #006699; font-weight: bold;">if</span> (stoken.stop_requested()) <span style="color: #006699; font-weight: bold;">return</span>;               <span style="color: #0099ff; font-style: italic;">// (3)</span>
+            std<span style="color: #555555;">::</span>cerr <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"interruptable: "</span> <span style="color: #555555;">&lt;&lt;</span> counter <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>; 
+            <span style="color: #555555;">++</span>counter;
+        }
+    });
+    
+    std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>sleep_for(<span style="color: #ff6600;">1</span>s);
+    
+    std<span style="color: #555555;">::</span>cerr <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    std<span style="color: #555555;">::</span>cerr <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Main thread interrupts both jthreads"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    nonInterruptable.request_stop();
+    interruptable.request_stop();                              <span style="color: #0099ff; font-style: italic;">// (4)</span>
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    
+}
+</pre>
+</div>
+<p></p>
+<p>In the main program, I start the two threads <code>nonInterruptable</code> and interruptable (lines 1)and 2). Unlike in the thread <code>nonInterruptable</code> , the thread <code>interruptable</code> gets a <code>std::stop_token</code> and uses it in line (3) to check if it was interrupted: <code>stoken.stop_requested()</code>. In case of a stop request, the lambda function returns, and, therefore, the thread ends. The call <code>interruptable.request_stop()</code> (line 4) triggers the stop request. This does not hold for the previous call <code>nonInterruptable.request_stop()</code> . The call has no effect.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/jthread/interruptJthread.png" alt="interruptJthread" width="400" height="382" /></p>
+<p>To make my post complete, with C++20, you can also cooperatively interrupt a condition variable.</p>
+<h2>New wait Overloads for <code>std::condition_variable_any</code></h2>
+<p>Before I write about <code>std::condition_variable_any</code>, here are my post about <a href="index.php/tag/condition-variable">condition variables</a>.&nbsp;</p>
+<p>The three wait variations <code>wait, wait_for</code>, and<code> wait_until</code> of the std::condition_variable_any get new overloads. These overloads take a <code>std::stop_token</code>.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Predicate</span><span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">bool</span> wait(Lock<span style="color: #555555;">&amp;</span> lock,  
+          stop_token stoken,
+          Predicate pred);
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Rep</span>, <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Period</span>, <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Predicate</span><span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">bool</span> wait_for(Lock<span style="color: #555555;">&amp;</span> lock, 
+              stop_token stoken, 
+              <span style="color: #006699; font-weight: bold;">const</span> chrono<span style="color: #555555;">::</span>duration<span style="color: #555555;">&lt;</span>Rep, Period<span style="color: #555555;">&gt;&amp;</span> rel_time, 
+              Predicate pred);
+                
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Clock</span>, <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Duration</span>, <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Predicate</span><span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">bool</span> wait_until(Lock<span style="color: #555555;">&amp;</span> lock, 
+                stop_token stoken,
+                <span style="color: #006699; font-weight: bold;">const</span> chrono<span style="color: #555555;">::</span>time_point<span style="color: #555555;">&lt;</span>Clock, Duration<span style="color: #555555;">&gt;&amp;</span> abs_time, 
+                Predicate pred);
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>These new overloads need a predicate. The presented versions ensure to get notified if a stop request for the passed <code>std::stop_token stoken</code> is signaled. They return a boolean that indicates whether the predicate evaluates to <code>true</code>. This returned boolean is independent of whether a stop was requested or of whether the timeout was triggered.</p>
+<p>After the wait calls, you can check if a stop request occurred.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">cv.wait(lock, stoken, predicate);
+<span style="color: #006699; font-weight: bold;">if</span> (stoken.stop_requested()){
+    <span style="color: #0099ff; font-style: italic;">// interrupt occurred</span>
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The following example shows the usage of a condition variable with a stop request.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// conditionVariableAny.cpp</span>
+
+<span style="color: #009999;">#include &lt;condition_variable&gt;</span>
+<span style="color: #009999;">#include &lt;thread&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;chrono&gt;</span>
+<span style="color: #009999;">#include &lt;mutex&gt;</span>
+<span style="color: #009999;">#include &lt;thread&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">using</span> <span style="color: #006699; font-weight: bold;">namespace</span> std<span style="color: #555555;">::</span>literals;
+
+std<span style="color: #555555;">::</span>mutex mutex_;
+std<span style="color: #555555;">::</span>condition_variable_any condVar;
+
+<span style="color: #007788; font-weight: bold;">bool</span> dataReady;
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">receiver</span>(std<span style="color: #555555;">::</span>stop_token stopToken) {                 <span style="color: #0099ff; font-style: italic;">// (1)</span>
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Waiting"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    std<span style="color: #555555;">::</span>unique_lock<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span> lck(mutex_);
+    <span style="color: #007788; font-weight: bold;">bool</span> ret <span style="color: #555555;">=</span> condVar.wait(lck, stopToken, []{<span style="color: #006699; font-weight: bold;">return</span> dataReady;});
+    <span style="color: #006699; font-weight: bold;">if</span> (ret){
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Notification received: "</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    }
+    <span style="color: #006699; font-weight: bold;">else</span>{
+         std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Stop request received"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    }
+}
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">sender</span>() {                                            <span style="color: #0099ff; font-style: italic;">// (2)</span>
+
+    std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>sleep_for(<span style="color: #ff6600;">5</span>ms);
+    {
+        std<span style="color: #555555;">::</span>lock_guard<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span> lck(mutex_);
+        dataReady <span style="color: #555555;">=</span> <span style="color: #336666;">true</span>;
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Send notification"</span>  <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    }
+    condVar.notify_one();                                  <span style="color: #0099ff; font-style: italic;">// (3)</span>
+
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+  std<span style="color: #555555;">::</span>jthread t1(receiver);
+  std<span style="color: #555555;">::</span>jthread t2(sender);
+  
+  t1.request_stop();                                       <span style="color: #0099ff; font-style: italic;">// (4)</span>
+
+  t1.join();
+  t2.join();
+
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The receiver thread (line 1) is waiting for the notification of the sender thread (line 2). Before the sender thread sends its notification (line 3), the main thread triggered a stop request in<br />line (4). The output of the program shows that the stop request happened before the notification.</p>
+<h2><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/jthread/conditionVariableAny.png" alt="conditionVariableAny" width="281" height="113" /></h2>
+<h2>What's next?</h2>
+<p>What happens when your write without synchronization to <code>std::cout</code>? You get a mess. Thanks to C++20, we have synchronized output streams.</p>
+<p>{loadmoduleid 153}</p>
+<p>&nbsp;</p>
+<div style="color: #000000; background-color: #ffffff; font-family: Consolas, 'Courier New', monospace; font-weight: normal; font-size: 18px; line-height: 24px; white-space: pre;"><code>&nbsp;</code></div>
