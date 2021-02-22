@@ -1,0 +1,231 @@
+<p>What happens when you write without synchronization to<code> std::cout</code>? You get a mess. With C++20, this must not be anymore.</p>
+<hr id="system-readmore" />
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/SynchronizedOutputstreams/TimelineCpp20.png" alt="TimelineCpp20" width="650" height="253" /></p>
+<p>Before I present synchronized output streams with C++20, I want to show non-synchronized output in C++11.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// coutUnsynchronized.cpp</span>
+
+<span style="color: #009999;">#include &lt;chrono&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;thread&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Worker</span>{
+<span style="color: #9999ff;">public:</span>
+  Worker(std<span style="color: #555555;">::</span>string n)<span style="color: #555555;">:</span>name(n) {};
+    <span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">operator</span>() (){
+      <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #007788; font-weight: bold;">int</span> i <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span>; i <span style="color: #555555;">&lt;=</span> <span style="color: #ff6600;">3</span>; <span style="color: #555555;">++</span>i) {
+        <span style="color: #0099ff; font-style: italic;">// begin work</span>
+        std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>sleep_for(std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>milliseconds(<span style="color: #ff6600;">200</span>));      <span style="color: #0099ff; font-style: italic;">// (3)</span>
+        <span style="color: #0099ff; font-style: italic;">// end work</span>
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> name <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">": "</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Work "</span> <span style="color: #555555;">&lt;&lt;</span> i <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" done !!!"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>; <span style="color: #0099ff; font-style: italic;">// (4)</span>
+      }
+    }
+<span style="color: #9999ff;">private:</span>
+  std<span style="color: #555555;">::</span>string name;
+};
+
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Boss: Let's start working.</span><span style="color: #cc3300; font-weight: bold;">\n\n</span><span style="color: #cc3300;">"</span>;
+ 
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> herb<span style="color: #555555;">=</span> std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span>(Worker(<span style="color: #cc3300;">"Herb"</span>));                        <span style="color: #0099ff; font-style: italic;">// (1)</span>
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> andrei<span style="color: #555555;">=</span> std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span>(Worker(<span style="color: #cc3300;">"  Andrei"</span>));
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> scott<span style="color: #555555;">=</span> std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span>(Worker(<span style="color: #cc3300;">"    Scott"</span>));
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> bjarne<span style="color: #555555;">=</span> std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span>(Worker(<span style="color: #cc3300;">"      Bjarne"</span>));
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> bart<span style="color: #555555;">=</span> std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span>(Worker(<span style="color: #cc3300;">"        Bart"</span>));
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> jenne<span style="color: #555555;">=</span> std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span>(Worker(<span style="color: #cc3300;">"          Jenne"</span>));            <span style="color: #0099ff; font-style: italic;">// (2)</span>
+  
+  
+  herb.join();
+  andrei.join();
+  scott.join();
+  bjarne.join();
+  bart.join();
+  jenne.join();
+  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Boss: Let's go home."</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;                   <span style="color: #0099ff; font-style: italic;">// (5)</span>
+  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The boss has six workers (lines 1 - 2). Each worker has to take care of three work packages that take 1/5 second each (line 3). After the worker is done with his work package, he screams out loudly to the boss (line 4). Once the boss receives notifications from all workers, he sends them home (line 5).<br />What a mess for such a simple workflow! Each worker screams out his message ignoring his coworkers!</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/SynchronizedOutputstreams/coutUnsynchronized.png" alt="coutUnsynchronized" width="500" height="542" /></p>
+<ul>
+<li><strong><code>std::cout</code> is thread-safe</strong>: The C++11 standard guarantees that you must not protect <code>std::cout</code>. Each character is written atomically. More output statements like those in the example may interleave. This interleaving is only a visual issue; the program is well-defined. This remark is valid for all global stream objects. Insertion to and extraction from global stream objects (<code>std::cout, std::cin, std::cerr</code>, and<code> std::clog</code>) is thread-safe. To put it more formally: writing to<code> std::cout</code> is not participating in a data race, but does create a race condition. This means that the output depends on the interleaving of threads. Read more about the terms data race and race condition in my previous post:<a href="index.php/race-condition-versus-data-race"> Race Conditions versus Data Races</a>.</li>
+</ul>
+<p>How can we solve this issue? With C++11, the answer is straightforward: use a lock such as <code>std::lock_guard</code> to synchronize the access to <code>std::cout</code>. For more information about locks in C++11, read my previous post <a href="index.php/prefer-locks-to-mutexes">Prefer Locks to Mutexes</a>.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// coutSynchronized.cpp</span>
+
+<span style="color: #009999;">#include &lt;chrono&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;mutex&gt;</span>
+<span style="color: #009999;">#include &lt;thread&gt;</span>
+
+std<span style="color: #555555;">::</span>mutex coutMutex;                                                 <span style="color: #0099ff; font-style: italic;">// (1)</span>
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Worker</span>{
+<span style="color: #9999ff;">public:</span>
+  Worker(std<span style="color: #555555;">::</span>string n)<span style="color: #555555;">:</span>name(n) {};
+ 
+    <span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">operator</span>() (){
+      <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #007788; font-weight: bold;">int</span> i <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span>; i <span style="color: #555555;">&lt;=</span> <span style="color: #ff6600;">3</span>; <span style="color: #555555;">++</span>i) { 
+        <span style="color: #0099ff; font-style: italic;">// begin work</span>
+        std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>sleep_for(std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>milliseconds(<span style="color: #ff6600;">200</span>));
+        <span style="color: #0099ff; font-style: italic;">// end work</span>
+        std<span style="color: #555555;">::</span>lock_guard<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span> coutLock(coutMutex);             <span style="color: #0099ff; font-style: italic;">// (2)</span>
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> name <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">": "</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Work "</span> <span style="color: #555555;">&lt;&lt;</span> i <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" done !!!"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+      }                                                              <span style="color: #0099ff; font-style: italic;">// (3)</span>
+    }
+<span style="color: #9999ff;">private:</span>
+  std<span style="color: #555555;">::</span>string name;
+};
+
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Boss: Let's start working."</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n\n</span><span style="color: #cc3300;">"</span>;
+ 
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> herb<span style="color: #555555;">=</span> std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span>(Worker(<span style="color: #cc3300;">"Herb"</span>));
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> andrei<span style="color: #555555;">=</span> std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span>(Worker(<span style="color: #cc3300;">"  Andrei"</span>));
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> scott<span style="color: #555555;">=</span> std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span>(Worker(<span style="color: #cc3300;">"    Scott"</span>));
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> bjarne<span style="color: #555555;">=</span> std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span>(Worker(<span style="color: #cc3300;">"      Bjarne"</span>));
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> bart<span style="color: #555555;">=</span> std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span>(Worker(<span style="color: #cc3300;">"        Bart"</span>));
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> jenne<span style="color: #555555;">=</span> std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span>(Worker(<span style="color: #cc3300;">"          Jenne"</span>));
+  
+  herb.join();
+  andrei.join();
+  scott.join();
+  bjarne.join();
+  bart.join();
+  jenne.join();
+  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Boss: Let's go home."</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The <code>coutMutex</code> in line (1) protects the shared object<code> std::cout</code>. Putting the<code> coutMutex</code> into a <code>std::lock_guard</code> guarantees that the <code>coutMutex</code> is locked in the constructor (line 2) and unlocked in the destructor (line 3) of the <code>std::lock_guard.</code> Thanks to the <code>coutMutex</code> guarded by the<code> coutLock</code> the mess becomes a harmony.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/SynchronizedOutputstreams/coutSynchronized.png" alt="coutSynchronized" width="450" height="615" /></p>
+<p>With C++20, writing synchronized to <code>std::cout</code> is a piece of cake. <code>std::basic_sync</code>buf is a wrapper for a <code>std::basic_streambuf</code>. It accumulates output in its buffer. The wrapper sets its content to the wrapped buffer when it is destructed. Consequently, the content appears as a contiguous sequence of characters, and no interleaving of characters can happen.<br />Thanks to <code>std::basic_osyncstream</code>, you can directly write synchronously to <code>std::cout</code> by using a named synchronized output stream<code>.</code><br />Here is how the previous program <code>coutUnsynchronized.cpp</code> is refactored to write synchronized to <code>std::cout</code>. So far, only GCC 11 supports synchronized output streams.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// synchronizedOutput.cpp</span>
+
+<span style="color: #009999;">#include &lt;chrono&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;syncstream&gt;</span>
+<span style="color: #009999;">#include &lt;thread&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Worker</span>{
+<span style="color: #9999ff;">public:</span>
+  Worker(std<span style="color: #555555;">::</span>string n)<span style="color: #555555;">:</span> name(n) {};
+    <span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">operator</span>() (){
+      <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #007788; font-weight: bold;">int</span> i <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span>; i <span style="color: #555555;">&lt;=</span> <span style="color: #ff6600;">3</span>; <span style="color: #555555;">++</span>i) {
+        <span style="color: #0099ff; font-style: italic;">// begin work</span>
+        std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>sleep_for(std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>milliseconds(<span style="color: #ff6600;">200</span>));
+        <span style="color: #0099ff; font-style: italic;">// end work</span>
+        std<span style="color: #555555;">::</span>osyncstream syncStream(std<span style="color: #555555;">::</span>cout);                    <span style="color: #0099ff; font-style: italic;">// (1)</span>
+        syncStream <span style="color: #555555;">&lt;&lt;</span> name <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">": "</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Work "</span> <span style="color: #555555;">&lt;&lt;</span> i                 <span style="color: #0099ff; font-style: italic;">// (3)</span><br />                   <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" done !!!"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+      }                                                            <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    }
+<span style="color: #9999ff;">private:</span>
+  std<span style="color: #555555;">::</span>string name;
+};
+
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Boss: Let's start working.</span><span style="color: #cc3300; font-weight: bold;">\n\n</span><span style="color: #cc3300;">"</span>;
+ 
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> herb<span style="color: #555555;">=</span> std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span>(Worker(<span style="color: #cc3300;">"Herb"</span>));
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> andrei<span style="color: #555555;">=</span> std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span>(Worker(<span style="color: #cc3300;">"  Andrei"</span>));
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> scott<span style="color: #555555;">=</span> std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span>(Worker(<span style="color: #cc3300;">"    Scott"</span>));
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> bjarne<span style="color: #555555;">=</span> std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span>(Worker(<span style="color: #cc3300;">"      Bjarne"</span>));
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> bart<span style="color: #555555;">=</span> std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span>(Worker(<span style="color: #cc3300;">"        Bart"</span>));
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> jenne<span style="color: #555555;">=</span> std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span>(Worker(<span style="color: #cc3300;">"          Jenne"</span>));
+  
+  
+  herb.join();
+  andrei.join();
+  scott.join();
+  bjarne.join();
+  bart.join();
+  jenne.join();
+  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Boss: Let's go home."</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The only change to the previous program <code>coutUnsynchronized.cpp</code> is that <code>std::cout</code> is wrapped in a <code>std::osyncstream</code> (line 1). When the <code>std::osyncstream</code> goes out of scope in line (2), the characters are transferred and <code>std::cout</code> is flushed. It is worth mentioning that the<code> std::cout</code> calls in the main program do not introduce a data race and, therefore, need not be synchronized. The output happens before or after the output of the threads.</p>
+<p><br />Because I use the <code>syncStream</code> declared on line (3) only once, a temporary object may be more appropriate. The following code snippet presents the modified call operator:</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">operator</span>()() {
+  <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #007788; font-weight: bold;">int</span> i <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span>; i <span style="color: #555555;">&lt;=</span> <span style="color: #ff6600;">3</span>; <span style="color: #555555;">++</span>i) { 
+    <span style="color: #0099ff; font-style: italic;">// begin work</span>
+    std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>sleep_for(std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>milliseconds(<span style="color: #ff6600;">200</span>));
+    <span style="color: #0099ff; font-style: italic;">// end work</span>
+    std<span style="color: #555555;">::</span>osyncstream(std<span style="color: #555555;">::</span>cout) <span style="color: #555555;">&lt;&lt;</span> name <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">": "</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Work "</span> <span style="color: #555555;">&lt;&lt;</span> i <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" done !!!"</span> 
+                                <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  }
+}
+</pre>
+</div>
+<p></p>
+<p><code>std::basic_osyncstream syncStream</code> offers two interesting member functions.</p>
+<ul>
+<ul>
+<li><code>syncStream.emit()</code> emits all buffered output and executes all pending flushes.</li>
+<li><code>syncStream.get_wrapped()</code> returns a pointer to the wrapped buffer.</li>
+</ul>
+</ul>
+<p><a href="https://en.cppreference.com/w/cpp/io/basic_osyncstream/get_wrapped">cppreference.com</a> shows how you can sequence the output of different output streams with the <code>get_wrapped</code> member function.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// sequenceOutput.cpp</span>
+
+<span style="color: #009999;">#include &lt;syncstream&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+  
+  std<span style="color: #555555;">::</span>osyncstream bout1(std<span style="color: #555555;">::</span>cout);
+  bout1 <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Hello, "</span>;
+  {
+      std<span style="color: #555555;">::</span>osyncstream(bout1.get_wrapped()) <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Goodbye, "</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Planet!"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  } <span style="color: #0099ff; font-style: italic;">// emits the contents of the temporary buffer</span>
+  
+  bout1 <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"World!"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  
+} <span style="color: #0099ff; font-style: italic;">// emits the contents of bout1</span>
+</pre>
+</div>
+<p></p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/SynchronizedOutputstreams/sequenceOutput.png" alt="sequenceOutput" /></p>
+<h2>What's next?</h2>
+<p>Wow! Now I'm done with C++20. I have written about 70 posts to <a href="index.php/category/c-20">C++20</a>. You can have more information on C++20 in my book: <a href="https://leanpub.com/c20">C++20: Get the Details</a>.</p>
+<p>But there is still one feature, I want to give more insight into coroutines. In my next posts, I start to play with the new keywords <code>co_return</code>, <code>co_yield</code>, and <code>co_await. </code></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>{loadmoduleid 153}</p>
