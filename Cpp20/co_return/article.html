@@ -1,0 +1,125 @@
+<p>Instead of <code>return</code>, a coroutine uses<code> co_return</code> returning its result. In this post, I want to implement a simple coroutine using co_return.</p>
+<hr id="system-readmore" />
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/co_return/TimelineCpp20.png" alt="TimelineCpp20" width="650" height="236" /></p>
+<p>First, you may wonder why are write once more about coroutines in C++20 because I have already presented the theory behind <a href="index.php/tag/coroutines">coroutines</a>. My answer is straightforward and based on my experience. C++20 does not provide concrete coroutines, instead, C++20 provides a framework for implementing coroutines. This framework consists of more than 20 functions, some of which you must implement, some of which you can override. Based on these functions, the compiler generates two workflows, which define the behavior of the coroutine. To make it short. Coroutines in C++20 are double-edged swords. On one side, they give you enormous power, on the other side, they are quite challenging to understand. I dedicated more than 80 pages to coroutines in my book "<a href="https://leanpub.com/c20">C++20: Get the Details</a>", and I'm not yet explained everything.</p>
+<p>From my experience, using simple coroutines and modifying them is the easiest - may be only - way to understand them. And this is exactly the approach I'm pursuing in the following posts. I present simple coroutines and modify them. To make the workflow obvious, I put many comments inside and add only so much theory that is necessary to understand the internals of coroutines. My explanations are by no means complete and should only serve as a starting point to deepen your knowledge about coroutines.</p>
+<h2>A Short Reminder</h2>
+<p>While you can only call a <strong>function</strong> and return from it, you can call a <strong>coroutine</strong>, suspend and resume it, and destroy a suspended coroutine.</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/co_return/FunctionsVersusCoroutines.png" alt="FunctionsVersusCoroutines" width="500" height="268" /></p>
+<p>With the new keywords <code>co_await</code> and <code>co_yield</code>, C++20 extends the execution of C++ functions with two new concepts.</p>
+<p>Thanks to <code>co_await expression</code> it is possible to suspend and resume the execution of the expression. If you use <code>co_await expression</code> in a function <code>func</code>, the call <code>auto getResult = func()</code> does not block if the result of the function call<code> func()</code> is not available. Instead of resource-consuming blocking, you have resource-friendly waiting.<br /><code></code></p>
+<p><code>co_yield</code> expression supports generator functions. The generator function returns a new value each time you call it. A generator function is a kind of data stream from which you can pick values. The data stream can be infinite. Therefore, we are at the center of lazy evaluation with C++.</p>
+<p>Additionally, a coroutine does not <code>return</code> its result, a coroutine does<code> co_return</code>&nbsp; its result.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">// ...<br /><br />MyFuture<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> createFuture() {
+    co_return <span style="color: #ff6600;">2021</span>;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main() {
+
+    <span style="color: #006699; font-weight: bold;">auto</span> fut <span style="color: #555555;">=</span> createFuture();
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"fut.get(): "</span> <span style="color: #555555;">&lt;&lt;</span> fut.get() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+}   
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>In this straightforward example <code>createFuture</code> is the coroutine because it uses one of the three new keywords <code>co_return, co_yield,</code> or <code>co_await</code> and it returns a coroutine<code> MyFuture&lt;int&gt;</code>. What? This is what often puzzled me. The name coroutine is used for two entities. Let me introduce two new terms. <code>createFuture</code> is a <strong>coroutine factory </strong>that returns a <strong>coroutine object</strong> <code>fut, which </code>can be used to ask for the result: <code>fut.get()</code>.&nbsp;</p>
+<p>This theory should be enough. Let's talk about <code>co_return</code>.</p>
+<h2>co_return</h2>
+<p>Admittedly, the coroutine in the following program<code> eagerFuture.cpp</code> is the simplest coroutine, I can imagine that still does something meaningful: it automatically stores the result of its invocation.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// eagerFuture.cpp</span>
+
+<span style="color: #009999;">#include &lt;coroutine&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;memory&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">struct</span> MyFuture {
+    std<span style="color: #555555;">::</span>shared_ptr<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span> value;                           <span style="color: #0099ff; font-style: italic;">// (3)</span>
+    MyFuture(std<span style="color: #555555;">::</span>shared_ptr<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span> p)<span style="color: #555555;">:</span> value(p) {}
+    <span style="color: #555555;">~</span>MyFuture() { }
+    T get() {                                          <span style="color: #0099ff; font-style: italic;">// (10)</span>
+        <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #555555;">*</span>value;
+    }
+
+    <span style="color: #006699; font-weight: bold;">struct</span> promise_type {
+        std<span style="color: #555555;">::</span>shared_ptr<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span> ptr <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>make_shared<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span>(); <span style="color: #0099ff; font-style: italic;">// (4)</span>
+        <span style="color: #555555;">~</span>promise_type() { }
+        <span style="color: #006699; font-weight: bold;">MyFuture&lt;T&gt;</span> get_return_object() {              <span style="color: #0099ff; font-style: italic;">// (7)</span>
+            <span style="color: #006699; font-weight: bold;">return</span> ptr;
+        }
+        <span style="color: #007788; font-weight: bold;">void</span> return_value(T v) {
+            <span style="color: #555555;">*</span>ptr <span style="color: #555555;">=</span> v;
+        }
+        std<span style="color: #555555;">::</span>suspend_never initial_suspend() {          <span style="color: #0099ff; font-style: italic;">// (5)</span>
+            <span style="color: #006699; font-weight: bold;">return</span> {};
+        }
+        std<span style="color: #555555;">::</span>suspend_never final_suspend() {            <span style="color: #0099ff; font-style: italic;">// (6)</span>
+            <span style="color: #006699; font-weight: bold;">return</span> {};
+        }
+        <span style="color: #007788; font-weight: bold;">void</span> unhandled_exception() {
+            std<span style="color: #555555;">::</span>exit(<span style="color: #ff6600;">1</span>);
+        }
+    };
+};
+
+MyFuture<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> createFuture() {                         <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    co_return <span style="color: #ff6600;">2021</span>;                                    <span style="color: #0099ff; font-style: italic;">// (9)</span>
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    <span style="color: #006699; font-weight: bold;">auto</span> fut <span style="color: #555555;">=</span> createFuture();
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"fut.get(): "</span> <span style="color: #555555;">&lt;&lt;</span> fut.get() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;   <span style="color: #0099ff; font-style: italic;">// (2)</span>
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p><code>MyFuture</code> behaves as a future, which runs immediately (see "<a href="index.php/asynchronous-function-calls">Asynchronous Function Calls</a>"). The call of the coroutine <code>createFuture</code> (line 1) returns the future, and the call<code> fut.get</code> (line 2) picks up the result of the associated promise.</p>
+<p>There is one subtle difference to a future: the return value of the coroutine <code>createFuture</code> is available after its invocation. Due to the lifetime issues of the coroutine, the coroutine is managed by a <code>std::shared_ptr</code> (lines 3 and 4). The coroutine always uses <code>std::suspend_never</code> (lines 5, and 6) and, therefore, neither does suspend before it runs nor after. This means the coroutine is immediately executed when the function <code>createFuture</code> is invoked. The member function <code>get_return_object</code> (line 7) returns the handle to the coroutine and stores it in a local variable. <code>return_value</code> (lines 8) stores the result of the coroutine, which was provided by <code>co_return 2021</code> (line 9). The client invokes <code>fut.get</code> (line 2) and uses the future as a handle to the promise. The member function<code> get</code> finally returns the result to the client (line 10).</p>
+<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/Cpp20/co_return/eagerFuture.png" alt="eagerFuture" width="150" height="43" /></p>
+<p>You may think that it is not worth the effort of implementing a coroutine that behaves just like a function. You are right! However, this simple coroutine is an ideal starting point for writing various implementations of futures.</p>
+<p>At this point, I should add a bit of theory.&nbsp;</p>
+<h2>The Promise Workflow</h2>
+<p>When you use<code> co_yield</code>, <code>co_await</code>, or <code>co_return</code> in a function, the function becomes a coroutine, and the compiler transforms its function body to something equivalent to the following lines.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">{
+  Promise prom;                      <span style="color: #0099ff; font-style: italic;">// (1)</span>
+  co_await prom.initial_suspend();   <span style="color: #0099ff; font-style: italic;">// (2)</span>
+  try {                                         
+    <span style="color: #555555;">&lt;</span>function body<span style="color: #555555;">&gt;                  <span style="color: #0099ff; font-style: italic;">// (3)</span></span>
+  }
+  <span style="color: #006699; font-weight: bold;">catch</span> (...) {
+    prom.unhandled_exception();
+  }
+<span style="color: #9999ff;">FinalSuspend:</span>
+  co_await prom.final_suspend();     <span style="color: #0099ff; font-style: italic;">// (4)</span>
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Do these function names sound familiar to you? Right! These are the member functions of the inner class<code> promise_type</code>. Here are the steps the compiler performs when it creates the coroutine object as the return value of the coroutine factory <code>createFuture</code>. It first creates the promise object (line 1), invokes its <code>initial_suspend</code> member function (line 2), executes the body of the coroutine factory (line 3), and finally, calls the member function<code> final_suspend</code> (line 4). Both member functions <code>initial_suspend</code> and <code>final_suspend</code> in the program <code>eagerFuture.cpp</code> return the predefined awaitables<code> std::suspend_never</code>.&nbsp; As its name suggests, this awaitable suspends never and, hence, the coroutine object suspends never und behaves such as a usual function. An awaitable is something you can await on. The operator co_await needs an awaitable. I write in a future post about the awaitable and the second awaiter workflow.</p>
+<p>From this simplified promise workflow, you can deduce, which member functions the promise (<code>promise_type</code>) at least needs:</p>
+<ul>
+<li>A default constructor</li>
+<li><code>initial_suspend</code></li>
+<li><code>final_suspend</code></li>
+<li><code>unhandled_exception</code></li>
+</ul>
+<p>Admittedly, this was not the full explanation but at least enough to get the first intuition about the workflow of coroutines.</p>
+<h2>What's next?</h2>
+<p>You may already guess it. In my next post, I use this simple coroutine as a starting point for further experiments. First, I add comments to the program to make its workflow explicit, second, I make the coroutine lazy and resume it on another thread.</p>
+<p>&nbsp;</p>
+<p>{loadmoduleid 153}</p>
+<p>&nbsp;</p>
+<p></p>
