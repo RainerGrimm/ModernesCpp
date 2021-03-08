@@ -1,0 +1,198 @@
+<p>Based on the coroutine-based implementation of a simple future in my last post "<a href="https://www.modernescpp.com/index.php/implementing-futures-with-coroutines">Implementing Simple Futures with Coroutines</a>", I want to go today one big step further. I analyze the workflow of the simple future and make it lazy.</p>
+<hr id="system-readmore" />
+<p><img src="https://www.modernescpp.com/images/blog/Cpp20/co_return2/TimelineCpp20.png" alt="TimelineCpp20" width="650" height="236" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>Before I create variations of the future, you should understand its control flow. I assume, that you know my previous post: "<a href="https://www.modernescpp.com/index.php/implementing-futures-with-coroutines">Implementing Simple Futures with Coroutines</a>. In this post, comments help me to make the control flow of the coroutine transparent. Additionally, I add a link to an online compiler to each presented program so that you directly use and experiment with the programs.</p>
+<h2>The Transparent Control Flow</h2>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// eagerFutureWithComments.cpp</span>
+
+<span style="color: #009999;">#include &lt;coroutine&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;memory&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">struct</span> MyFuture {
+    std<span style="color: #555555;">::</span>shared_ptr<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span> value
+    MyFuture(std<span style="color: #555555;">::</span>shared_ptr<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span> p)<span style="color: #555555;">:</span> value(p) {                         <span style="color: #0099ff; font-style: italic;">// (3)</span>
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"    MyFuture::MyFuture"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    }
+    <span style="color: #555555;">~</span>MyFuture() { 
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"    MyFuture::~MyFuture"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    }
+    T get() {
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"    MyFuture::get"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+        <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #555555;">*</span>value;
+    }
+
+    <span style="color: #006699; font-weight: bold;">struct</span> promise_type {                                              <span style="color: #0099ff; font-style: italic;">// (4)</span>
+        std<span style="color: #555555;">::</span>shared_ptr<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span> ptr <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>make_shared<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span>();                <span style="color: #0099ff; font-style: italic;">// (11)</span>
+        promise_type() {
+            std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"        promise_type::promise_type"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+        }
+        <span style="color: #555555;">~</span>promise_type() { 
+            std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"        promise_type::~promise_type"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+        }
+        MyFuture<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span> get_return_object() {
+            std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"        promise_type::get_return_object"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+            <span style="color: #006699; font-weight: bold;">return</span> ptr;
+        }
+        <span style="color: #007788; font-weight: bold;">void</span> return_value(T v) {
+            std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"        promise_type::return_value"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+            <span style="color: #555555;">*</span>ptr <span style="color: #555555;">=</span> v;
+        }
+        std<span style="color: #555555;">::</span>suspend_never initial_suspend() {                         <span style="color: #0099ff; font-style: italic;">// (6)</span>
+            std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"        promise_type::initial_suspend"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+            <span style="color: #006699; font-weight: bold;">return</span> {};
+        }
+        std<span style="color: #555555;">::</span>suspend_never final_suspend() noexcept {                 <span style="color: #0099ff; font-style: italic;">// (7)</span>
+            std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"        promise_type::final_suspend"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+            <span style="color: #006699; font-weight: bold;">return</span> {};
+        }<br />        <span style="color: #007788; font-weight: bold;">void</span> return_void() {}
+        <span style="color: #007788; font-weight: bold;">void</span> unhandled_exception() {
+            std<span style="color: #555555;">::</span>exit(<span style="color: #ff6600;">1</span>);
+        }
+    };                                                                 <span style="color: #0099ff; font-style: italic;">// (5)</span>
+};
+
+MyFuture<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> createFuture() {                                         <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"createFuture"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    co_return <span style="color: #ff6600;">2021</span>;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    <span style="color: #006699; font-weight: bold;">auto</span> fut <span style="color: #555555;">=</span> createFuture();                                         <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    <span style="color: #006699; font-weight: bold;">auto</span> res <span style="color: #555555;">=</span> fut.get();                                              <span style="color: #0099ff; font-style: italic;">// (8)</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"res: "</span> <span style="color: #555555;">&lt;&lt;</span> res <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+}                                                                     <span style="color: #0099ff; font-style: italic;">// (12)</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The call <code>createFuture</code> (line 1) causes the creating of the instance of<code> MyFuture</code> (line 2). Before <code>MyFuture</code> 's constructor call (line 3) is completed, the promise <code>promise_type</code> is created, executed, and destroyed (lines 4 - 5). The promise uses in each step of its control flow the awaitable <code>std::suspend_never</code> (lines 6 and 7) and, hence, never suspends. To save the result of the promise for the later<code> fut.get()</code> call (line 8), it has to be allocated. Furthermore, the used <code>std::shared_ptr'</code>s ensure (lines 3 and 10) that the program does not cause a memory leak. As a local, <code>fut </code>goes out of scope in line 12, and the C++ run time calls its destructor.</p>
+<p>You can try out the program on the <a href="https://godbolt.org/z/Y9naEx">Compiler Explorer</a>.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Cpp20/co_return2/eagerFutureWithComments.png" alt="eagerFutureWithComments" width="400" height="305" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>&nbsp;</p>
+<p>The presented coroutine runs immediately and is, therefore, eager. Furthermore, the coroutine runs in the thread of the caller.</p>
+<p>Let's make the future lazy.</p>
+<h2>A Lazy Future</h2>
+<p>A lazy future is a future that runs only if asked for the value. Let's see what I have to change in the previous coroutine to make the future lazy.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// lazyFuture.cpp</span>
+
+<span style="color: #009999;">#include &lt;coroutine&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;memory&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">struct</span> MyFuture {
+    <span style="color: #006699; font-weight: bold;">struct</span> promise_type;
+    <span style="color: #006699; font-weight: bold;">using</span> handle_type <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>coroutine_handle<span style="color: #555555;">&lt;</span>promise_type<span style="color: #555555;">&gt;</span>;
+ 
+    handle_type coro;                                               <span style="color: #0099ff; font-style: italic;">// (5)</span>
+
+    MyFuture(handle_type h)<span style="color: #555555;">:</span> coro(h) {
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"    MyFuture::MyFuture"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    }
+    <span style="color: #555555;">~</span>MyFuture() { 
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"    MyFuture::~MyFuture"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+        <span style="color: #006699; font-weight: bold;">if</span> ( coro ) coro.destroy();                                 <span style="color: #0099ff; font-style: italic;">// (8)</span>
+    }
+
+    T get() {
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"    MyFuture::get"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+        coro.resume();                                              <span style="color: #0099ff; font-style: italic;">// (6)</span>
+        <span style="color: #006699; font-weight: bold;">return</span> coro.promise().result;
+    }
+
+    <span style="color: #006699; font-weight: bold;">struct</span> promise_type {
+		T result;
+        promise_type() {
+           std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"        promise_type::promise_type"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+        }
+        <span style="color: #555555;">~</span>promise_type() { 
+            std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"        promise_type::~promise_type"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+        }
+        <span style="color: #006699; font-weight: bold;">auto</span> get_return_object() {                                  <span style="color: #0099ff; font-style: italic;">// (3)</span>
+            std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"        promise_type::get_return_object"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+            <span style="color: #006699; font-weight: bold;">return</span> MyFuture{handle_type<span style="color: #555555;">::</span>from_promise(<span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">this</span>)};
+        }
+        <span style="color: #007788; font-weight: bold;">void</span> return_value(T v) {
+            std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"        promise_type::return_value"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+            result <span style="color: #555555;">=</span> v;
+        }
+        std<span style="color: #555555;">::</span>suspend_always initial_suspend() {                    <span style="color: #0099ff; font-style: italic;">// (1)</span>
+            std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"        promise_type::initial_suspend"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+            <span style="color: #006699; font-weight: bold;">return</span> {};
+        }
+        std<span style="color: #555555;">::</span>suspend_always final_suspend() noexcept {            <span style="color: #0099ff; font-style: italic;">// (2)</span>
+            std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"        promise_type::final_suspend"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+            <span style="color: #006699; font-weight: bold;">return</span> {};
+        }<br />        <span style="color: #007788; font-weight: bold;">void</span> return_void() {}
+        <span style="color: #007788; font-weight: bold;">void</span> unhandled_exception() {
+            std<span style="color: #555555;">::</span>exit(<span style="color: #ff6600;">1</span>);
+        }
+    };
+};
+
+MyFuture<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> createFuture() {
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"createFuture"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    co_return <span style="color: #ff6600;">2021</span>;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    <span style="color: #006699; font-weight: bold;">auto</span> fut <span style="color: #555555;">=</span> createFuture();                                        <span style="color: #0099ff; font-style: italic;">// (4)</span>
+    <span style="color: #006699; font-weight: bold;">auto</span> res <span style="color: #555555;">=</span> fut.get();                                             <span style="color: #0099ff; font-style: italic;">// (7)</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"res: "</span> <span style="color: #555555;">&lt;&lt;</span> res <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Let's first study the promise. The promise always suspends at the beginning (line 1) and the end (line 2). Furthermore, the member function <code>get_return_object</code> (line 3) creates the return object that is returned to the caller of the coroutine c<code>reateFuture</code> (line 4). The future <code>MyFuture</code> is more interesting. It has a handle <code>coro</code> (line 5) to the promise. <code>MyFuture</code> uses the handle to manage its promise. It resumes the promise (line 6), asks the promise for the result (line 7), and finally destroys it (line 8). The resumption of the coroutine is necessary because it never runs automatically (line 1). When the client invokes<code> fut.get()</code> (line 7) to ask for the result of the future, it implicitly resumes the promise (line 6).</p>
+<p>You can try out the program on the&nbsp;<a href="https://godbolt.org/z/EejWcj">Compiler Explorer</a>.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Cpp20/co_return2/lazyFuture.png" alt="lazyFuture" width="400" height="322" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>&nbsp;</p>
+<p>What happens if the client is not interested in the result of the future and, hence, does not resume the coroutine? Let's try it out.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    <span style="color: #006699; font-weight: bold;">auto</span> fut <span style="color: #555555;">=</span> createFuture();
+    <span style="color: #0099ff; font-style: italic;">// auto res = fut.get();</span>
+    <span style="color: #0099ff; font-style: italic;">// std::cout &lt;&lt; "res: " &lt;&lt; res &lt;&lt; '\n';</span>
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>As you may guess, the promise never runs, and the member functions <code>return_value</code> and<code> final_suspend</code> are not executed.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Cpp20/co_return2/lazyFutureWithoutGet.png" alt="lazyFutureWithoutGet" width="400" height="202" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>Before I end this post, I want to write about the lifetime challenges of coroutines.</p>
+<h2>Lifetime Challenges of Coroutines</h2>
+<p>One of the challenges of dealing with coroutines is to handle the lifetime of the coroutine.</p>
+<p>In the first program <code>eagerFutureWithComments.cpp</code>, I stored the coroutine result in a <code>std::shared_ptr</code>. This is critical because the coroutine is eagerly executed.</p>
+<p>In the program<code> lazyFuture.cpp</code>, the call <code>final_suspend</code> suspends always (line 2): <code>std::suspend_always final_suspend()</code>. Consequently, the promise outlives the client, and a <code>std::shared_ptr</code> is not necessary anymore. Returning <code>std::suspend_never</code> from the function<code> final_suspend</code> would cause, in this case, undefined behavior, because the client would outlive the promise. Hence, the lifetime of the <code>result</code> ends bevor the client asks for it.</p>
+<p>&nbsp;</p>
+<h2>What's next?</h2>
+<p>My final step in the variation of the future is still missing. In the next post, I resume the coroutine on a separate thread.</p>
+<p>&nbsp;</p>
+<p>{loadmoduleid 153}</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
