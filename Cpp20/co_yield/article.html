@@ -1,0 +1,201 @@
+<p>In this post, I analyze the new keyword co_yield. Thanks to co_yield, you can create an infinite data stream in C++20.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/Cpp20/co_yield/TimelineCpp20.png" alt="" width="650" class="pull-center" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>This is what happened so far in my pragmatical journey through the new coroutine keywords <code>co_return,</code> <code>co_yield</code>, and <code>co_await.</code></p>
+<p><code>co_return</code>:</p>
+<ul>
+<li><a href="https://www.modernescpp.com/index.php/implementing-futures-with-coroutines">Implementing Simple Futures With Coroutines</a></li>
+<li><a href="https://www.modernescpp.com/index.php/executing-a-future-in-a-separate-thread-with-coroutines">Lazy Futures with Coroutines</a></li>
+<li><a href="https://www.modernescpp.com/index.php/executing-a-future-in-a-separate-thread-with-coroutines">Executing a Future in a separate Thread with Coroutines</a></li>
+</ul>
+<h2>A Generator</h2>
+<p>As a starting point for further variations, I want to present to start with a generator which I only ask for three values. This simplification and visualization should help to understand the control flow of the generator.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// infiniteDataStreamComments.cpp</span>
+
+<span style="color: #009999;">#include &lt;coroutine&gt;</span>
+<span style="color: #009999;">#include &lt;memory&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">struct</span> Generator {
+    
+    <span style="color: #006699; font-weight: bold;">struct</span> promise_type;
+    <span style="color: #006699; font-weight: bold;">using</span> handle_type <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>coroutine_handle<span style="color: #555555;">&lt;</span>promise_type<span style="color: #555555;">&gt;</span>;
+    
+    Generator(handle_type h)<span style="color: #555555;">:</span> coro(h) {
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"        Generator::Generator"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    }                
+
+    handle_type coro;
+    
+    <span style="color: #555555;">~</span>Generator() {
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"        Generator::~Generator"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+        <span style="color: #006699; font-weight: bold;">if</span> ( coro ) coro.destroy();
+    }
+    Generator(<span style="color: #006699; font-weight: bold;">const</span> Generator<span style="color: #555555;">&amp;</span>) <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">delete</span>;
+    Generator<span style="color: #555555;">&amp;</span> <span style="color: #006699; font-weight: bold;">operator</span> <span style="color: #555555;">=</span> (<span style="color: #006699; font-weight: bold;">const</span> Generator<span style="color: #555555;">&amp;</span>) <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">delete</span>;
+    Generator(Generator<span style="color: #555555;">&amp;&amp;</span> oth)<span style="color: #555555;">:</span> coro(oth.coro) {
+        oth.coro <span style="color: #555555;">=</span> nullptr;
+    }
+    Generator<span style="color: #555555;">&amp;</span> <span style="color: #006699; font-weight: bold;">operator</span> <span style="color: #555555;">=</span> (Generator<span style="color: #555555;">&amp;&amp;</span> oth) {
+        coro <span style="color: #555555;">=</span> oth.coro;
+        oth.coro <span style="color: #555555;">=</span> nullptr;
+        <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">this</span>;
+    }
+    T getNextValue() {
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"        Generator::getNextValue"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+        coro.resume();                                                 <span style="color: #0099ff;"> // (13)</span> 
+        <span style="color: #006699; font-weight: bold;">return</span> coro.promise().current_value;
+    }
+    <span style="color: #006699; font-weight: bold;">struct</span> promise_type {
+        promise_type() {                                                <span style="color: #0099ff;">// (2)</span>
+            std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"            promise_type::promise_type"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+        }                              
+          
+        <span style="color: #555555;">~</span>promise_type() {
+            std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"            promise_type::~promise_type"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+        }
+        
+        std<span style="color: #555555;">::</span>suspend_always initial_suspend() {                         <span style="color: #0099ff;">// (5)</span>
+            std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"            promise_type::initial_suspend"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;  
+            <span style="color: #006699; font-weight: bold;">return</span> {};                                                 <span style="color: #0099ff;"> // (6)</span>
+        }
+        std<span style="color: #555555;">::</span>suspend_always final_suspend() noexcept {
+            std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"            promise_type::final_suspend"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+            <span style="color: #006699; font-weight: bold;">return</span> {};
+        }
+        <span style="color: #006699; font-weight: bold;">auto</span> get_return_object() {                                       <span style="color: #0099ff;">// (3)</span>
+            std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"            promise_type::get_return_object"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+            <span style="color: #006699; font-weight: bold;">return</span> Generator{handle_type<span style="color: #555555;">::</span>from_promise(<span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">this</span>)};          <span style="color: #0099ff;">// (4)</span>
+        }
+      
+        std<span style="color: #555555;">::</span>suspend_always yield_value(<span style="color: #007788; font-weight: bold;">int</span> value) {                    <span style="color: #0099ff;"> // (8)</span>
+            std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"            promise_type::yield_value"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+            current_value <span style="color: #555555;">=</span> value;                                       <span style="color: #0099ff;">// (9)</span>
+            <span style="color: #006699; font-weight: bold;">return</span> {};                                                   <span style="color: #0099ff;">// (10)</span>
+        }
+        <span style="color: #007788; font-weight: bold;">void</span> return_void() {}
+        <span style="color: #007788; font-weight: bold;">void</span> unhandled_exception() {
+            std<span style="color: #555555;">::</span>exit(<span style="color: #ff6600;">1</span>);
+        }
+
+        T current_value;
+    };
+
+};
+
+Generator<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> getNext(<span style="color: #007788; font-weight: bold;">int</span> start <span style="color: #555555;">=</span> <span style="color: #ff6600;">10</span>, <span style="color: #007788; font-weight: bold;">int</span> step <span style="color: #555555;">=</span> <span style="color: #ff6600;">10</span>) {
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"    getNext: start"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    <span style="color: #006699; font-weight: bold;">auto</span> value <span style="color: #555555;">=</span> start;
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #007788; font-weight: bold;">true</span><span style="color: #555555;"></span><span style="color: #ff6600;"></span><span style="color: #555555;"></span>) {                                             <span style="color: #0099ff;">            // (11)</span>
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"    getNext: before co_yield"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+        co_yield value;                                                <span style="color: #0099ff;">  // (7)</span>
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"    getNext: after co_yield"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+        value <span style="color: #555555;">+=</span> step;
+    }
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main() {
+  
+    <span style="color: #006699; font-weight: bold;">auto</span> gen <span style="color: #555555;">=</span> getNext();                                                <span style="color: #0099ff;">// (1)</span>
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #007788; font-weight: bold;">int</span> i <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>; i <span style="color: #555555;">&lt;=</span> <span style="color: #ff6600;">2</span>; <span style="color: #555555;">++</span>i) {
+        <span style="color: #006699; font-weight: bold;">auto</span> val <span style="color: #555555;">=</span> gen.getNextValue();                                 <span style="color: #0099ff;">  // (12)</span>
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"main: "</span> <span style="color: #555555;">&lt;&lt;</span> val <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;                           <span style="color: #0099ff;"> // (14)</span>
+    }
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<div>
+<div>Executing&nbsp;the&nbsp;program&nbsp;on&nbsp;the&nbsp;<a href="https://godbolt.org/z/cTW9Gq">Compiler Explorer</a> makes&nbsp;the&nbsp;control&nbsp;flow&nbsp;transparent.</div>
+<div>&nbsp;</div>
+<div><img src="https://www.modernescpp.com/images/blog/Cpp20/co_yield/infiniteDataStreamComments.png" alt="infiniteDataStreamComments" width="450" height="495" style="display: block; margin-left: auto; margin-right: auto;" /></div>
+<div>
+<p>&nbsp;</p>
+<p>Let's analyze the control flow.</p>
+<p>The call<code> getNext()</code> (line 1) triggers the creation of the<code> Generator&lt;int&gt;</code>. First,&nbsp;<code>promise_type</code> (line 2) is created, and the following <code>get_return_object</code> call (line 3) creates the generator (line 4) and stores it in a local variable. The result of this call is returned to the caller when the coroutine is suspended the first time. The initial suspension happens immediately (line 5). Because the member function call<code> initial_suspend</code> returns an Awaitable<code> std::suspend_always</code> (line 6), the control flow continues with the coroutine<code> getNext</code> until the instruction<code> co_yield value</code> (line 7). This call is mapped to the call<code> yield_value(int value)</code> (line 8) and the current value is prepared <code>current_value = value</code> (line 9). The member function <code>yield_value(int value)</code> returns the Awaitable <code>std::suspend_always</code> (line 10). Consequently, the execution of the coroutine pauses, the control flow goes back to the main function, and the for loop starts (line 11). The call<code> gen.getNextValue()</code> (line 12) starts the execution of the coroutine by resuming the coroutine, using <code>coro.resume()</code> (line 13). Further, the function<code> getNextValue()</code> returns the current value that was prepared using the previously invoked member function <code>yield_value(int value)</code> (line 8). Finally, the generated number is displayed in line14 and the for loop continues. In the end, the generator and the promise are destructed.</p>
+<p>After this detailed analysis, I want to make a first modification of the control flow.</p>
+<h3>Modifications</h3>
+<div>
+<div>My&nbsp;code&nbsp;snippets&nbsp;and&nbsp;line&nbsp;numbers&nbsp;are&nbsp;all&nbsp;based&nbsp;on&nbsp;the&nbsp;previous&nbsp;program<code> infiniteDataStreamComments.cpp</code>.&nbsp;I&nbsp;only&nbsp;show&nbsp;the&nbsp;modifications.</div>
+<div>&nbsp;</div>
+<h4>The Coroutine is Not Resumed</h4>
+<div>
+<div>
+<div>When&nbsp;I&nbsp;disable&nbsp;the&nbsp;resumption&nbsp;of&nbsp;the&nbsp;coroutine&nbsp;(<code>gen.getNextValue()</code> in&nbsp;line 12)&nbsp;and&nbsp;the&nbsp;display&nbsp;of&nbsp;its&nbsp;value&nbsp;(line 14),&nbsp;the&nbsp;coroutine&nbsp;immediately&nbsp;pauses.&nbsp;</div>
+<div>&nbsp;</div>
+</div>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+  
+    <span style="color: #006699; font-weight: bold;">auto</span> gen <span style="color: #555555;">=</span> getNext();
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #007788; font-weight: bold;">int</span> i <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>; i <span style="color: #555555;">&lt;=</span> <span style="color: #ff6600;">2</span>; <span style="color: #555555;">++</span>i) {
+        <span style="color: #0099ff; font-style: italic;">// auto val = gen.getNextValue();</span>
+        <span style="color: #0099ff; font-style: italic;">// std::cout &lt;&lt; "main: " &lt;&lt; val &lt;&lt; '\n';                   </span>
+    }
+    
+}
+</pre>
+</div>
+</div>
+<div>&nbsp;</div>
+<div>
+<div><br />
+<div>The&nbsp;coroutine&nbsp;never&nbsp;runs.&nbsp;Consequently,&nbsp;the&nbsp;generator&nbsp;and&nbsp;its&nbsp;promise&nbsp;are&nbsp;created&nbsp;and&nbsp;destroyed.&nbsp;</div>
+<div>&nbsp;</div>
+<div><img src="https://www.modernescpp.com/images/blog/Cpp20/co_yield/infiniteDataStreamCoroutineNeverRuns.png" alt="infiniteDataStreamCoroutineNeverRuns" width="350" height="154" style="display: block; margin-left: auto; margin-right: auto;" /></div>
+<div>&nbsp;</div>
+<h4><code>initial_suspend</code> Never Suspends</h4>
+<p>In the program, the member function<code> initial_suspend</code> returns the Awaitable <code>std::suspend_always</code> (line 5). As its name suggests, the Awaitable <code>std::suspends_always</code> causes the coroutine to pause immediately. Let me return <code>std::suspend_never</code> instead of <code>std::suspend_always</code>.</p>
+</div>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">std<span style="color: #555555;">::</span>suspend_never initial_suspend() {  
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"            promise_type::initial_suspend"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    <span style="color: #006699; font-weight: bold;">return</span> {};
+}
+</pre>
+</div>
+</div>
+<div>In this case, the coroutine runs immediately and pauses when the function<code> yield_value</code> (line 8) is invoked. A subsequent call <code>gen.getNextValue()</code> (line 12) resumes the coroutine and triggers the execution of the member function <code>yield_value</code> once more. The result is that the start value 10 is ignored, and the coroutine returns the values 20, 30, and 40.</div>
+<div>&nbsp;</div>
+<div><img src="https://www.modernescpp.com/images/blog/Cpp20/co_yield/infiniteDataStreamInitialSuspendSuspendsNever.png" alt="infiniteDataStreamInitialSuspendSuspendsNever" width="400" height="499" style="display: block; margin-left: auto; margin-right: auto;" /></div>
+<div>&nbsp;</div>
+<h4><code>yield_value</code> Never Suspends</h4>
+<div>&nbsp;</div>
+<div>The member function <code>yield_value</code> (line 8) is triggered by the call <code>co_yield value</code> and prepares the current_value (line 9). The function returns the Awaitable <code>std::suspend_always</code> (line 10) and, therefore, pauses the coroutine. Consequently, a subsequent call<code> gen.getNextValue</code> (line 12) has to resume the coroutine. When I change the return value of the member function <code>yield_value</code> to <code>std::suspend_never</code>, let me see what happens.</div>
+<div>&nbsp;</div>
+<div>&nbsp;</div>
+</div>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">std<span style="color: #555555;">::</span>suspend_never yield_value(<span style="color: #007788; font-weight: bold;">int</span> value) {    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"            promise_type::yield_value"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    current_value <span style="color: #555555;">=</span> value;
+    <span style="color: #006699; font-weight: bold;">return</span> {};
+}
+</pre>
+</div>
+</div>
+<div>&nbsp;</div>
+<div>
+<div>
+<div>As&nbsp;you&nbsp;may&nbsp;guess,&nbsp;the&nbsp;while&nbsp;loop&nbsp;(line 1)&nbsp;runs&nbsp;forever,&nbsp;and&nbsp;the&nbsp;coroutine&nbsp;does&nbsp;not&nbsp;return&nbsp;anything.</div>
+<div>&nbsp;</div>
+<div><img src="https://www.modernescpp.com/images/blog/Cpp20/co_yield/infiniteDataStreamCommentsYieldValueSuspendsNever.png" alt="infiniteDataStreamCommentsYieldValueSuspendsNever" width="400" height="466" style="display: block; margin-left: auto; margin-right: auto;" /></div>
+<div>&nbsp;</div>
+<div>@<a href="https://github.com/mattgodbolt">Matt Godbolt</a>: this was not a denial-of-service attack.</div>
+<h2>What's next?</h2>
+<p>So far, I never used the fact that the coroutine is a class template. In my next post, I restructure the generator so that it produces a finite number of arbitrary values.</p>
+<div>&nbsp;{loadmoduleid 153}</div>
+<div>&nbsp;</div>
+<div>&nbsp;</div>
+<div>&nbsp;</div>
+</div>
+</div>
+</div>

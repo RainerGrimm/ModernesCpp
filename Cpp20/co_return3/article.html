@@ -1,0 +1,187 @@
+<p>This post concludes my posts about co_return in C++20. I started with an eager future, continued with a lazy future. Today, I execute the future in a separate thread using coroutines as an implementation detail.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p><img src="https://www.modernescpp.com/images/blog/Cpp20/co_return3/TimelineCpp20.png" alt="TimelineCpp20" width="650" height="236" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>Before I continue, I want to emphasize. The reason for this mini-series about coroutines in C++20 is simple: I want to help you to build an intuition about the complicated workflow of coroutines. This is what happened so far in this mini-series. Each post is base on the previous ones.</p>
+<p><code>co_return</code>:</p>
+<ul>
+<li><a href="https://www.modernescpp.com/index.php/implementing-futures-with-coroutines">Implementing Simple Futures With Coroutines</a></li>
+<li><a href="https://www.modernescpp.com/index.php/lazy-futures-with-coroutines-in-c-20">Lazy Futures with Coroutines</a></li>
+</ul>
+<p>&nbsp;Now,&nbsp; I want to execute the coroutine on a separate thread.</p>
+<h2>Execution on Another Thread</h2>
+<p>The coroutine in the previous example "<a href="https://www.modernescpp.com/index.php/lazy-futures-with-coroutines-in-c-20">Lazy Futures with Coroutines in C++20</a>"&nbsp; was fully suspended before entering the coroutine body of <code>createFuture</code>.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">MyFuture<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> createFuture() {
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"createFuture"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    co_return <span style="color: #ff6600;">2021</span>;
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The reason was, that the function<code> initial_suspend</code> of the promise returns<code> std::suspend_always</code>. This means that the coroutine is at first suspended and can, hence,&nbsp; be executed on a separate thread</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// lazyFutureOnOtherThread.cpp</span>
+
+<span style="color: #009999;">#include &lt;coroutine&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;memory&gt;</span>
+<span style="color: #009999;">#include &lt;thread&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">struct</span> MyFuture {
+    <span style="color: #006699; font-weight: bold;">struct</span> promise_type;
+    <span style="color: #006699; font-weight: bold;">using</span> handle_type <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>coroutine_handle<span style="color: #555555;">&lt;</span>promise_type<span style="color: #555555;">&gt;</span>; 
+    handle_type coro;
+
+    MyFuture(handle_type h)<span style="color: #555555;">:</span> coro(h) {}
+    <span style="color: #555555;">~</span>MyFuture() {
+        <span style="color: #006699; font-weight: bold;">if</span> ( coro ) coro.destroy();
+    }
+
+    T get() {                                           <span style="color: #0099ff; font-style: italic;">// (1)</span>
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"    MyFuture::get:  "</span> 
+                  <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"std::this_thread::get_id(): "</span> 
+                  <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>get_id() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+        
+        std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t([<span style="color: #006699; font-weight: bold;">this</span>] { coro.resume(); });       <span style="color: #0099ff; font-style: italic;">// (2)</span>
+        t.join();
+        <span style="color: #006699; font-weight: bold;">return</span> coro.promise().result;
+    }
+
+    <span style="color: #006699; font-weight: bold;">struct</span> promise_type {
+        promise_type(){ 
+            std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"        promise_type::promise_type:  "</span> 
+                      <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"std::this_thread::get_id(): "</span> 
+                      <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>get_id() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+        }
+        <span style="color: #555555;">~</span>promise_type(){ 
+            std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"        promise_type::~promise_type:  "</span> 
+                      <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"std::this_thread::get_id(): "</span> 
+                      <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>get_id() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+        }
+
+        T result;
+        <span style="color: #006699; font-weight: bold;">auto</span> <span style="color: #cc00ff;">get_return_object</span>() {
+            <span style="color: #006699; font-weight: bold;">return</span> MyFuture{handle_type<span style="color: #555555;">::</span>from_promise(<span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">this</span>)};
+        }
+        <span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">return_value</span>(T v) {
+            std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"        promise_type::return_value:  "</span> 
+                      <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"std::this_thread::get_id(): "</span> 
+                      <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>get_id() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+            std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> v <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+            result <span style="color: #555555;">=</span> v;
+        }
+        std<span style="color: #555555;">::</span>suspend_always initial_suspend() {
+            <span style="color: #006699; font-weight: bold;">return</span> {};
+        }
+        std<span style="color: #555555;">::</span>suspend_always final_suspend() noexcept {
+            std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"        promise_type::final_suspend:  "</span> 
+                      <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"std::this_thread::get_id(): "</span> 
+                      <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>get_id() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+            <span style="color: #006699; font-weight: bold;">return</span> {};
+        }
+        <span style="color: #007788; font-weight: bold;">void</span> unhandled_exception() {
+            std<span style="color: #555555;">::</span>exit(<span style="color: #ff6600;">1</span>);
+        }
+    };
+};
+
+MyFuture<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> createFuture() {
+    co_return <span style="color: #ff6600;">2021</span>;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"main:  "</span> 
+              <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"std::this_thread::get_id(): "</span> 
+              <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>get_id() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    <span style="color: #006699; font-weight: bold;">auto</span> fut <span style="color: #555555;">=</span> createFuture();
+    <span style="color: #006699; font-weight: bold;">auto</span> res <span style="color: #555555;">=</span> fut.get();
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"res: "</span> <span style="color: #555555;">&lt;&lt;</span> res <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>I added a few comments to the program that show the id of the running thread. The program<code> lazyFutureOnOtherThread.cpp</code> is quite similar to the previous program <code>lazyFuture.cpp</code> ín the post "<a href="https://www.modernescpp.com/index.php/lazy-futures-with-coroutines-in-c-20">Lazy Futures with Coroutines in C++20</a>". The main difference is the member function get (line 1). The call <code>std::thread t([this] { coro.resume(); });</code> (line 2) resumes the coroutine on another thread.</p>
+<p>You can try out the program on the&nbsp;<a href="https://wandbox.org/permlink/jFVVj80Gxu6bnNkc">Wandbox</a> online compiler.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Cpp20/co_return3/lazyFutureOnOtherThread.png" alt="lazyFutureOnOtherThread" width="650" height="165" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>&nbsp;</p>
+<p>I want to add a few additional remarks about the member function <code>get</code>. It is crucial that the promise resumed in a separate thread, finishes before it returns <code>coro.promise().result;</code> .</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">T <span style="color: #cc00ff;">get</span>() {
+    std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t([<span style="color: #006699; font-weight: bold;">this</span>] { coro.resume(); });
+    t.join();
+    <span style="color: #006699; font-weight: bold;">return</span> coro.promise().result;
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Where I to join the thread<code> t</code> after the call return<code> coro.promise().result</code>, the program would have undefined behavior. In the following implementation of the function <code>get</code>, I use a <code>std::jthread</code>. Here is my post about std::jthread in C++20: "<a href="https://www.modernescpp.com/index.php/an-improved-thread-with-c-20">An Improved Thread with C++20</a>". Since <code>std::jthread</code> automatically joins when it goes out of scope. This is too late.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%;">T <span style="color: #cc00ff;">get</span>() {   <br />    std<span style="color: #555555;">::</span>jthread t([<span style="color: #006699; font-weight: bold;">this</span>] { coro.resume(); });
+    <span style="color: #006699; font-weight: bold;">return</span> coro.promise().result;
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>In this case, it is highly likely that the client gets its result before the promise prepares it using the member function<code> return_value</code>. Now, <code>result</code> has an arbitrary value, and therefore so does <code>res</code>.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Cpp20/co_return3/lazyFutureOnOtherThreadLateJoin.png" alt="lazyFutureOnOtherThreadLateJoin" width="650" height="164" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<div>&nbsp;</div>
+<div>There are other possibilities to ensure that the thread is done before the return call.</div>
+<div>&nbsp;</div>
+<ul>
+<li><code>std::jthread</code> has its own scope</li>
+</ul>
+<div>&nbsp;</div>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">T <span style="color: #cc00ff;">get</span>() {
+    {
+        std<span style="color: #555555;">::</span>jthread t([<span style="color: #006699; font-weight: bold;">this</span>] { coro.resume(); });
+    }
+    <span style="color: #006699; font-weight: bold;">return</span> coro.promise().result;
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<ul>
+<li>Make<code> std::jthread</code> a temporary object</li>
+</ul>
+<p><!-- HTML generated using hilite.me --></p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">T <span style="color: #cc00ff;">get</span>() {<br />    std<span style="color: #555555;">::</span>jthread([<span style="color: #006699; font-weight: bold;">this</span>] { coro.resume(); });<br />    <span style="color: #006699; font-weight: bold;">return</span> coro.promise().result;<br />}</pre>
+</div>
+<p>&nbsp;</p>
+<p>In particular, I don't like the last solution because it may take you a few seconds to recognize that I just called the constructor of <code>std::jthread</code>.</p>
+<p>Now, it is the right time to add more theory about coroutines.</p>
+<h2><code>promise_type</code></h2>
+<p>You may wonder that the coroutine such as <code>MyFuture</code> has always inner type <code>promise_type</code>. This name is required. Alternatively, you can specialize <code><a href="https://en.cppreference.com/w/cpp/coroutine/coroutine_traits">std::coroutines_traits</a>&nbsp;</code>on <code>MyFuture </code>and define a public <code>promise_type</code> in it. I mentioned this point explicitly because I know a few people including me which already fall into this trap.</p>
+<p>Here is another trap I fall into on Windows.</p>
+<h2><code>return_void</code> and <code>return_value</code></h2>
+<p>The promise needs either the member function<code> return_void</code> or <code>return_value.</code></p>
+<ul>
+<li>The promise needs a <code>return_void</code> member function if
+<ul>
+<li>the coroutine has no <code>co_return</code> statement.</li>
+<li>the coroutine has a <code>co_return</code> statement without argument.</li>
+<li>the coroutine has a <code>co_return expression</code> statement where expression has type<code> void.</code></li>
+</ul>
+</li>
+<li>The promise needs a <code>return_value</code> member function if it returns<code> co_return</code> expression statement where expression must not have the type <code>void</code></li>
+</ul>
+<p>Falling off the end of a void-returning coroutine without a <code>return_void</code> member function is undefined behavior. Interestingly, the Microsoft&nbsp; but not the GCC compiler requires a member function <code>return_void</code> if the coroutine is always suspended at its final suspension point and, therefore, does not fail of the end: <code> std<span style="color: #555555;">::</span>suspend_always final_suspend() noexcept; </code>From my perspective, the C++20 standard is not clear and I always add a member function<code> void return_void() {}</code> to my promise type.</p>
+<h2>What's next?</h2>
+<p>After my discussion of the new keyword <code>co_return</code>, I want to continue with <code>co_yield</code>. <code>co_yield</code> enables you to create infinite data streams. I show in my next post, how.</p>
+<p>{loadmoduleid 153}</p>
