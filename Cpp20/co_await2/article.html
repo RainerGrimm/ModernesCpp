@@ -1,0 +1,208 @@
+<p>In my last post "<a href="https://www.modernescpp.com/index.php/starting-jobs-with-coroutines">Starting Jobs with Coroutines</a>", I applied <code>co_await</code> to start a job. In this post, I improve the workflow and automatically resume a job if necessary. In my final step, I resume the job on a separate thread.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/Cpp20/co_await2/TimelineCpp20.png" alt="TimelineCpp20" width="650" height="236" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>This is my 7th post in my mini-series about the new keywords co_return, co_yield, and co_await. To understand this practical introduction to coroutines, you should know all the previous posts:</p>
+<p><code>co_return</code>:</p>
+<ul>
+<li><a href="https://www.modernescpp.com/index.php/implementing-futures-with-coroutines">Implementing Simple Futures With Coroutines</a></li>
+<li><a href="https://www.modernescpp.com/index.php/lazy-futures-with-coroutines-in-c-20">Lazy Futures with Coroutines</a></li>
+<li><a href="https://www.modernescpp.com/index.php/executing-a-future-in-a-separate-thread-with-coroutines">Executing a Future in a separate Thread with Coroutines</a></li>
+</ul>
+<p><code>co_yield:</code></p>
+<ul>
+<li><a href="https://www.modernescpp.com/index.php/an-infinite-data-stream-with-coroutines-in-c-20">An Infinite Data Stream with Coroutines</a></li>
+<li><a href="https://www.modernescpp.com/index.php/a-generic-data-stream-with-coroutines-in-c-20">A Generic Data Stream with Coroutines</a></li>
+</ul>
+<p><code>co_await:</code></p>
+<ul>
+<li><a href="https://www.modernescpp.com/index.php/starting-jobs-with-coroutines">Starting Jobs with Coroutines</a></li>
+</ul>
+<h2>Automatically Resuming the Awaiter</h2>
+<p>In the previous workflow (see <a href="https://www.modernescpp.com/index.php/starting-jobs-with-coroutines">Starting Jobs with Coroutines</a>), I presented the awaiter workflow in detail and I explicitly started the job.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span>  <span style="color: #cc3300;">"Before job"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    <span style="color: #006699; font-weight: bold;">auto</span> job <span style="color: #555555;">=</span> prepareJob();
+    job.start();
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span>  <span style="color: #cc3300;">"After job"</span> <span style="color: #555555;">&lt;&lt;</span>  <span style="color: #cc3300;">'\n'</span>;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>This explicit invoking of<code> job.start()</code> was necessary because <code>await_ready</code> in the Awaitable <code>MySuspendAlways</code> always returned <code>false</code>. Now let's assume that await_ready can return <code>true</code> or <code>false</code> and the job is not explicitly started. A short reminder: When <code>await_ready</code> returns <code>true</code>, the function <code>await_resume</code> is directly invoked but not <code>await_suspend</code>.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// startJobWithAutomaticResumption.cpp</span>
+
+<span style="color: #009999;">#include &lt;coroutine&gt;</span>
+<span style="color: #009999;">#include &lt;functional&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;random&gt;</span>
+
+std<span style="color: #555555;">::</span>random_device seed;
+<span style="color: #006699; font-weight: bold;">auto</span> gen <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>bind_front(std<span style="color: #555555;">::</span>uniform_int_distribution<span style="color: #555555;">&lt;&gt;</span>(<span style="color: #ff6600;">0</span>,<span style="color: #ff6600;">1</span>),         <span style="color: #0099ff;">// (1)</span>
+                           std<span style="color: #555555;">::</span>default_random_engine(seed()));
+
+<span style="color: #006699; font-weight: bold;">struct</span> MySuspendAlways {                                                 <span style="color: #0099ff;">// (3)</span>
+    <span style="color: #007788; font-weight: bold;">bool</span> await_ready() <span style="color: #006699; font-weight: bold;">const</span> noexcept { 
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"        MySuspendAlways::await_ready"</span>  <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+        <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc00ff;">gen</span>();
+    }
+    <span style="color: #007788; font-weight: bold;">bool</span> await_suspend(std<span style="color: #555555;">::</span>coroutine_handle<span style="color: #555555;">&lt;&gt;</span> handle) <span style="color: #006699; font-weight: bold;">const</span> noexcept {  <span style="color: #0099ff;">// (5)</span>
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"        MySuspendAlways::await_suspend"</span>  <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+        handle.resume();                                                <span style="color: #0099ff;"> // (6)</span>
+        <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #336666;">true</span>;
+
+    }
+    <span style="color: #007788; font-weight: bold;">void</span> await_resume() <span style="color: #006699; font-weight: bold;">const</span> noexcept {                                 <span style="color: #0099ff;">// (4)</span>
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"        MySuspendAlways::await_resume"</span>  <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    }
+};
+ 
+<span style="color: #006699; font-weight: bold;">struct</span> Job { 
+    <span style="color: #006699; font-weight: bold;">struct</span> promise_type;
+    <span style="color: #006699; font-weight: bold;">using</span> handle_type <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>coroutine_handle<span style="color: #555555;">&lt;</span>promise_type<span style="color: #555555;">&gt;</span>;
+    handle_type coro;
+    Job(handle_type h)<span style="color: #555555;">:</span> coro(h){}
+    <span style="color: #555555;">~</span>Job() {
+        <span style="color: #006699; font-weight: bold;">if</span> ( coro ) coro.destroy();
+    }
+
+    <span style="color: #006699; font-weight: bold;">struct</span> promise_type {
+        <span style="color: #006699; font-weight: bold;">auto</span> get_return_object() { 
+            <span style="color: #006699; font-weight: bold;">return</span> Job{handle_type<span style="color: #555555;">::</span>from_promise(<span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">this</span>)};
+        }
+        MySuspendAlways initial_suspend() {                    <span style="color: #0099ff;"> // (2)</span>
+            std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"    Job prepared"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+            <span style="color: #006699; font-weight: bold;">return</span> {}; 
+        }
+        std<span style="color: #555555;">::</span>suspend_always final_suspend() noexcept {
+            std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"    Job finished"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>; 
+            <span style="color: #006699; font-weight: bold;">return</span> {}; 
+        }
+        <span style="color: #007788; font-weight: bold;">void</span> return_void() {}
+        <span style="color: #007788; font-weight: bold;">void</span> unhandled_exception() {}
+    
+    };
+};
+ 
+Job <span style="color: #cc00ff;">performJob</span>() {
+    co_await std<span style="color: #555555;">::</span>suspend_never();
+}
+ 
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span>  <span style="color: #cc3300;">"Before jobs"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    performJob();
+    performJob();
+    performJob();
+    performJob();
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span>  <span style="color: #cc3300;">"After jobs"</span> <span style="color: #555555;">&lt;&lt;</span>  <span style="color: #cc3300;">'\n'</span>;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>First, the coroutine is now called <code>performJob</code> and runs automatically. <code>gen</code> (line 1) is a random number generator for the numbers 0 or 1. It uses for its job the default random engine, initialized with the seed. Thanks to<code> std::bind_front</code>, I can bind it together with the <code>std::uniform_int_distribution</code> to get a callable which, when used, gives me a random number 0 or 1.</p>
+<p>A callable is something that behaves like a function. Not only are these named functions but also function objects or lambda expressions. Read more about the new function<code> std::bind_front</code> in the post "<a href="https://www.modernescpp.com/index.php/more-and-more-utilities-in-c-20">More and More Utilities in C++20</a>".</p>
+<p>I removed in this example the awaitables with predefined Awaitables from the C++ standard, except the awaitable <code>MySuspendAlways</code> as the return type of the member function <code>initial_suspend</code> (line 2). <code>await_ready</code> (line 3) returns a boolean. When the boolean is <code>true</code>, the control flow jumps directly to the member function <code>await_resume</code> (line 4), when <code>false</code>, the coroutine is immediately suspended and, therefore, the function <code>await_suspend</code> runs (line 5). The function <code>await_suspend</code> gets the handle to the coroutine and uses it to resume the coroutine (line 6). Instead of returning the value <code>true</code>, await_suspend can also return <code>void</code>.</p>
+<p>The following screenshot shows: When <code>await_ready</code> returns <code>true</code>, the function <code>await_resume</code> is called, when <code>await_ready</code> returns <code>false</code>, the function <code>await_suspend</code> is also called.</p>
+<div>
+<div>You&nbsp;can&nbsp;try&nbsp;out&nbsp;the&nbsp;program&nbsp;on&nbsp;the <a href="https://godbolt.org/z/8b1Y14">Compiler Explorer</a>.</div>
+<div>&nbsp;</div>
+<div><img src="https://www.modernescpp.com/images/blog/Cpp20/co_await2/startJobWithAutomaticResumption.png" alt="startJobWithAutomaticResumption" width="463" height="536" style="display: block; margin-left: auto; margin-right: auto;" /></div>
+<div>&nbsp;</div>
+<div>Let me now make the final step and automatically resume the awaiter on a separate thread.</div>
+<h2>Automatically Resuming the Awaiter on a Separate Thread</h2>
+<p>The following program is based on the previous program.</p>
+<div>&nbsp;</div>
+</div>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// startJobWithResumptionOnThread.cpp</span>
+
+<span style="color: #009999;">#include &lt;coroutine&gt;</span>
+<span style="color: #009999;">#include &lt;functional&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;random&gt;</span>
+<span style="color: #009999;">#include &lt;thread&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+
+std<span style="color: #555555;">::</span>random_device seed;
+<span style="color: #006699; font-weight: bold;">auto</span> gen <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>bind_front(std<span style="color: #555555;">::</span>uniform_int_distribution<span style="color: #555555;">&lt;&gt;</span>(<span style="color: #ff6600;">0</span>,<span style="color: #ff6600;">1</span>), 
+                           std<span style="color: #555555;">::</span>default_random_engine(seed()));
+ 
+<span style="color: #006699; font-weight: bold;">struct</span> MyAwaitable {
+    std<span style="color: #555555;">::</span>jthread<span style="color: #555555;">&amp;</span> outerThread;
+    <span style="color: #007788; font-weight: bold;">bool</span> <span style="color: #cc00ff;">await_ready</span>() <span style="color: #006699; font-weight: bold;">const</span> noexcept {                   <span style="color: #0099ff;"> </span>
+        <span style="color: #006699; font-weight: bold;">auto</span> res <span style="color: #555555;">=</span> gen();
+        <span style="color: #006699; font-weight: bold;">if</span> (res) std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" (executed)"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+        <span style="color: #006699; font-weight: bold;">else</span> std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" (suspended)"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+        <span style="color: #006699; font-weight: bold;">return</span> res;                                        <span style="color: #0099ff;">// (6)</span>   
+    }
+    <span style="color: #007788; font-weight: bold;">void</span> await_suspend(std<span style="color: #555555;">::</span>coroutine_handle<span style="color: #555555;">&lt;&gt;</span> h) {        <span style="color: #0099ff;">// (7)</span>
+        outerThread <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>jthread([h] { h.resume(); });  <span style="color: #0099ff;"> // (8)</span>
+    }
+    <span style="color: #007788; font-weight: bold;">void</span> await_resume() {}
+};
+
+ 
+<span style="color: #006699; font-weight: bold;">struct</span> Job{
+    <span style="color: #006699; font-weight: bold;">static</span> <span style="color: #006699; font-weight: bold;">inline</span> <span style="color: #007788; font-weight: bold;">int</span> JobCounter{<span style="color: #ff6600;">1</span>};
+    Job() {
+        <span style="color: #555555;">++</span>JobCounter;
+    }
+    
+    <span style="color: #006699; font-weight: bold;">struct</span> promise_type {
+        <span style="color: #007788; font-weight: bold;">int</span> JobNumber{JobCounter};
+        Job <span style="color: #cc00ff;">get_return_object</span>() { <span style="color: #006699; font-weight: bold;">return</span> {}; }
+        std<span style="color: #555555;">::</span>suspend_never initial_suspend() {        <span style="color: #0099ff;"> // (2)</span>
+            std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"    Job "</span> <span style="color: #555555;">&lt;&lt;</span> JobNumber <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" prepared on thread "</span> 
+                      <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>get_id();
+            <span style="color: #006699; font-weight: bold;">return</span> {}; 
+        }
+        std<span style="color: #555555;">::</span>suspend_never final_suspend() noexcept {  <span style="color: #0099ff;">// (3)</span>
+            std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"    Job "</span> <span style="color: #555555;">&lt;&lt;</span> JobNumber <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" finished on thread "</span> 
+                      <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>get_id() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+            <span style="color: #006699; font-weight: bold;">return</span> {}; 
+        }
+        <span style="color: #007788; font-weight: bold;">void</span> return_void() {}
+        <span style="color: #007788; font-weight: bold;">void</span> unhandled_exception() { }
+    };
+};
+ 
+Job <span style="color: #cc00ff;">performJob</span>(std<span style="color: #555555;">::</span>jthread<span style="color: #555555;">&amp;</span> out) {
+    co_await MyAwaitable{out};                     <span style="color: #0099ff;">   // (1)</span>
+}
+ 
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>jthread<span style="color: #555555;">&gt;</span> threads(<span style="color: #ff6600;">8</span>);             <span style="color: #0099ff;">// (4)</span>
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;</span> thr<span style="color: #555555;">:</span> threads) performJob(thr);        <span style="color: #0099ff;"> // (5)</span>
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The main difference with the previous program is the new awaitable <code>MyAwaitable</code>, used in the coroutine <code>performJob</code> (line 1). On the contrary, the coroutine object returned from the coroutine <code>performJob</code> is straightforward. Essentially, its member functions <code>initial_suspend</code> (line 2) and <code>final_suspend</code> (line 3) return the predefined awaitable <code>std::suspend_never.</code> Additionally, both functions show the <code>JobNumber</code> of the executed job and the thread ID on which it runs. The screenshot shows which coroutine runs immediately and which one is suspended. Thanks to the thread id, you can observe that suspended coroutines are resumed on a different thread.</p>
+<div>
+<div>You&nbsp;can&nbsp;try&nbsp;out&nbsp;the&nbsp;program&nbsp;on&nbsp;the <a href="https://wandbox.org/permlink/skHgWKF0SYAwp8Dm">Wandbox</a>.</div>
+<div>&nbsp;</div>
+<div><img src="https://www.modernescpp.com/images/blog/Cpp20/co_await2/startJobWithAutomaticResumptionOnThread.png" alt="startJobWithAutomaticResumptionOnThread" width="450" height="315" style="display: block; margin-left: auto; margin-right: auto;" /></div>
+<div>&nbsp;</div>
+<div>Let me discuss the interesting control flow of the program. Line 4 creates eight default-constructed threads, which the coroutine <code>performJob</code> (line 5) takes by reference. Further, the reference becomes the argument for creating <code>MyAwaitable{out}</code> (line 1). Depending on the value of <code>res</code> (line 6), and, therefore, the return value of the function <code>await_read</code>y, the Awaitable continues (<code>res</code> is <code>true</code>) to run or is suspended (<code>res</code> is <code>false</code>). In case <code>MyAwaitable</code> is suspended, the function <code>await_suspend</code> (line 7) is executed. Thanks to the assignment of <code>outerThread</code> (line 8), it becomes a running thread. The running threads must outlive the lifetime of the coroutine. For this reason, the threads have the scope of the <code>main</code> function.</div>
+<div>&nbsp;</div>
+<h2>What's next?</h2>
+<p>DONE: I have written almost 100 posts about C++20. In my next post I want to say a few concluding words about C++20 and answer the questions "What's next" regarding C++.</p>
+<p>&nbsp;</p>
+<p>{loadmoduleid 153}</p>
+<div>&nbsp;</div>
+</div>
