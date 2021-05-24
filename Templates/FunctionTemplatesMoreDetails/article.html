@@ -1,0 +1,146 @@
+<p>In the last post "<a href="https://www.modernescpp.com/index.php/function-templates">Function Templates</a>", I wrote about the overloading of function templates and automatically deducing the return type of a function template. Today, I dive deeper and specify explicitly the template arguments of a function template and bring concepts into the play.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/Templates/FunctionTemplateMoreDetails/templatesNew.png" alt="templatesNew" width="650" height="396" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>Before I start this post, I have to make two general remarks. Today, I write about a don't and a do.</p>
+<ul>
+<li><strong>Don't: In general, you should not explicitly specify the template arguments for function templates. </strong></li>
+<li><strong>Do: In general, you should use restricted template parameters (concepts).</strong></li>
+</ul>
+<p>Let me start with the don't.</p>
+<h2>Explicitly Specifying the Template Arguments</h2>
+<p>You can explicitly specify the template arguments. This is necessary if the compiler cannot deduce the type parameters of the function templates, or you use class template. With C++17, the compiler can automatically deduce the type of the template arguments from the constructor arguments:</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> myVec{<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">5</span>};  <span style="color: #0099ff; font-style: italic;">// (1)</span>
+std<span style="color: #555555;">::</span>vector myVec{<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">5</span>};       <span style="color: #0099ff; font-style: italic;">// (2)</span>
+</pre>
+</div>
+<p>Instead of the line (1), you can just use line (2) in C++17. I will write more about this feature in an upcoming post.</p>
+<p>Once more. In general, you should not specify the template arguments. But I intentionally did it.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// maxExplicitTypeParameter.cpp</span>
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+T max(<span style="color: #006699; font-weight: bold;">const</span> T<span style="color: #555555;">&amp;</span> lhs,<span style="color: #006699; font-weight: bold;">const</span> T<span style="color: #555555;">&amp;</span> rhs) {
+    <span style="color: #006699; font-weight: bold;">return</span> (lhs <span style="color: #555555;">&gt;</span> rhs)<span style="color: #555555;">?</span> lhs <span style="color: #555555;">:</span> rhs;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main() {
+  
+  <span style="color: #006699; font-weight: bold;">auto</span> res1 <span style="color: #555555;">=</span> max<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">float</span><span style="color: #555555;">&gt;</span>(<span style="color: #ff6600;">5.5</span>, <span style="color: #ff6600;">6.0</span>);
+  <span style="color: #006699; font-weight: bold;">auto</span> res2 <span style="color: #555555;">=</span> max<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">bool</span><span style="color: #555555;">&gt;</span>(<span style="color: #ff6600;">5.5</span>, <span style="color: #ff6600;">6.0</span>);
+  <span style="color: #006699; font-weight: bold;">auto</span> res3 <span style="color: #555555;">=</span> max(<span style="color: #ff6600;">5.5</span>, <span style="color: #ff6600;">6.0</span>);
+  
+}
+</pre>
+</div>
+<p>&nbsp;What is happening in lines (1) - (3)? <a href="https://cppinsights.io/lnk?code=Ly8gbWF4RXhwbGljaXRUeXBlUGFyYW1ldGVyLmNwcAoKdGVtcGxhdGUgPHR5cGVuYW1lIFQ+ClQgbWF4KFQgbGhzLFQgcmhzKSB7CiAgICByZXR1cm4gKGxocyA+IHJocyk/IGxocyA6IHJoczsKfQoKaW50IG1haW4oKSB7CiAgCiAgYXV0byByZXMxID0gbWF4PGZsb2F0Pig1LjUsIDYuMCk7CiAgYXV0byByZXN0MiA9IG1heDxib29sPig1LjUsIDYuMCk7CiAgYXV0byByZXMzID0gbWF4KDUuNSwgNi4wKTsKICAKfQ==&amp;insightsOptions=cpp11&amp;std=cpp11&amp;rev=1.0">C++ Insights </a>helps me to analyze the code. These are the crucial output lines:</p>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/FunctionTemplateMoreDetails/maxExplicitInstantiationCppInsightsNew.png" alt="maxExplicitInstantiationCppInsightsNew" width="650" height="610" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>&nbsp;</p>
+<ul>
+<li>The call <code>max&lt;float&gt;(5.5, 6.0)</code> in line (1) causes the instantiation of the function template <code>max</code> for <code>double</code> (line 10). Consequently, both doubles are converted to <code>const float</code> (line 40).&nbsp;</li>
+<li>The call <code>max&lt;bool&gt;(5.5,&nbsp; 6.0) </code>in line (2) puts a lot of work on the compiler's shoulder.&nbsp;<ol>
+<li>The invocation causes the compiler to implicitly convert the doubles to <code>bool.</code></li>
+<li>To compare both bools inside the function body (line 23), they have to be promoted to <code>int</code> (line 23).</li>
+<li>Finally, the return type <code>res2</code> is bool. Consequently, the <code>int</code> must be converted to <code>bool</code>.</li>
+</ol></li>
+<li>The call<code> max(5.5, 6.0)</code>&nbsp; in line (3) does exactly the job you want. Not conversion or promotion is necessary.</li>
+</ul>
+<p>Honestly, I would consider the <code>max&lt;bool&gt;(5.5, 6.0)</code> as an error and not intentionally. But this happens, when you want to be smarter than the compiler.</p>
+<p>There is a related syntax to the explicit specification of template arguments that you may sometimes see but puzzles you: <code>max&lt;&gt;(5.5, 6.0); </code>When I ask in my seminars: What could that mean? Based on the previous theory, half of my participants would guess it right</p>
+<p>Imagine, you have a function and a function template <code>max</code>:</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// maxCompilerDeduction.cpp</span>
+
+<span style="color: #007788; font-weight: bold;">double</span> <span style="color: #cc00ff;">max</span>(<span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">double</span><span style="color: #555555;">&amp;</span> lhs, <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">double</span><span style="color: #555555;">&amp;</span> rhs) {
+  <span style="color: #006699; font-weight: bold;">return</span> (lhs <span style="color: #555555;">&gt;</span> rhs)<span style="color: #555555;">?</span> lhs <span style="color: #555555;">:</span> rhs;
+}
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+T max(<span style="color: #006699; font-weight: bold;">const</span> T<span style="color: #555555;">&amp;</span> lhs,<span style="color: #006699; font-weight: bold;">const</span> T<span style="color: #555555;">&amp;</span> rhs) {
+    <span style="color: #006699; font-weight: bold;">return</span> (lhs <span style="color: #555555;">&gt;</span> rhs)<span style="color: #555555;">?</span> lhs <span style="color: #555555;">:</span> rhs;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main() {
+  
+  <span style="color: #006699; font-weight: bold;">auto</span> res1 <span style="color: #555555;">=</span> max(<span style="color: #ff6600;">5.5</span>, <span style="color: #ff6600;">6.0</span>);    <span style="color: #0099ff; font-style: italic;">// (1)</span>
+  <span style="color: #006699; font-weight: bold;">auto</span> res2 <span style="color: #555555;">=</span> max<span style="color: #555555;">&lt;&gt;</span>(<span style="color: #ff6600;">5.5</span>, <span style="color: #ff6600;">6.0</span>);  <span style="color: #0099ff; font-style: italic;">// (2)</span>
+  
+}
+</pre>
+</div>
+<p>As we learned in the previous post "<a href="https://www.modernescpp.com/index.php/function-templates">Function Templates</a>", the compiler prefers the function when the function and the function templates are ideal fits. Okay, this answers line (1). Line (2) expresses, that the compiler should only consider the function template <code>max</code> and ignore the function <code>max</code>. Additionally, the compiler automatically deduces the template parameters for the function arguments. Consequently, <a href="https://cppinsights.io/lnk?code=Ly8gbWF4Q29tcGlsZXJEZWR1Y3Rpb24uY3BwCgpkb3VibGUgbWF4KGNvbnN0IGRvdWJsZSYgbGhzLCBjb25zdCBkb3VibGUmIHJocykgewogIHJldHVybiAobGhzID4gcmhzKT8gbGhzIDogcmhzOwp9Cgp0ZW1wbGF0ZSA8dHlwZW5hbWUgVD4KVCBtYXgoY29uc3QgVCYgbGhzLGNvbnN0IFQmIHJocykgewogICAgcmV0dXJuIChsaHMgPiByaHMpPyBsaHMgOiByaHM7Cn0KCmludCBtYWluKCkgewogIAogIGF1dG8gcmVzMSA9IG1heCg1LjUsIDYuMCk7CiAgYXV0byByZXMyID0gbWF4PD4oNS41LCA2LjApOwogIAp9&amp;insightsOptions=cpp11&amp;std=cpp11&amp;rev=1.0">C++ Insights</a> shows, that the compiler instantiated <code>max</code> for <code>double</code>.</p>
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/Templates/FunctionTemplateMoreDetails/maxCompilerDeductionCppInsights.png" alt="maxCompilerDeductionCppInsights" width="450" height="142" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>So far, I only considered function overloading with functions and function templates having unrestricted type parameters. Okay, I can do better and should. Now, I bring restricted type parameters (concepts) into the play. This means, here is my do for this post: Use restricted type parameters if possible.</p>
+<h2>Overloading with Concepts</h2>
+<p>C++20 has the concept <code>std::totally_ordered</code>. A type <code>T</code> supports a total order, if it supports partial order and any elements of T can be compared. Let me be more formal:</p>
+<p>A type T supports <strong>partial order</strong>, if the following relations for all elements a, b, and c of the type T hold:</p>
+<ol>
+<li>a &lt;= a (reflexive)</li>
+<li>If a &lt;= b and b &lt;= c then a &lt;= c (transitive)</li>
+<li>If a &lt;=b and b &lt;= a then a == b (antisymmetric)</li>
+</ol>
+<p>A type T supports <strong>total order</strong>, if it supports partial order and all elements of T can be compared.</p>
+<ol>
+<li>a &lt;= b or b &lt;= b (comparable)</li>
+</ol>
+<p>The following program uses the concept<code> std::totally_ordered</code>:</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// maxUnconstrainedConstrained.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;concepts&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Account</span> {
+ <span style="color: #9999ff;">public:</span>
+    <span style="color: #006699; font-weight: bold;">explicit</span> Account(<span style="color: #007788; font-weight: bold;">double</span> b)<span style="color: #555555;">:</span> balance(b) {}
+    <span style="color: #007788; font-weight: bold;">double</span> getBalance() <span style="color: #006699; font-weight: bold;">const</span> { 
+        <span style="color: #006699; font-weight: bold;">return</span> balance;
+    }
+ <span style="color: #9999ff;">private:</span>
+    <span style="color: #007788; font-weight: bold;">double</span> balance;
+};
+  
+Account <span style="color: #cc00ff;">max</span>(<span style="color: #006699; font-weight: bold;">const</span> Account<span style="color: #555555;">&amp;</span> lhs, <span style="color: #006699; font-weight: bold;">const</span> Account<span style="color: #555555;">&amp;</span> rhs) {  <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"max function</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>;
+    <span style="color: #006699; font-weight: bold;">return</span> (lhs.getBalance() <span style="color: #555555;">&gt;</span> rhs.getBalance())<span style="color: #555555;">?</span> lhs <span style="color: #555555;">:</span> rhs;
+}
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>totally_ordered T<span style="color: #555555;">&gt;</span>                       <span style="color: #0099ff; font-style: italic;">// (2)</span>
+T max(<span style="color: #006699; font-weight: bold;">const</span> T<span style="color: #555555;">&amp;</span> lhs,<span style="color: #006699; font-weight: bold;">const</span> T<span style="color: #555555;">&amp;</span> rhs) {                     
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"max restricted function template</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>;
+    <span style="color: #006699; font-weight: bold;">return</span> (lhs <span style="color: #555555;">&gt;</span> rhs)<span style="color: #555555;">?</span> lhs <span style="color: #555555;">:</span> rhs;
+}
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>                                   <span style="color: #0099ff; font-style: italic;">// (3)</span>
+T max(<span style="color: #006699; font-weight: bold;">const</span> T<span style="color: #555555;">&amp;</span> lhs,<span style="color: #006699; font-weight: bold;">const</span> T<span style="color: #555555;">&amp;</span> rhs) {                   
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"max unrestriced function template</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>;
+    <span style="color: #006699; font-weight: bold;">return</span> (lhs <span style="color: #555555;">&gt;</span> rhs)<span style="color: #555555;">?</span> lhs <span style="color: #555555;">:</span> rhs;
+}
+
+
+<span style="color: #007788; font-weight: bold;">int</span> main() {
+  
+    Account account1(<span style="color: #ff6600;">50.5</span>);
+    Account <span style="color: #cc00ff;">account2</span>(<span style="color: #ff6600;">60.5</span>);
+    Account maxAccount <span style="color: #555555;">=</span> max(account1, account2);       <span style="color: #0099ff; font-style: italic;">// (4)</span>
+  
+    <span style="color: #007788; font-weight: bold;">int</span> i1{<span style="color: #ff6600;">50</span>};
+    <span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">i2</span>(<span style="color: #ff6600;">60</span>);
+    <span style="color: #007788; font-weight: bold;">int</span> maxI <span style="color: #555555;">=</span> max(i2, i2);                             <span style="color: #0099ff; font-style: italic;">// (5)</span>
+  
+}
+</pre>
+</div>
+<p>The program defines a function <code>max</code> taking two Accounts (line 1), and two function templates. The first function template <code>max</code> in line (2) requires that the values support a total ordering. The second function template <code>max</code> has no type constraints on its type parameters. As you might expect, the compiler chooses the best fitting overload. A function template a fits better than another function template b, if a is more specialized than b. This means that it chooses the function for Accounts (line 4) and the function template <code>max</code> with restricted type parameters for <code>int</code> (line 5).</p>
+<p>The comments in the various <code>max</code> function make the decisions of the compiler transparent.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/FunctionTemplateMoreDetails/maxCompilerExplorer.png" alt="maxCompilerExplorer" width="300" height="56" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>You can study the program on the <a href="https://godbolt.org/z/4ThvMqbz4">Compiler Explorer</a>.</p>
+<h2>What's next?</h2>
+<p>After the basics to function templates, I present in my next post the basics about class templates. Additionally, I will write in this context about generic member functions, inheritance with templates, and alias templates.</p>
+<p>&nbsp;{loadmoduleid 153}</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
