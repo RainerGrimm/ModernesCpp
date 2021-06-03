@@ -1,0 +1,240 @@
+<p>C++20 has three new keywords to make a coroutine out of a function: <code>co_return</code>, <code>co_yield</code>, and <code>co_await</code>. <code>co_await</code> requires an Awaitable as arguments and starts the Awaiter workflow. Let me show in this post, what that means.</p>
+<hr id="system-readmore" />
+<p><img src="https://www.modernescpp.com/images/blog/Cpp20/co_await/TimelineCpp20.png" alt="TimelineCpp20" width="650" height="236" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>To understand this post, you should have a basic understanding of coroutines. Here are my previous posts to coroutines, presenting coroutines from the practical perspective.</p>
+<p><code>co_return</code>:</p>
+<ul>
+<li><a href="https://www.modernescpp.com/index.php/implementing-futures-with-coroutines">Implementing Simple Futures With Coroutines</a></li>
+<li><a href="https://www.modernescpp.com/index.php/lazy-futures-with-coroutines-in-c-20">Lazy Futures with Coroutines</a></li>
+<li><a href="https://www.modernescpp.com/index.php/executing-a-future-in-a-separate-thread-with-coroutines">Executing a Future in a separate Thread with Coroutines</a></li>
+</ul>
+<p><code>co_yield:</code></p>
+<ul>
+<li><a href="https://www.modernescpp.com/index.php/an-infinite-data-stream-with-coroutines-in-c-20">An Infinite Data Stream with Coroutines</a></li>
+<li><a href="https://www.modernescpp.com/index.php/a-generic-data-stream-with-coroutines-in-c-20">A Generic Data Stream with Coroutines</a></li>
+</ul>
+<p>Before I implement Awaitables and show their applications, I should write about the awaiter workflow.</p>
+<h2>The Awaiter Workflow</h2>
+<p>First, I have a short reminder. The awaiter workflow is based on the member functions of the Awaitable:<code> await_ready()</code>,<code> await_suspend()</code>, and <code>await_resume().</code> C++20 has the two predefined Awaitables <code>std::suspend_always</code> and <code>std::suspend_never</code>, which I heavily used in this mini-series to coroutines.</p>
+<ul>
+<li><code>std::suspend_always</code></li>
+</ul>
+<p><!-- HTML generated using hilite.me --></p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">struct</span> suspend_always {
+    constexpr <span style="color: #007788; font-weight: bold;">bool</span> await_ready() <span style="color: #006699; font-weight: bold;">const</span> noexcept { <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #336666;">false</span>; }
+    constexpr <span style="color: #007788; font-weight: bold;">void</span> await_suspend(std<span style="color: #555555;">::</span>coroutine_handle<span style="color: #555555;">&lt;&gt;</span>) <span style="color: #006699; font-weight: bold;">const</span> noexcept {}
+    constexpr <span style="color: #007788; font-weight: bold;">void</span> await_resume() <span style="color: #006699; font-weight: bold;">const</span> noexcept {}
+};
+</pre>
+</div>
+<p>&nbsp;</p>
+<ul>
+<li><code>std::suspend_never</code></li>
+</ul>
+<p><!-- HTML generated using hilite.me --></p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">struct</span> suspend_never {
+    constexpr <span style="color: #007788; font-weight: bold;">bool</span> await_ready() <span style="color: #006699; font-weight: bold;">const</span> noexcept { <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #336666;">true</span>; }
+    constexpr <span style="color: #007788; font-weight: bold;">void</span> await_suspend(std<span style="color: #555555;">::</span>coroutine_handle<span style="color: #555555;">&lt;&gt;</span>) <span style="color: #006699; font-weight: bold;">const</span> noexcept {}
+    constexpr <span style="color: #007788; font-weight: bold;">void</span> await_resume() <span style="color: #006699; font-weight: bold;">const</span> noexcept {}
+};
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Here is the awaiter workflow in prose.</p>
+<p><!-- HTML generated using hilite.me --></p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%;">awaitable.await_ready() returns <span style="color: #336666;">false</span><span style="color: #555555;">:              <span style="color: #3366ff;">     // (1)</span></span>
+    
+    suspend coroutine
+	
+    awaitable.await_suspend(coroutineHandle) returns<span style="color: #555555;">:</span>   <span style="color: #3366ff;"> // (3)</span>
+	
+        <span style="color: #007788; font-weight: bold;">void</span><span style="color: #555555;">:                                            <span style="color: #3366ff;">// (4)</span></span>
+            awaitable.await_suspend(coroutineHandle);
+            coroutine keeps suspended
+            <span style="color: #006699; font-weight: bold;">return</span> to caller
+
+        <span style="color: #9999ff;">bool:                                            <span style="color: #3366ff;">// (5)</span></span>
+            <span style="color: #007788; font-weight: bold;">bool</span> result <span style="color: #555555;">=</span> awaitable.await_suspend(coroutineHandle);
+            <span style="color: #006699; font-weight: bold;">if</span> result<span style="color: #555555;">:</span> 
+                coroutine keep suspended
+                <span style="color: #006699; font-weight: bold;">return</span> to caller
+            <span style="color: #9999ff;">else:</span> 
+                go to resumptionPoint
+
+        another coroutine handle<span style="color: #555555;">:</span>	                <span style="color: #3366ff;"> // (6)</span>
+            <span style="color: #006699; font-weight: bold;">auto</span> anotherCoroutineHandle <span style="color: #555555;">=</span> awaitable.await_suspend(coroutineHandle);
+            anotherCoroutineHandle.resume();
+            <span style="color: #006699; font-weight: bold;">return</span> to caller
+	
+<span style="color: #9999ff;">resumptionPoint:</span>
+
+<span style="color: #006699; font-weight: bold;">return</span> awaitable.await_resume();                    <span style="color: #3366ff;">     // (2)
+</span></pre>
+</div>
+<p>&nbsp;</p>
+<p>The workflow is only executed if<code> awaitable.await_ready()</code> returns <code>false</code> (line 1). In case it returns <code>true</code>, the coroutine is ready and returns with the result of the call <code>awaitable.await_resume()</code> (line 2).</p>
+<p>Let me assume that <code>awaitable.await_ready()</code> returns <code>false</code>. First, the coroutine is suspended (line 3), and immediately the return value&nbsp;&nbsp;<code>awaitable.await_suspend()</code> is evaluated. The return type can be <code>void</code> (line 4), a boolean (line 5), or another coroutine handle (line 6), such as <code>anotherCoroutineHandle.</code> Depending on the return type, the program flow returns or another coroutine is executed.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Cpp20/co_await/awaiterWorkflow.png" alt="awaiterWorkflow" width="700" height="173" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>Let me apply the theory and start a job on request.</p>
+<h2>Starting a Job on Request</h2>
+<p>The coroutine in the following example is as simple as it can be. It awaits on the predefined Awaitable <code>std::suspend_never()</code>.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// startJob.cpp</span>
+
+<span style="color: #009999;">#include &lt;coroutine&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+ 
+<span style="color: #006699; font-weight: bold;">struct</span> Job { 
+    <span style="color: #006699; font-weight: bold;">struct</span> promise_type;
+    <span style="color: #006699; font-weight: bold;">using</span> handle_type <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>coroutine_handle<span style="color: #555555;">&lt;</span>promise_type<span style="color: #555555;">&gt;</span>;
+    handle_type coro;
+    Job(handle_type h)<span style="color: #555555;">:</span> coro(h){}
+    <span style="color: #555555;">~</span>Job() {
+        <span style="color: #006699; font-weight: bold;">if</span> ( coro ) coro.destroy();
+    }
+    <span style="color: #007788; font-weight: bold;">void</span> start() {
+        coro.resume();                                    <span style="color: #0099ff;">// (6)</span> 
+    }
+
+
+    <span style="color: #006699; font-weight: bold;">struct</span> promise_type {
+        <span style="color: #006699; font-weight: bold;">auto</span> get_return_object() { 
+            <span style="color: #006699; font-weight: bold;">return</span> Job{handle_type<span style="color: #555555;">::</span>from_promise(<span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">this</span>)};
+        }
+        std<span style="color: #555555;">::</span>suspend_always initial_suspend() {          <span style="color: #0099ff;"> // (4)</span>
+            std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"    Preparing job"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+            <span style="color: #006699; font-weight: bold;">return</span> {}; 
+        }
+        std<span style="color: #555555;">::</span>suspend_always final_suspend() noexcept {    <span style="color: #0099ff;">// (7)</span>
+            std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"    Performing job"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>; 
+            <span style="color: #006699; font-weight: bold;">return</span> {}; 
+        }
+        <span style="color: #007788; font-weight: bold;">void</span> return_void() {}
+        <span style="color: #007788; font-weight: bold;">void</span> unhandled_exception() {}
+    
+    };
+};
+ 
+Job <span style="color: #cc00ff;">prepareJob</span>() {                                        <span style="color: #0099ff;">// (1)</span>
+    co_await std<span style="color: #555555;">::</span>suspend_never();                       <span style="color: #0099ff;"> // (2)</span>
+}
+ 
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span>  <span style="color: #cc3300;">"Before job"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    <span style="color: #006699; font-weight: bold;">auto</span> job <span style="color: #555555;">=</span> prepareJob();                             <span style="color: #0099ff;"> // (3)</span>                       
+    job.start();                                        <span style="color: #0099ff;">  // (5)</span>  
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span>  <span style="color: #cc3300;">"After job"</span> <span style="color: #555555;">&lt;&lt;</span>  <span style="color: #cc3300;">'\n'</span>;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>You may think that the coroutine <code>prepareJob</code> (line 1) is meaningless because the Awaitable always suspends. No! The function <code>prepareJob</code> is at least a coroutine factory using <code>co_await</code> (line 2) and returning a coroutine object. The function call <code>prepareJob()</code> in line 3 creates the coroutine object of type <code>Job</code>. When you study the data type Job, you recognize that the coroutine object is immediately suspended, because the member function of the promise returns the Awaitable <code>std::suspend_always</code> (line 5). This is exactly the reason why the function call <code>job.start</code> (line 5) is necessary to resume the coroutine (line 6). The member function <code>final_suspend</code>() also returns <code>std::suspend_always</code> (line 27).</p>
+<p><img src="https://www.modernescpp.com/images/blog/Cpp20/co_await/startJob.png" alt="startJob" width="200" height="101" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>The program <code>startJob.cpp</code> is an ideal starting point for further experiments. First, making the workflow transparent eases its understanding.</p>
+<h2>The Transparent Awaiter Workflow</h2>
+<p>I added a few comments to the previous program.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// startJobWithComments.cpp</span>
+
+<span style="color: #009999;">#include &lt;coroutine&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">struct</span> MySuspendAlways {                                 <span style="color: #0099ff;"> // (1)</span>
+    <span style="color: #007788; font-weight: bold;">bool</span> await_ready() <span style="color: #006699; font-weight: bold;">const</span> noexcept { 
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"        MySuspendAlways::await_ready"</span>  <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+        <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #336666;">false</span>; 
+    }
+    <span style="color: #007788; font-weight: bold;">void</span> await_suspend(std<span style="color: #555555;">::</span>coroutine_handle<span style="color: #555555;">&lt;&gt;</span>) <span style="color: #006699; font-weight: bold;">const</span> noexcept {
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"        MySuspendAlways::await_suspend"</span>  <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    }
+    <span style="color: #007788; font-weight: bold;">void</span> await_resume() <span style="color: #006699; font-weight: bold;">const</span> noexcept {
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"        MySuspendAlways::await_resume"</span>  <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    }
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> MySuspendNever {                                <span style="color: #0099ff;">  // (2)</span>
+    <span style="color: #007788; font-weight: bold;">bool</span> await_ready() <span style="color: #006699; font-weight: bold;">const</span> noexcept { 
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"        MySuspendNever::await_ready"</span>  <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+        <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #336666;">true</span>; 
+    }
+    <span style="color: #007788; font-weight: bold;">void</span> await_suspend(std<span style="color: #555555;">::</span>coroutine_handle<span style="color: #555555;">&lt;&gt;</span>) <span style="color: #006699; font-weight: bold;">const</span> noexcept {
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"        MySuspendNever::await_suspend"</span>  <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    }
+    <span style="color: #007788; font-weight: bold;">void</span> await_resume() <span style="color: #006699; font-weight: bold;">const</span> noexcept {
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"        MySuspendNever::await_resume"</span>  <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    }
+};
+ 
+<span style="color: #006699; font-weight: bold;">struct</span> Job { 
+    <span style="color: #006699; font-weight: bold;">struct</span> promise_type;
+    <span style="color: #006699; font-weight: bold;">using</span> handle_type <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>coroutine_handle<span style="color: #555555;">&lt;</span>promise_type<span style="color: #555555;">&gt;</span>;
+    handle_type coro;
+    Job(handle_type h)<span style="color: #555555;">:</span> coro(h){}
+    <span style="color: #555555;">~</span>Job() {
+        <span style="color: #006699; font-weight: bold;">if</span> ( coro ) coro.destroy();
+    }
+    <span style="color: #007788; font-weight: bold;">void</span> start() {
+        coro.resume();
+    }
+
+
+    <span style="color: #006699; font-weight: bold;">struct</span> promise_type {
+        <span style="color: #006699; font-weight: bold;">auto</span> get_return_object() { 
+            <span style="color: #006699; font-weight: bold;">return</span> Job{handle_type<span style="color: #555555;">::</span>from_promise(<span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">this</span>)};
+        }
+        MySuspendAlways initial_suspend() {        <span style="color: #0099ff;"> // (3)</span>
+            std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"    Job prepared"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+            <span style="color: #006699; font-weight: bold;">return</span> {}; 
+        }
+        MySuspendAlways final_suspend() noexcept { <span style="color: #0099ff;"> // (4)</span>
+            std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"    Job finished"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>; 
+            <span style="color: #006699; font-weight: bold;">return</span> {}; 
+        }
+        <span style="color: #007788; font-weight: bold;">void</span> return_void() {}
+        <span style="color: #007788; font-weight: bold;">void</span> unhandled_exception() {}
+    
+    };
+};
+ 
+Job <span style="color: #cc00ff;">prepareJob</span>() {
+    co_await MySuspendNever();                     <span style="color: #0099ff;">// (5)</span>
+}
+ 
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span>  <span style="color: #cc3300;">"Before job"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    <span style="color: #006699; font-weight: bold;">auto</span> job <span style="color: #555555;">=</span> prepareJob();                      <span style="color: #0099ff;">// (6)</span>
+    job.start();                                <span style="color: #0099ff;">  // (7)
+</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span>  <span style="color: #cc3300;">"After job"</span> <span style="color: #555555;">&lt;&lt;</span>  <span style="color: #cc3300;">'\n'</span>;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>First, I replaced the predefined Awaitables<code> std::suspend_always</code> and<code> std::suspend_never</code> with Awaitables <code>MySuspendAlways</code> (line 1) and <code>MySuspendNever</code> (line 2). I use them in lines 3, 4, and 5. The Awaitables mimic the behaviour of the predefined Awaitables but additionally write a comment. Due to the use of <code>std::cout</code>, the member functions <code>await_ready</code>, <code>await_suspend</code>, and <code>await_resume</code> cannot be declared as <code>constexpr</code>.</p>
+<p>The screenshot of the program execution shows the control flow nicely, which you can directly observe on the <a href="https://godbolt.org/z/T5rcE4">Compiler Explorer</a>.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Cpp20/co_await/startJobWithComments.png" alt="startJobWithComments" width="400" height="254" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>The function <code>initial_suspend</code> (line 3) is executed at the beginning of the coroutine and the function<code> final_suspend</code> at its end (line 4). The call <code>prepareJob()</code> (line 6) triggers the creation of the coroutine object, and the function call<code> job.start()</code> its resumption and, hence, completion (line 7). Consequently, the members<code> await_ready</code>, <code>await_suspend</code>, and <code>await_resume</code> of <code>MySuspendAlways</code> are executed. When you don't resume the Awaitable such as the coroutine object returned by the member function<code> final_suspend</code>, the function<code> await_resume</code> is not processed. In contrast, the Awaitable's <code>MySuspendNever</code>&nbsp;the function is immediately ready because <code>await_ready</code> returns <code>true</code> and, hence, does not suspend.</p>
+<div>
+<div>Thanks&nbsp;to&nbsp;the&nbsp;comments,&nbsp;you&nbsp;should&nbsp;have&nbsp;an&nbsp;elementary&nbsp;understanding&nbsp;of&nbsp;the awaiter&nbsp;workflow. Now,&nbsp;it's&nbsp;time&nbsp;to&nbsp;vary&nbsp;it.</div>
+<h2>What's next?</h2>
+<div>&nbsp;</div>
+</div>
+<p>In my next posts,&nbsp; I automatically resume the Awaiter on the same and, finally, on a separate thread.</p>
+<p>{loadmoduleid 153}</p>
+<p>&nbsp;</p>
+<hr />
