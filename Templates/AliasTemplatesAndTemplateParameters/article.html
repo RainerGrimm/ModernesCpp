@@ -1,0 +1,169 @@
+<p>Today, I write about two topics: alias templates and template parameters. Alias templates are a way to give a name to a family of types. Template parameters can be types, non-types, and templates themselves.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/Templates/AliasTemplates/templatesParameters.png" alt="templatesParameters" width="650" height="394" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>Let's start with the alias templates.</p>
+<h2>Alias Templates</h2>
+<p>With C++11, we got alias templates. Alias templates provide a means to give a convenient name to a family of types. The following code snippet presents the idea for the class template Matrix.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T, <span style="color: #007788; font-weight: bold;">int</span> Line, <span style="color: #007788; font-weight: bold;">int</span> Col<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Matrix</span>{
+    ....
+};
+</pre>
+</div>
+<p>&nbsp;</p>
+<p><code>Matrix</code> has three template parameters. The type parameter<code> T</code>, and the non-type parameters <code>Line</code>, and <code>Col</code> (I write about template parameters in the next section.)</p>
+<p>For readability, I want to have two special matrices: a <code>Square</code> and a <code>Vector</code>. A <code>Square</code>'s number of lines and columns should be equal. A <code>Vector</code>'s line size should be one. Thanks to type aliases, I can express my ideas directly in code.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T, <span style="color: #007788; font-weight: bold;">int</span> Line<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">using</span> Square <span style="color: #555555;">=</span> Matrix<span style="color: #555555;">&lt;</span>T, Line, Line<span style="color: #555555;">&gt;</span>; <span style="color: #0099ff; font-style: italic;">// (1)</span>
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T, <span style="color: #007788; font-weight: bold;">int</span> Line<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">using</span> Vector <span style="color: #555555;">=</span> Matrix<span style="color: #555555;">&lt;</span>T, Line, <span style="color: #ff6600;">1</span><span style="color: #555555;">&gt;</span>;    <span style="color: #0099ff; font-style: italic;">// (2)</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The keyword <code>using </code>((1) and (2)) declares a type alias. While the primary template <code>Matrix</code> can be parametrized in the three dimensions <code>T</code>, <code>Line</code>, and <code>Col</code>, the type aliases <code>Square</code> and <code>Vector </code>reduce the parametrization to the two dimensions<code> T</code> and <code>Line</code>. From this point of view, alias templates enable it to create intuitive names for partially bound templates. Using&nbsp;<code>Square</code> and <code>Vector</code> is straightforward.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">Matrix<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>, <span style="color: #ff6600;">5</span>, <span style="color: #ff6600;">3</span><span style="color: #555555;">&gt;</span> ma;
+Square<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">double</span>, <span style="color: #ff6600;">4</span><span style="color: #555555;">&gt;</span> sq;
+Vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">char</span>, <span style="color: #ff6600;">5</span><span style="color: #555555;">&gt;</span> vec;
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>A nice use-case of alias templates is the<a href="https://en.cppreference.com/w/cpp/header/type_traits"> type-traits library</a>.</p>
+<h3>Type-Traits Library</h3>
+<p>When you apply <code>std::move(arg)</code> on a value <code>arg</code>, the compiler uses typically <a href="https://en.cppreference.com/w/cpp/types/remove_reference"><code>std::remove_reference</code></a> to remove a reference from the underlying type:</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">static_cast</span><span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>remove_reference<span style="color: #555555;">&lt;</span>decltype(arg)<span style="color: #555555;">&gt;::</span>type<span style="color: #555555;">&amp;&amp;&gt;</span>(arg);   <span style="color: #0099ff; font-style: italic;">// (1)</span>
+
+<span style="color: #006699; font-weight: bold;">static_cast</span><span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span><span style="color: #007788; font-weight: bold;">remove_reference_t</span><span style="color: #555555;">&lt;</span>decltype(arg)<span style="color: #555555;">&gt;&amp;&amp;&gt;</span>(arg);       <span style="color: #0099ff; font-style: italic;">// (2)</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Thanks to alias templates, version (line 2) is valid since C++14. The following helper type is available:</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span> <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">T</span> <span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">using</span> <span style="color: #007788; font-weight: bold;">remove_reference_t</span> <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">typename</span> remove_reference<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>type;
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Of course, the corresponding helper types for the other functions of the<a href="https://en.cppreference.com/w/cpp/header/type_traits"> type-traits library</a> returning a type are also available with C++14.</p>
+<p>&nbsp;</p>
+<p>The previously defined class template <code>Matrix</code> uses the two non-type template parameters <code>Line</code> and <code>Col</code>.</p>
+<h2>Template Parameters</h2>
+<p>&nbsp;Template parameters can be types, non-types, and templates themselves.</p>
+<h3>Types</h3>
+<p>Okay, types are the most often used template parameters. Here are a few examples:</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> myVec;
+std<span style="color: #555555;">::</span>map<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>string, <span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> myMap;
+std<span style="color: #555555;">::</span>lock_guard<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span> myLockGuard;
+</pre>
+</div>
+<h3>Non-Types</h3>
+<p>Non-types can be a</p>
+<ul>
+<li>lvalue reference</li>
+<li><span style="font-family: 'courier new', courier;">nullptr</span></li>
+<li>pointer</li>
+<li>enumerator of a <code>enum</code></li>
+<li>integral values</li>
+<li>floating-point values (C++20)</li>
+</ul>
+<p>Integral values are the most used non-types. <span style="font-family: courier new, courier;">std::array</span> is the typical example because you have to specify at compile time the size of a <span style="font-family: courier new, courier;">std::array:<br /></span></p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">std<span style="color: #555555;">::</span>array<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>, <span style="color: #ff6600;">3</span><span style="color: #555555;">&gt;</span> myArray{<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>};
+</pre>
+</div>
+<h3>Templates</h3>
+<p>Templates themself can be template parameters. Their definition may look a bit weird.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// templateTemplateParameters.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;list&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+<span style="color: #009999;">#include &lt;string&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T, <span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span>, <span style="color: #006699; font-weight: bold;">typename</span><span style="color: #555555;">&gt;</span> <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Cont</span> <span style="color: #555555;">&gt;</span>    <span style="color: #0099ff; font-style: italic;">// (1)</span>
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Matrix</span>{
+<span style="color: #9999ff;">public:</span>
+  <span style="color: #006699; font-weight: bold;">explicit</span> Matrix(std<span style="color: #555555;">::</span>initializer_list<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span> inList)<span style="color: #555555;">:</span> data(inList) {  <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> d<span style="color: #555555;">:</span> data) std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> d <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span>;
+  }
+  <span style="color: #007788; font-weight: bold;">int</span> getSize() <span style="color: #006699; font-weight: bold;">const</span>{
+    <span style="color: #006699; font-weight: bold;">return</span> data.size();
+  }
+
+<span style="color: #9999ff;">private:</span>
+  Cont<span style="color: #555555;">&lt;</span>T, std<span style="color: #555555;">::</span>allocator<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;&gt;</span> data;                                  <span style="color: #0099ff; font-style: italic;">// (3)                               </span>
+
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> '\n';
+
+                                                                    <span style="color: #0099ff; font-style: italic;">// (4)</span>
+  Matrix<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>, std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&gt;</span> myIntVec{<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">5</span>, <span style="color: #ff6600;">6</span>, <span style="color: #ff6600;">7</span>, <span style="color: #ff6600;">8</span>, <span style="color: #ff6600;">9</span>, <span style="color: #ff6600;">10</span>}; 
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt; </span>'\n';
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"myIntVec.getSize(): "</span> <span style="color: #555555;">&lt;&lt;</span> myIntVec.getSize() <span style="color: #555555;">&lt;&lt;</span> '\n'<span style="color: #555555;"></span>;
+
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+  Matrix<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">double</span>, std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&gt;</span> myDoubleVec{<span style="color: #ff6600;">1.1</span>, <span style="color: #ff6600;">2.2</span>, <span style="color: #ff6600;">3.3</span>, <span style="color: #ff6600;">4.4</span>, <span style="color: #ff6600;">5.5</span>}; <span style="color: #0099ff; font-style: italic;">// (5)</span>
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> '\n';
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"myDoubleVec.getSize(): "</span>  <span style="color: #555555;">&lt;&lt;</span> myDoubleVec.getSize() <span style="color: #555555;">&lt;&lt; </span>'\n';
+
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> '\n';
+                                                                    <span style="color: #0099ff; font-style: italic;">// (6)</span>
+  Matrix<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>string, std<span style="color: #555555;">::</span>list<span style="color: #555555;">&gt;</span> myStringList{<span style="color: #cc3300;">"one"</span>, <span style="color: #cc3300;">"two"</span>, <span style="color: #cc3300;">"three"</span>, <span style="color: #cc3300;">"four"</span>};  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> '\n';
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"myStringList.getSize(): "</span> <span style="color: #555555;">&lt;&lt;</span> myStringList.getSize() <span style="color: #555555;">&lt;&lt;</span> '\n';
+
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> '\n';
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p><code>Matrix</code> is a simple class template, that can be initialized by a<span style="font-family: courier new, courier;"> std::initializer_list</span> (line 2). A <span style="font-family: courier new, courier;">Matrix</span> can be used with a <span style="font-family: courier new, courier;">std::vector</span> (line 4 and line 5), or a<span style="font-family: courier new, courier;"> std::list</span> (line 6) to hold its values. So far, nothing special.&nbsp;</p>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/AliasTemplates/templateTemplateParameters.png" alt="templateTemplateParameters" width="450" height="271" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>But hold, I forget to mention line 1 and line 3. Line 1 declares a class template that has two template parameters. Okay, the first parameter is the type of the elements and the second parameter stands for the container. Let's have a closer look at the second parameter:<span style="font-family: courier new, courier;"> template &lt;typename, typename&gt; class Cont &gt;. </span>This means the second template argument should be a template requiring two template parameters. The first template parameter is the type of elements the container stores and the second template parameter is the defaulted allocator a container of the standard template library has. Even the allocator has a default value such as in the case of a <a href="https://en.cppreference.com/w/cpp/container/vector">std::vector</a>. The allocator depends on the type of elements.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span>
+    <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">T</span>,
+    <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Allocator</span> <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>allocator<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span>
+<span style="color: #555555;">&gt;</span> <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">vector</span>;
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Line 3 shows the usage of the allocator in this internally used container. The matrix can use all containers, which are of the kind: <span style="font-family: courier new, courier;">container&lt; type of the elements, allocator of the elements&gt;</span>. This is true for the <a href="https://en.cppreference.com/w/cpp/container">sequence containers</a> such as <span style="font-family: courier new, courier;">std::vector</span>, <span style="font-family: courier new, courier;">std::deque</span>, or<span style="font-family: courier new, courier;"> std::list</span>.&nbsp; <span style="font-family: courier new, courier;">std::array</span> and <span style="font-family: courier new, courier;">std::forward_list</span> would fail because<span style="font-family: courier new, courier;"> std::array</span> needs an additional non-type for specifying its size at compile-time and <span style="font-family: courier new, courier;">std::forward_list</span> does not support the <span style="font-family: courier new, courier;">size</span> method.</p>
+<p>Maybe you don't like the keyword class for the name of the template template parameter. With C++17, you can replace <code>class</code> with <code>typename</code>:</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T, <span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span>, <span style="color: #006699; font-weight: bold;">typename</span><span style="color: #555555;">&gt;</span> <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Cont</span> <span style="color: #555555;">&gt;</span>    <span style="color: #0099ff; font-style: italic;">// (1)</span>
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Matrix</span>;
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T, <span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span>, <span style="color: #006699; font-weight: bold;">typename</span><span style="color: #555555;">&gt;</span> <span style="color: #006699; font-weight: bold;">typename</span> Cont <span style="color: #555555;">&gt;</span> <span style="color: #0099ff; font-style: italic;">// (2) </span>
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Matrix</span>;
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Line (1) is valid since C++17 and equivalent to line (1).</p>
+<h2>The Next pdf Bundle: Coroutines</h2>
+<p>In the post <a href="https://www.modernescpp.com/index.php/which-pdf-bundle-do-you-want-make-your-choice">"Which pdf bundle do you want? Make your choice!</a>" you decided for the coroutines bundle.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/AliasTemplates/pollResult.png" alt="pollResult" width="650" height="629" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>I'm still in the process of preparing the bundle but it should be available in the next few days.</p>
+<p>If you subscribe to the English newsletter, you automatically get the link to the current pdf bundle. Have a look at the right top corner of this page. This automatism makes it quite comfortable for me. People that are already subscribed to my newsletter get the link automatically.</p>
+<h2>What's next?</h2>
+<p>In my next post, I write about template arguments. It is quite interesting how the compiler deduces the types. The rules do not only apply to function templates (C++98) but also to&nbsp;<code>auto</code> (C++11), to class templates (C++17), and concepts (C++20).</p>
+<p>{loadmoduleid 153}</p>
+<p>&nbsp;</p>
