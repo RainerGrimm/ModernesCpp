@@ -1,0 +1,300 @@
+<p>It is quite interesting how the compiler deduces the types for the template arguments. To make it short, you get most of the time the type you expect. The rules do not only apply to function templates (C++98) but also to&nbsp;<code>auto</code> (C++11), to class templates (C++17), and concepts (C++20).</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/TemplateArguments/templatesArguments.png" alt="templatesArguments" width="650" height="392" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>C++ supports function template argument deduction since its beginning. Here is a short recap.</p>
+<h2>Function Template Argument Deduction</h2>
+<p>Let me invoke a function template <code>max</code> for <code>int </code>and double</p>
+<p><!-- HTML generated using hilite.me --></p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+T max(T lhs, T rhs) {
+    <span style="color: #006699; font-weight: bold;">return</span> (lhs <span style="color: #555555;">&gt;</span> rhs)<span style="color: #555555;">?</span> lhs <span style="color: #555555;">:</span> rhs;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main() {
+  
+    max(<span style="color: #ff6600;">10</span>, <span style="color: #ff6600;">5</span>);        <span style="color: #3366ff;"> // (1)</span>
+    max(<span style="color: #ff6600;">10.5</span>, <span style="color: #ff6600;">5.5</span>);    <span style="color: #3366ff;"> // (2)</span>
+  
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>In this case, the compiler deduces the template arguments from the function arguments.&nbsp;<a href="https://cppinsights.io/lnk?code=dGVtcGxhdGUgPHR5cGVuYW1lIFQ+ClQgbWF4KFQgbGhzLCBUIHJocykgewogICAgcmV0dXJuIChsaHMgPiByaHMpPyBsaHMgOiByaHM7Cn0KCmludCBtYWluKCkgewogIAogICAgbWF4KDEwLCA1KTsKICAgIG1heCgxMC41LCA1LjUpOwogIAp9&amp;insightsOptions=cpp2a&amp;std=cpp2a&amp;rev=1.0">C++ Insights</a> shows that the compiler creates a full specialized function template for <code>max</code> for<code> int</code> (1) and for <code>double</code> (2).</p>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/TemplateArguments/functionTempateIntDouble.png" alt="functionTempateIntDouble" width="395" height="545" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>The process of template type deduction such as in this case produces most of the times the expected type. It is quite enlightening to analyze this process deeper.</p>
+<h2>Template Type Deduction</h2>
+<p>When deducing the template type, three entities come into play: T, ParameterType, and expression.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">void</span> func(ParameterType param);
+
+func(expression);
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Two types are deduced:</p>
+<ul>
+<li><code>T</code></li>
+<li><code>ParameterType</code></li>
+</ul>
+<p>The <code>ParameterType</code> can be a</p>
+<ul>
+<li>Value</li>
+<li>Reference (&amp;) or Pointer (*)</li>
+<li>Univeral Reference (&amp;&amp;)</li>
+</ul>
+<p>The <code>expression</code> can be an lvalue or an rvalue having. Additionally, the lvalue or rvalue can be a reference, or <code>const</code>/<code>volatile</code> qualified.</p>
+<p>The easiest way to understand the template type deduction process is to vary the<code> ParameterType</code>.</p>
+<h3>ParameterType is a Value</h3>
+<p>Taking the parameter by value is probably the most used variant.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">void</span> func(T param);
+
+func(expr);
+</pre>
+</div>
+<p>&nbsp;</p>
+<ul>
+<li>When <code>expr</code> is a reference, the reference is ignored <code>=&gt; newExpr </code>is created</li>
+<li>When <code>newExpr</code> is <code>const</code> or <code>volatile</code>, <code>const</code> or <code>volatile</code> is ignored.</li>
+</ul>
+<p>If the ParameterType is a reference or a universal reference, the constness (or volatileness) of <code>expr</code> is respected.</p>
+<h3>ParameterType is a Reference (&amp;) or Pointer (*)</h3>
+<p>For simplicity, I use a reference. The analogous argumentation holds for a pointer. Essentially, you exactly get the result you expect.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">void</span> func(T<span style="color: #555555;">&amp;</span> param);
+<span style="color: #0099ff; font-style: italic;">// void func(T* param);</span>
+
+func(expr);
+</pre>
+</div>
+<p>&nbsp;</p>
+<ul>
+<li>When <code>expr</code> is a reference, the reference is ignored (but added at the end).</li>
+<li>The expr matches the <code>ParameterType</code> and the resulting type becomes a reference. This means,
+<ul>
+<li>an <code>expr</code> of type <code>int</code> becomes an<code> int&amp;</code></li>
+<li>an <code>expr</code> of type<code> const int</code> becomes a <code>const int&amp;</code></li>
+<li>an <code>expr</code> of type<code> const int&amp;</code> becomes a <code>const int&amp;</code></li>
+</ul>
+</li>
+</ul>
+<h3>ParameterType is a Universal Reference (&amp;&amp;)</h3>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">void</span> func(T<span style="color: #555555;">&amp;&amp;</span> param);
+
+func(expr);
+</pre>
+</div>
+<p>&nbsp;</p>
+<ul>
+<li>When <code>expr</code> is an lvalue, the resulting type becomes an lvalue reference.</li>
+<li>When <code>expr</code> is an rvalue, the resulting type becomes an rvalue reference.</li>
+</ul>
+<p>Admittedly, this explanation was pretty technical. Here is an example.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// templateTypeDeduction.cpp</span>
+<span style="color: #009999;"></span>
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">void</span> funcValue(T param) { }
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">void</span> funcReference(T<span style="color: #555555;">&amp;</span> param) { }
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">void</span> funcUniversalReference(T<span style="color: #555555;">&amp;&amp;</span> param) { }
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">RVal</span>{};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">int</span> lVal{};
+    <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&amp;</span> ref <span style="color: #555555;">=</span> lVal;
+  
+    funcValue(lVal);                  <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    funcValue(ref);
+  
+    funcReference(lVal);              <span style="color: #0099ff; font-style: italic;">// (2)</span>
+  
+    funcUniversalReference(lVal);     <span style="color: #0099ff; font-style: italic;">// (3)</span>
+    funcUniversalReference(RVal());
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>I define and use a function template taking its argument by value (1), by reference (2), and by universal reference (3).</p>
+<p>Thanks to<a href="https://cppinsights.io/s/6bb71783"> C++ Insights</a>, I can visualize the type deduction of the compiler.</p>
+<ul>
+<li><strong>(1)</strong>: Both calls of <code>funcValue</code> cause the same instantiation of the function template. The deduced type is an <code>int</code>.</li>
+</ul>
+<p>&nbsp;</p>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/TemplateArguments/TypeDeductionValue.png" alt="TypeDeductionValue" width="400" height="127" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<ul>
+<li><strong>(2)</strong>: Calling the function <code>funcReference</code> with<code> const int&amp;</code> gives the type<code> const int&amp;</code>.</li>
+</ul>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/TemplateArguments/TypeDeductionReference.png" alt="TypeDeductionReference" width="436" height="128" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<ul>
+<li><strong>(3)</strong>: Using the function <code>funcUniversalReference</code> give an lvalue reference or an rvalue reference.</li>
+</ul>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/TemplateArguments/TypeDeductionUniversalReference.png" alt="TypeDeductionUniversalReference" width="476" height="336" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>There is one interesting fact when you invoke the function <code>funcValue</code> with a C-array. The C-array decays.</p>
+<h3>Decay of a C-array</h3>
+<p>Taking a C-array by value is special.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// typeDeductionArray.cpp</span>
+<span style="color: #009999;"></span>
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">void</span> funcValue(T param) { }
+
+<span style="color: #007788; font-weight: bold;">int</span> main() {
+
+    <span style="color: #007788; font-weight: bold;">int</span> intArray[<span style="color: #ff6600;">10</span>]{ <span style="color: #ff6600;">0</span>, <span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">5</span>, <span style="color: #ff6600;">6</span>, <span style="color: #ff6600;">7</span>, <span style="color: #ff6600;">8</span>, <span style="color: #ff6600;">9</span>};
+
+    funcValue(intArray);
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>When you invoke the function template <code>funcValue</code> with a C-array, the C-array decays to a pointer onto its first element. Decay has many facets. It is applied when a function argument is passed by value. Decay means that an implicit conversion function-to-pointer, array-to-pointer, or lvalue-to-rvalue is applied. Additionally, the reference of a type T and its const-volatile qualifiers are removed.</p>
+<p>Here is the screenshot of the program from <a href="https://cppinsights.io/s/910a53e4">C++ Insights</a>.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/TemplateArguments/typeDeductionArray.png" alt="typeDeductionArray" width="359" height="129" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>This essentially means that you don't know the size of the C-array.&nbsp;</p>
+<p>But there is a trick. Taking the C-array by reference and pattern matching on the type and the size on the C-array gives you the size of the C-array:</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// typeDeductionArraySize.cpp</span>
+
+<span style="color: #009999;">#include &lt;cstddef&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T, std<span style="color: #555555;">::</span><span style="color: #007788; font-weight: bold;">size_t</span> N<span style="color: #555555;">&gt;</span>
+std<span style="color: #555555;">::</span><span style="color: #007788; font-weight: bold;">size_t</span> funcArraySize(T (<span style="color: #555555;">&amp;</span>arr)[N]) { 
+    <span style="color: #006699; font-weight: bold;">return</span> N;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    <span style="color: #007788; font-weight: bold;">int</span> intArray[<span style="color: #ff6600;">10</span>]{ <span style="color: #ff6600;">0</span>, <span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">5</span>, <span style="color: #ff6600;">6</span>, <span style="color: #ff6600;">7</span>, <span style="color: #ff6600;">8</span>, <span style="color: #ff6600;">9</span>};
+
+    funcArraySize(intArray);
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"funcArraySize(intArray): "</span> <span style="color: #555555;">&lt;&lt;</span> funcArraySize(intArray) <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The function template <code>funcArraySize</code> deduces the size of the C-arrays. I gave for readability reasons the C-array parameter the name<code> arr: std::size_t funcArraySize(T (&amp;arr)[N])</code>. This is not necessary and you can just write <code>std::size_t funcArraySize(T (&amp;)[N])</code>.&nbsp; Here are the internals from<a href="https://cppinsights.io/s/6e908572"> C++ Insights</a>.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/TemplateArguments/typeDeductionArraySize.png" alt="typeDeductionArraySize" width="412" height="151" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>&nbsp;Finally, the output of the program:</p>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/TemplateArguments/typeDeductionArraySizeProgram.png" alt="typeDeductionArraySizeProgram" width="450" height="210" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>&nbsp;</p>
+<p>When you understand template type deduction, you essentially understand <code>auto</code> type deduction in C++11.</p>
+<h2><code>auto</code> Type Deduction</h2>
+<p><code>auto</code> type deduction uses the rules of template type deduction.</p>
+<p>To remind you, these are the essential entities of template type deduction:</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span> 
+<span style="color: #007788; font-weight: bold;">void</span> func(ParameterType param);
+
+<span style="color: #006699; font-weight: bold;">auto</span> val <span style="color: #555555;">=</span> <span style="color: #ff6600;">2011</span>;
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Understanding <code>auto</code> means, that you have to regard <code>auto</code> as the replacements for<code> T</code> and the type specifiers of <code>auto</code> as the replacements for the <code>ParameterType</code> in the function template.&nbsp;</p>
+<p>The type specifier can be a value (1), a reference (2), or a universal reference (3).</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #006699; font-weight: bold;">auto</span> val <span style="color: #555555;">=</span> arg;      <span style="color: #006699;">// (1)</span>
+
+<span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;</span> val <span style="color: #555555;">=</span> arg;     <span style="color: #006699;">// (2)</span>
+
+<span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;&amp;</span> val <span style="color: #555555;">=</span> arg;  <span style="color: #006699;">  // (3)
+</span></pre>
+</div>
+<p>&nbsp;</p>
+<p>Let's try it out and change the previous program <code>templateTypeDeduction.cpp</code> and use <code>auto</code> instead of function templates.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// autoTypeDeduction.cpp</span>
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">RVal</span>{};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">int</span> lVal{};
+    <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&amp;</span> ref <span style="color: #555555;">=</span> lVal;
+  
+    <span style="color: #006699; font-weight: bold;">auto</span> val1 <span style="color: #555555;">=</span> lVal;          <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    <span style="color: #006699; font-weight: bold;">auto</span> val2 <span style="color: #555555;">=</span> ref;
+  
+    <span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;</span> val3 <span style="color: #555555;">=</span> lVal;         <span style="color: #0099ff; font-style: italic;">// (2)</span>
+  
+    <span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;&amp;</span> val4 <span style="color: #555555;">=</span> lVal;        <span style="color: #0099ff; font-style: italic;">// (3)</span>
+    <span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;&amp;</span> val5 <span style="color: #555555;">=</span> RVal();
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>When you study the resulting types in<a href="https://cppinsights.io/s/2c652b47"> C++ Insights</a>, you see that they are identical to the types deduced in the program <code>templateTypeDeduction.cpp</code>.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/TemplateArguments/autoTypeDeduction.png" alt="autoTypeDeduction" width="266" height="335" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>Of course, <code>auto</code> also decays when it takes a C-array by value.</p>
+<div class="" dir="auto">
+<div id="jsc_c_69" class="ecm0bbzt hv4rvrfc ihqw7lf3 dati1w0a" data-ad-comet-preview="message" data-ad-preview="message">
+<div class="j83agx80 cbu4d94t ew0dbk1b irj2b8pg">
+<div class="qzhwtbm6 knvmm38d">
+<div class="kvgmc6g5 cxmmr5t8 oygrvhab hcukyx3x c1et5uql ii04i59q">
+<h2 dir="auto">The New pdf-Bundle is Ready: C++20 Coroutines</h2>
+</div>
+<div class="o9v6fnle cxmmr5t8 oygrvhab hcukyx3x c1et5uql ii04i59q">
+<div dir="auto">I have prepared the pdf-bundle. To get it is quite simple. If you subscribe to my German or English newsletter, you will get the link to the pdf bundle.</div>
+<div>&nbsp;</div>
+</div>
+<div class="o9v6fnle cxmmr5t8 oygrvhab hcukyx3x c1et5uql ii04i59q">
+<div dir="auto">Here is more information about the pdf-Bundle:&nbsp;<a href="https://www.modernescpp.com/index.php/the-new-pdf-bundle-is-ready-coroutines"> C++ Coroutines</a>.<a href="https://l.facebook.com/l.php?u=https%3A%2F%2Fbit.ly%2F3vfloEb%3Ffbclid%3DIwAR0nYKAmilriNZURCCikuTvweDlI3Q-tU95xUTEq_9VPrljd57EjoiZIam8&amp;h=AT1TyTow6ZUAoaV5qQ0h82Gu58NtpQfWM1wLrJQAXArk0-QvlPDNQVxbtShBvcvKVI-DZL90Z6sIvRJX8JcxPKTwcGfv59Gz-ZkVxniCvttmmrLQmNj8i5qQyakmWAnBeZ5uysgfKSUeQDGIjYsI&amp;__tn__=-UK-R&amp;c[0]=AT0NEu2r43XJ-0UEbBfVepWqyEZMUzoYz8AwUA5LWrxYJK_Qq12eNNvZ-Q0gnMob4yICH8Cg9BBLMzANeRXn7ValnqfiLAem_Z4NW_4XSWt4VDSrD62MBxuraSS2tkLU85Af1aUIsSm8q23z3O4daVfZwEPwTm_3Ok5rkcHtwM_6LITr6Pd8Co46knBQwPyIgEtIh1jCtOd0f9XY1g" target="_blank" rel="nofollow noopener" class="oajrlxb2 g5ia77u1 qu0x051f esr5mh6w e9989ue4 r7d6kgcz rq0escxv nhd2j8a9 nc684nl6 p7hjln8o kvgmc6g5 cxmmr5t8 oygrvhab hcukyx3x jb3vyjys rz4wbd8a qt6c0cv9 a8nywdso i1ao9s8h esuyzwwr f1sip0of lzcic4wl py34i1dx gpro0wi8" tabindex="0" role="link"></a></div>
+<div><img src="https://www.modernescpp.com/images/blog/Templates/TemplateArguments/pollResult.png" alt="pollResult" width="650" height="629" style="display: block; margin-left: auto; margin-right: auto;" /></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<h2>What's next?</h2>
+<p>C++17 makes type deduction more powerful. First, automatic type deduction is possible for non-type template parameters, and second, class templates can also deduce their arguments. In particular, class template argument deduction makes the life of a programmer much easier.</p>
+<p>{loadmoduleid 153}</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<div id="simple-translate">
+<div>
+<div class="simple-translate-button isShow" style="background-image: url('moz-extension://981aa874-2db4-44d3-a97f-b02a72476831/icons/512.png'); height: 22px; width: 22px; top: 351px; left: 884px;">&nbsp;</div>
+<div class="simple-translate-panel" style="width: 300px; height: 200px; top: 0px; left: 0px; font-size: 13px; background-color: #ffffff;">
+<div class="simple-translate-result-wrapper" style="overflow: hidden;">
+<div class="simple-translate-move" draggable="draggable">&nbsp;</div>
+<div class="simple-translate-result-contents">
+<p class="simple-translate-result" dir="auto" style="color: #000000;">&nbsp;</p>
+<p class="simple-translate-candidate" dir="auto" style="color: #737373;">&nbsp;</p>
+</div>
+</div>
+</div>
+</div>
+</div>
