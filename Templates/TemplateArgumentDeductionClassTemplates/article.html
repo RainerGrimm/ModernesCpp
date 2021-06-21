@@ -1,0 +1,214 @@
+<p>In my last post<a href="https://www.modernescpp.com/index.php/template-arguments"> Template Arguments</a>, I wrote about function template type deduction (C++98) and auto type deduction (C++11). Today I wear more modern hats. I start with automatic type deduction of non-type template parameters and class templates (C++17) and finish with automatic type deduction of concepts (C++20).</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/Templates/TemplateArgumentDeductionClassTemplates/templatesArguments.png" alt="templatesArguments" width="650" height="392" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>Following the chronological order, let me start with two C++17 features: type deduction of non-type template parameters and type deduction of class templates in C++17.</p>
+<h2>Automatic type deduction of non-type template parameters</h2>
+<p>First of all. What are non-type template parameters? These are<code> nullptr</code>, integral values such as <code>bool</code>, and <code>int</code>, lvalue references, pointer, enumerations, and with C++20 floating-point values. Most of the time, integral types are used and so do I.</p>
+<p>After this theory, let's start with an example.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">auto</span> N<span style="color: #555555;">&gt;          <span style="color: #0099ff; font-style: italic;">// (1)</span></span>
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">MyClass</span>{
+    ....
+};
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span> N<span style="color: #555555;">&gt;</span>         <span style="color: #0099ff;"> // (2)</span>
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">MyClass</span><span style="color: #555555;">&lt;</span>N<span style="color: #555555;">&gt;</span> {
+    ....
+};
+
+
+MyClass<span style="color: #555555;">&lt;</span><span style="color: #cc3300;">'x'</span><span style="color: #555555;">&gt;</span> myClass1;    <span style="color: #0099ff; font-style: italic;">// (3)</span>
+MyClass<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">2017</span><span style="color: #555555;">&gt;</span>  myClass2;  <span style="color: #0099ff; font-style: italic;">// (4)</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>By using <span style="font-family: courier new,courier;">auto</span> in (1) in the template signature,&nbsp; <span style="font-family: courier new,courier;">N</span> is a non-type template parameter. The compiler will automatically deduce it. You can also partially specialize for <span style="font-family: courier new,courier;">int </span>(2). The template instantiation (3) will use the primary template (1) and the following template instantiation the partial specialization for<span style="font-family: courier new,courier;"> int </span>(4).<span style="font-family: courier new,courier;"><br /></span></p>
+<p>The usual type modifiers can be used to constrain the type of the non-type template parameters.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">const</span> <span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">*</span> p<span style="color: #555555;">&gt;</span> 
+<span style="color: #006699; font-weight: bold;">class</span> S;
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>In this declaration of a class template<code> S</code>, <span style="font-family: courier new,courier;">p</span> must be a pointer to <span style="font-family: courier new,courier;">const.</span></p>
+<p>The automatic type deduction for non-type templates can also be applied to variadic templates.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">auto</span>... ns<span style="color: #555555;">&gt;</span> 
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">VariadicTemplate</span>{ .... }; 
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">auto</span> n1, decltype(n1)... ns<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">TypedVariadicTemplate</span>{ .... };
+</pre>
+</div>
+<p>&nbsp;</p>
+<p><span style="font-family: courier new,courier;">VariadicTemplate</span> can deduce an arbitrary number of non-type template parameters. <span style="font-family: courier new,courier;">TypeVariadicTemplate</span> will only deduce the first template parameter. The remaining templated parameters will be of the same type such as the first type:<code> decltype(n1)</code>.</p>
+<p>Automatic type deduction from class templates makes the usage class template quite comfortable.</p>
+<h2>Automatic Type Deduction of Class Templates</h2>
+<p>A function template can deduce its type parameters from its function arguments. But that was not possible for special functions: constructors of class templates. With C++17, this statement is simply wrong. A constructor can deduce its type parameters from its constructor arguments. Here is a first example.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// templateArgumentDeduction.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">void</span> showMe(<span style="color: #006699; font-weight: bold;">const</span> T<span style="color: #555555;">&amp;</span> t) {
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> t <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+}
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">struct</span> ShowMe{
+    ShowMe(<span style="color: #006699; font-weight: bold;">const</span> T<span style="color: #555555;">&amp;</span> t) {
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> t <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    }
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+  
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    
+    showMe(<span style="color: #ff6600;">5.5</span>);          <span style="color: #0099ff; font-style: italic;">// not showMe&lt;double&gt;(5.5);</span>
+    showMe(<span style="color: #ff6600;">5</span>);            <span style="color: #0099ff; font-style: italic;">// not showMe&lt;int&gt;(5);</span>
+    
+    ShowMe(<span style="color: #ff6600;">5.5</span>);          <span style="color: #0099ff; font-style: italic;">// not ShowMe&lt;double&gt;(5.5);</span>
+    ShowMe(<span style="color: #ff6600;">5</span>);            <span style="color: #0099ff; font-style: italic;">// not ShowMe&lt;int&gt;(5);</span>
+  
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Let me say a few words about the <code>main</code> function. The instantiation of the function template <code>showMe</code> <code></code>is valid since the first C++ standard C++98, but the instantiation of the class template <code>ShowMe</code> since C++17. From the user's perspective, the usage of functions template or class templates feels just like an ordinary function or class.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/TemplateArgumentDeductionClassTemplates/templateArgumentDeduction.png" alt="templateArgumentDeduction" width="482" height="271" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>Maybe, you are not convinced. Here are more examples of class template argument deduction.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// classTemplateArgumentDeduction.cpp</span>
+
+<span style="color: #009999;">#include &lt;array&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+<span style="color: #009999;">#include &lt;mutex&gt;</span>
+<span style="color: #009999;">#include &lt;memory&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+  
+    std<span style="color: #555555;">::</span>array myArr{<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>};          <span style="color: #0099ff; font-style: italic;">// deduces std::array&lt;int, 3&gt; </span>
+    std<span style="color: #555555;">::</span>vector myVec{<span style="color: #ff6600;">1.5</span>, <span style="color: #ff6600;">2.5</span>};        <span style="color: #0099ff; font-style: italic;">// deduces std::vector&lt;double&gt;</span>
+ 
+    std<span style="color: #555555;">::</span>mutex mut;
+    std<span style="color: #555555;">::</span>lock_guard myLock(mut);       <span style="color: #0099ff; font-style: italic;">// deduces std::lock_guard&lt;mutex&gt;(mut);</span>
+  
+    std<span style="color: #555555;">::</span>pair myPair(<span style="color: #ff6600;">5</span>, <span style="color: #ff6600;">5.5</span>);          <span style="color: #0099ff; font-style: italic;">// deduces std::pair&lt;int, double&gt;</span>
+    std<span style="color: #555555;">::</span>tuple myTup(<span style="color: #ff6600;">5</span>, myArr, myVec); <span style="color: #0099ff; font-style: italic;">// deduces std::tuple&lt;int, </span>
+                                       <span style="color: #0099ff; font-style: italic;">// std::array&lt;int, 3&gt;, std::vector&lt;double&gt;&gt;</span>
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The comments show the by the C++17 compiler deduces type. Thanks to<a href="https://cppinsights.io/s/b83f6def"> C++ Insights</a>, you can visualize this process of template argument deduction.</p>
+<p>The last two examples to std::pair and std::tuple are pretty interesting. Before C++17, we used factory functions such as std::make_pair or std::make_tuple to create a std::pair or a std::tuple without specifying the type parameters. In contrast to class templates, the compiler could deduce the type parameter from the function arguments. Here is a simplified version of <code>std::pair</code>.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// makePair.cpp<br /></span>
+<span style="color: #009999;">#include &lt;utility&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T1, <span style="color: #006699; font-weight: bold;">typename</span> T2<span style="color: #555555;">&gt;</span>
+std<span style="color: #555555;">::</span>pair<span style="color: #555555;">&lt;</span>T1, T2<span style="color: #555555;">&gt;</span> make_pair2(T1 t1, T2 t2) { 
+    <span style="color: #006699; font-weight: bold;">return</span> std<span style="color: #555555;">::</span>pair<span style="color: #555555;">&lt;</span>T1, T2<span style="color: #555555;">&gt;</span>(t1, t2); 
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main() {
+	
+   <span style="color: #006699; font-weight: bold;">auto</span> arg{<span style="color: #ff6600;">5.5</span>};
+   <span style="color: #006699; font-weight: bold;">auto</span> pair1 <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>make_pair(<span style="color: #ff6600;">5</span>, arg);
+   <span style="color: #006699; font-weight: bold;">auto</span> pair2 <span style="color: #555555;">=</span> make_pair2(<span style="color: #ff6600;">5</span>, arg);
+   <span style="color: #006699; font-weight: bold;">auto</span> pair3 <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>pair(<span style="color: #ff6600;">5</span>, arg);
+   
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The compiler deduces the same type for<code> pair1</code> and<code> pair2</code>. With C++17, we don't need this factory function anymore and can directly invoke the constructor of <code>std::pair</code> to get<code> pair3</code>.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/TemplateArgumentDeductionClassTemplates/makePair.png" alt="makePair" width="500" height="466" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>You can study the program on <a href="https://cppinsights.io/s/513635bd">C++ Insights</a>.</p>
+<p>You may wonder that my function template<code> make_pair2</code> took its arguments by value.<code> std::make_pair</code> decays its arguments and so does my function template<code> make_pair2</code>. I wrote about the decay of function arguments in my last post <a href="https://www.modernescpp.com/index.php/template-arguments">Template Arguments</a>.</p>
+<p>Before I write a few words about the automatic type deduction with concepts, I want to emphasize is explicit. Automatic type deduction is more than convenient. It's a security feature.<strong> When you don't specify the type, you cannot make an error.</strong></p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// automaticTypeDeduction.cpp</span>
+
+<span style="color: #009999;">#include &lt;string&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">void</span> func(T) {};
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">struct</span> Class{
+  Class(T){}
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+  
+    <span style="color: #007788; font-weight: bold;">int</span> a1 <span style="color: #555555;">=</span> <span style="color: #ff6600;">5.5</span>;              <span style="color: #0099ff; font-style: italic;">// static_cast&lt;int&gt;(5.5)</span>
+    <span style="color: #006699; font-weight: bold;">auto</span> a2 <span style="color: #555555;">=</span> <span style="color: #ff6600;">5.5</span>;
+  
+    func<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">float</span><span style="color: #555555;">&gt;</span>(<span style="color: #ff6600;">5.5</span>);          <span style="color: #0099ff; font-style: italic;">// static_cast&lt;float&gt;(5.5)</span>
+    func(<span style="color: #ff6600;">5.5</span>);
+  
+    Class<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>string<span style="color: #555555;">&gt;</span> class1(<span style="color: #cc3300;">"class"</span>); <span style="color: #0099ff; font-style: italic;">// calls essentially std::string("class")</span>
+    Class class2(<span style="color: #cc3300;">"class"</span>);
+  
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>All errors are only due to the fact that I explicitly specified the type:</p>
+<ul>
+<li><code>int a1</code> triggers the narrowing conversion from <code>double</code> to<code> int</code></li>
+<li><code>func&lt;float&gt;(5.5)</code> causes the conversion from the <code>double</code> value<code> 5.5</code> to <code>float</code></li>
+<li><code>Class&lt;std::string&gt; class1("class")</code> creates a C++-string initialized with a C-string.</li>
+</ul>
+<p>If you want to study the program, here it is: <a href="https://cppinsights.io/s/c8c70e7c">C++ Insights</a>.</p>
+<p>There is not much to add to the story of automatic type deduction when concepts come into play.</p>
+<h2>Automatic Type Deduction with Concepts</h2>
+<p>Automatic type deduction with concepts work like expected:</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// typeDeductionConcepts.cpp</span>
+
+<span style="color: #009999;">#include &lt;concepts&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">foo</span>(<span style="color: #006699; font-weight: bold;">auto</span> t) {}                  <span style="color: #0099ff; font-style: italic;">// (1)</span>
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">bar</span>(std<span style="color: #555555;">::</span>integral <span style="color: #006699; font-weight: bold;">auto</span> t){}     <span style="color: #0099ff; font-style: italic;">// (2)</span>
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>regular T<span style="color: #555555;">&gt;</span>            <span style="color: #0099ff; font-style: italic;">// (3)</span>
+<span style="color: #006699; font-weight: bold;">struct</span> Class{
+  Class(T){}
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    foo(<span style="color: #ff6600;">5.5</span>);
+    bar(<span style="color: #ff6600;">5</span>);
+    Class cl(<span style="color: #336666;">true</span>);
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Whether you use an unconstrained placeholder ( <code>auto</code> in line 1), a constrained placeholder (concept in line 2), or a restricted template parameter (concept in line 3), the compiler deduces the expected type. <a href="https://cppinsights.io/s/218e9e55">C++ Insights</a> helps to visualize the type deduction.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/TemplateArgumentDeductionClassTemplates/typeDeductionConcepts.png" alt="typeDeductionConcepts" width="500" height="745" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<h2>What's next?</h2>
+<p>In my next post, I write about the next exciting feature of templates: specialization. You can fully specialize a function template or class template. Additionally, a class template can be partially specialized.</p>
+<p>{loadmoduleid 153}</p>
+<p>&nbsp;</p>
