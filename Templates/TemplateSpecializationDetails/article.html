@@ -1,0 +1,191 @@
+<p>After I presented in my last post<a href="https://www.modernescpp.com/index.php/template-specialization"> Template Specialization</a> the basics about template specialization, I dig today deeper. I want to present the partial and full specialization of a class template as a compile-time if.</p>
+<hr id="system-readmore" />
+<p><img src="https://www.modernescpp.com/images/blog/Templates/TemplateSpecializationMoreDetails/TemplateSpecialization.png" alt="TemplateSpecialization" width="650" height="409" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<h2>Specialization of Class Templates as a Compile-Time if</h2>
+<p>After my last blog post <a href="https://www.modernescpp.com/index.php/template-specialization"> Template Specialization</a>, I got a few similar questions. How can you decide if a type is a given type or two types are the same? Answering these questions is easier than it seems and helps me to present more theories about class template specialization. To answer these questions, I implement simplified versions of <a href="https://en.cppreference.com/w/cpp/types/is_same"><code>std::is_same</code></a> and<a href="https://en.cppreference.com/w/cpp/types/remove_reference"> std::remove_reference</a>. The presented techniques in this post are an application of class template specialization and are a compile-time if.</p>
+<h3><code>std::is_same</code></h3>
+<p><code>std::is_same</code> is a function from the type-traits library. It returns<a href="https://en.cppreference.com/w/cpp/types/integral_constant"> std::true_type</a> if both types are the same, otherwise it returns<code> std::false</code>_type. For simplicity reasons, I return <code>true</code> or <code>false</code>.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// isSame.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T, <span style="color: #006699; font-weight: bold;">typename</span> U<span style="color: #555555;">&gt;</span>                 <span style="color: #0099ff; font-style: italic;">// (1)</span>
+<span style="color: #006699; font-weight: bold;">struct</span> isSame {
+    <span style="color: #006699; font-weight: bold;">static</span> constexpr <span style="color: #007788; font-weight: bold;">bool</span> value <span style="color: #555555;">=</span> <span style="color: #336666;">false</span>;
+};
+ 
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>                             <span style="color: #0099ff; font-style: italic;">// (2)</span>
+<span style="color: #006699; font-weight: bold;">struct</span> isSame<span style="color: #555555;">&lt;</span>T, T<span style="color: #555555;">&gt;</span> {
+    <span style="color: #006699; font-weight: bold;">static</span> constexpr <span style="color: #007788; font-weight: bold;">bool</span> value <span style="color: #555555;">=</span> <span style="color: #336666;">true</span>;
+}; 
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;                          
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>boolalpha;
+                                                <span style="color: #0099ff; font-style: italic;">// (3)</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"isSame&lt;int, int&gt;::value: "</span> <span style="color: #555555;">&lt;&lt;</span> isSame<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>, <span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"isSame&lt;int, int&amp;&gt;::value: "</span> <span style="color: #555555;">&lt;&lt;</span> isSame<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>, <span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&amp;&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  
+                                                
+    <span style="color: #007788; font-weight: bold;">int</span> a(<span style="color: #ff6600;">2011</span>);
+    <span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&amp;</span> b(a);                                  <span style="color: #0099ff; font-style: italic;">// (4)</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"isSame&lt;decltype(a), decltype(b)&gt;::value "</span> <span style="color: #555555;">&lt;&lt;</span> 
+                  isSame<span style="color: #555555;">&lt;</span>decltype(a), decltype(b)<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The primary template (1) returns as default <code>false</code>, when you ask for its<code> value. </code>On the contrary, the partial specialization (2) that is used when both types are the same returns <code>true</code>. You can use the class template <code>isSame</code> on types (3) and, thanks to <code>decltype</code>, on values (4). The following screenshot shows the output of the program.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/TemplateSpecializationMoreDetails/isSame.png" alt="isSame" width="450" height="229" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>You may already guess it. The class template <code>isSame</code> is an example of template metaprogramming. Now, I have to make a short detour and write a few words about meta.</p>
+<h3>Metafunctions and Metadata</h3>
+<p>At runtime, we use data and functions. At compile time, we use metadata and metafunctions. Quite easy, it's called meta because we do metaprogramming, but what is metadata or a metafunction? Here is the first definition.</p>
+<ul>
+<li><strong>Metadata</strong>: Types and integral values that are used in metafunctions.</li>
+<li><strong>Metafunction</strong>: Functions that are executed at a compile time.</li>
+</ul>
+<p>Let me elaborate more on the terms metadata and metafunction.</p>
+<h4 id="h1-1-1-metadata">Metadata</h4>
+<p>Metadata includes three entities:</p>
+<ol>
+<li>Types such as int, double, or<code> std::string</code></li>
+<li>Non-types such as integrals, enumerators, pointers, lvalue reference, and floating-point values with C++20</li>
+<li>Templates</li>
+</ol>
+<p>So far, I only used types in my metafunction <code>isSame</code>.</p>
+<h4 id="h1-1-2-metafunction">Metafunction</h4>
+<p>Types such as the class template <code>isSame</code> are used in template metaprogramming to simulate functions. Base on my definition of metafunctions, <code>constexpr</code> functions can also be executed at compile time and are, therefore, metafunctions.</p>
+<p>A metafunction <code></code>cannot only return a value, but it can also return a type. By convention, a metafunction returns a using via<code> ::value</code>, and a type using <code>::type</code>.The following metafunction <code>removeReference</code> returns a type as result.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// removeReference.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;utility&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T, <span style="color: #006699; font-weight: bold;">typename</span> U<span style="color: #555555;">&gt;</span>                 
+<span style="color: #006699; font-weight: bold;">struct</span> isSame {
+    <span style="color: #006699; font-weight: bold;">static</span> constexpr <span style="color: #007788; font-weight: bold;">bool</span> value <span style="color: #555555;">=</span> <span style="color: #336666;">false</span>;
+};
+ 
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>                             
+<span style="color: #006699; font-weight: bold;">struct</span> isSame<span style="color: #555555;">&lt;</span>T, T<span style="color: #555555;">&gt;</span> {
+    <span style="color: #006699; font-weight: bold;">static</span> constexpr <span style="color: #007788; font-weight: bold;">bool</span> value <span style="color: #555555;">=</span> <span style="color: #336666;">true</span>;
+}; 
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>                <span style="color: #0099ff; font-style: italic;">// (1)</span>
+<span style="color: #006699; font-weight: bold;">struct</span> removeReference { 
+    <span style="color: #006699; font-weight: bold;">using</span> type <span style="color: #555555;">=</span> T;
+};
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>               <span style="color: #0099ff; font-style: italic;">// (2)</span>
+<span style="color: #006699; font-weight: bold;">struct</span> removeReference<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&amp;&gt;</span> {
+    <span style="color: #006699; font-weight: bold;">using</span> type <span style="color: #555555;">=</span> T;
+};
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>               <span style="color: #0099ff; font-style: italic;">// (3)</span>
+<span style="color: #006699; font-weight: bold;">struct</span> removeReference<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&amp;&amp;&gt;</span> {
+    <span style="color: #006699; font-weight: bold;">using</span> type <span style="color: #555555;">=</span> T;
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>boolalpha;
+                                    <span style="color: #0099ff; font-style: italic;">// (4)                </span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"isSame&lt;int, removeReference&lt;int&gt;::type&gt;::value: "</span> <span style="color: #555555;">&lt;&lt;</span> 
+                  isSame<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>, removeReference<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;::</span>type<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"isSame&lt;int, removeReference&lt;int&amp;&gt;::type&gt;::value: "</span> <span style="color: #555555;">&lt;&lt;</span> 
+                  isSame<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>, removeReference<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&amp;&gt;::</span>type<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"isSame&lt;int, removeReference&lt;int&amp;&amp;&gt;::type&gt;::value: "</span> <span style="color: #555555;">&lt;&lt;</span> 
+                  isSame<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>, removeReference<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&amp;&amp;&gt;::</span>type<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+
+                                  <span style="color: #0099ff; font-style: italic;">// (5)</span>
+
+    <span style="color: #007788; font-weight: bold;">int</span> a(<span style="color: #ff6600;">2011</span>);
+    <span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&amp;</span> b(a);   
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"isSame&lt;int, removeReference&lt;decltype(a)&gt;::type&gt;::value: "</span> <span style="color: #555555;">&lt;&lt;</span> 
+                  isSame<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>, removeReference<span style="color: #555555;">&lt;</span>decltype(a)<span style="color: #555555;">&gt;::</span>type<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"isSame&lt;int, removeReference&lt;decltype(b)&gt;::type&gt;::value: "</span> <span style="color: #555555;">&lt;&lt;</span> 
+                  isSame<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>, removeReference<span style="color: #555555;">&lt;</span>decltype(b)<span style="color: #555555;">&gt;::</span>type<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"isSame&lt;int, removeReference&lt;decltype(std::move(a))&gt;::type&gt;::value: "</span> <span style="color: #555555;">&lt;&lt;</span> 
+                  isSame<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>, removeReference<span style="color: #555555;">&lt;</span>decltype(std<span style="color: #555555;">::</span>move(a))<span style="color: #555555;">&gt;::</span>type<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>In this example, I apply the previously defined metafunction <code>isSame</code> and the metafunction <code>removeReference</code>. The primary template <code>removeReference</code> (1) returns T using the name <code>type</code>. The partial specializations for the lvalue reference (2) and the rvalue reference also return T by removing the references from it's template parameter. As before, you can use the metafunction <code>removeReference</code> with types (4) and, thanks to <code>decltype</code>, with values (5). <code>decltype(a)</code> returns a value, <code>decltype(b)</code> returns an lvalue reference, and <code>decltype(std::move(a))</code> returns an rvalue reference.<br /><br /></p>
+<p>Finally, here is the output of the program.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/TemplateSpecializationMoreDetails/removeReference.png" alt="removeReference" width="550" height="237" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>There is one trap I fall into. When you define a member function of a fully specialized class template outside the class, you must not use<code> template&lt;&gt;</code>.</p>
+<h2>Member Functions of Specialization Defined Outside the Class Body</h2>
+<p>The following code program shows the class template <code>Matrix</code>, having a partial and a full specialization.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// specializationExtern.cpp</span>
+
+<span style="color: #009999;">#include &lt;cstddef&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T, std<span style="color: #555555;">::</span><span style="color: #007788; font-weight: bold;">size_t</span> Line, std<span style="color: #555555;">::</span><span style="color: #007788; font-weight: bold;">size_t</span> Column<span style="color: #555555;">&gt;</span>  <span style="color: #0099ff; font-style: italic;">// (1)</span>
+<span style="color: #006699; font-weight: bold;">struct</span> Matrix;
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>                                        <span style="color: #0099ff; font-style: italic;">// (2)</span>
+<span style="color: #006699; font-weight: bold;">struct</span> Matrix<span style="color: #555555;">&lt;</span>T, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">3</span><span style="color: #555555;">&gt;</span>{
+    <span style="color: #007788; font-weight: bold;">int</span> numberOfElements() <span style="color: #006699; font-weight: bold;">const</span>;
+};
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">int</span> Matrix<span style="color: #555555;">&lt;</span>T, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">3</span><span style="color: #555555;">&gt;::</span>numberOfElements() <span style="color: #006699; font-weight: bold;">const</span> {
+    <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #ff6600;">3</span> <span style="color: #555555;">*</span> <span style="color: #ff6600;">3</span>;
+};
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;&gt;</span>                                                 <span style="color: #0099ff; font-style: italic;">// (3)</span>
+<span style="color: #006699; font-weight: bold;">struct</span> Matrix<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>, <span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">4</span><span style="color: #555555;">&gt;</span>{
+    <span style="color: #007788; font-weight: bold;">int</span> numberOfElements() <span style="color: #006699; font-weight: bold;">const</span>;
+};
+
+<span style="color: #0099ff; font-style: italic;">// template &lt;&gt;                                              // (4)</span>
+<span style="color: #007788; font-weight: bold;">int</span> Matrix<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>, <span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">4</span><span style="color: #555555;">&gt;::</span>numberOfElements() <span style="color: #006699; font-weight: bold;">const</span> {
+    <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #ff6600;">4</span> <span style="color: #555555;">*</span> <span style="color: #ff6600;">4</span>;
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    Matrix<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">double</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">3</span><span style="color: #555555;">&gt;</span> mat1;                              <span style="color: #0099ff; font-style: italic;">// (5)</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"mat1.numberOfElements(): "</span> <span style="color: #555555;">&lt;&lt;</span> mat1.numberOfElements() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    Matrix<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>, <span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">4</span><span style="color: #555555;">&gt;</span> mat2;                                 <span style="color: #0099ff; font-style: italic;">// (6)</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"mat2.numberOfElements(): "</span> <span style="color: #555555;">&lt;&lt;</span> mat2.numberOfElements() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>(1) declares the primary template. (2) defines the partial specialization and (3) the full specialization of <code>Matrix</code>. The member functions <code>numberOfElements</code> are defined outside the class body. Line (4) is probably the non-intuitive line. When you define the member function <code>numberOfElements</code> outside the class body, you must not use<code> template &lt;&gt;</code>. Line (5) causes the instantiation of the partial and line (6) the instantiation of the full specialization.</p>
+<h2><img src="https://www.modernescpp.com/images/blog/Templates/TemplateSpecializationMoreDetails/specializationExtern.png" alt="specializationExtern" width="400" height="214" style="display: block; margin-left: auto; margin-right: auto;" /></h2>
+<h2>What's next?</h2>
+<p>In my next post, I write about the full specialization of function templates and their surprising interplay with functions. To make a long story short, according to the C++ Core Guidelines holds:<a href="https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-specialize-function"> T.144: Don't specialize function templates</a>.</p>
+<p>&nbsp;</p>
+<p>{loadmoduleid 153}</p>
