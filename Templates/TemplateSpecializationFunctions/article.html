@@ -1,0 +1,236 @@
+<p>As you may know from my previous post <a href="https://www.modernescpp.com/index.php/template-specialization">Template Specialization</a>, function template can only be full but not partial specialized. To make my long story short:<a href="https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-specialize-function"> Don't specialize function templates</a>. Just use function overloading.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/Templates/TemplateSpecializationFunctionTemplates/TemplateSpecialization.png" alt="TemplateSpecialization" width="650" height="409" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>You may wonder why I write about a feature of C++, you should not use. The reason is quite simple. When you see the surprising behavior of fully specialized function templates, you will hopefully use a non-generic function instead.</p>
+<h2>Don't Specialize Function Templates</h2>
+<p>Maybe the title reminds you? Right. This is title is from the C++ Core Guidelines: <a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rt-specialize-function">T.144: Don’t specialize function templates</a></p>
+<p>The reason for the rules is quite short: function template specialization doesn't participate in overloading. Let's see what that means. My program is based on the program snippet from Demiov/<a href="https://en.wikipedia.org/wiki/David_Abrahams_(computer_programmer)">Abrahams</a>.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// dimovAbrahams.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;string&gt;</span>
+
+<span style="color: #0099ff; font-style: italic;">// getTypeName</span>
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>            <span style="color: #0099ff; font-style: italic;">// (1) primary template</span>
+std<span style="color: #555555;">::</span>string getTypeName(T){
+    <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc3300;">"unknown"</span>;
+}
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>            <span style="color: #0099ff; font-style: italic;">// (2) primary template that overloads (1)</span>
+std<span style="color: #555555;">::</span>string getTypeName(T<span style="color: #555555;">*</span>){
+    <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc3300;">"pointer"</span>;
+}
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;&gt;</span>                      <span style="color: #0099ff; font-style: italic;">// (3) explicit specialization of (2)</span>
+std<span style="color: #555555;">::</span>string getTypeName(<span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">*</span>){
+    <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc3300;">"int pointer"</span>;
+}
+
+<span style="color: #0099ff; font-style: italic;">// getTypeName2</span>
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>            <span style="color: #0099ff; font-style: italic;">// (4) primary template</span>
+std<span style="color: #555555;">::</span>string getTypeName2(T){
+    <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc3300;">"unknown"</span>;
+}
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;&gt;</span>                      <span style="color: #0099ff; font-style: italic;">// (5) explicit specialization of (4)</span>
+std<span style="color: #555555;">::</span>string getTypeName2(<span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">*</span>){
+    <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc3300;">"int pointer"</span>;
+}
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>            <span style="color: #0099ff; font-style: italic;">// (6) primary template that overloads (4)</span>
+std<span style="color: #555555;">::</span>string getTypeName2(T<span style="color: #555555;">*</span>){
+    <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc3300;">"pointer"</span>;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main(){
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> '\n'<span style="color: #555555;"></span>;
+    
+    <span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">* </span>p;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"getTypeName(p): "</span> <span style="color: #555555;">&lt;&lt;</span> getTypeName(p) <span style="color: #555555;">&lt;&lt;</span>  '\n';  
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"getTypeName2(p): "</span> <span style="color: #555555;">&lt;&lt;</span> getTypeName2(p) <span style="color: #555555;">&lt;&lt;</span>  '\n';
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span>  '\n';
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Admittedly, the code looks quite boring but bear with me. I defined inline (1) the primary template&nbsp;<span style="font-family: courier new, courier;">getTypeName.</span> (2) is an overload for pointers and (3) a full specialization for an <code>int</code> pointer. In the case of <span style="font-family: courier new, courier;">getTypeName2,</span> I made a small variation. I put the explicit <code>specialisation</code> (5) before the overload for pointers (6).</p>
+<p>This reordering has surprising consequences.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/TemplateSpecializationFunctionTemplates/dimovAbrahams.png" alt="dimovAbrahams" width="356" height="217" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>In the first case, the full specialization for the <span style="font-family: courier new, courier;">int</span> pointer is called, and in the second case, the overload of pointers. What?&nbsp; The reason for this non-intuitive behavior is that overload resolution ignores function template specialization. Overload resolution operates on primary templates and functions. In both cases, overload resolutions found both primary templates. In the first case (<span style="font-family: courier new, courier;">getTypeName</span>), the pointer variant is the better fit and, therefore, the explicit specialization for the <span style="font-family: courier new, courier;">int</span> pointer was chosen. In the second variant (<span style="font-family: courier new, courier;">getTypeName2</span>), the pointer variant was chosen but the full specialization belongs to the primary template (line 4). Consequently, it was ignored.</p>
+<p>I know, this was pretty complicated. Just keep the rule in mind:<strong> Don't specialize function template, use non-generic functions instead.</strong></p>
+<p>Do you want to have proof for my statement? Here it is: Making out of the explicit specialization in (3) and (5) non-generic functions solves the issue. I just have to comment out the template declaration<code> template&lt;&gt;</code>. For simplicity reasons, I removed the other comments.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// dimovAbrahams.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;string&gt;</span>
+
+<span style="color: #0099ff; font-style: italic;">// getTypeName</span>
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>           
+std<span style="color: #555555;">::</span>string getTypeName(T){
+    <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc3300;">"unknown"</span>;
+}
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>            
+std<span style="color: #555555;">::</span>string getTypeName(T<span style="color: #555555;">*</span>){
+    <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc3300;">"pointer"</span>;
+}
+<br />// <span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;&gt;</span>                      <span style="color: #0099ff; font-style: italic;">// (3)</span>
+std<span style="color: #555555;">::</span>string getTypeName(<span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">*</span>){
+    <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc3300;">"int pointer"</span>;
+}
+
+<span style="color: #0099ff; font-style: italic;">// getTypeName2</span>
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>           
+std<span style="color: #555555;">::</span>string getTypeName2(T){
+    <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc3300;">"unknown"</span>;
+}
+<br />// <span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;&gt;</span>                      <span style="color: #0099ff; font-style: italic;">// (5) </span>
+std<span style="color: #555555;">::</span>string getTypeName2(<span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">*</span>){
+    <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc3300;">"int pointer"</span>;
+}
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>           
+std<span style="color: #555555;">::</span>string getTypeName2(T<span style="color: #555555;">*</span>){
+    <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc3300;">"pointer"</span>;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main(){
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> '\n'<span style="color: #555555;"></span>;
+    
+    <span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">* </span>p;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"getTypeName(p): "</span> <span style="color: #555555;">&lt;&lt;</span> getTypeName(p) <span style="color: #555555;">&lt;&lt;</span>  '\n';  
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"getTypeName2(p): "</span> <span style="color: #555555;">&lt;&lt;</span> getTypeName2(p) <span style="color: #555555;">&lt;&lt;</span>  '\n';
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span>  '\n';
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Now, function overloading works as expected and the non-generic function taking an <code>int</code> pointer is used.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/TemplateSpecializationFunctionTemplates/dimovAbrahams2.png" alt="dimovAbrahams2" width="380" height="232" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>I already wrote about Template Arguments. But I forgot one important fact. You can provide default template arguments for function templates and class templates.</p>
+<h2>Default Template Arguments</h2>
+<p>What is common to the class templates of the Standard Template Library (STL)? Yes! Many of the template arguments have defaults.</p>
+<p>Here are a few examples.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span>
+    <span style="color: #006699; font-weight: bold;">typename</span> T,
+    <span style="color: #006699; font-weight: bold;">typename</span> Allocator <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>allocator<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span>
+<span style="color: #555555;">&gt;</span> <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">vector</span>;
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span>
+    <span style="color: #006699; font-weight: bold;">typename</span> Key,
+    <span style="color: #006699; font-weight: bold;">typename</span> T,
+    <span style="color: #006699; font-weight: bold;">typename</span> Hash <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>hash<span style="color: #555555;">&lt;</span>Key<span style="color: #555555;">&gt;</span>,
+    <span style="color: #006699; font-weight: bold;">typename</span> KeyEqual <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>equal_to<span style="color: #555555;">&lt;</span>Key<span style="color: #555555;">&gt;</span>,
+    <span style="color: #006699; font-weight: bold;">typename</span> Allocator <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>allocator<span style="color: #555555;">&lt;</span> std<span style="color: #555555;">::</span>pair<span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">const</span> Key, T<span style="color: #555555;">&gt;&gt;</span>
+<span style="color: #555555;">&gt;</span> <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">unordered_map</span>;
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span>
+    <span style="color: #006699; font-weight: bold;">typename</span> T,
+    <span style="color: #006699; font-weight: bold;">typename</span> Allocator <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>allocator<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span>
+<span style="color: #555555;">&gt;</span> <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">deque</span>;
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span>
+    <span style="color: #006699; font-weight: bold;">typename</span> T,
+    <span style="color: #006699; font-weight: bold;">typename</span> Container <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>deque<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span>
+<span style="color: #555555;">&gt;</span> <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">stack</span>;
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span>
+    <span style="color: #006699; font-weight: bold;">typename</span> CharT,
+    <span style="color: #006699; font-weight: bold;">typename</span> Traits <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>char_traits<span style="color: #555555;">&lt;</span>CharT<span style="color: #555555;">&gt;</span>,
+    <span style="color: #006699; font-weight: bold;">typename</span> Allocator <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>allocator<span style="color: #555555;">&lt;</span>CharT<span style="color: #555555;">&gt;</span>
+<span style="color: #555555;">&gt;</span> <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">basic_string</span>;
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>This is part of the power of the STL:</p>
+<ul>
+<li>Each container has a default allocator that depends on its elements.</li>
+<li>You have to specify the required arguments such as the key type and value type for a <code>std::unordered_map: std::unordered_map&lt;std::string, int&gt;. <br /></code></li>
+<li>
+<p>You can instantiate a<code> std::unordered_map</code> using a special hash function returning the has value for the key, and a special binary predicate determining if two keys are equal: <code>std::unordered_map&lt;std::string, int, MyHash&gt;</code>, or <code>std::unordered_map&lt;std::string, int, MyHash, MyBinaryPredicate&gt;</code>.</p>
+</li>
+<li>std::string is just an alias for common character types. Here are the aliases based on<code> std::basic_string.</code></li>
+</ul>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%; padding-left: 30px;">std<span style="color: #555555;">::</span>string         std<span style="color: #555555;">::</span>basic_string<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">char</span><span style="color: #555555;">&gt;</span>
+std<span style="color: #555555;">::</span>wstring 	    std<span style="color: #555555;">::</span>basic_string<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">wchar_t</span><span style="color: #555555;">&gt;</span>
+std<span style="color: #555555;">::</span>u8string 	    std<span style="color: #555555;">::</span>basic_string<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">char8_t</span><span style="color: #555555;">&gt;</span>  (C<span style="color: #555555;">++</span><span style="color: #ff6600;">20</span>)
+std<span style="color: #555555;">::</span>u16string      std<span style="color: #555555;">::</span>basic_string<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">char16_t</span><span style="color: #555555;">&gt;</span> (C<span style="color: #555555;">++</span><span style="color: #ff6600;">11</span>)
+std<span style="color: #555555;">::</span>u32string      std<span style="color: #555555;">::</span>basic_string<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">char32_t</span><span style="color: #555555;">&gt;</span> (C<span style="color: #555555;">++</span><span style="color: #ff6600;">11</span>)
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Of course, when a template argument has a default, the following templates arguments must also have a default.</p>
+<p>So far, I only wrote about default template arguments for class templates. I want to end this post with an example about function templates.</p>
+<p>Assume, I want to decide for a few objects having the same type which one is smaller. An algorithm such as <code>isSmaller</code> models a generic idea and should, therefore, be a template.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// templateDefaultArguments.cpp</span>
+
+<span style="color: #009999;">#include &lt;functional&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;string&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Account</span>{
+<span style="color: #9999ff;">public:</span>
+  <span style="color: #006699; font-weight: bold;">explicit</span> Account(<span style="color: #007788; font-weight: bold;">double</span> b)<span style="color: #555555;">:</span> balance(b){}
+  <span style="color: #007788; font-weight: bold;">double</span> getBalance() <span style="color: #006699; font-weight: bold;">const</span> {
+    <span style="color: #006699; font-weight: bold;">return</span> balance;
+  }
+<span style="color: #9999ff;">private:</span>
+  <span style="color: #007788; font-weight: bold;">double</span> balance;
+};
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T, <span style="color: #006699; font-weight: bold;">typename</span> Pred <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>less<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;&gt;</span>                        <span style="color: #0099ff; font-style: italic;">// (1)</span>
+<span style="color: #007788; font-weight: bold;">bool</span> isSmaller(T fir, T sec, Pred pred <span style="color: #555555;">=</span> Pred() ){
+  <span style="color: #006699; font-weight: bold;">return</span> pred(fir,sec);
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main(){
+
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>boolalpha <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"isSmaller(3,4): "</span> <span style="color: #555555;">&lt;&lt;</span> isSmaller(<span style="color: #ff6600;">3</span>,<span style="color: #ff6600;">4</span>) <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;                <span style="color: #0099ff; font-style: italic;">// (2) </span>
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"isSmaller(2.14,3.14): "</span>  <span style="color: #555555;">&lt;&lt;</span> isSmaller(<span style="color: #ff6600;">2.14</span>,<span style="color: #ff6600;">3.14</span>) <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"isSmaller(std::string(abc),std::string(def)): "</span> <span style="color: #555555;">&lt;&lt;</span> 
+                isSmaller(std<span style="color: #555555;">::</span>string(<span style="color: #cc3300;">"abc"</span>),std<span style="color: #555555;">::</span>string(<span style="color: #cc3300;">"def"</span>)) <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+  <span style="color: #007788; font-weight: bold;">bool</span> resAcc<span style="color: #555555;">=</span> isSmaller(Account(<span style="color: #ff6600;">100.0</span>),Account(<span style="color: #ff6600;">200.0</span>),                     <span style="color: #0099ff; font-style: italic;">// (3)</span>
+               [](<span style="color: #006699; font-weight: bold;">const</span> Account<span style="color: #555555;">&amp;</span> fir, <span style="color: #006699; font-weight: bold;">const</span> Account<span style="color: #555555;">&amp;</span> sec){ <span style="color: #006699; font-weight: bold;">return</span> fir.getBalance() <span style="color: #555555;">&lt;</span> sec.getBalance(); });
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"isSmaller(Account(100.0),Account(200.0)): "</span> <span style="color: #555555;">&lt;&lt;</span> resAcc <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+  <span style="color: #007788; font-weight: bold;">bool</span> acc<span style="color: #555555;">=</span> isSmaller(std<span style="color: #555555;">::</span>string(<span style="color: #cc3300;">"3.14"</span>),std<span style="color: #555555;">::</span>string(<span style="color: #cc3300;">"2.14"</span>),              <span style="color: #0099ff; font-style: italic;">// (4)</span>
+            [](<span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span>string<span style="color: #555555;">&amp;</span> fir, <span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span>string<span style="color: #555555;">&amp;</span> sec){ <span style="color: #006699; font-weight: bold;">return</span> std<span style="color: #555555;">::</span>stod(fir) <span style="color: #555555;">&lt;</span> std<span style="color: #555555;">::</span>stod(sec); });
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"isSmaller(std::string(3.14),std::string(2.14)): "</span> <span style="color: #555555;">&lt;&lt;</span> acc <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>In the default case (2), <code>isSmaller</code> works as expected. <code>isSmaller</code> (1) uses the template argument <a href="https://en.cppreference.com/w/cpp/utility/functional/less"><code>std::less</code></a> that is one of many <a href="https://en.cppreference.com/w/cpp/utility/functional">predefined function objects</a> in the STL. It applies the less than operator <code>&lt;</code> onto its arguments. To use it, I had to instantiate std::less&lt;T&gt; in the following line:<code> Pred pred = Pred()</code>.</p>
+<p>Thanks to the default template argument, I can compare accounts (3) or strings (4).&nbsp;<code>Account</code> does not support the less-than operator. Nevertheless, I can compare <code>Account</code>s. (3). Additionally, I want to compare strings not lexicographically but based on their internal number (4). Providing the two lambda expressions in (3) and (4) as binary predicates let me do my job successfully.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/TemplateSpecializationFunctionTemplates/templateDefaultArgument.png" alt="templateDefaultArgument" width="600" height="277" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<h2>What's next?</h2>
+<p>When you study the graphic at the beginning of this post, you see that I'm done with the basics of templates. In my next post about templates, I dive further into the details and write about template instantiation.</p>
+<p>&nbsp;</p>
+<p>{loadmoduleid 153}</p>
