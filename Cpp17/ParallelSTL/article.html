@@ -1,0 +1,130 @@
+<p>GCC supports my favorite C++17 feature: the parallel algorithms of the Standard Template Library (STL). I recognized this a few days ago and I'm happy to write a post about it and share my enthusiasm.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/Cpp17/ParallelSTL/timelineParallelSTL.png" alt="timelineParallelSTL" width="650" height="249" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>The Microsoft compiler supports the parallel algorithms since their beginning but sadly neither GCC nor Clang. I have to be precise, since GCC 9 you can use the parallel algorithms. Before I show you examples with performance numbers in my next post, I want to write about the parallel algorithms of the STL and give you the necessary information.</p>
+<h2>Parallel Algorithms of the Standard Template Library</h2>
+<p>The Standard Template Library has more than 100 algorithms for searching, counting, and manipulating ranges and their elements. With C++17, 69 of them get new overloads, and new ones are added. The overloaded, and new algorithms can be invoked with a so-called execution policy. Using an execution policy, you can specify whether the algorithm should run sequentially, in parallel, or parallel with vectorization. For using the execution policy, you have to include the header <code>&lt;execution&gt;</code>.</p>
+<h3>Execution Policy</h3>
+<div>
+<div>The C++17 standard&nbsp;defines&nbsp;three&nbsp;execution&nbsp;policies:</div>
+<br />
+<ul>
+<li><code>std::execution::sequenced_policy</code></li>
+<li><code>std::execution::parallel_policy</code></li>
+<li><code>std::execution::parallel_unsequenced_policy</code></li>
+</ul>
+<br />
+<div>The&nbsp;corresponding&nbsp;policy&nbsp;tag&nbsp;specifies&nbsp;whether&nbsp;a&nbsp;program&nbsp;should&nbsp;run&nbsp;sequentially,&nbsp;in&nbsp;parallel,&nbsp;or&nbsp;parallel&nbsp;with&nbsp;vectorization.</div>
+<br />
+<ul>
+<li><code>std::execution::seq</code>:&nbsp;runs&nbsp;the&nbsp;program&nbsp;sequentially</li>
+</ul>
+<br />
+<ul>
+<li><code>std::execution::par</code>:&nbsp;runs&nbsp;the&nbsp;program&nbsp;in&nbsp;parallel&nbsp;on&nbsp;multiple&nbsp;threads</li>
+</ul>
+<br />
+<ul>
+<li><code>std::execution::par_unseq</code>:&nbsp;runs&nbsp;the&nbsp;program&nbsp;in&nbsp;parallel&nbsp;on&nbsp;multiple&nbsp;threads&nbsp;and&nbsp;allows&nbsp;the&nbsp;interleaving&nbsp;of&nbsp;individual&nbsp;loops;&nbsp;permits&nbsp;a vectorized version&nbsp;with <a href="https://en.wikipedia.org/wiki/SIMD">SIMD</a> (<strong>S</strong>ingle<strong> I</strong>nstruction <strong>M</strong>ultiple<strong> D</strong>ata).</li>
+</ul>
+<br />
+<div>The&nbsp;usage&nbsp;of&nbsp;the&nbsp;execution&nbsp;policy<code> std::execution::par</code> or <code>std::execution::par_unseq</code> allows&nbsp;the&nbsp;algorithm&nbsp;to&nbsp;run&nbsp;parallel&nbsp;or&nbsp;parallel&nbsp;and&nbsp;vectorized.&nbsp;This&nbsp;policy&nbsp;is&nbsp;a&nbsp;permission&nbsp;and&nbsp;not&nbsp;a&nbsp;requirement.<code></code><code></code></div>
+<br />
+<div>The&nbsp;following&nbsp;code&nbsp;snippet&nbsp;applies&nbsp;all&nbsp;execution&nbsp;policies.</div>
+<br /> <!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%;">std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> v <span style="color: #555555;">=</span> {<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">5</span>, <span style="color: #ff6600;">6</span>, <span style="color: #ff6600;">7</span>, <span style="color: #ff6600;">8</span>, <span style="color: #ff6600;">9</span>};
+
+<span style="color: #0099ff; font-style: italic;">// standard sequential sort                              </span>
+std<span style="color: #555555;">::</span>sort(v.begin(), v.end());                            <span style="color: #0099ff;"> // (1)</span>
+
+<span style="color: #0099ff; font-style: italic;">// sequential execution</span>
+std<span style="color: #555555;">::</span>sort(std<span style="color: #555555;">::</span>execution<span style="color: #555555;">::</span>seq, v.begin(), v.end());        <span style="color: #0099ff;">// (2)</span>
+
+<span style="color: #0099ff; font-style: italic;">// permitting parallel execution</span>
+std<span style="color: #555555;">::</span>sort(std<span style="color: #555555;">::</span>execution<span style="color: #555555;">::</span>par, v.begin(), v.end());        <span style="color: #0099ff;">// (3)</span>
+
+<span style="color: #0099ff; font-style: italic;">// permitting parallel and vectorized execution</span>
+std<span style="color: #555555;">::</span>sort(std<span style="color: #555555;">::</span>execution<span style="color: #555555;">::</span>par_unseq, v.begin(), v.end());  <span style="color: #0099ff;">// (4)
+</span></pre>
+</div>
+<br />
+<div>The&nbsp;example&nbsp;shows&nbsp;that&nbsp;you&nbsp;can&nbsp;still&nbsp;use&nbsp;the&nbsp;classic&nbsp;variant&nbsp;of <code>std::sort</code> (4).&nbsp;Besides,&nbsp;in&nbsp;C++17,&nbsp;you&nbsp;can&nbsp;specify&nbsp;explicitly&nbsp;whether&nbsp;the&nbsp;sequential&nbsp;(2),&nbsp;parallel&nbsp;(3),&nbsp;or&nbsp;the&nbsp;parallel&nbsp;and&nbsp;vectorized&nbsp;(4)&nbsp;version&nbsp;should&nbsp;be&nbsp;used.</div>
+</div>
+<h3>Parallel and Vectorized Execution</h3>
+<div>Whether an algorithm runs in a parallel and vectorized way depends on many factors. For example, it depends on whether the CPU and the operating system support SIMD instructions. Additionally, it also depends on the compiler and the optimization level you used to translate your code.</div>
+<div><br />The following example shows a simple loop for filling a vector.</div>
+<div>&nbsp;</div>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">int</span> SIZE <span style="color: #555555;">=</span> <span style="color: #ff6600;">8</span>;
+ 
+<span style="color: #007788; font-weight: bold;">int</span> vec[] <span style="color: #555555;">=</span> {<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">5</span>, <span style="color: #ff6600;">6</span>, <span style="color: #ff6600;">7</span>, <span style="color: #ff6600;">8</span>};
+<span style="color: #007788; font-weight: bold;">int</span> res[] <span style="color: #555555;">=</span> {<span style="color: #ff6600;">0</span>, <span style="color: #ff6600;">0</span>, <span style="color: #ff6600;">0</span>, <span style="color: #ff6600;">0</span>, <span style="color: #ff6600;">0</span>, <span style="color: #ff6600;">0</span>, <span style="color: #ff6600;">0</span>, <span style="color: #ff6600;">0</span>};
+ 
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #007788; font-weight: bold;">int</span> i <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>; i <span style="color: #555555;">&lt;</span> SIZE; <span style="color: #555555;">++</span>i) {
+        res[i] <span style="color: #555555;">=</span> vec[i]<span style="color: #555555;">+</span><span style="color: #ff6600;">5</span>;
+    }
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The expression<code> res[i] = vec[i] + 5</code> is the crucial line in this small example. Thanks to <a href="https://godbolt.org/">Compiler Explorer</a>, we can have a closer look at the assembler instructions generated by clang 3.6.</p>
+<h4>Without Optimization</h4>
+<p>Here are the assembler instructions. Each addition is done sequentially.</p>
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/Cpp17/ParallelSTL/seq.png" alt="seq" width="282" height="93" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<h4>With Maximum Optimization</h4>
+<p>By using the highest optimization level, -O3, special registers such as <code>xmm0</code> are used that can hold 128 bits or 4 ints. This special register means that the addition takes place in parallel on four elements of the vector.</p>
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/Cpp17/ParallelSTL/vec.png" alt="vec" width="468" height="138" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>An overload of an algorithm without an execution policy and an overload of an algorithm with a sequential execution policy <code>std::execution::seq</code> differ in one aspect: exceptions.</p>
+<p>&nbsp;</p>
+<h3>Exceptions</h3>
+<p>If an exception occurs during the usage of an algorithm with an execution policy,<a href="https://en.cppreference.com/w/cpp/error/terminate"><code>std::terminate</code></a> is called.<code> std::terminate</code> calls the installed<a href="https://en.cppreference.com/w/cpp/error/terminate_handler"><code>std::terminate_handler</code></a>. The consequence is that per default <a href="https://en.cppreference.com/w/cpp/utility/program/abort"><code>std::abort</code></a> is called, which causes abnormal program termination. The handling of exceptions is the difference between an algorithm’s invocation without an execution policy and an algorithm with a sequential <code>std::execution::seq</code> execution policy. The invocation of the algorithm without an execution policy propagates the exception, and, therefore, the exception can be handled.</p>
+<p>With C++17, 69 of the STL algorithms got new overloads, and new algorithms were added.</p>
+<h3>Algorithms</h3>
+<p>Here are the 69 algorithms with parallelized versions.</p>
+<h4>&nbsp;<img src="https://www.modernescpp.com/images/blog/Cpp17/ParallelSTL/allAlgorithm.png" alt="allAlgorithm" width="700" height="326" style="display: block; margin-left: auto; margin-right: auto;" /></h4>
+<h4>The New Algorithms</h4>
+<p>The new algorithm in C++17, which are design for parallel execution, are in the <code>std</code> namespace and need the header <code>&lt;numeric&gt;</code>.</p>
+<ul>
+<li><code>std::exclusive_scan: </code>Applies from the left a binary callable up to the ith (exclusive) element of the range. The left argument of the callable is the previous result. Stores intermediate results.</li>
+<li><code>std::inclusive_scan</code>: Applies from the left a binary callable up to the ith (inclusive) element of the range. The left argument of the callable is the previous result. Stores intermediate results.</li>
+<li><code>std::transform_exclusive_scan</code>: First applies a unary callable to the range and then applies<code> std::exclusive_scan</code>.</li>
+<li><code>std::transform_inclusive_scan</code>: First applies a unary callable to the range and then applies <code>std::inclusive_scan</code>.</li>
+<li><code>std::reduce</code>: Applies a binary callable to the range.</li>
+<li><code>std::transform_reduce</code>: Applies first a unary callable to one or a binary callable to two ranges and then<code> std::reduce</code> to the resulting range.</li>
+</ul>
+<p>Admittedly this description is not easy to digest, but if you already know <code>std::accumulat</code>e and<code> std::partial_sum</code>, the reduce and scan variations should be quite familiar. <code>std::reduce</code> is the parallel pendant to std::accumulate and scan the parallel pendant to partial_sum. The parallel execution is the reason that<code> std::reduce</code> needs an associative and commutative callable. The corresponding statement hold for the scan variations in contrary to the partial_sum variations. To get the full details, visit<a href="https://en.cppreference.com/w/cpp/algorithm"> cppreferenc.com/algorithm</a>.</p>
+<p>You may wonder, why we need <code>std::reduce</code> for parallel execution because we already have<code> std::accumulate</code>. The reason is that<code> std::accumulate</code> processes its elements in an order that cannot be parallelized.</p>
+<h4><code>std::accumulate</code> versus<code> std::reduce</code></h4>
+<p>While<code> std::accumulate</code> processes its elements from left to the right,<code> std::reduce</code> does it in an arbitrary order. Let me start with a small code snippet using<code> std::accumulate</code> and <code>std::reduce</code>. The callable is the lambda function<code> [](int a, int b){ return a * b; }</code>.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> v{<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>};
+
+std<span style="color: #555555;">::</span>accumulate(v.begin(), v.end(), <span style="color: #ff6600;">1</span>, [](<span style="color: #007788; font-weight: bold;">int</span> a, <span style="color: #007788; font-weight: bold;">int</span> b){ <span style="color: #006699; font-weight: bold;">return</span> a <span style="color: #555555;">*</span> b; });
+std<span style="color: #555555;">::</span>reduce(std<span style="color: #555555;">::</span>execution<span style="color: #555555;">::</span>par, v.begin(), v.end(), <span style="color: #ff6600;">1</span> , [](<span style="color: #007788; font-weight: bold;">int</span> a, <span style="color: #007788; font-weight: bold;">int</span> b){ <span style="color: #006699; font-weight: bold;">return</span> a <span style="color: #555555;">*</span> b; });
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The two following graphs show the different processing strategies of<code> std::accumulate</code> and <code>std::reduce</code>.</p>
+<ul>
+<li><code>std::accumulate</code> starts at the left and successively applies the binary operator.</li>
+</ul>
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/Cpp17/ParallelSTL/AccumulateNew.png" alt="AccumulateNew" width="400" height="255" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<ul>
+<li>On the contrary, <code>std::reduce</code> applies the binary operator in a non-deterministic way.</li>
+</ul>
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/Cpp17/ParallelSTL/ReduceNew.png" alt="ReduceNew" width="400" height="222" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>&nbsp;</p>
+<p>The associativity of the callable allows the<code> std::reduce</code> algorithm to apply the reduction step on arbitrary adjacents pairs of elements. Thanks to commutativity, the intermediate results can be computed in an arbitrary order.</p>
+<h2>What's next?</h2>
+<p>As promised, my next post uses parallel algorithms of the STL and provides performance numbers for the Microsoft compiler and the GCC.</p>
+<h2><span class="css-901oao css-16my406 r-poiln3 r-bcqeeo r-qvutc0">Five Vouchers for Stephan Roth's Book "Clean C++20" to Win </span></h2>
+<p><span class="css-901oao css-16my406 r-poiln3 r-bcqeeo r-qvutc0">I give away five vouchers for Stephan Roth's book "Clean C++20", sponsored by the book's publisher Apress. Here is how you can get it: </span><a href="https://t.co/CzCtb9errG?amp=1" target="_blank" rel="noopener noreferrer" class="css-4rbku5 css-18t94o4 css-901oao css-16my406 r-1n1174f r-1loqt21 r-poiln3 r-bcqeeo r-qvutc0" dir="ltr" role="link"><span class="css-901oao css-16my406 r-poiln3 r-hiw28u r-qvk6io r-bcqeeo r-qvutc0" aria-hidden="true">https://</span>bit.ly/StephanRoth</a><span class="css-901oao css-16my406 r-poiln3 r-bcqeeo r-qvutc0">.</span></p>
+<p>&nbsp;</p>
+<p>{loadmoduleid 153}</p>
+<p>&nbsp;</p>
