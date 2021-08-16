@@ -1,0 +1,123 @@
+<p>There is a lot of power in the strange-looking three dots that are heavily used in the Standard Template Library. Today, I visualize the expansion of the three dots and show a few use cases.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/Templates/MoreAboutVariadicTemplates/templates.png" alt="templates" width="650" height="409" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>Let me start this post with an analysis of the pack expansion in variadic templates.</p>
+<h2>Pack Expansion</h2>
+<p>Here is a short reminder.</p>
+<p>A variadic template is a template that can have an arbitrary number of template parameters.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> ... Args<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">void</span> variadicTemplate(Args ... args) { 
+    . . . . <span style="color: #0099ff; font-style: italic;">// four dots</span>
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The ellipsis (<code>...</code>) makes <code>Args</code> or <code>args</code> a so-called parameter pack. Precisely, <code>Args</code> is a template parameter pack and <code>args </code>is a function parameter pack. Two operations are possible with parameter packs. They can be packed and unpacked. If the ellipse is to the left of <code>Args</code>, the parameter pack will be packed, if it is to the right of <code>Args</code>, it is unpacked. Because of the function template argument deduction, the compiler can derive the template arguments.</p>
+<p>Before I write about the pack expansion, I have to make a short disclaimer. Usually, you don't apply pack expansion directly. You use variadic templates doing it automatically or use<a href="https://en.cppreference.com/w/cpp/language/fold"> fold expression </a>or<a href="https://en.cppreference.com/w/cpp/language/if"><code> constexpr if</code></a> in C++17. I will write about fold expressions and<code> constexpr if</code> in future posts.&nbsp;Said that visualizing pack expansions helps a lot for a better understanding of variadic templates and fold expressions.</p>
+<p data-id="d31cd0ecb6b7a1f933552f524bd0ffb7">The usage of parameter packs obeys a typical pattern for class templates.</p>
+<ul data-id="19e7d38ceb52f4648497935ee9386fcd">
+<li>Perform an operation on the first element of the parameter pack and recursively invoke the operation on the remaining elements. This step reduces the parameter pack successively by its first element.</li>
+<li>The recursion ends after a finite number of steps.</li>
+<li>The boundary condition is typically a fully specialized template.</li>
+</ul>
+<p>Thanks to this functional pattern for processing lists, you can calculate the product of numbers at compile time. In Lisp, you call the head of the list <code>ca</code>r and the rest <code>cdr</code>. In Haskell, you call it <code>head</code> and <code>tail</code>.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// multVariadicTemplates.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span> ...<span style="color: #555555;">&gt;                                         <span style="color: #3366ff;">       </span></span><em> <span style="color: #0099ff;">// (1)</span></em>
+<span style="color: #006699; font-weight: bold;">struct</span> Mult;
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;&gt;                                                        </span><span style="color: #0099ff; font-style: italic;">// (2)</span>
+<span style="color: #006699; font-weight: bold;">struct</span> Mult<span style="color: #555555;">&lt;&gt;</span> {
+    <span style="color: #006699; font-weight: bold;">static</span> <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">int</span> value <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span>;
+};
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span> i, <span style="color: #007788; font-weight: bold;">int</span> ... tail<span style="color: #555555;">&gt;                                     <span style="color: #0099ff; font-style: italic;">// (3)</span></span>
+<span style="color: #006699; font-weight: bold;">struct</span> Mult<span style="color: #555555;">&lt;</span>i, tail ...<span style="color: #555555;">&gt;</span> {
+    <span style="color: #006699; font-weight: bold;">static</span> <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">int</span> value <span style="color: #555555;">=</span> i <span style="color: #555555;">*</span> Mult<span style="color: #555555;">&lt;</span>tail ...<span style="color: #555555;">&gt;::</span>value;
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Mult&lt;10&gt;::value: "</span> <span style="color: #555555;">&lt;&lt;</span> Mult<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">10</span><span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> '\n'<span style="color: #555555;"></span>;  <em><span style="color: #0099ff;">// (4)</span></em>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Mult&lt;10,10,10&gt;::value: "</span> <span style="color: #555555;">&lt;&lt;</span> Mult<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">10</span>, <span style="color: #ff6600;">10</span>, <span style="color: #ff6600;">10</span><span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> '\n'<span style="color: #555555;"></span>;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Mult&lt;1,2,3,4,5&gt;::value: "</span> <span style="color: #555555;">&lt;&lt;</span> Mult<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">5</span><span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> '\n'<span style="color: #555555;"></span>;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p><code></code><code></code>The class template <code>Mult</code> consists of a primary template and two specializations. Since the primary template (1) is not needed, a declaration is sufficient in this case: <code>template&lt;int ...&gt; struct Mult</code>. The specializations of the class template exist for no element (2) and for at least one element (3). If<code> Mult&lt;10,10,10&gt;::value</code> is called, the last template is used by successively calling the first element with the rest of the parameter pack, so that value expands to the product 10*10*10. In the final recursion, the parameter pack contains no elements, and the boundary condition comes into action:<code> template&lt;&gt; struct Mult&lt;&gt;</code> (1). This returns the result of <code>Mult&lt;10,10,10&gt;::value= 10*10*10*1</code> at compile time.</p>
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/Templates/MoreAboutVariadicTemplates/multVariadicTemplates.png" alt="multVariadicTemplates" width="400" height="237" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>Now, to the interesting part: What happens under the hood. Let have a closer look at the call <code>Mult&lt;10,10,10&gt;::value</code>. This call triggers no recursion but a recursive instantiation. Here are the essential parts from<a href="https://cppinsights.io/s/af3c8d68"> C++ Insights</a>:</p>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/MoreAboutVariadicTemplates/multInstantiation.png" alt="multInstantiation" width="400" height="332" style="display: block; margin-left: auto; margin-right: auto;" />The compiler generates full specializations for three (<code>Mult&lt;10, 10, 10&gt;</code>) and two arguments (<code>Mult&lt;10, 10&gt;</code>). You may ask yourself: Where are the instantiations for one (<code>Mult&lt;10&gt;</code>) and no argument (<code>Mult&lt;&gt;</code>).<code> Mult&lt;10&gt;</code> was already requested in (4) and <code>Mult&lt;&gt;</code> (1) is the boundary condition.</p>
+<p>Let me continue with an anecdote. When I introduce <code></code>variadic templates I ask my participants: Whom of you ever used an ellipse? Half of my participants answer never. I answer them that I don't believe them and they may be heard from the <a href="https://en.cppreference.com/w/cpp/io/c/fprintf">printf </a>family.</p>
+<h3>A Type-Safe <code>printf</code> Function</h3>
+<p>Of course, you know the C function printf: <span class="mw-geshi cpp source-cpp"><code><span class="kw4">int</span> printf<span class="br0">(</span> <span class="kw4">const</span> <span class="kw4">char</span><span class="sy2">*</span> format, ... <span class="br0">)</span></code><span class="sy4"><code>;. printf</code> is a function that can get an arbitrary number of arguments. Its power is based on the macro <a href="https://en.cppreference.com/w/cpp/utility/variadic/va_arg">va_arg </a>and is, therefore, not type-safe. Let's implement a simplified <code>printf</code> function using variadic templates. This function is the</span></span> <code></code>hello world of variadic templates.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// myPrintf.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+ 
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">myPrintf</span>(<span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">char</span><span style="color: #555555;">*</span> format){                           <span style="color: #0099ff; font-style: italic;">// (3)</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> format;
+}
+ 
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T, <span style="color: #006699; font-weight: bold;">typename</span> ... Args<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">void</span> myPrintf(<span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">char</span><span style="color: #555555;">*</span> format, T value, Args ... args){   <span style="color: #0099ff; font-style: italic;">// (4)</span>
+    <span style="color: #006699; font-weight: bold;">for</span> ( ; <span style="color: #555555;">*</span>format <span style="color: #555555;">!=</span> <span style="color: #cc3300;">'\0'</span>; format<span style="color: #555555;">++</span> ) {                    <span style="color: #0099ff; font-style: italic;">// (5)</span>
+        <span style="color: #006699; font-weight: bold;">if</span> ( <span style="color: #555555;">*</span>format <span style="color: #555555;">==</span> <span style="color: #cc3300;">'%'</span> ) {                              <span style="color: #0099ff; font-style: italic;">// (6) </span>
+           std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> value;
+           myPrintf(format <span style="color: #555555;">+</span> <span style="color: #ff6600;">1</span>, args ... );                  <span style="color: #0099ff; font-style: italic;">// (7)</span>
+           <span style="color: #006699; font-weight: bold;">return</span>;
+        }
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #555555;">*</span>format;                                <span style="color: #0099ff; font-style: italic;">// (8)</span>
+    }
+}
+ 
+<span style="color: #007788; font-weight: bold;">int</span> main(){
+    
+    myPrintf(<span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>);                                          <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    
+    myPrintf(<span style="color: #cc3300;">"% world% %</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>, <span style="color: #cc3300;">"Hello"</span>, <span style="color: #cc3300;">'!'</span>, <span style="color: #ff6600;">2011</span>);            <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    
+    myPrintf(<span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>);                                          
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>How does the code work? If <span style="font-family: courier new, courier;">myPrintf</span> is invoked without a format string (1), (3) is used in the case. (2) uses the function template. The function templates loops (5) as long as the format symbol is not equal to <span style="font-family: courier new, courier;">`\0`</span>. If the format symbol is not equal to <span style="font-family: courier new, courier;">`\0</span> , two control flows are possible. First, if the format starts with '<span style="font-family: 'courier new', courier;">%</span>'&nbsp; (6), the first argument <span style="font-family: courier new, courier;">value</span> is displayed<span style="font-family: courier new, courier;"> </span>and <span style="font-family: courier new, courier;">myPrintf</span> is once more invoked but this time with a new format symbol and an argument less (7). Second, if the format string does not start with&nbsp;<code>'<span style="font-family: courier new, courier;">%</span></code>', the format symbol is just displayed (line 8). The function <span style="font-family: courier new, courier;">myPrintf</span> (3) is the boundary condition for the recursive calls.</p>
+<p>The output of the program is as expected.</p>
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/Templates/MoreAboutVariadicTemplates/myPrintf.png" alt="myPrintf" width="300" height="187" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>As before,<a href="https://cppinsights.io/s/0b4200ca"> C++ Insights</a> helps a lot to get more insight into the template instantiation process. Here are the three instantiations caused by<code> myPrintf("% world% %\n", "Hello", '!', 2011);:</code></p>
+<ul>
+<li>Four arguments:</li>
+</ul>
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/Templates/MoreAboutVariadicTemplates/fourArguments.png" alt="fourArguments" width="650" height="246" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>&nbsp;</p>
+<ul>
+<li>Thee arguments:</li>
+</ul>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/MoreAboutVariadicTemplates/threeArguments.png" alt="threeArguments" width="500" height="268" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>&nbsp;</p>
+<ul>
+<li>Two arguments:</li>
+</ul>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/MoreAboutVariadicTemplates/twoArguments.png" alt="twoArguments" width="450" height="243" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<h2>Short Two Weeks Break</h2>
+<p>Due to vacation and probably limited connectivity, I will not publish a post in the next two weeks. If you want to publish a guest post, please let me know.</p>
+<h2>What's Next?</h2>
+<p>In my next post, I use variadic templates to implement the C++ idiom for a fully generic factory. One implementation of this life-saving C++ idiom is<code> std::make_unique</code>.</p>
+<p>&nbsp;</p>
+<p>&nbsp;{loadmoduleid 153}</p>
+<p>&nbsp;</p>
