@@ -1,0 +1,118 @@
+<p>A variadic template is a template that can have an arbitrary number of template parameters. This feature may seem magical to you if you see it the first time. So, let me demystify variadic templates.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/Templates/VariadicTemplates/templates.png" alt="templates" width="650" height="399" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>You may wonder that my graphic showing the topics I write about includes template instantiation. The reason is simple. After my last post about "<a href="https://www.modernescpp.com/index.php/template-instantiation">Template Instantiation</a>", one of my German readers (pseudonym <span class="first">Urfahraner Auge) </span>made a comment. There is an important difference between implicit and explicit instantiation of a template that I forgot to mention. He is right. The implicit instantiation of templates is lazy but the explicit instantiation of templates is eager.</p>
+<h2>Lazy versus Eager Template Instantiation</h2>
+<p>Template instantiation is lazy. <code></code>Meaning, if you don't need a member function of a class template it will not be instantiated.&nbsp;Only the declaration of the member function is available, but not its definition. This works so far that you can use invalid code in a member function. Of course, the member function must not be called.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// numberImplicitExplicit.cpp</span>
+
+<span style="color: #009999;">#include &lt;cmath&gt;</span>
+<span style="color: #009999;">#include &lt;string&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">struct</span> Number {
+	<span style="color: #007788; font-weight: bold;">int</span> absValue() {
+        <span style="color: #006699; font-weight: bold;">return</span> std<span style="color: #555555;">::</span>abs(val);
+    }
+  T val{};
+};
+
+<span style="color: #0099ff; font-style: italic;">// template class Number&lt;std::string&gt;;           // (2)</span>
+<span style="color: #0099ff; font-style: italic;">// template int Number&lt;std::string&gt;::absValue(); // (3)</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+  
+    Number<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>string<span style="color: #555555;">&gt;</span> numb;
+    <span style="color: #0099ff; font-style: italic;">// numb.absValue();                         // (1)</span>
+  
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>If you call the member function <code>numb.absValue()</code> (line 1), you get what you may expect. A compile-time error message essentially saying that the is no overload<code> std::abs</code> for<code> std::string</code> available. Here are the first two lines from the verbose error message:</p>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/VariadicTemplates/numberImplicitExplicit.png" alt="numberImplicitExplicit" width="650" height="79" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>I have to explain template instantiation more precisely:<strong> The implicit instantiation of templates is lazy but the explicit instantiation of templates is eager. </strong></p>
+<p>When you enable line (2) (<code>template&nbsp;class&nbsp;Number&lt;std::string&gt;</code>) and explicitly instantiated the class template <code>Number</code> or you enable line (3) (<code>template&nbsp;int&nbsp;Number&lt;std::string&gt;::absValue(</code>)) and explicitly instantiated the member function <code>absValue</code> for <code>std::string</code>, you get a compile-time error. This compile-time error is equivalent to the compiler error invoking the member function absValue in line (1) (<code>numb.absValue()</code>). Once more, here are the first two lines of the error messages after enabling line (2) or line (3).</p>
+<ul>
+<li>Line (2) enabled</li>
+</ul>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/VariadicTemplates/numberImplicitExplicit2.png" alt="numberImplicitExplicit2" width="650" height="81" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<ul>
+<li>Line (3) enabled</li>
+</ul>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/VariadicTemplates/numberImplicitExplicit3.png" alt="numberImplicitExplicit3" width="650" height="86" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<h3>A Personal Note:</h3>
+<p>I'm keen on getting comments about my posts. They help me to write about the content you want to hear. In particular, the German community is very engaged.</p>
+<p>Now, finally to something completely different: variadic templates.</p>
+<h2>Variadic Templates</h2>
+<p>&nbsp;A variadic template is a template that can have an arbitrary number of template parameters. This feature may seem magical to you if you see it the first time.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> ... Args<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">void</span> variadicTemplate(Args ... args) { 
+    . . . . <span style="color: #0099ff; font-style: italic;">// four dots</span>
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The ellipsis (<code>...</code>) makes <code>Args</code> or <code>args</code> a so-called parameter pack. Precisely, <code>Args</code> is a template parameter pack and <code>args </code>is a function parameter pack. Two operations are possible with parameter packs. They can be packed and unpacked. If the ellipse is to the left of <code>Args</code>, the parameter pack will be packed, if it is to the to the right of&nbsp;<code> Args</code>, it is unpacked. Because of the function template argument deduction, the compiler can derive the template arguments.</p>
+<p>Variadic templates are often used in the Standard Template Library and also in the core language.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span>... Types<span style="color: #555555;">&gt;</span>                                              <span style="color: #0099ff; font-style: italic;">// (1)</span>
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">tuple</span>; 
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> Callabe, <span style="color: #006699; font-weight: bold;">typename</span>... Args <span style="color: #555555;">&gt;</span>                            <span style="color: #0099ff; font-style: italic;">// (2)</span>
+<span style="color: #006699; font-weight: bold;">explicit</span> <span style="color: #006699; font-weight: bold;">thread</span>(Callable<span style="color: #555555;">&amp;&amp;</span> f, Args<span style="color: #555555;">&amp;&amp;</span>... args);	
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> Lockable1, <span style="color: #006699; font-weight: bold;">typename</span> Lockable2, <span style="color: #006699; font-weight: bold;">typename</span>... LockableN<span style="color: #555555;">&gt;</span>  <span style="color: #0099ff; font-style: italic;">// (3)</span>
+<span style="color: #007788; font-weight: bold;">void</span> lock(Lockable1<span style="color: #555555;">&amp;</span> lock1, Lockable2<span style="color: #555555;">&amp;</span> lock2, LockableN<span style="color: #555555;">&amp;</span>... lockn);
+
+<span style="color: #006699; font-weight: bold;">sizeof</span>...(ParameterPack);                                                 <span style="color: #0099ff; font-style: italic;">// (4)</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>All four examples from the C++11 standard use variadic templates. The first three are part of the Standard Template Library. Let's see what I can deduce from the declarations.</p>
+<ol>
+<li><code>std::tuple</code> accepts an arbitrary number of different types.</li>
+<li><code>std::thread</code> allows it to invoke a callable with an arbitrary number of arguments. The argument can have different types. A callable is something you can invoke such as a function, a function object, or a lambda expression. The function <code>std::thread</code> takes its callable and its arguments by universal reference. If you need more detail: I already wrote about template argument deduction and universal references in my post "<a href="https://www.modernescpp.com/index.php/template-arguments">Template Arguments</a>".&nbsp;</li>
+<li><code>std::lock</code> allows it to lock an arbitrary number of lockable types in an atomic step. Locking one lockable type in an atomic step is trivial. Consequently, <code>std::lock</code> requires at least two arguments. <code>Lockable</code> is named requirement. Types supporting <code>Lockable</code> must have the member functions<code> lock</code>, <code>unlock</code>, and<code> try_lock</code>.</li>
+<li>The<code> sizeof ...</code> - operator returns the number of elements in the <code>ParameterPack</code>.<a href="https://en.cppreference.com/w/cpp/language/parameter_pack" title="cpp/language/parameter pack"><br /></a></li>
+</ol>
+<p>The<code> sizeof...</code>-operator seems to be special because the ParameterPack is used in the core language. Let me write a few words about it.</p>
+<h3><code>sizeof..</code>.-Operator</h3>
+<p>Thanks to the <code>sizeof</code> ...-operator can be used to directly determine how many elements a parameter pack contains. The elements are not evaluated.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// printSize.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">using</span> <span style="color: #006699; font-weight: bold;">namespace</span> std<span style="color: #555555;">::</span>literals;
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> ... Args<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">void</span> printSize(Args<span style="color: #555555;">&amp;&amp;</span> ... args){
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #006699; font-weight: bold;">sizeof</span>...(Args) <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">' '</span>;              <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #006699; font-weight: bold;">sizeof</span>...(args) <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;             <span style="color: #0099ff; font-style: italic;">// (2)</span>
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    printSize();                                       <span style="color: #0099ff; font-style: italic;">// (3)</span>
+    printSize(<span style="color: #cc3300;">"C string"</span>, <span style="color: #cc3300;">"C++ string"</span>s, <span style="color: #ff6600;">2011</span>, <span style="color: #336666;">true</span>);  <span style="color: #0099ff; font-style: italic;">// (4)</span>
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The <code>sizeof</code>..-operator allows it to determine the size of the template parameter pack (1) and the function parameter pack (2) at compile time. I apply it to an empty parameter pack (3), and a parameter pack containing four elements. The first element is a C-string and the second a C++-string. To use the C++-string literal, I have to include the namespace<code> std::literals</code> (5). C++14 supports C++ string literals.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/VariadicTemplates/printSize.png" alt="printSize" width="345" height="243" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<h2>What's next?</h2>
+<p>In my next post, I dive deeper into variadic templates and introduce the functional pattern to evaluate a variadic template. Additionally, I&nbsp; present the perfect factory function and jump from C++11 to C++17: fold expression in C++17.</p>
+<p>{loadmoduleid 153}</p>
