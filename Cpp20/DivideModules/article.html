@@ -1,0 +1,208 @@
+<p>When your module becomes bigger you want to divide its functionality into manageable components. C++20 modules offer two approaches: submodules and partitions. Let me discuss both approaches in this post.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/Cpp20/DivideModules/TimelineCpp20.png" alt="TimelineCpp20" width="650" height="223" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>Before I start I want to make a short disclaimer. For simplicity reason, I ignore in this post the separation of the module interface unit and the module implementation unit. This means I define each module in one file. Additionally, I don't use namespaces. I described both features, which you should use, in my previous post "<a href="https://bit.ly/ModuleInterfaceUnitModuleImplementationUnit">C++20: Module Interface Unit and Module Implementation Unit</a>".</p>
+<p>The idea of a submodule is straightforward. Consequently, I start with them.</p>
+<h2>Submodules</h2>
+<p>A module can import modules and then re-export them.</p>
+<p>The module <span style="font-family: courier new, courier;">math</span>&nbsp;imports in the following example the submodules <span style="font-family: courier new, courier;">math.math1</span> and <span style="font-family: courier new, courier;">math.math2</span>.</p>
+<ul>
+<li>Module <span style="font-family: courier new, courier;">math</span></li>
+</ul>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// mathModule.ixx</span>
+
+<span style="color: #006699; font-weight: bold;">export</span> module math;
+
+<span style="color: #006699; font-weight: bold;">export</span> import math.math1;
+<span style="color: #006699; font-weight: bold;">export</span> import math.math2;
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The expression <span style="font-family: courier new, courier;">export import math.math1</span> imports the module <span style="font-family: courier new, courier;">math.math</span>1 and re-exports it as part of the module&nbsp;&nbsp;<span style="font-family: courier new, courier;">math</span>.</p>
+<p>For completeness, here are the modules <span style="font-family: courier new, courier;">math.math1</span> and <span style="font-family: courier new, courier;">math.math2. </span>I used a point to separate the module <span style="font-family: courier new, courier;">math</span> from its submodules. This point is not necessary.</p>
+<ul>
+<li>Submodule<span style="font-family: courier new, courier;"> math.math1</span></li>
+</ul>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// mathModule1.ixx</span>
+
+<span style="color: #006699; font-weight: bold;">export</span> module math.math1;          <span style="color: #0099ff; font-style: italic;">// (1)   </span>
+
+<span style="color: #006699; font-weight: bold;">export</span> <span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">add</span>(<span style="color: #007788; font-weight: bold;">int</span> fir, <span style="color: #007788; font-weight: bold;">int</span> sec) { <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    <span style="color: #006699; font-weight: bold;">return</span> fir <span style="color: #555555;">+</span> sec;
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<ul>
+<li>Submodule <span style="font-family: courier new, courier;">math.math2</span></li>
+</ul>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// mathModule2.ixx</span>
+
+<span style="color: #006699; font-weight: bold;">export</span> module math.math2;     <span style="color: #0099ff; font-style: italic;">// (1)   </span>
+
+<span style="color: #006699; font-weight: bold;">export</span> {                      <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    <span style="color: #007788; font-weight: bold;">int</span> mul(<span style="color: #007788; font-weight: bold;">int</span> fir, <span style="color: #007788; font-weight: bold;">int</span> sec) {
+        <span style="color: #006699; font-weight: bold;">return</span> fir <span style="color: #555555;">*</span> sec;
+    }
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>If you look carefully, you recognize a small difference in the export statements (2) in the modules <span style="font-family: courier new, courier;">math.math1</span> and<span style="font-family: courier new, courier;"> math.math2</span>. <span style="font-family: courier new, courier;">math.math1</span> uses an export specifier and <span style="font-family: courier new, courier;">math.math2</span> as a so-called export group or export block.</p>
+<p>From the client's perspective, using the <span style="font-family: courier new, courier;">math</span> module is straightforward.</p>
+<ul>
+<li>Client program</li>
+</ul>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// mathModuleClient.cpp</span>
+
+import std.core;
+import math;
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"add(3, 4): "</span> <span style="color: #555555;">&lt;&lt;</span> add(<span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"mul(3, 4): "</span> <span style="color: #555555;">&lt;&lt;</span> mul(<span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Compiling, linking, and executing the program works as expected with the Microsoft implementation of modules:</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">cl.exe <span style="color: #555555;">/</span>std<span style="color: #555555;">:</span>c<span style="color: #555555;">++</span>latest <span style="color: #555555;">/</span>c <span style="color: #555555;">/</span>experimental<span style="color: #555555;">:</span>module mathModule1.ixx <span style="color: #555555;">/</span>EHsc <span style="color: #555555;">/</span>MD  <span style="color: #0099ff; font-style: italic;">// (3)</span>
+cl.exe <span style="color: #555555;">/</span>std<span style="color: #555555;">:</span>c<span style="color: #555555;">++</span>latest <span style="color: #555555;">/</span>c <span style="color: #555555;">/</span>experimental<span style="color: #555555;">:</span>module mathModule2.ixx <span style="color: #555555;">/</span>EHsc <span style="color: #555555;">/</span>MD  <span style="color: #0099ff; font-style: italic;">// (3)</span>
+cl.exe <span style="color: #555555;">/</span>std<span style="color: #555555;">:</span>c<span style="color: #555555;">++</span>latest <span style="color: #555555;">/</span>c <span style="color: #555555;">/</span>experimental<span style="color: #555555;">:</span>module mathModule.ixx <span style="color: #555555;">/</span>EHsc <span style="color: #555555;">/</span>MD   <span style="color: #0099ff; font-style: italic;">// (3)</span>
+cl.exe <span style="color: #555555;">/</span>std<span style="color: #555555;">:</span>c<span style="color: #555555;">++</span>latest <span style="color: #555555;">/</span>experimental<span style="color: #555555;">:</span>module mathModuleClient.cpp mathModule1.obj mathModule2.obj mathModule.obj <span style="color: #555555;">/</span>EHsc <span style="color: #555555;">/</span>MD <span style="color: #0099ff; font-style: italic;">// (4)</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p><img src="https://www.modernescpp.com/images/blog/Cpp20/DivideModules/mathModuleClientFix.png" alt="mathModuleClientFix" width="350" height="147" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>Each compilation process (3) produces two artefacts: The IFC file (interface file ) <span style="font-family: courier new, courier;">*.ifc,</span> which is implicitly used in (4), and the&nbsp;<span style="font-family: courier new, courier;"> *.obj</span> file, which is explicitly used in (4).</p>
+<p>I already mentioned that a submodule is just a module. Each submodule has a module declaration (1). Consequently, I can create a second client that is only interested in the <span style="font-family: courier new, courier;">math.math1</span> module.</p>
+<ul>
+<li>&nbsp;Second client program</li>
+</ul>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// mathModuleClient1.cpp</span>
+
+import std.core;
+import math.math1;
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"add(3, 4): "</span> <span style="color: #555555;">&lt;&lt;</span> add(<span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>It's sufficient to compile the new client program and link it. The existing module <span style="font-family: courier new, courier;">math.math1</span> just works fine.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">cl.exe <span style="color: #555555;">/</span>std<span style="color: #555555;">:</span>c<span style="color: #555555;">++</span>latest <span style="color: #555555;">/</span>experimental<span style="color: #555555;">:</span>module mathModuleClient1.cpp mathModule1.obj  <span style="color: #555555;">/</span>EHsc <span style="color: #555555;">/</span>MD
+</pre>
+</div>
+<p>&nbsp;</p>
+<h2><img src="https://www.modernescpp.com/images/blog/Cpp20/DivideModules/mathModuleClient1Fix.png" alt="mathModuleClient1Fix" width="350" height="117" style="display: block; margin-left: auto; margin-right: auto;" /></h2>
+<p>The division of modules into modules and submodules is a means for the module designer to give the user of the module the possibility to more granular import parts of the module. This observation does not apply to module partitions.</p>
+<h2>Module Partitions</h2>
+<p>A module can be divided into partitions. Each partition consists of a module interface unit (partition interface file) and zero or more module implementation units (see "<a href="https://bit.ly/ModuleInterfaceUnitModuleImplementationUnit">C++20: Module Interface Unit and Module Implementation Unit</a>"). The names, which the partitions exports are imported and re-exported by the primary module interface unit (primary interface file). The name of a partition must begin with the name of the module. The partitions can not exist on their own.</p>
+<p>The description of module partitions is more difficult to understand than its implementation. In the following lines, I rewrite the <span style="font-family: courier new, courier;">math</span> module and its submodules <span style="font-family: courier new, courier;">math.math1</span> and <span style="font-family: courier new, courier;">math.math2</span> to module partitions. In this straightforward process, I refer to the shortly introduced terms of module partitions.</p>
+<ul>
+<li>&nbsp;Primary interface file <span style="font-family: courier new, courier;">mathPartition.ixx</span></li>
+</ul>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// mathPartition.ixx</span>
+
+<span style="color: #006699; font-weight: bold;">export</span> module math;   <span style="color: #0099ff; font-style: italic;">// (1)</span>
+
+<span style="color: #006699; font-weight: bold;">export</span> import <span style="color: #555555;">:</span>math1; <span style="color: #0099ff; font-style: italic;">// (2)</span>
+<span style="color: #006699; font-weight: bold;">export</span> import <span style="color: #555555;">:</span>math2; <span style="color: #0099ff; font-style: italic;">// (2)</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The primary interface file consists of the module declaration (1). It imports and re-exports the partitions <span style="font-family: courier new, courier;">math1</span> and <span style="font-family: courier new, courier;">math2</span> using colons (2). The name of the partitions must begin with the name of the module. Consequently, you don't have to specify them.</p>
+<ul>
+<li>Module partitions (<span style="font-family: courier new, courier;">mathPartition1.ixx</span>, and <span style="font-family: courier new, courier;">mathPartition2.ixx</span>)</li>
+</ul>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// mathPartition1.ixx</span>
+
+<span style="color: #006699; font-weight: bold;">export</span> module math<span style="color: #555555;">:</span>math1;     <span style="color: #0099ff; font-style: italic;">// (1)   </span>
+
+<span style="color: #006699; font-weight: bold;">export</span> <span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">add</span>(<span style="color: #007788; font-weight: bold;">int</span> fir, <span style="color: #007788; font-weight: bold;">int</span> sec) {
+    <span style="color: #006699; font-weight: bold;">return</span> fir <span style="color: #555555;">+</span> sec;
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// mathPartition2.ixx</span>
+
+<span style="color: #006699; font-weight: bold;">export</span> module math<span style="color: #555555;">:</span>math2;     <span style="color: #0099ff; font-style: italic;">// (1)   </span>
+
+<span style="color: #006699; font-weight: bold;">export</span> { 
+    <span style="color: #007788; font-weight: bold;">int</span> mul(<span style="color: #007788; font-weight: bold;">int</span> fir, <span style="color: #007788; font-weight: bold;">int</span> sec) {
+        <span style="color: #006699; font-weight: bold;">return</span> fir <span style="color: #555555;">*</span> sec;
+    }
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Similar to the module declaration, (1) declares a module interface partition. A module interface partition is also a module interface unit. The name <span style="font-family: courier new, courier;">math</span> stands for the module and the name <span style="font-family: courier new, courier;">math1</span> or <span style="font-family: courier new, courier;">math2</span> for the partition.</p>
+<ul>
+<li>Client program</li>
+</ul>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// mathModuleClient.cpp</span>
+
+import std.core;
+import math;
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"add(3, 4): "</span> <span style="color: #555555;">&lt;&lt;</span> add(<span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"mul(3, 4): "</span> <span style="color: #555555;">&lt;&lt;</span> mul(<span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>You may have already assumed it: the client program is identical to the client program I previously used with submodules. The same observation holds for the creation of the executable.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">cl.exe <span style="color: #555555;">/</span>std<span style="color: #555555;">:</span>c<span style="color: #555555;">++</span>latest <span style="color: #555555;">/</span>c <span style="color: #555555;">/</span>experimental<span style="color: #555555;">:</span>module mathPartition1.ixx <span style="color: #555555;">/</span>EHsc <span style="color: #555555;">/</span>MD
+cl.exe <span style="color: #555555;">/</span>std<span style="color: #555555;">:</span>c<span style="color: #555555;">++</span>latest <span style="color: #555555;">/</span>c <span style="color: #555555;">/</span>experimental<span style="color: #555555;">:</span>module mathPartition2.ixx <span style="color: #555555;">/</span>EHsc <span style="color: #555555;">/</span>MD
+cl.exe <span style="color: #555555;">/</span>std<span style="color: #555555;">:</span>c<span style="color: #555555;">++</span>latest <span style="color: #555555;">/</span>c <span style="color: #555555;">/</span>experimental<span style="color: #555555;">:</span>module mathPartition.ixx <span style="color: #555555;">/</span>EHsc <span style="color: #555555;">/</span>MD
+cl.exe <span style="color: #555555;">/</span>std<span style="color: #555555;">:</span>c<span style="color: #555555;">++</span>latest <span style="color: #555555;">/</span>experimental<span style="color: #555555;">:</span>module mathModuleClient.cpp mathPartition1.obj mathPartition2.obj mathPartition.obj <span style="color: #555555;">/</span>EHsc <span style="color: #555555;">/</span>MD
+</pre>
+</div>
+<p>&nbsp;</p>
+<h2><img src="https://www.modernescpp.com/images/blog/Cpp20/DivideModules/mathModuleClientFix.png" alt="mathModuleClientFix" width="350" height="147" style="display: block; margin-left: auto; margin-right: auto;" /></h2>
+<h2>What's next?</h2>
+<p>There is more modules in C++20. For example, modules introduce header units, and they distinguish between global and private module fragment. Finally, I want to write about linkage.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>{loadmoduleid 153}</p>
