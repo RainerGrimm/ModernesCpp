@@ -1,0 +1,190 @@
+<p>Modules are one of the four prominent features of C++20. They overcome the restrictions of header files and promise a lot: faster build-times, fewer violations of the One-Definition-Rule, less usage of the preprocessor. Today, I want to create a simple math module.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<h2>&nbsp;<img src="https://www.modernescpp.com/images/blog/Cpp20/AFirstModule/TimelineCpp20.png" alt="TimelineCpp20" width="650" height="223" style="display: block; margin-left: auto; margin-right: auto;" /></h2>
+<h2>The Long History of Modules in C++</h2>
+<h2><img src="https://www.modernescpp.com/images/blog/Cpp20/AFirstModule/wg21-structure-2019-11.png" alt="wg21 structure 2019 11" width="400" height="293" style="float: right;" /></h2>
+<p>Modules may be older than you think. My short historic detour should give only an idea, how long it takes to get something such valuable into the C++ standard.</p>
+<p>In 2004, Daveed Vandevoorde wrote the proposal <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2004/n1736.pdf">N1736.pdf</a>, which described the first time idea of modules. It took until 2012 to get a dedicated Study Group (SG2, Modules) for modules. In 2017, Clang 5.0 and MSVC 19.1 provided the first implementation. One year later, the Modules TS (technical specification) was finalized. Around the same time, Google proposed the so-called ATOM (Another Take On Modules) proposal (<a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p0947r1.html">P0947</a>) for modules. In 2019, the Modules TS and the ATOM proposal was merged into the C++20 committee draft (<a href="https://github.com/cplusplus/draft/releases/tag/n4842">N4842</a>), which is the syntax I present in my posts to modules.</p>
+<p>The C++ standardization process is democratic. Section <a href="https://isocpp.org/std/">Standardization</a> gives you more information about the standard and the standardization process. The image to the right shows the various study groups.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>Explaining modules from the user's perspective is quite easy, but this will not hold for the implementer's perspective. My plan for this post is to start with a simple modules math and add more features to it as we go.</p>
+<h2>The <span style="font-family: 'courier new', courier;">math</span> Modul</h2>
+<p>First, here is my first module:<span style="font-family: courier new, courier;"><br /></span></p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// math.ixx</span>
+
+<span style="color: #006699; font-weight: bold;">export</span> module math;
+
+<span style="color: #006699; font-weight: bold;">export</span> <span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">add</span>(<span style="color: #007788; font-weight: bold;">int</span> fir, <span style="color: #007788; font-weight: bold;">int</span> sec){
+    <span style="color: #006699; font-weight: bold;">return</span> fir <span style="color: #555555;">+</span> sec;
+} 
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The expression <span style="font-family: courier new, courier;">export module math</span> is the module declaration. By putting <span style="font-family: courier new, courier;">export</span> before the function adds<span style="font-family: courier new, courier;">,</span> <span style="font-family: courier new, courier;">add </span>is exported and can, therefore, be used by a consumer of my module.&nbsp;</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// client.cpp</span>
+
+import math;
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+   
+   add(<span style="color: #ff6600;">2000</span>, <span style="color: #ff6600;">20</span>);
+   
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p><span style="font-family: courier new, courier;">import math</span> imports the module <span style="font-family: courier new, courier;">math</span> and makes the exported names in the module visible to the <span style="font-family: 'courier new', courier;">client.cpp</span>. Let me say a few words about module declaration files before I build the module.</p>
+<h3>Module Declaration Files</h3>
+<p>Did you noticed the strange name of the module: <span style="font-family: courier new, courier;">math.ixx</span>.</p>
+<ul>
+<li>cl.exe (Microsoft) uses the required extension <strong><span style="font-family: courier new, courier;">ixx. </span></strong>The <span style="font-family: courier new, courier;"><strong>ixx</strong> </span>stands for a module interface source.</li>
+<li>Clang uses the extension<span style="font-family: courier new, courier;"></span><span style="font-family: courier new, courier;">cppm.</span>&nbsp;cppm stands presumably for a <span style="font-family: 'courier new', courier;">cpp</span> module declaration.<strong>&nbsp;Wrong!!! The documentation to Clang is misleading. Stop using the <span style="font-family: 'courier new', courier;">cppm</span> extension until you read my next post. Use the extension <span style="font-family: 'courier new', courier;">cpp</span>. I assume you don't want to make the same Odyssey such as me.</strong> &nbsp;</li>
+<li>I don't know of a GCC extension.</li>
+</ul>
+<h3>Compile the Module <span style="font-family: courier new, courier;">math</span></h3>
+<p>To compile the module, you have to use a very current Clang, GCC, or cl.exe compiler. I go in this post with cl.exe on Windows. The Microsoft blog provides two excellent introductions to modules: <a href="https://docs.microsoft.com/en-us/cpp/cpp/modules-cpp?view=vs-2019">Overview of modules in C++</a> and&nbsp;<a href="https://devblogs.microsoft.com/cppblog/c-modules-conformance-improvements-with-msvc-in-visual-studio-2019-16-5/">C++ Modules conformance improvements with MSVC in Visual Studio 2019 16.5</a>. In contrast, the lack of introductions to the Clang and GCC compiler makes it quite difficult to use modules.</p>
+<p>Here are more details of my used Microsoft compiler:</p>
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/Cpp20/AFirstModule/MicrosoftCompiler.png" alt="MicrosoftCompiler" width="500" height="140" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>These are the steps to compile and use the module with the Microsoft compiler. I only show the minimal command line. With an older Microsoft compiler, you have to use at least <span style="font-family: 'courier new', courier;">/std:cpplatest.</span></p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">cl.exe /experimental:module /c math.ixx           <span style="color: #0099ff; font-style: italic;">// 1</span>
+cl.exe /experimental:module client.cpp math.obj   <span style="color: #0099ff; font-style: italic;">// 2</span>                            
+</pre>
+</div>
+<p>&nbsp;</p>
+<ol>
+<li>Creates an obj file <span style="font-family: 'courier new', courier;">math.obj</span> and an <em>IFC</em> file <span style="font-family: 'courier new', courier;">math.ifc</span>. The <em>IFC</em> file contains the metadata description of the module interface. The binary format of the <em>IFC</em> is modeled after the <a href="http://www.stroustrup.com/gdr-bs-macis09.pdf">Internal Program Representation</a>&nbsp;by Gabriel Dos Reis and Bjarne Stroustrup (2004/2005).&nbsp;<span style="font-family: courier new, courier;"><br /></span></li>
+<li>Creates the executable<span style="font-family: courier new, courier;">&nbsp;client</span><span style="font-family: courier new, courier;">.exe. </span>Without the implicitly used&nbsp;<span style="font-family: 'courier new', courier;">math.ifc</span> file from the first step, the linker can not find the module.</li>
+</ol>
+<p><img src="https://www.modernescpp.com/images/blog/Cpp20/AFirstModule/moduleNotFound1.png" alt="moduleNotFound1" width="550" height="268" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>For obvious reasons, I will not show you the output of the program execution. Let me change this.</p>
+<h3>Global Module Fragment</h3>
+<p>The global module fragment is meant to compose module interfaces. It's a place to use preprocessor directives such as&nbsp;<span style="font-family: 'courier new', courier;">#include</span>&nbsp;so that the module interface can compile. The code in the global module fragment is not exported by the module interface.</p>
+<p>The second version of the module <span style="font-family: courier new, courier;">math</span> supports the two functions <span style="font-family: courier new, courier;">add</span> and <span style="font-family: courier new, courier;">getProduct</span>.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// math1.ixx</span>
+module;                   <span style="color: #0099ff; font-style: italic;">// global module fragment (1)</span>
+
+<span style="color: #009999;">#include &lt;numeric&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">export</span> module math;       <span style="color: #0099ff; font-style: italic;">// module declaration (2)</span>
+
+<span style="color: #006699; font-weight: bold;">export</span> <span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">add</span>(<span style="color: #007788; font-weight: bold;">int</span> fir, <span style="color: #007788; font-weight: bold;">int</span> sec){
+    <span style="color: #006699; font-weight: bold;">return</span> fir <span style="color: #555555;">+</span> sec;
+}
+
+<span style="color: #006699; font-weight: bold;">export</span> <span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">getProduct</span>(<span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;&amp;</span> vec) {
+    <span style="color: #006699; font-weight: bold;">return</span> std<span style="color: #555555;">::</span>accumulate(vec.begin(), vec.end(), <span style="color: #ff6600;">1</span>, std<span style="color: #555555;">::</span>multiplies<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span>());
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>I included the necessary headers between the global module fragment (line 1) and the module declaration (line 2).</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// client1.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+
+import math;
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;   
+   
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"add(2000, 20): "</span> <span style="color: #555555;">&lt;&lt;</span> add(<span style="color: #ff6600;">2000</span>, <span style="color: #ff6600;">20</span>) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> myVec{<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">5</span>, <span style="color: #ff6600;">6</span>, <span style="color: #ff6600;">7</span>, <span style="color: #ff6600;">8</span>, <span style="color: #ff6600;">9</span>, <span style="color: #ff6600;">10</span>};
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"getProduct(myVec): "</span> <span style="color: #555555;">&lt;&lt;</span> getProduct(myVec) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+   
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>&nbsp;The client imports the module <span style="font-family: courier new, courier;">math</span> and uses its functionality:</p>
+<p><img src="https://www.modernescpp.com/images/blog/Cpp20/AFirstModule/client1.png" alt="client1" width="300" height="164" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>Maybe, you don't like to use a Standard Library Header anymore. Microsoft supports modules for all STL headers. Here is what I have found in the post "<a href="https://devblogs.microsoft.com/cppblog/cpp-modules-in-visual-studio-2017/">Using C++ Modules in Visual Studio 2017</a>" from the Microsoft C++ team blog.</p>
+<ul>
+<li>C++ modules in Visual Studio 2017
+<ul>
+<li><span style="font-family: Courier New;"><code>std.regex</code></span> provides the content of the header <span style="font-family: Courier New, Courier, monospace;"><code>&lt;regex&gt;</code></span></li>
+<li><span style="font-family: Courier New, Courier, monospace;"><code>std.filesystem</code></span> provides the content of the header <code><span style="font-family: Courier New, Courier, monospace;">&lt;experimental/filesystem</span>&gt;</code></li>
+<li><span style="font-family: Courier New, Courier, monospace;"><code>std.memory</code></span> provides the content of the header <span style="font-family: Courier New, Courier, monospace;"><code>&lt;memory&gt;</code></span></li>
+<li><span style="font-family: Courier New, Courier, monospace;"><code>std.threading</code></span> provides the contents of headers <span style="font-family: Courier New, Courier, monospace;"><code>&lt;atomic&gt;</code>, <code>&lt;condition_variable&gt;</code>, <code>&lt;future&gt;</code>, <code>&lt;mutex&gt;</code>, <code>&lt;shared_mutex&gt;</code>,and <code>&lt;thread&gt;</code></span></li>
+<li class=""><span style="font-family: Courier New, Courier, monospace;"><code>std.core</code></span> provides everything else in the C++ Standard Library</li>
+</ul>
+<div>&nbsp;</div>
+</li>
+</ul>
+<p>To use the Microsoft Standard Library modules, you have to specify the exception handling model (<a href="https://docs.microsoft.com/en-us/cpp/build/reference/eh-exception-handling-model?view=vs-2019"><span style="font-family: courier new, courier;">/EHsc)</span></a> and the multithreading library (<a href="https://docs.microsoft.com/en-us/cpp/build/reference/md-mt-ld-use-run-time-library?view=vs-2019"><span style="font-family: courier new, courier;">/MD)</span></a>.&nbsp; Additionally, you have to use the flag&nbsp;<a href="https://docs.microsoft.com/en-us/cpp/build/reference/std-specify-language-standard-version?view=vs-2019"><span style="font-family: courier new, courier;">/std:c++latest</span></a>.</p>
+<p>Here are the modified versions of the interface file<span style="font-family: courier new, courier;"> math2.ixx</span> and the source file <span style="font-family: courier new, courier;">client2.cpp</span>.</p>
+<ul>
+<li><span style="font-family: courier new, courier;">math2.ixx</span></li>
+</ul>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// math2.ixx</span>
+module;                   
+
+import std.core;                            <span style="color: #0099ff; font-style: italic;">// (1)</span>
+
+<span style="color: #006699; font-weight: bold;">export</span> module math;       
+
+<span style="color: #006699; font-weight: bold;">export</span> <span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">add</span>(<span style="color: #007788; font-weight: bold;">int</span> fir, <span style="color: #007788; font-weight: bold;">int</span> sec){
+    <span style="color: #006699; font-weight: bold;">return</span> fir <span style="color: #555555;">+</span> sec;
+}
+
+<span style="color: #006699; font-weight: bold;">export</span> <span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">getProduct</span>(<span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;&amp;</span> vec) {
+    <span style="color: #006699; font-weight: bold;">return</span> std<span style="color: #555555;">::</span>accumulate(vec.begin(), vec.end(), <span style="color: #ff6600;">1</span>, std<span style="color: #555555;">::</span>multiplies<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span>());
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<ul>
+<li><span style="font-family: courier new, courier;">client2.cpp</span></li>
+</ul>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// client2.cpp</span>
+
+import std.core;                  <span style="color: #0099ff; font-style: italic;">// (1)</span>
+
+import math;
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;   
+   
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"add(2000, 20): "</span> <span style="color: #555555;">&lt;&lt;</span> add(<span style="color: #ff6600;">2000</span>, <span style="color: #ff6600;">20</span>) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> myVec{<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">5</span>, <span style="color: #ff6600;">6</span>, <span style="color: #ff6600;">7</span>, <span style="color: #ff6600;">8</span>, <span style="color: #ff6600;">9</span>, <span style="color: #ff6600;">10</span>};
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"getProduct(myVec): "</span> <span style="color: #555555;">&lt;&lt;</span> getProduct(myVec) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+   
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Both files use in line (1) the module<span style="font-family: courier new, courier;"> std.core.</span></p>
+<h2>What's next?</h2>
+<p>My first modules <span style="font-family: courier new, courier;">math.ixx, math1.ixx,</span> and <span style="font-family: courier new, courier;">math2.ixx</span> defined its functionality in one file. In the next post, I separate the module definition into a so-called module interface unit and a so-called module implementation unit.&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p style="text-align: justify;">{loadmoduleid 153}</p>
