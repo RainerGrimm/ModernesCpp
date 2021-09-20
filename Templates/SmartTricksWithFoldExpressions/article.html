@@ -1,0 +1,168 @@
+<p>To complete my post about variadic templates and fold expressions, I present in this post smart tricks using parameter packs and fold expressions.</p>
+<hr id="system-readmore" />
+<p><img src="https://www.modernescpp.com/images/blog/Templates/SmartTricksWithFoldExpressions/templates.png" alt="FoldExpressions" width="650" height="399" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>Fold expressions enable it to reduce a parameter pack with a binary operator. Thanks to them, you can write concise expressions for repeated operations. This repeated operation can be a print function or a push_back function to push elements onto a vector. Let me start with the print function.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// printFoldExpressions.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;string&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> ... Args<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">void</span> printMe(Args<span style="color: #555555;">&amp;&amp;</span> ... args) {
+    (std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span>  ... <span style="color: #555555;">&lt;&lt;</span>  std<span style="color: #555555;">::</span>forward<span style="color: #555555;">&lt;</span>Args<span style="color: #555555;">&gt;</span>(args)) <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>boolalpha;
+
+    printMe();
+    printMe(<span style="color: #cc3300;">"Rainer "</span>, <span style="color: #cc3300;">"Grimm"</span>);
+    printMe(<span style="color: #336666;">true</span>, <span style="color: #cc3300;">" "</span>, <span style="color: #cc3300;">"+"</span>, <span style="color: #cc3300;">" "</span>,<span style="color: #336666;">false</span>, <span style="color: #cc3300;">" = "</span>, <span style="color: #336666;">true</span> <span style="color: #555555;">+</span> <span style="color: #336666;">false</span>);
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The <code>printMe </code>function can accept an arbitrary number of arguments. In the concrete function, this means no argument, two C-strings, and a few strings and numbers. The <code>printMe</code> function automatically deduces their types and displays them. Three powerful C++ techniques are involved.</p>
+<ul>
+<li>Variadic templates (<code> ...</code> ): accepts an arbitrary number of arguments. Read more here: "<a href="https://www.modernescpp.com/index.php/variadic-templates-or-the-power-of-three-dots">Variadic Templates or the Power of Three Dots</a>" and "<a href="https://www.modernescpp.com/index.php/more-arbout-variadic-templates">More about Variadic Templates</a>".</li>
+<li>Perfect forwarding (<code>std::forward</code>): forwards the arguments without changing their value category. Read more here: <a href="https://www.modernescpp.com/index.php/perfect-forwarding">Perfect Forwarding</a>.</li>
+<li>Fold expressions <code>(std::cout &lt;&lt; ... &lt;&lt; std::forward&lt;Args&gt;(args)</code>): reduces the parameter pack from left using the binary operator<code> &lt;&lt;</code> and the initial value <code>std::cout</code>. Read more here: <a href="https://www.modernescpp.com/index.php/from-variadic-templates-to-fold-expressions">From Variadic Templates to Fold Expressions</a>.&nbsp;<code> <br /></code></li>
+</ul>
+<p>Finally, here is the output of the program. <img src="https://www.modernescpp.com/images/blog/Templates/SmartTricksWithFoldExpressions/printFoldExpressions.png" alt="printFoldExpressions" width="425" height="255" style="display: block; margin-left: auto; margin-right: auto;" />&nbsp;</p>
+<p>Thanks to fold expressions, you can also push an arbitrary number of arguments onto a vector.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// pushBackFoldExpressions.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;string&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">using</span> <span style="color: #006699; font-weight: bold;">namespace</span> std;
+ 
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T, <span style="color: #006699; font-weight: bold;">typename</span>... Args<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">void</span> myPushBack(vector<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;&amp;</span> v, Args<span style="color: #555555;">&amp;&amp;</span>... args) {
+    (v.push_back(args), ...);                    <span style="color: #0099ff; font-style: italic;">// (1)</span>
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> myIntVec;
+	myPushBack(myIntVec, <span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">5</span>, <span style="color: #ff6600;">6</span>, <span style="color: #ff6600;">7</span>, <span style="color: #ff6600;">8</span>, <span style="color: #ff6600;">9</span>, <span style="color: #ff6600;">10</span>);
+	<span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> v <span style="color: #555555;">:</span> myIntVec) std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> v <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">' '</span>;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n\n</span><span style="color: #cc3300;">"</span>;
+
+    std<span style="color: #555555;">::</span>vector myDoubleVec{<span style="color: #ff6600;">1.1</span>, <span style="color: #ff6600;">2.2</span>, <span style="color: #ff6600;">3.3</span>};      <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    myPushBack(myDoubleVec, <span style="color: #ff6600;">4.4</span>, <span style="color: #ff6600;">5.5</span>, <span style="color: #ff6600;">6.6</span>);
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> v<span style="color: #555555;">:</span> myDoubleVec) std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> v <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">' '</span>;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"\n\n"</span>;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The lines (1) and (2) are the most interesting ones. (2) pushes the three doubles onto the vector. With C++17, the compiler can automatically deduce the types of the arguments. The expression<code> (v.push_back(args),...)</code> pushes the elements from the right using the binary comma operator (<code>,</code>). Alternatively, I could also push from the left <code>(..., v.push_back(args))</code>, because the comma operator is associative. Honestly, this looks weird. Therefore, I prefer the first variant.</p>
+<p>The following screenshot shows the output of the program.</p>
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/Templates/SmartTricksWithFoldExpressions/pushBackFoldExpressions.png" alt="pushBackFoldExpressions" width="513" height="250" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>Now, I want to go one stack back from fold expressions to variadic templates and present the overload pattern. The overload pattern is a clever way to wrap multiple lambdas into an overload set.</p>
+<h2>Overload Pattern</h2>
+<p>I want to make it short. Here is the overload pattern implemented with C++20:</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename </span>... Ts<span style="color: #555555;">&gt;</span> <span style="color: #006699; font-weight: bold;">struct</span> Overload <span style="color: #555555;">:</span> Ts ... { <span style="color: #006699; font-weight: bold;">using</span> Ts<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">operator</span>() ... ; };
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>What? Sorry, my mistake. I should layout it properly.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename </span>... Ts<span style="color: #555555;">&gt;</span> 
+<span style="color: #006699; font-weight: bold;">struct</span> Overload <span style="color: #555555;">:</span> Ts ... { 
+    <span style="color: #006699; font-weight: bold;">using</span> Ts<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">operator</span>() ... ; 
+};
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The struct <code>Overload</code> can have arbitrary many base classes (<code>Ts ...</code>). It derives from each class <code>public</code> and brings the call operator (<code>Ts::operator..</code>.) of each base class into its scope.</p>
+<p>There is more to explain about these four magic lines of code. Before I do that in my next post, let me use the overload pattern to display the types of integral literals. The following program requires a C++20 compiler.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// overloadPattern.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> ... Ts<span style="color: #555555;">&gt;</span> 
+<span style="color: #006699; font-weight: bold;">struct</span> Overload <span style="color: #555555;">:</span> Ts ... { 
+    <span style="color: #006699; font-weight: bold;">using</span> Ts<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">operator</span>() ...;
+};
+
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    <span style="color: #006699; font-weight: bold;">auto</span> TypeOfIntegral <span style="color: #555555;">=</span> Overload {
+        [](<span style="color: #007788; font-weight: bold;">int</span>) { <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc3300;">"  int"</span>; },
+        [](<span style="color: #007788; font-weight: bold;">unsigned</span> <span style="color: #007788; font-weight: bold;">int</span>) { <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc3300;">" unsigned int"</span>; },
+        [](<span style="color: #007788; font-weight: bold;">long</span> <span style="color: #007788; font-weight: bold;">int</span>) { <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc3300;">" long int"</span>; },
+        [](<span style="color: #007788; font-weight: bold;">long</span> <span style="color: #007788; font-weight: bold;">long</span> <span style="color: #007788; font-weight: bold;">int</span>) { <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc3300;">"long long int"</span>; },
+        [](<span style="color: #006699; font-weight: bold;">auto</span>) { <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc3300;">"unknown type"</span>; },
+    };
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"TypeOfIntegral(5): "</span> <span style="color: #555555;">&lt;&lt;</span> TypeOfIntegral(<span style="color: #ff6600;">5</span>) <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"TypeOfIntegral(5u): "</span> <span style="color: #555555;">&lt;&lt;</span> TypeOfIntegral(<span style="color: #ff6600;">5u</span>) <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"TypeOfIntegral(5U): "</span> <span style="color: #555555;">&lt;&lt;</span> TypeOfIntegral(<span style="color: #ff6600;">5U</span>) <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"TypeOfIntegral(5l): "</span> <span style="color: #555555;">&lt;&lt;</span> TypeOfIntegral(<span style="color: #ff6600;">5l</span>) <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"TypeOfIntegral(5L): "</span> <span style="color: #555555;">&lt;&lt;</span> TypeOfIntegral(<span style="color: #ff6600;">5L</span>) <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"TypeOfIntegral(5ll): "</span> <span style="color: #555555;">&lt;&lt;</span> TypeOfIntegral(<span style="color: #ff6600;">5ll</span>) <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"TypeOfIntegral(5LL): "</span> <span style="color: #555555;">&lt;&lt;</span> TypeOfIntegral(<span style="color: #ff6600;">5LL</span>) <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"TypeOfIntegral(5ul): "</span> <span style="color: #555555;">&lt;&lt;</span> TypeOfIntegral(<span style="color: #ff6600;">5ul</span>) <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"TypeOfIntegral(5.5): "</span> <span style="color: #555555;">&lt;&lt;</span> TypeOfIntegral(<span style="color: #ff6600;">5.5</span>) <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>; 
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>In the program <code>overloadPattern.cpp</code>, the overload set consists of lambda expressions accepting an <code>int</code>, an<code> unsigned int</code>, a <code>long int</code>, a<code> long long int</code>, and<code> auto</code>. <code>auto</code> is the fallback that is used for example if the overload set is invoked with an unknown type. This happens when I invoke <code>TypeOfIntegral</code> with an <code>unsigned long</code> or a <code>double</code> value.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/SmartTricksWithFoldExpressions/overloadPattern.png" alt="overloadPattern" width="403" height="388" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<h2>What's next?</h2>
+<p>Typically, you use the overload pattern for a<code> std::variant</code>. <code>std::variant</code> is a type-safe union. An instance <code>var</code> of<code> std::variant</code> (C++17) has one value from one of its types.<code> std::visit</code> allows you to apply a visitor to<code> var</code>. Exactly here comes the overload pattern very handy into play. Read more about <code>std::variant, std::visit</code>, and the overload pattern in my next post.</p>
+<p>&nbsp;</p>
+<h2>Pdf Bundle: C++20 Modules</h2>
+<p>Base on the last poll, I've created the next pdf bundle.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/SmartTricksWithFoldExpressions/bundle.png" alt="bundle" width="500" height="488" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>&nbsp;</p>
+<p>&nbsp;The pdf bundle includes all<span class="css-901oao css-16my406 r-poiln3 r-bcqeeo r-qvutc0"><br /></span></p>
+<ul>
+<li><span class="css-901oao css-16my406 r-poiln3 r-bcqeeo r-qvutc0"> posts. </span></li>
+<li><span class="css-901oao css-16my406 r-poiln3 r-bcqeeo r-qvutc0">source code files to these posts.</span></li>
+</ul>
+<p><span class="css-901oao css-16my406 r-poiln3 r-bcqeeo r-qvutc0">Here is more info on how to get the pdf bundle: <a href="https://www.modernescpp.com/index.php/the-new-pdf-bundle-is-ready-c-20-modules">The New pdf Bundle is Ready: C++20 Modules</a><br /></span></p>
+<p>&nbsp;</p>
+<p><span class="css-901oao css-16my406 r-poiln3 r-bcqeeo r-qvutc0">{loadmoduleid 153}&nbsp;</span><a href="https://t.co/VFJVdPduZf?amp=1" target="_blank" rel="noopener noreferrer" class="css-4rbku5 css-18t94o4 css-901oao css-16my406 r-1n1174f r-1loqt21 r-poiln3 r-bcqeeo r-qvutc0" dir="ltr" role="link"><span class="css-901oao css-16my406 r-poiln3 r-hiw28u r-qvk6io r-bcqeeo r-qvutc0" aria-hidden="true"></span></a></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
