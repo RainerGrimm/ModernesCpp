@@ -1,0 +1,206 @@
+<p>Typically, you use the overload pattern for a<code> std::variant</code>. <code>std::variant</code> is a type-safe union. A<code> </code><code>std::variant</code> (C++17) has one value from one of its types.<code> std::visit</code> allows you to apply a visitor to it. Exactly here comes the overload pattern very handy into play.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/Templates/VisitingAVariant/templates.png" alt="templates" width="650" height="409" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>I introduced in my last post "<a href="https://www.modernescpp.com/index.php/smart-tricks-with-fold-expressions">Smart Tricks with Parameter Packs and Fold Expressions</a>` the overload pattern as a smart trick to create an overload set using lambdas. Typically, the overload pattern is used for visiting the value held by a<code> std::variant</code>.</p>
+<p>I know from my C++ seminars that most developers don't know <code>std::variant</code> and<code> std::visit</code> and still use a union. Therefore, let me give you a quick reminder about <code>std::variant</code> and <code>std::visit</code>.</p>
+<h2><code>std::variant (C++17)<br /></code></h2>
+<p>A <span style="font-family: courier new,courier;">std::variant</span> is a type-safe union. An instance of <span style="font-family: courier new,courier;">std::variant</span> has a value from one of its types. The value must not be a reference, C-array or <span style="font-family: courier new,courier;">void.</span> A std::variant can have one type more than once. A default-initialized <span style="font-family: courier new,courier;">std::variant</span> will be initialized with its first type. In this case, the first type must have a default constructor. Here is an example, based on <a href="http://en.cppreference.com/w/cpp/utility/variant">cppreference.com.</a>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// variant.cpp</span>
+
+<span style="color: #009999;">#include &lt;variant&gt;</span>
+<span style="color: #009999;">#include &lt;string&gt;</span>
+ 
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+
+  std<span style="color: #555555;">::</span>variant<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>, <span style="color: #007788; font-weight: bold;">float</span><span style="color: #555555;">&gt;</span> v, w;
+  v <span style="color: #555555;">=</span> <span style="color: #ff6600;">12</span>;                              <span style="color: #0099ff; font-style: italic;">// (1)</span>
+  <span style="color: #007788; font-weight: bold;">int</span> i <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>get<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span>(v);
+  w <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>get<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span>(v);               <em><span style="color: #0099ff;"> // (2)</span></em>
+  w <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>get<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">0</span><span style="color: #555555;">&gt;</span>(v);                  <span style="color: #0099ff; font-style: italic;">// (3)</span>
+  w <span style="color: #555555;">=</span> v;                               <span style="color: #0099ff; font-style: italic;">// (4)</span>
+ 
+  <span style="color: #0099ff; font-style: italic;">//  std::get&lt;double&gt;(v);             // (5) ERROR</span>
+  <span style="color: #0099ff; font-style: italic;">//  std::get&lt;3&gt;(v);                  // (6) ERROR</span>
+ 
+  try{
+    std<span style="color: #555555;">::</span>get<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">float</span><span style="color: #555555;">&gt;</span>(w);                <span style="color: #0099ff; font-style: italic;">// (7)</span>
+  }
+  <span style="color: #006699; font-weight: bold;">catch</span> (std<span style="color: #555555;">::</span>bad_variant_access<span style="color: #555555;">&amp;</span>) {}
+ 
+  std<span style="color: #555555;">::</span>variant<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>string<span style="color: #555555;">&gt;</span> v(<span style="color: #cc3300;">"abc"</span>);  <span style="color: #0099ff; font-style: italic;">// (8)</span>
+  v <span style="color: #555555;">=</span> <span style="color: #cc3300;">"def"</span>;                           <span style="color: #0099ff; font-style: italic;">// (9)</span>
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>I define both variants <span style="font-family: courier new,courier;">v</span> and<span style="font-family: courier new,courier;"> w</span>. They can have an <span style="font-family: courier new,courier;">int</span> and a <span style="font-family: courier new,courier;">float</span> value. Their initial value is 0. <span style="font-family: courier new,courier;">v</span> becomes 12 (line 1). <span style="font-family: courier new,courier;">std::get&lt;int&gt;(v)</span> returns the value. In line (2) - (3) you see three possibilities to assign the variant <span style="font-family: courier new,courier;">v</span> the variant <span style="font-family: courier new,courier;">w.</span> But you have to keep a few rules in mind. You can ask for the value of a variant by type (line 5) or by index (line 6). The type must be unique and the index valid. On line 7, the variant <span style="font-family: courier new,courier;">w</span> holds an <span style="font-family: courier new,courier;">int</span> value. Therefore, I get a <span style="font-family: courier new,courier;">std::bad_variant_access</span> exception. If the constructor call or assignment call is unambiguous, a simple conversion takes place. That is the reason that it's possible to construct a <span style="font-family: courier new,courier;">std::variant&lt;std::string&gt;</span> in line (8) with a C-string or assign a new C-string to the variant (line 9).</p>
+<p>Of course, there is way more about<code> std::variant.</code> Read the posts "<a href="https://www.cppstories.com/2018/06/variant/">Everything You Need to Know About std::variant from C++17</a>" by Bartlomiej Filipek.</p>
+<p>Thanks to the function <code>std::visit</code>, C++17 provides a convenient way to visits the elements of a<code> std::variant</code>.</p>
+<h2><code>std::visit</code></h2>
+<p>What sounds like the <a href="https://en.wikipedia.org/wiki/Visitor_pattern">visitor pattern</a> according to the classical design patterns is really a kind of a visitor for a container of variants.</p>
+<p><span style="font-family: courier new,courier;">std::visit</span> allows you to apply a visitor to a container of variants. The visitor must be a callable. A callable is something, which you can invoke. Typical callables are functions, function objects, or lambdas. I use lambdas in my example.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// visitVariants.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+<span style="color: #009999;">#include &lt;typeinfo&gt;</span>
+<span style="color: #009999;">#include &lt;variant&gt;</span>
+
+  
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+  
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  
+    std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>variant<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">char</span>, <span style="color: #007788; font-weight: bold;">long</span>, <span style="color: #007788; font-weight: bold;">float</span>, <span style="color: #007788; font-weight: bold;">int</span>, <span style="color: #007788; font-weight: bold;">double</span>, <span style="color: #007788; font-weight: bold;">long</span> <span style="color: #007788; font-weight: bold;">long</span><span style="color: #555555;">&gt;&gt;</span>      <span style="color: #0099ff; font-style: italic;">// 1</span>
+               vecVariant <span style="color: #555555;">=</span> {<span style="color: #ff6600;">5</span>, <span style="color: #cc3300;">'2'</span>, <span style="color: #ff6600;">5.4</span>, <span style="color: #ff6600;">100ll</span>, <span style="color: #ff6600;">2011l</span>, <span style="color: #ff6600;">3.5f</span>, <span style="color: #ff6600;">2017</span>};
+  
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;</span> v<span style="color: #555555;">:</span> vecVariant){
+        std<span style="color: #555555;">::</span>visit([](<span style="color: #006699; font-weight: bold;">auto</span> arg){std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> arg <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span>;}, v);                <span style="color: #0099ff; font-style: italic;">// 2</span>
+    }
+  
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;</span> v<span style="color: #555555;">:</span> vecVariant){
+        std<span style="color: #555555;">::</span>visit([](<span style="color: #006699; font-weight: bold;">auto</span> arg){std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #006699; font-weight: bold;">typeid</span>(arg).name() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span>;}, v); <span style="color: #0099ff; font-style: italic;">// 3</span>
+    }
+  
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"\n\n"</span>;
+  
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>I create in (1) a<span style="font-family: courier new,courier;"> std::vector</span> of variants and initialize each variant. Each variant can hold a <span style="font-family: courier new,courier;">char, long, float, int, double,</span> or<span style="font-family: courier new,courier;"> long long value. </span>It's quite easy to traverse the vector of variants and apply the lambda (lines (2) and (3) to it. First, I display the current value (2), and second, thanks to the call <span style="font-family: courier new,courier;">typeid(arg).name()</span> (3), I get a string representation of the type of the current value.<span style="font-family: courier new,courier;"></span></p>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/VisitingAVariant/visitVariants.png" alt="visitVariants" width="350" height="203" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>Fine? No!. I used in the program <code>visitVariant.cpp</code> a generic lambda. Consequently, the string representations of the types are pretty unreadable using gcc: "<code>i c d x l f i</code>". Honestly, I want to apply a specific lambda to each type of the variants. Now, the overload pattern comes to my rescue.</p>
+<h3>Overload Pattern</h3>
+<p>Thanks to the overload pattern, I can display each type with a readable string and display each value in an appropriate way.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// visitVariantsOverloadPattern.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+<span style="color: #009999;">#include &lt;typeinfo&gt;</span>
+<span style="color: #009999;">#include &lt;variant&gt;</span>
+<span style="color: #009999;">#include &lt;string&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> ... Ts<span style="color: #555555;">&gt;</span>                                                 <em><span style="color: #0099ff;">// (7)</span> </em>
+<span style="color: #006699; font-weight: bold;">struct</span> Overload <span style="color: #555555;">:</span> Ts ... { 
+    <span style="color: #006699; font-weight: bold;">using</span> Ts<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">operator</span>() ...;
+};
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span>class... Ts<span style="color: #555555;">&gt;</span> Overload(Ts...) <span style="color: #555555;">-&gt;</span> Overload<span style="color: #555555;">&lt;</span>Ts...<span style="color: #555555;">&gt;</span>;
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+  
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  
+    std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>variant<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">char</span>, <span style="color: #007788; font-weight: bold;">long</span>, <span style="color: #007788; font-weight: bold;">float</span>, <span style="color: #007788; font-weight: bold;">int</span>, <span style="color: #007788; font-weight: bold;">double</span>, <span style="color: #007788; font-weight: bold;">long</span> <span style="color: #007788; font-weight: bold;">long</span><span style="color: #555555;">&gt;&gt;</span>  <span style="color: #0099ff; font-style: italic;">// (1)    </span>
+               vecVariant <span style="color: #555555;">=</span> {<span style="color: #ff6600;">5</span>, <span style="color: #cc3300;">'2'</span>, <span style="color: #ff6600;">5.4</span>, <span style="color: #ff6600;">100ll</span>, <span style="color: #ff6600;">2011l</span>, <span style="color: #ff6600;">3.5f</span>, <span style="color: #ff6600;">2017</span>};
+
+    <span style="color: #006699; font-weight: bold;">auto</span> TypeOfIntegral <span style="color: #555555;">=</span> Overload {                                      <span style="color: #0099ff; font-style: italic;">// (2)</span>
+        [](<span style="color: #007788; font-weight: bold;">char</span>) { <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc3300;">"char"</span>; },
+        [](<span style="color: #007788; font-weight: bold;">int</span>) { <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc3300;">"int"</span>; },
+        [](<span style="color: #007788; font-weight: bold;">unsigned</span> <span style="color: #007788; font-weight: bold;">int</span>) { <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc3300;">"unsigned int"</span>; },
+        [](<span style="color: #007788; font-weight: bold;">long</span> <span style="color: #007788; font-weight: bold;">int</span>) { <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc3300;">"long int"</span>; },
+        [](<span style="color: #007788; font-weight: bold;">long</span> <span style="color: #007788; font-weight: bold;">long</span> <span style="color: #007788; font-weight: bold;">int</span>) { <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc3300;">"long long int"</span>; },
+        [](<span style="color: #006699; font-weight: bold;">auto</span>) { <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc3300;">"unknown type"</span>; },
+    };
+  
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> v <span style="color: #555555;">:</span> vecVariant) {                                           <span style="color: #0099ff; font-style: italic;">// (3)</span>
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>visit(TypeOfIntegral, v) <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    }
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>variant<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span>, <span style="color: #007788; font-weight: bold;">double</span>, std<span style="color: #555555;">::</span>string<span style="color: #555555;">&gt;&gt;</span>      <span style="color: #0099ff; font-style: italic;">// (4)</span>
+        vecVariant2 <span style="color: #555555;">=</span> { <span style="color: #ff6600;">1.5</span>, std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span>{<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">5</span>}, <span style="color: #cc3300;">"Hello "</span>};
+
+    <span style="color: #006699; font-weight: bold;">auto</span> DisplayMe <span style="color: #555555;">=</span> Overload {                                           <span style="color: #0099ff; font-style: italic;">// (5)</span>
+        [](std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;&amp;</span> myVec) { 
+                <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> v<span style="color: #555555;">:</span> myVec) std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> v <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span>;
+                std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>; 
+            },
+        [](<span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;</span> arg) { std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> arg <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;},
+    };
+
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> v <span style="color: #555555;">:</span> vecVariant2) {                                         <span style="color: #0099ff; font-style: italic;">// (6)</span>
+        std<span style="color: #555555;">::</span>visit(DisplayMe, v);
+    }
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Line (1) creates a vector of variants having integral types and line (4) a vector of variants having a <code>std::vector&lt;int&gt;</code>,<code> double</code>, and a <code>std::string</code>.</p>
+<p>Let me continue with the first variant<code> vecVariant</code>. TypeOfIntegral (2) is an overload set that returns for a few integral types a string representation.If the type is not handled by the overload set, I return the string "<code>unknown type</code>". In line (3), I apply the overload set to each variant<code> v</code> using<code> std::visit</code>.</p>
+<p>The second variant vecVariant2 (4) has composed types. I create an overload set (5) to display their values. In general, I can just push the value onto<code> std:.cout</code>. For the<code> std::vector&lt;int&gt;</code>, I use a range-based for-loop to push its values to<code> std::cout</code>.</p>
+<p>Finally, here is the output of the program.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/VisitingAVariant/visitVariantsOverloadPattern.png" alt="visitVariantsOverloadPattern" width="494" height="417" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>I want to add a few words to the overload pattern used in this example (7). I already introduced in my last post "<a href="https://www.modernescpp.com/index.php/smart-tricks-with-fold-expressions">Smart Tricks with Parameter Packs and Fold Expressions</a>`.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> ... Ts<span style="color: #555555;">&gt;</span>                                  <span style="color: #0099ff; font-style: italic;">// (1)</span>
+<span style="color: #006699; font-weight: bold;">struct</span> Overload <span style="color: #555555;">:</span> Ts ... { 
+    <span style="color: #006699; font-weight: bold;">using</span> Ts<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">operator</span>() ...;
+};
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span>class... Ts<span style="color: #555555;">&gt;</span> Overload(Ts...) <span style="color: #555555;">-&gt;</span> Overload<span style="color: #555555;">&lt;</span>Ts...<span style="color: #555555;">&gt;</span>; <span style="color: #0099ff; font-style: italic;">// (2)</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Line (1) is the overload pattern and line (2) is the deduction guide for it. The struct <code>Overload</code> can have arbitrary many base classes (<code>Ts ...</code>). It derives from each class <code>public</code> and brings the call operator (<code>Ts::operator..</code>.) of each base class into its scope. The base classes need an overloaded call operator (Ts::operator()). Lambdas provide this call operator. The following example is as simple as it can be.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #009999;">#include &lt;variant&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> ... Ts<span style="color: #555555;">&gt;</span>                                                 
+<span style="color: #006699; font-weight: bold;">struct</span> Overload <span style="color: #555555;">:</span> Ts ... { 
+    <span style="color: #006699; font-weight: bold;">using</span> Ts<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">operator</span>() ...;
+};
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span>class... Ts<span style="color: #555555;">&gt;</span> Overload(Ts...) <span style="color: #555555;">-&gt;</span> Overload<span style="color: #555555;">&lt;</span>Ts...<span style="color: #555555;">&gt;</span>;
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+  
+    std<span style="color: #555555;">::</span>variant<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">char</span>, <span style="color: #007788; font-weight: bold;">int</span>, <span style="color: #007788; font-weight: bold;">float</span><span style="color: #555555;">&gt;</span> var <span style="color: #555555;">=</span> <span style="color: #ff6600;">2017</span>;
+
+    <span style="color: #006699; font-weight: bold;">auto</span> TypeOfIntegral <span style="color: #555555;">=</span> Overload {    <em><span style="color: #0099ff;"> // (1) </span></em>                                 
+        [](<span style="color: #007788; font-weight: bold;">char</span>) { <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc3300;">"char"</span>; },
+        [](<span style="color: #007788; font-weight: bold;">int</span>) { <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc3300;">"int"</span>; },
+        [](<span style="color: #006699; font-weight: bold;">auto</span>) { <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc3300;">"unknown type"</span>; },
+    };
+  
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Using this<a href="https://cppinsights.io/s/70167530"> example in C++ Insights</a> make the magic transparent. First, call (1) causes the creation of a fully specialized class template.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/VisitingAVariant/OverloadPatternInstantiated.png" alt="OverloadPatternInstantiated" width="650" height="235" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>Second, the used lambdas in the overload pattern such as<code> [](char) { return "char"; }</code> causes the creation of a function object. In this case, the compiler gives the function object the name<code> __lambda_15_9</code>.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/VisitingAVariant/lambdaChar.png" alt="lambdaChar" width="668" height="447" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>Studying the auto-generate types show at least one interesting point. The call operator of __lambda_15_9 is overloaded for<code> char: const char * operator() (char) const { return "char"; }</code></p>
+<p>The deduction guide (<code>template&lt;class... Ts&gt; Overload(Ts...) -&gt; Overload&lt;Ts...&gt;;</code>) (line 2) is only needed for C++17. The deduction guide tells the compiler how to create out-of-constructor arguments template parameters. C++20 can automatically deduce the template.&nbsp;</p>
+<h2>What's next?</h2>
+<p>The friendship of templates is special. In my next post, I explain why.</p>
+<p>&nbsp;</p>
+<p>{loadmoduleid 153}</p>
+<div id="simple-translate">
+<div>
+<div class="simple-translate-button isShow" style="background-image: url('moz-extension://981aa874-2db4-44d3-a97f-b02a72476831/icons/512.png'); height: 22px; width: 22px; top: 213px; left: 511px;">&nbsp;</div>
+<div class="simple-translate-panel" style="width: 300px; height: 200px; top: 0px; left: 0px; font-size: 13px; background-color: #ffffff;">
+<div class="simple-translate-result-wrapper" style="overflow: hidden;">
+<div class="simple-translate-move" draggable="draggable">&nbsp;</div>
+<div class="simple-translate-result-contents">
+<p class="simple-translate-result" dir="auto" style="color: #000000;">&nbsp;</p>
+<p class="simple-translate-candidate" dir="auto" style="color: #737373;">&nbsp;</p>
+</div>
+</div>
+</div>
+</div>
+</div>
