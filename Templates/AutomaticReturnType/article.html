@@ -1,0 +1,227 @@
+<p>Depending on the used C++ standard, there are different ways to return the right return type of a function template. In this post, I start with traits (C++98), continue in my next post with C++11/14, and end with concepts (C++20).</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/Templates/AutomaticReturnType/AutomaticReturnType.png" alt="AutomaticReturnType" width="650" height="398" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>Here is the challenge for today's post.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T, <span style="color: #006699; font-weight: bold;">typename</span> T2<span style="color: #555555;">&gt;</span>
+<span style="color: #555555;">???</span> sum(T t, T2 t2) {
+    <span style="color: #006699; font-weight: bold;">return</span> t <span style="color: #555555;">+</span> t2;
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>When you have a function template such as <code>sum</code> with at least two type parameters, you can not decide in general the return type of the function. Of course, sum&nbsp;should return the type the arithmetic operation<code> t + t2 </code>provides. Here are a few examples using <a href="https://en.wikipedia.org/wiki/Run-time_type_information">run-time type information (RTTI)</a> with <code>std::type_info.</code></p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// typeinfo.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;typeinfo&gt;</span>
+ 
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+	
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+ 
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"typeid(5.5 + 5.5).name(): "</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #006699; font-weight: bold;">typeid</span>(<span style="color: #ff6600;">5.5</span> <span style="color: #555555;">+</span> <span style="color: #ff6600;">5.5</span>).name() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"typeid(5.5 + true).name(): "</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #006699; font-weight: bold;">typeid</span>(<span style="color: #ff6600;">5.5</span> <span style="color: #555555;">+</span> <span style="color: #336666;">true</span>).name() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"typeid(true + 5.5).name(): "</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #006699; font-weight: bold;">typeid</span>(<span style="color: #336666;">true</span> <span style="color: #555555;">+</span> <span style="color: #ff6600;">5.5</span>).name() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"typeid(true + false).name(): "</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #006699; font-weight: bold;">typeid</span>(<span style="color: #336666;">true</span> <span style="color: #555555;">+</span> <span style="color: #336666;">false</span>).name() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>I executed the program on Windows using MSVC, because MSVC produces in contrast to GCC or Clang human-readable names.</p>
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/Templates/AutomaticReturnType/typeinfo.png" alt="typeinfo" width="351" height="189" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>Adding two <code>double</code>s returns a <code>double</code>, adding a <code>double</code> and a <code>bool</code> returns a <code>bool</code>, and adding two <code>bool</code>s returns an <code>int</code>.</p>
+<p>I use in my examples only<a href="https://en.cppreference.com/w/c/language/arithmetic_types"> arithmetic types</a>. If you want to apply my examples to user-defined that support arithmetic operations, you must extend my solutions.</p>
+<p>Now, my journey starts with C++98.</p>
+<h2>C++98</h2>
+<p>Honestly, C++98 provides no general solution for returning the right type. Essentially, you must implement the type-deduction rules using a technique called<a href="https://accu.org/journals/overload/9/43/frogley_442/"> traits</a> also know as template traits. A traits class provides useful information about template parameters and can be used instead of the template parameters.</p>
+<p>The following class <code>ResultType</code> provides a type-to-type mapping using full template specialization.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// traits.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;typeinfo&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T, <span style="color: #006699; font-weight: bold;">typename</span> T2<span style="color: #555555;">&gt;</span> <span style="color: #0099ff; font-style: italic;">// primary template (1)</span>
+<span style="color: #006699; font-weight: bold;">struct</span> ReturnType;       
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;&gt;</span>  <span style="color: #0099ff; font-style: italic;">// full specialization for double, double</span>
+<span style="color: #006699; font-weight: bold;">struct</span> ReturnType <span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">double</span>, <span style="color: #007788; font-weight: bold;">double</span><span style="color: #555555;">&gt;</span> {
+    <span style="color: #006699; font-weight: bold;">typedef</span> <span style="color: #007788; font-weight: bold;">double</span> Type;
+};
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;&gt;</span> <span style="color: #0099ff; font-style: italic;">//  full specialization for double, bool</span>
+<span style="color: #006699; font-weight: bold;">struct</span> ReturnType <span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">double</span>, <span style="color: #007788; font-weight: bold;">bool</span><span style="color: #555555;">&gt;</span> {
+    <span style="color: #006699; font-weight: bold;">typedef</span> <span style="color: #007788; font-weight: bold;">double</span> Type;        <span style="color: #0099ff;"> // (2)</span>
+};
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;&gt;</span> <span style="color: #0099ff; font-style: italic;">// full specialization for bool, double</span>
+<span style="color: #006699; font-weight: bold;">struct</span> ReturnType <span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">bool</span>, <span style="color: #007788; font-weight: bold;">double</span><span style="color: #555555;">&gt;</span> {
+    <span style="color: #006699; font-weight: bold;">typedef</span> <span style="color: #007788; font-weight: bold;">double</span> Type;
+};
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;&gt;</span> <span style="color: #0099ff; font-style: italic;">// full specialization for bool, bool</span>
+<span style="color: #006699; font-weight: bold;">struct</span> ReturnType <span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">bool</span>, <span style="color: #007788; font-weight: bold;">bool</span><span style="color: #555555;">&gt;</span> {
+    <span style="color: #006699; font-weight: bold;">typedef</span> <span style="color: #007788; font-weight: bold;">int</span> Type;
+};
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T, <span style="color: #006699; font-weight: bold;">typename</span> T2<span style="color: #555555;">&gt;</span>  
+<span style="color: #006699; font-weight: bold;">typename</span> ReturnType<span style="color: #555555;">&lt;</span>T, T2<span style="color: #555555;">&gt;::</span>Type sum(T t, T2 t2) {  <span style="color: #0099ff;"> // (3)</span>
+    <span style="color: #006699; font-weight: bold;">return</span> t <span style="color: #555555;">+</span> t2;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"typeid(sum(5.5, 5.5)).name(): "</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #006699; font-weight: bold;">typeid</span>(sum(<span style="color: #ff6600;">5.5</span>, <span style="color: #ff6600;">5.5</span>)).name() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"typeid(sum(5.5, true)).name(): "</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #006699; font-weight: bold;">typeid</span>(sum(<span style="color: #ff6600;">5.5</span>, <span style="color: #336666;">true</span>)).name() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"typeid(sum(true, 5.5)).name(): "</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #006699; font-weight: bold;">typeid</span>(sum(<span style="color: #336666;">true</span>, <span style="color: #ff6600;">5.5</span>)).name() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"typeid(sum(true, false)).name(): "</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #006699; font-weight: bold;">typeid</span>(sum(<span style="color: #336666;">true</span>, <span style="color: #336666;">false</span>)).name() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Line (1) is the primary template or general template. The primary template has to be declared before the following full specializations. If the primary template is not needed, a declaration such as in line 1 is fine. The following lines provide the full specializations for <code>&lt;double, double&gt;</code> , for <code>&lt;double, bool&gt;</code>, for<code> &lt;bool, double&gt;</code>, and for<code> &lt;bool, bool&gt;</code>. You can read more details about template specialization in my previous posts:</p>
+<ul>
+<li><a href="https://www.modernescpp.com/index.php/template-specialization">Template Specialization</a></li>
+<li><a href="https://www.modernescpp.com/index.php/template-specialization-more-details">Template Specialization - More Details about Class Templates</a></li>
+<li><a href="https://www.modernescpp.com/index.php/full-specialization-of-function-templates">Full Specialization of Function Templates</a></li>
+</ul>
+<p>The critical observation in the various full specializations of <code>ReturnType</code> is that they all have an alias <code>Type</code> such as<code> typedef double Type</code> (line 2). This alias is the return type of the function template <code>sum</code> (line 3): <code>typename ReturnType&lt;T, T2&gt;::type</code>.</p>
+<p>The traits work as expected.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/AutomaticReturnType/traits.png" alt="traits" width="532" height="189" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>&nbsp;</p>
+<p>You may be wondering why I used <code>typename</code> in the return type expression of the function template<code> sum</code>. At least one reader of my previous post about <code>Dependent Names</code> asked me when to apply <code>typename</code> or <code>.template </code>to templates.<code> </code><code></code> The short answer is that the compiler can not decide if the expression<code> ReturnType<span style="color: #555555;">&lt;</span>T, T2<span style="color: #555555;">&gt;::</span>Type </code>is a type (such as in this case), a non-type, or a template. Using <code>typename</code> before <code>ReturnType&lt;T, T2&gt;::Type</code> gives the compiler the crucial hint. You can read the long answer in my previous post <a href="https://www.modernescpp.com/index.php/dependent-types">Dependent Names</a>.</p>
+<h3>Missing Overload</h3>
+<p>Originally, I wanted to continue my post and write about C++11 but I assume you have an additional question: What happens when I invoke the function template <code>sum</code> with arguments for which not partial template specialization is defined? Let me try it out with<code> sum(5.5f, 5)</code>.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// traitsError.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;typeinfo&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T, <span style="color: #006699; font-weight: bold;">typename</span> T2<span style="color: #555555;">&gt;</span> <span style="color: #0099ff; font-style: italic;">// primary template</span>
+<span style="color: #006699; font-weight: bold;">struct</span> ReturnType;       
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;&gt;</span>  <span style="color: #0099ff; font-style: italic;">// full specialization for double, double</span>
+<span style="color: #006699; font-weight: bold;">struct</span> ReturnType <span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">double</span>, <span style="color: #007788; font-weight: bold;">double</span><span style="color: #555555;">&gt;</span> {
+    <span style="color: #006699; font-weight: bold;">typedef</span> <span style="color: #007788; font-weight: bold;">double</span> Type;
+};
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;&gt;</span> <span style="color: #0099ff; font-style: italic;">//  full specialization for double, bool</span>
+<span style="color: #006699; font-weight: bold;">struct</span> ReturnType <span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">double</span>, <span style="color: #007788; font-weight: bold;">bool</span><span style="color: #555555;">&gt;</span> {
+    <span style="color: #006699; font-weight: bold;">typedef</span> <span style="color: #007788; font-weight: bold;">double</span> Type;
+};
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;&gt;</span> <span style="color: #0099ff; font-style: italic;">// full specialization for bool, double</span>
+<span style="color: #006699; font-weight: bold;">struct</span> ReturnType <span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">bool</span>, <span style="color: #007788; font-weight: bold;">double</span><span style="color: #555555;">&gt;</span> {
+    <span style="color: #006699; font-weight: bold;">typedef</span> <span style="color: #007788; font-weight: bold;">double</span> Type;
+};
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;&gt;</span> <span style="color: #0099ff; font-style: italic;">// full specialization for bool, bool</span>
+<span style="color: #006699; font-weight: bold;">struct</span> ReturnType <span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">bool</span>, <span style="color: #007788; font-weight: bold;">bool</span><span style="color: #555555;">&gt;</span> {
+    <span style="color: #006699; font-weight: bold;">typedef</span> <span style="color: #007788; font-weight: bold;">int</span> Type;
+};
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T, <span style="color: #006699; font-weight: bold;">typename</span> T2<span style="color: #555555;">&gt;</span>  
+<span style="color: #006699; font-weight: bold;">typename</span> ReturnType<span style="color: #555555;">&lt;</span>T, T2<span style="color: #555555;">&gt;::</span>Type sum(T t, T2 t2) {
+    <span style="color: #006699; font-weight: bold;">return</span> t <span style="color: #555555;">+</span> t2;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"typeid(sum(5.5f, 5.5)).name(): "</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #006699; font-weight: bold;">typeid</span>(sum(<span style="color: #ff6600;">5.5f</span>, <span style="color: #ff6600;">5.5</span>)).name() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Many C++ programmers expect that the float value <code>5.5f</code> is converted to an <code>double</code> and the full specialization for <code>&lt;double, double&gt;</code> is used.&nbsp;</p>
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/Templates/AutomaticReturnType/traitsError.png" alt="traitsError" width="650" height="195" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>&nbsp;</p>
+<p>NO! The types must match exactly. The MSVC compiler gives an exact error message. There is no overload <code>sum</code> for<code> T = float</code> and<code> T2 = double</code> available. The primary template is not defined and can, therefore, not be instantiated.</p>
+<p><strong>Types do not convert, only expressions such as values can be converted: <code>double res&nbsp; = 5.5f + 5.5</code>;</strong></p>
+<h3>Default Return Type</h3>
+<p>When you make out of the declaration of the primary template a definition, the primary template becomes the default case. Consequently, the following implementation of <code>ReturnType</code> uses<code> long double</code> as the default return type.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// traitsDefault.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;typeinfo&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T, <span style="color: #006699; font-weight: bold;">typename</span> T2<span style="color: #555555;">&gt;</span> <span style="color: #0099ff; font-style: italic;">// primary template</span>
+<span style="color: #006699; font-weight: bold;">struct</span> ReturnType {
+    <span style="color: #006699; font-weight: bold;">typedef</span> <span style="color: #007788; font-weight: bold;">long</span> <span style="color: #007788; font-weight: bold;">double</span> Type;    <em> <span style="color: #0099ff;"></span></em>
+};
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;&gt;</span>  <span style="color: #0099ff; font-style: italic;">// full specialization for double, double</span>
+<span style="color: #006699; font-weight: bold;">struct</span> ReturnType <span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">double</span>, <span style="color: #007788; font-weight: bold;">double</span><span style="color: #555555;">&gt;</span> {
+    <span style="color: #006699; font-weight: bold;">typedef</span> <span style="color: #007788; font-weight: bold;">double</span> Type;
+};
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;&gt;</span> <span style="color: #0099ff; font-style: italic;">//  full specialization for double, bool</span>
+<span style="color: #006699; font-weight: bold;">struct</span> ReturnType <span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">double</span>, <span style="color: #007788; font-weight: bold;">bool</span><span style="color: #555555;">&gt;</span> {
+    <span style="color: #006699; font-weight: bold;">typedef</span> <span style="color: #007788; font-weight: bold;">double</span> Type;
+};
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;&gt;</span> <span style="color: #0099ff; font-style: italic;">// full specialization for bool, double</span>
+<span style="color: #006699; font-weight: bold;">struct</span> ReturnType <span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">bool</span>, <span style="color: #007788; font-weight: bold;">double</span><span style="color: #555555;">&gt;</span> {
+    <span style="color: #006699; font-weight: bold;">typedef</span> <span style="color: #007788; font-weight: bold;">double</span> Type;
+};
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;&gt;</span> <span style="color: #0099ff; font-style: italic;">// full specialization for bool, bool</span>
+<span style="color: #006699; font-weight: bold;">struct</span> ReturnType <span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">bool</span>, <span style="color: #007788; font-weight: bold;">bool</span><span style="color: #555555;">&gt;</span> {
+    <span style="color: #006699; font-weight: bold;">typedef</span> <span style="color: #007788; font-weight: bold;">int</span> Type;
+};
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T, <span style="color: #006699; font-weight: bold;">typename</span> T2<span style="color: #555555;">&gt;</span>  
+<span style="color: #006699; font-weight: bold;">typename</span> ReturnType<span style="color: #555555;">&lt;</span>T, T2<span style="color: #555555;">&gt;::</span>Type sum(T t, T2 t2) {
+    <span style="color: #006699; font-weight: bold;">return</span> t <span style="color: #555555;">+</span> t2;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"typeid(sum(5.5, 5.5)).name(): "</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #006699; font-weight: bold;">typeid</span>(sum(<span style="color: #ff6600;">5.5</span>, <span style="color: #ff6600;">5.5</span>)).name() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"typeid(sum(5.5, true)).name(): "</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #006699; font-weight: bold;">typeid</span>(sum(<span style="color: #ff6600;">5.5</span>, <span style="color: #336666;">true</span>)).name() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"typeid(sum(true, 5.5)).name(): "</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #006699; font-weight: bold;">typeid</span>(sum(<span style="color: #336666;">true</span>, <span style="color: #ff6600;">5.5</span>)).name() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"typeid(sum(true, false)).name(): "</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #006699; font-weight: bold;">typeid</span>(sum(<span style="color: #336666;">true</span>, <span style="color: #336666;">false</span>)).name() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"typeid(sum(5.5f, 5.5)).name(): "</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #006699; font-weight: bold;">typeid</span>(sum(<span style="color: #ff6600;">5.5f</span>, <span style="color: #ff6600;">5.5</span>)).name() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The invocation of<code> sum(5.5f, 5.f)</code> causes the instantiation of the primary template.</p>
+<p>&nbsp;</p>
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/Templates/AutomaticReturnType/traitsDefault.png" alt="traitsDefault" width="458" height="217" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<h3>What's next?</h3>
+<p>In C++11, there are various ways to automatically deduce the return type. C++14 adds syntactic sugar to these techniques, and C++20 enables it to write it very explicitly. Read more about the improvements in my next post.</p>
+<p>&nbsp;</p>
+<p>{loadmoduleid 153}</p>
