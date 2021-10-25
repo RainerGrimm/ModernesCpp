@@ -1,0 +1,177 @@
+<p>I started my discussion about the&nbsp; "<a href="https://www.modernescpp.com/index.php/automatic-return-type">Automatic Return Type (C++98)</a>" in my last post. Today, I'm faced with the same challenge but solve it with C++11, C++14, and C++20.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/Templates/AutomaticReturnType2/AutomaticReturnType.png" alt="AutomaticReturnType" width="650" height="398" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>To remind you: Here is the challenge I want to solve.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T, <span style="color: #006699; font-weight: bold;">typename</span> T2<span style="color: #555555;">&gt;</span>
+<span style="color: #555555;">???</span> sum(T t, T2 t2) {
+    <span style="color: #006699; font-weight: bold;">return</span> t <span style="color: #555555;">+</span> t2;
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>When you have a function template <code></code>with at least two type parameters, you can not decide in general the return type of the function. Of course, <code>sum&nbsp;</code>should return the type the arithmetic operation<code> t + t2 </code>returns.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #006699; font-weight: bold;">typeid</span>(<span style="color: #ff6600;">5.5</span> <span style="color: #555555;">+</span> <span style="color: #ff6600;">5.5</span>).name();    <span style="color: #0099ff; font-style: italic;">// double</span>
+std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #006699; font-weight: bold;">typeid</span>(<span style="color: #ff6600;">5.5</span> <span style="color: #555555;">+</span> <span style="color: #336666;">true</span>).name();   <span style="color: #0099ff; font-style: italic;">// double</span>
+std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #006699; font-weight: bold;">typeid</span>(<span style="color: #336666;">true</span> <span style="color: #555555;">+</span> <span style="color: #ff6600;">5.5</span>).name();   <span style="color: #0099ff; font-style: italic;">// double</span>
+std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #006699; font-weight: bold;">typeid</span>(<span style="color: #336666;">true</span> <span style="color: #555555;">+</span> <span style="color: #336666;">false</span>).name(); <span style="color: #0099ff; font-style: italic;">// int</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>When you want to read the full story, read my previous post "<a href="https://www.modernescpp.com/index.php/automatic-return-type">Automatic Return Type (C++98)</a>". Now, I jump to C++11.</p>
+<h2>C++11</h2>
+<p>In C++11, there are essentially two ways to solve this issue: type-traits or <code>auto</code> combination with <code>decltype</code>.</p>
+<h3>Type-Traits</h3>
+<p>The Type-traits library has the function <a href="https://en.cppreference.com/w/cpp/types/common_type"><code>std::common_type</code></a>. This function determines at compile time the common type of an arbitrary number of types. The common type is that type among all types to which all types can be implicitly be converted. If this type is not available, you get a compile-time error.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// automaticReturnTypeTypeTraits.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;typeinfo&gt;</span>
+<span style="color: #009999;">#include &lt;type_traits&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T, <span style="color: #006699; font-weight: bold;">typename</span> T2<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">typename</span> std<span style="color: #555555;">::</span>common_type<span style="color: #555555;">&lt;</span>T, T2<span style="color: #555555;">&gt;::</span>type sum(T t, T2 t2) {
+    <span style="color: #006699; font-weight: bold;">return</span> t <span style="color: #555555;">+</span> t2;
+}
+
+
+<span style="color: #007788; font-weight: bold;">int</span> main() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #006699; font-weight: bold;">typeid</span>(sum(<span style="color: #ff6600;">5.5</span>, <span style="color: #ff6600;">5.5</span>)).name() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;     <span style="color: #0099ff; font-style: italic;">// double</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #006699; font-weight: bold;">typeid</span>(sum(<span style="color: #ff6600;">5.5</span>, <span style="color: #336666;">true</span>)).name() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;    <span style="color: #0099ff; font-style: italic;">// double</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #006699; font-weight: bold;">typeid</span>(sum(<span style="color: #336666;">true</span>, <span style="color: #ff6600;">5.5</span>)).name() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;    <span style="color: #0099ff; font-style: italic;">// double</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #006699; font-weight: bold;">typeid</span>(sum(<span style="color: #336666;">true</span>, <span style="color: #336666;">false</span>)).name() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;  <span style="color: #0099ff; font-style: italic;">// bool</span>
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>For simplicity reasons, I display the string representation of the type in the source code. I used the MSVC compiler. The GCC or Clang compiler would return single characters such as d for <code>double</code> and b for bool.</p>
+<p>There is one subtle difference between<code> std::common_type</code> and all other variants I presented in the last post and this post: <code>std::common_type</code> returns the common type, but my traits solution in the last post "<a href="https://www.modernescpp.com/index.php/automatic-return-type">Automatic Return Type (C++98)</a>" and the solutions based on <code>auto </code>in this post returns the type to which the expression<code> t + t2</code> evaluates to.</p>
+<h3><code>auto</code> in Combination with <code>decltype</code></h3>
+<p>Using <code>auto</code> to deduce the return type of a function in C++11 is way too verbose.</p>
+<p>First, you have to use the so-called trailing return type and second, you have to specify the return type in a <code>decltype</code> expression.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// automaticReturnTypeTypeAutoDecltype.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;typeinfo&gt;</span>
+<span style="color: #009999;">#include &lt;type_traits&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T, <span style="color: #006699; font-weight: bold;">typename</span> T2<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">auto</span> sum(T t, T2 t2) <span style="color: #555555;">-&gt;</span> decltype(t <span style="color: #555555;">+</span> t2) {
+    <span style="color: #006699; font-weight: bold;">return</span> t <span style="color: #555555;">+</span> t2;
+}
+
+
+<span style="color: #007788; font-weight: bold;">int</span> main() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #006699; font-weight: bold;">typeid</span>(sum(<span style="color: #ff6600;">5.5</span>, <span style="color: #ff6600;">5.5</span>)).name() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;     <span style="color: #0099ff; font-style: italic;">// double</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #006699; font-weight: bold;">typeid</span>(sum(<span style="color: #ff6600;">5.5</span>, <span style="color: #336666;">true</span>)).name() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;    <span style="color: #0099ff; font-style: italic;">// double</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #006699; font-weight: bold;">typeid</span>(sum(<span style="color: #336666;">true</span>, <span style="color: #ff6600;">5.5</span>)).name() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;    <span style="color: #0099ff; font-style: italic;">// double</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #006699; font-weight: bold;">typeid</span>(sum(<span style="color: #336666;">true</span>, <span style="color: #336666;">false</span>)).name() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;  <span style="color: #0099ff; font-style: italic;">// int</span>
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>&nbsp;You have to read the expression <code>auto sum(T t, T2 t2)&nbsp; -&gt; decltype(t + t2)</code> in the following way. You express with <code>auto</code> that you don't know the type and promise that you specify the type later. This specification happens in the decltype expression: decltype(t + t2). The return type of the function template <code>sum</code> is that type to which the arithmetic expression evaluates. Here is what I don't like about this C++11 syntax: You have to use two times the same expression<code> t + t2</code>. This is error-prone and redundant. The trailing return type syntax is in general optional but required for automatic return type deduction in C++11 and lambdas.</p>
+<p>Let's see if C++14 simplifies the use of the automatic return type.</p>
+<h2>C++14</h2>
+<p>With C++14, we got the convenient syntax for automatic return type deduction without redundancy.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// automaticReturnTypeTypeAuto.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;typeinfo&gt;</span>
+<span style="color: #009999;">#include &lt;type_traits&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T, <span style="color: #006699; font-weight: bold;">typename</span> T2<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">auto</span> sum(T t, T2 t2) {
+    <span style="color: #006699; font-weight: bold;">return</span> t <span style="color: #555555;">+</span> t2;
+}
+
+
+<span style="color: #007788; font-weight: bold;">int</span> main() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #006699; font-weight: bold;">typeid</span>(sum(<span style="color: #ff6600;">5.5</span>, <span style="color: #ff6600;">5.5</span>)).name() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;     <span style="color: #0099ff; font-style: italic;">// double</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #006699; font-weight: bold;">typeid</span>(sum(<span style="color: #ff6600;">5.5</span>, <span style="color: #336666;">true</span>)).name() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;    <span style="color: #0099ff; font-style: italic;">// double</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #006699; font-weight: bold;">typeid</span>(sum(<span style="color: #336666;">true</span>, <span style="color: #ff6600;">5.5</span>)).name() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;    <span style="color: #0099ff; font-style: italic;">// double</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #006699; font-weight: bold;">typeid</span>(sum(<span style="color: #336666;">true</span>, <span style="color: #336666;">false</span>)).name() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;  <span style="color: #0099ff; font-style: italic;">// int</span>
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>In C++14, you can just use <code>auto</code> as return type.</p>
+<p>Let's make the last jump to C++20.</p>
+<h2>C++20</h2>
+<p>In C++20, you should use instead of an unconstrained placeholder a constrained placeholder aka concept. Defining and using the concept <code>Arithmetic</code> expresses explicitly my intent. Only <a href="https://en.cppreference.com/w/c/language/arithmetic_types">arithmetic</a> types are allowed in the function template <code>sum</code>.</p>
+<p><code></code></p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// automaticReturnTypeTypeConcepts.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;typeinfo&gt;</span>
+<span style="color: #009999;">#include &lt;type_traits&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+concept Arithmetic <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>is_arithmetic<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value;
+
+Arithmetic <span style="color: #006699; font-weight: bold;">auto</span> <span style="color: #cc00ff;">sum</span>(Arithmetic <span style="color: #006699; font-weight: bold;">auto</span> t, Arithmetic <span style="color: #006699; font-weight: bold;">auto</span> t2) {
+    <span style="color: #006699; font-weight: bold;">return</span> t <span style="color: #555555;">+</span> t2;
+}
+
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #006699; font-weight: bold;">typeid</span>(sum(<span style="color: #ff6600;">5.5</span>, <span style="color: #ff6600;">5.5</span>)).name() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;     <span style="color: #0099ff; font-style: italic;">// double</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #006699; font-weight: bold;">typeid</span>(sum(<span style="color: #ff6600;">5.5</span>, <span style="color: #336666;">true</span>)).name() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;    <span style="color: #0099ff; font-style: italic;">// double</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #006699; font-weight: bold;">typeid</span>(sum(<span style="color: #336666;">true</span>, <span style="color: #ff6600;">5.5</span>)).name() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;    <span style="color: #0099ff; font-style: italic;">// double</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #006699; font-weight: bold;">typeid</span>(sum(<span style="color: #336666;">true</span>, <span style="color: #336666;">false</span>)).name() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;  <span style="color: #0099ff; font-style: italic;">// int</span>
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>I'm defining the concept <code>Arithmetic</code> by directly using the type-traits function <a href="https://en.cppreference.com/w/cpp/types/is_arithmetic"><code>std::is_arithmetic</code></a>. The function <code>std::is_arithmetic</code> is a so-called compile-time predicate. A compile-time function is a function, that returns at compile-time a <code>boolean</code>.</p>
+<p>In case you want to read more about concepts, read my previous posts about <a href="https://www.modernescpp.com/index.php/tag/concepts">concepts</a>.</p>
+<h2>What's next?</h2>
+<p>Template metaprogramming or programming at compile time using templates is a very powerful C++ technique with a bad reputation. The functions of the type-traits library such as <code>std::common_type</code> or<code> std::is_arithmetic</code> are examples of template metaprogramming in C++. In my next post, I elaborate more on template metaprogramming.</p>
+<h2>C++20 Training for Meeting C++</h2>
+<p>Next Tuesday (02.11.2021), I give a <a href="https://meetingcpp.com/mcpp/training/trainingslisting.php?tid=25">one-day training about the big four in C++20</a> (Concepts, Ranges, Modules, and Coroutines). When you book my training, you will also get a coupon for my <a href="https://leanpub.com/c20">C++20 book</a>.</p>
+<p>&nbsp;</p>
+<p>I'm happy to see you,</p>
+<p><img src="https://www.modernescpp.com/images/signatur/RainerGrimmSmall.png" alt="RainerGrimmSmall" width="222" height="66" style="float: left;" /></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>{loadmoduleid 153}</p>
