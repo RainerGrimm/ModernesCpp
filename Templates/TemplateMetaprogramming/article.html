@@ -1,0 +1,98 @@
+<p>Metaprogramming is programming at compile-time. It started in C++98 with template metaprogramming, was formalized in C++11 with the type-traits library, and since C++11 has steadily improved. The main driving force is constant expressions. In this post, I want to write about its roots.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/Templates/TemplateMetaprogramming/TemplateMetaprogramming.png" alt="TemplateMetaprogramming" width="650" height="403" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>My intention to write about template metaprogramming is that I want to demystify its techniques. This demystification helps you to better understand the functions of the <a href="https://en.cppreference.com/w/cpp/header/type_traits">type-traits library</a> and, in particular, appreciate <code>constexpr</code>. Most of the bad reputation of template metaprogramming is that you may get error messages of epic length. Template metaprogramming was not designed, it started with an accident.</p>
+<h2>The Accident</h2>
+<p>In 1994, <a href="http://www.erwin-unruh.de/primorig.html">Erwin Unruh</a> from Siemens presented at a C++ committee meeting a program that didn't compile. Here is probably the most famous program that never compiled successfully.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// Prime number computation by Erwin Unruh</span>
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span> i<span style="color: #555555;">&gt;</span> <span style="color: #006699; font-weight: bold;">struct</span> D { D(<span style="color: #007788; font-weight: bold;">void</span><span style="color: #555555;">*</span>); <span style="color: #006699; font-weight: bold;">operator</span> <span style="color: #cc00ff;">int</span>(); };
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span> p, <span style="color: #007788; font-weight: bold;">int</span> i<span style="color: #555555;">&gt;</span> <span style="color: #006699; font-weight: bold;">struct</span> is_prime {
+    <span style="color: #006699; font-weight: bold;">enum</span> { prim <span style="color: #555555;">=</span> (p<span style="color: #555555;">%</span>i) <span style="color: #555555;">&amp;&amp;</span> is_prime<span style="color: #555555;">&lt;</span>(i <span style="color: #555555;">&gt;</span> <span style="color: #ff6600;">2</span> <span style="color: #555555;">?</span> p <span style="color: #555555;">:</span> <span style="color: #ff6600;">0</span>), i <span style="color: #555555;">-</span><span style="color: #ff6600;">1</span><span style="color: #555555;">&gt;</span> <span style="color: #555555;">::</span> prim };
+    };
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span> <span style="color: #007788; font-weight: bold;">int</span> i <span style="color: #555555;">&gt;</span> <span style="color: #006699; font-weight: bold;">struct</span> Prime_print {
+    Prime_print<span style="color: #555555;">&lt;</span>i<span style="color: #555555;">-</span><span style="color: #ff6600;">1</span><span style="color: #555555;">&gt;</span> a;
+    <span style="color: #006699; font-weight: bold;">enum</span> { prim <span style="color: #555555;">=</span> is_prime<span style="color: #555555;">&lt;</span>i, i<span style="color: #555555;">-</span><span style="color: #ff6600;">1</span><span style="color: #555555;">&gt;::</span>prim };
+    <span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">f</span>() { D<span style="color: #555555;">&lt;</span>i<span style="color: #555555;">&gt;</span> d <span style="color: #555555;">=</span> prim; }
+    };
+
+<span style="color: #006699; font-weight: bold;">struct</span> is_prime<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">0</span>,<span style="color: #ff6600;">0</span><span style="color: #555555;">&gt;</span> { <span style="color: #006699; font-weight: bold;">enum</span> {prim<span style="color: #555555;">=</span><span style="color: #ff6600;">1</span>}; };
+<span style="color: #006699; font-weight: bold;">struct</span> is_prime<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">0</span>,<span style="color: #ff6600;">1</span><span style="color: #555555;">&gt;</span> { <span style="color: #006699; font-weight: bold;">enum</span> {prim<span style="color: #555555;">=</span><span style="color: #ff6600;">1</span>}; };
+<span style="color: #006699; font-weight: bold;">struct</span> Prime_print<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">2</span><span style="color: #555555;">&gt;</span> { <span style="color: #006699; font-weight: bold;">enum</span> {prim <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span>}; <span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">f</span>() { D<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">2</span><span style="color: #555555;">&gt;</span> d <span style="color: #555555;">=</span> prim; } };
+<span style="color: #009999;">#ifndef LAST</span>
+<span style="color: #009999;">#define LAST 10</span>
+<span style="color: #009999;">#endif</span>
+main () {
+    Prime_print<span style="color: #555555;">&lt;</span>LAST<span style="color: #555555;">&gt;</span> a;
+    } 
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Erwin Unruh used the Metaware Compilers, but the program is not valid for C++ anymore. A newer variant from the author is <a href="http://www.erwin-unruh.de/prim.html">here</a>. Okay, why is this program so famous? Let's have a look at the original error messages that wrote type as txpe.</p>
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/ModernCpp/CppCoreGuidelinesTemplateMetaprogramming/prim.PNG" alt="prim" width="500" height="182" /></p>
+<p>I highlighted the important parts in red. I think, you see the pattern. The program calculates at compile time the first prime numbers until 30. This means template instantiation can be used to do math at compile time. It is even better. Template metaprogramming is <a href="https://en.wikipedia.org/wiki/Turing_completeness">Turing-complete</a>, and can, therefore, be used to solve any computational problem. (Of course, Turing-completeness holds only in theory for template metaprogramming because the recursion instantiation depth (at least 1024 with C++11) and the length of the names which are generated during template instantiation provide some limitations.)</p>
+<h3>How does the magic work?</h3>
+<p>Let me decompose what is going on step by step.</p>
+<h4>Calculating at Compile Time</h4>
+<p>Calculating the factorial of a number is the "Hello World" of template metaprogramming.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// factorial.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span> N<span style="color: #555555;">&gt;</span>                                                                 <span style="color: #0099ff; font-style: italic;">// (2)</span>
+<span style="color: #006699; font-weight: bold;">struct</span> Factorial{
+    <span style="color: #006699; font-weight: bold;">static</span> <span style="color: #007788; font-weight: bold;">int</span> <span style="color: #006699; font-weight: bold;">const</span> value <span style="color: #555555;">=</span> N <span style="color: #555555;">*</span> Factorial<span style="color: #555555;">&lt;</span>N<span style="color: #555555;">-</span><span style="color: #ff6600;">1</span><span style="color: #555555;">&gt;::</span>value;
+};
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;&gt;</span>                                                                      <span style="color: #0099ff; font-style: italic;">// (3)</span>
+<span style="color: #006699; font-weight: bold;">struct</span> Factorial<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">1</span><span style="color: #555555;">&gt;</span>{
+    <span style="color: #006699; font-weight: bold;">static</span> <span style="color: #007788; font-weight: bold;">int</span> <span style="color: #006699; font-weight: bold;">const</span> value <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span>;
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> '\n';
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Factorial&lt;5&gt;::value: "</span> <span style="color: #555555;">&lt;&lt;</span> Factorial<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">5</span><span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> '\n'<span style="color: #555555;"></span>;    <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Factorial&lt;10&gt;::value: "</span> <span style="color: #555555;">&lt;&lt;</span> Factorial<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">10</span><span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> '\n'<span style="color: #555555;"></span>;  <em><span style="color: #0099ff;">// (4)</span></em>
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> '\n'<span style="color: #555555;"></span>;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The call<code> factorial&lt;5&gt;::value</code> in line (1) causes the instantiation of the primary or general template in line (2). During this instantiation, <code>Factorial&lt;4&gt;::value</code> will be instantiated. This recursion will end if the fully specialized class template<code> Factorial&lt;1&gt; </code>kicks in in line (3).&nbsp; Maybe, you like it more pictorial.</p>
+<p><img src="https://www.modernescpp.com/images/blog/ModernCpp/CppCoreGuidelinesTemplateMetaprogramming/factorial5.PNG" alt="factorial5" width="500" height="119" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>Here is the output of the program:</p>
+<p><img src="https://www.modernescpp.com/images/blog/ModernCpp/CppCoreGuidelinesTemplateMetaprogramming/factorial.png" alt="factorial" width="300" height="172" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>Thanks to the <a href="https://cppinsights.io/s/ad3d8a2a">C++ Insights</a> and the <a href="https://godbolt.org/z/5j11zj1ax">Compiler Explorer</a>, you can and should analyze the program further. This should help to build your intuition about template instantiation and template metaprogramming.</p>
+<p>Let me start with C++ Insights:</p>
+<h4>C++ Insights</h4>
+<p>The call<code> Factorial&lt;5&gt;::value</code> (line 1) causes the instantiation of the class template for the numbers 5 to 2. The full specialization for 1 is already available. The call <code>Factorial&lt;10&gt;::value</code> (line 2) causes the instantiation of the function template for the numbers 10 - 6 because all other full specialized function templates are already available. The following output shows the instantiation for the numbers 5 to 2.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/TemplateMetaprogramming/CppInsightsRecursiveInstantiaion.png" alt="CppInsightsRecursiveInstantiaion" width="444" height="738" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>&nbsp;</p>
+<p><span class="tlid-translation translation"><span class="" title=""></span></span></p>
+<p>Now, my analysis continues with the <a href="https://godbolt.org/z/5j11zj1ax">Compiler Explorer</a>.</p>
+<h4>Compiler Explorer</h4>
+<p>For simplicity reasons, I only provide a screenshot of the main program and the corresponding assembler instructions.</p>
+<p>The Compiler Explorer allows you to visualize this compile-time calculation.</p>
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/Templates/TemplateMetaprogramming/compilerExplorerCodeFactorial.png" alt="goldboltSource" width="600" height="180" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/TemplateMetaprogramming/compilerExplorerAssemblerFactorial.png" alt="goldboltAssem" width="662" height="216" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>The output shows it. The factorials of 5 and 10 are just constants and were calculated during compile time. You can see the result directly in the first line and last line of the assembler instructions.</p>
+<h2>CppCon 2021</h2>
+<p>I was quite happy this week that I can use a previous post as a starting point for this post. I gave <a href="https://cppcon.org/program2021/">this week four talks at the CppCon</a> and, honestly, this was too much. Here are my talks that are published on <a href="https://www.youtube.com/user/CppCon">Youtube's CppCon channel</a>. The pdfs are already available.</p>
+<ul>
+<li><a href="https://www.grimm-jaud.de/images/stories/pdfs/ConcurrencyPatterns.pdf">Concurrency Patterns</a><a href="https://cppcon.org/program2021/"> </a></li>
+<li><a href="https://www.grimm-jaud.de/images/stories/pdfs/TheManyFlavorsOfConstnessInModernCpp.pdf"><span class="css-901oao css-16my406 r-poiln3 r-bcqeeo r-qvutc0">The Many Flavors of Constness in Modern C++</span></a></li>
+<li><a href="https://www.grimm-jaud.de/images/stories/pdfs/ObjectOrientedProgramming.pdf"><span class="css-901oao css-16my406 r-poiln3 r-bcqeeo r-qvutc0">Object-Oriented Programming: The Good Parts</span></a></li>
+<li><span class="css-901oao css-16my406 r-poiln3 r-bcqeeo r-qvutc0"><a href="https://www.grimm-jaud.de/images/stories/pdfs/C20TheSmallPearls.pdf">C++20: The Small Pearls</a> <br /></span></li>
+</ul>
+<h2>What's next?</h2>
+<p>In my next post, I continue my journey with template metaprogramming and provide you with more insights.</p>
+<p>&nbsp;</p>
+<p>{loadmoduleid 153}</p>
+<p>&nbsp;</p>
