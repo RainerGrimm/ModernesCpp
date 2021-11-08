@@ -1,0 +1,167 @@
+<p>In my last post "<a href="https://www.modernescpp.com/index.php/template-metaprogramming-a-introduction">Template Metaprogramming - How it All Started</a>", I wrote about the roots of template metaprogramming and presented the hello world of template metaprogramming: calculating the factorial of a number at compile time. In this post, I will write about, how template metaprogramming can be used to modify types at compile time.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/TemplateMetaprogrammingHowItWorks/TemplateMetaprogramming.png" alt="TemplateMetaprogramming" width="650" height="403" style="display: block; margin-left: auto; margin-right: auto;" /> The factorial program in the last post "<a href="https://www.modernescpp.com/index.php/template-metaprogramming-a-introduction">Template Metaprogramming - How it All Started</a>" was a nice example but not idiomatic for template metaprogramming. Manipulating types at compile time is typical in template metaprogramming.</p>
+<h2>Type Manipulation at Compile Time</h2>
+<p>For example, here is what <a href="https://en.cppreference.com/w/cpp/utility/move">std::move</a> is conceptionally doing:</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">static_cast</span><span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>remove_reference<span style="color: #555555;">&lt;</span>decltype(arg)<span style="color: #555555;">&gt;::</span>type<span style="color: #555555;">&amp;&amp;&gt;</span>(arg);
+</pre>
+</div>
+<p>&nbsp;</p>
+<p><code>std::move</code> takes its argument <code>arg</code>, deduces its type <code>(decltype(arg))</code>, removes its reference (<code>std::remove_reverence</code>), and casts it to an rvalue reference (<code>static_cast&lt;...&gt;::type&amp;&amp;&gt;</code>). Essentially,<br /><code>std::move</code> is an rvalue reference cast. Now, move semantics can kick in.</p>
+<p>How can a function remove constness from its argument?</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// removeConst.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;type_traits&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T <span style="color: #555555;">&gt;</span>
+    <span style="color: #006699; font-weight: bold;">struct</span> removeConst {
+    <span style="color: #006699; font-weight: bold;">using</span> type <span style="color: #555555;">=</span> T;        <span style="color: #0099ff; font-style: italic;">// (1)</span>
+};
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T <span style="color: #555555;">&gt;</span>
+    <span style="color: #006699; font-weight: bold;">struct</span> removeConst<span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">const</span> T<span style="color: #555555;">&gt;</span> {
+    <span style="color: #006699; font-weight: bold;">using</span> type <span style="color: #555555;">=</span> T;       <span style="color: #0099ff; font-style: italic;">// (2)</span>
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>boolalpha;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>is_same<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>, removeConst<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;::</span>type<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;       <span style="color: #0099ff; font-style: italic;">// true</span>    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>is_same<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>, removeConst<span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;::</span>type<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>; <span style="color: #0099ff; font-style: italic;">// true</span>
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>I implemented <code>removeConst</code> the way <code>std::remove_const</code> is probably implemented in the <a href="https://en.cppreference.com/w/cpp/header/type_traits">type-traits library</a>. <code>std::is_same</code> from the type-traits library helps me to decide at compile-time if both types are the same. In case of<code> removeConst&lt;int&gt;</code> the primary or general class template kicks in; in case of<code> removeConst&lt;const int&gt;</code>, the partial specialization for <code>const T</code> applies. The critical observation is that both class templates return the underlying type in (1) and (2) via the alias <code>type</code>. As promised, the constness of the argument is removed.</p>
+<p><br />There are additional observations:</p>
+<ul>
+<li>Template specialization (partial or full) is conditional execution at compile-time. Let me be more specific: When I use <code>removeConst</code> with a non-constant<code> int</code>, the compiler chooses the primary or general template. When I use a constant <code>int</code>, the compiler chooses the partial specialization for <code>const T</code>.</li>
+<li>The expression using <code>type = T</code> serves as the return value, which is, in this case, a type.</li>
+<li>When you study the program<a href="https://cppinsights.io/s/c9b121d0"> removeConst.cpp</a> on C++ Insights, you see that the expression that the expression <code>std::is_same&lt;int, removeConst&lt;int&gt;::type&gt;::value</code> boils down to the boolean value <code>std::integral_constant&lt;bool, true&gt;::value</code> that is displayed as <code>true</code>.</li>
+</ul>
+<p>Let me step back and write about template metaprogramming for a more conceptual view.</p>
+<h2>More Meta</h2>
+<p>At run time, we use data and functions. At compile time we use metadata and metafunctions. Quite logically, it's called meta because we do metaprogramming.</p>
+<h3>Metadata</h3>
+<p><strong>Metadata are values that metafunctions us at compile time.</strong></p>
+<p>There are three types of values:</p>
+<ul>
+<li>Types such as int, or double</li>
+<li>Non-types such as integrals, enumerators, pointers, references, floating-points with C++20</li>
+<li>Templates such as<code> std::vector</code>, or <code>std::deque</code></li>
+</ul>
+<p>You can read more about the three types of values in my previous post "<a href="https://www.modernescpp.com/index.php/alias-templates-and-template-parameters">Alias Templates and Template Parameters</a>".</p>
+<h3>Metafunctions</h3>
+<p><strong>Metafunctions are functions that are executed at compile time.</strong></p>
+<p>Admittedly, this sounds strange: Types are used in template metaprogramming to simulate functions. Based on the definition of metafunctions, <code>constexpr</code> functions that can be executed at compile time, are also metafunctions. The same holds for <code>consteval</code> functions in C++20.</p>
+<p>Here are two metafunctions.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span> a , <span style="color: #007788; font-weight: bold;">int</span> b<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">struct</span> Product {
+    <span style="color: #006699; font-weight: bold;">static</span> <span style="color: #007788; font-weight: bold;">int</span> <span style="color: #006699; font-weight: bold;">const</span> value <span style="color: #555555;">=</span> a <span style="color: #555555;">*</span> b;
+};
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T <span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">struct</span> removeConst<span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">const</span> T<span style="color: #555555;">&gt;</span> {
+    <span style="color: #006699; font-weight: bold;">using</span> type <span style="color: #555555;">=</span> T;
+};
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The first metafunction <code>Product</code> returns a value and the second one <code>removeConst</code> returns a type. The name value and type are just naming conventions for the return values. If a meta-function returns a value, it is called value; if it returns a type, it is called type. The <a href="https://en.cppreference.com/w/cpp/header/type_traits">type-traits library</a> follows exactly this naming convention.</p>
+<p>It is quite enlightening to compare functions with metafunctions.</p>
+<h3>Functions versus Metafunctions</h3>
+<p>The following function <code>power</code> and the metafunction <code>Power</code> calculate pow(2, 10) at run time and compile time.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// power.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">power</span>(<span style="color: #007788; font-weight: bold;">int</span> m, <span style="color: #007788; font-weight: bold;">int</span> n) {                               
+    <span style="color: #007788; font-weight: bold;">int</span> r <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span>;
+    <span style="color: #006699; font-weight: bold;">for</span>(<span style="color: #007788; font-weight: bold;">int</span> k <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span>; k <span style="color: #555555;">&lt;=</span> n; <span style="color: #555555;">++</span>k) r <span style="color: #555555;">*=</span> m;
+    <span style="color: #006699; font-weight: bold;">return</span> r;                                        
+}
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span> m, <span style="color: #007788; font-weight: bold;">int</span> n<span style="color: #555555;">&gt;</span>                              
+<span style="color: #006699; font-weight: bold;">struct</span> Power {
+    <span style="color: #006699; font-weight: bold;">static</span> <span style="color: #007788; font-weight: bold;">int</span> <span style="color: #006699; font-weight: bold;">const</span> value <span style="color: #555555;">=</span> m <span style="color: #555555;">*</span> Power<span style="color: #555555;">&lt;</span>m, n<span style="color: #555555;">-</span><span style="color: #ff6600;">1</span><span style="color: #555555;">&gt;::</span>value;
+};
+                          
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span> m<span style="color: #555555;">&gt;</span>                                     
+<span style="color: #006699; font-weight: bold;">struct</span> Power<span style="color: #555555;">&lt;</span>m, <span style="color: #ff6600;">0</span><span style="color: #555555;">&gt;</span> {                                   
+    <span style="color: #006699; font-weight: bold;">static</span> <span style="color: #007788; font-weight: bold;">int</span> <span style="color: #006699; font-weight: bold;">const</span> value <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span>;                       
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+	
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;	
+	
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"power(2, 10)= "</span> <span style="color: #555555;">&lt;&lt;</span> power(<span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">10</span>) <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Power&lt;2,10&gt;::value= "</span> <span style="color: #555555;">&lt;&lt;</span> Power<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">10</span><span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+	
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>This is the main difference:</p>
+<ul>
+<li><strong>Arguments</strong>: The function arguments go into the round brackets (( ... )) and the metafunction arguments go into the sharp brackets (<code>&lt; ...&gt;</code>). This observation also holds for the definition of the function and the metafunction. The function uses round brackets and the metafunction sharp brackets. Each metafunction argument produces a new type.</li>
+<li><strong>Return value</strong>: The function uses a return statement, and the metafunction a static integral constant value.</li>
+</ul>
+<p>I elaborate more on this comparison in the upcoming post about <code>constexpr</code> and <code>consteval</code> functions. Here is the output of the program.</p>
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/Templates/TemplateMetaprogrammingHowItWorks/power.png" alt="power" width="400" height="214" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p><code>power</code> is executed at run time and <code>Power</code> at compile time, but what is happening in the following example?</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// powerHybrid.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">power</span>(<span style="color: #007788; font-weight: bold;">int</span> m, <span style="color: #007788; font-weight: bold;">int</span> n) {                               
+    <span style="color: #007788; font-weight: bold;">int</span> r <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span>;
+    <span style="color: #006699; font-weight: bold;">for</span>(<span style="color: #007788; font-weight: bold;">int</span> k <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span>; k <span style="color: #555555;">&lt;=</span> n; <span style="color: #555555;">++</span>k) r <span style="color: #555555;">*=</span> m;
+    <span style="color: #006699; font-weight: bold;">return</span> r;                                        
+}
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span> m, <span style="color: #007788; font-weight: bold;">int</span> n<span style="color: #555555;">&gt;</span>                              
+<span style="color: #006699; font-weight: bold;">struct</span> Power {
+    <span style="color: #006699; font-weight: bold;">static</span> <span style="color: #007788; font-weight: bold;">int</span> <span style="color: #006699; font-weight: bold;">const</span> value <span style="color: #555555;">=</span> m <span style="color: #555555;">*</span> Power<span style="color: #555555;">&lt;</span>m, n<span style="color: #555555;">-</span><span style="color: #ff6600;">1</span><span style="color: #555555;">&gt;::</span>value;
+};
+                          
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span> m<span style="color: #555555;">&gt;</span>                                     
+<span style="color: #006699; font-weight: bold;">struct</span> Power<span style="color: #555555;">&lt;</span>m, <span style="color: #ff6600;">0</span><span style="color: #555555;">&gt;</span> {                                   
+    <span style="color: #006699; font-weight: bold;">static</span> <span style="color: #007788; font-weight: bold;">int</span> <span style="color: #006699; font-weight: bold;">const</span> value <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span>;                       
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+	
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;	
+	
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"power(2, 10)= "</span> <span style="color: #555555;">&lt;&lt;</span> power(<span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">10</span>) <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Power&lt;2,10&gt;::value= "</span> <span style="color: #555555;">&lt;&lt;</span> Power<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">10</span><span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+	
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The question is obviously: Is Power a function or a metafunction? I promise, the answer to this question gives you more insight.</p>
+<h2>What's next?</h2>
+<p>In my next post, I analyze the function/metafunction <code>Power</code> and introduce the type-traits library. The type traits library is idiomatic for compile-time programming in C++.</p>
+<p>&nbsp;</p>
+<p>{loadmoduleid 153}</p>
