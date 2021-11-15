@@ -1,0 +1,212 @@
+<p>First of all, hybrid programming is not an official term. I created it to emphasize a very interesting aspect of templates. The difference between function arguments and template arguments.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/Templates/TemplateMetaprogrammingHybridProgramming/TemplateMetaprogramming.png" alt="TemplateMetaprogramming" width="650" height="403" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>I ended my last post "<a href="https://www.modernescpp.com/index.php/template-metaprogramming-how-it-works">Template Metaprogramming - How it Works</a>" with a riddle. Here is the context for the riddle.</p>
+<h2>The Riddle</h2>
+<p>The function <code>power</code> and <code>Power</code> calculate the pow(2, 10). <code>power</code> is executed at run time and <code>Power</code> at compile time.</p>
+<p><!-- HTML generated using hilite.me --></p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// power.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">power</span>(<span style="color: #007788; font-weight: bold;">int</span> m, <span style="color: #007788; font-weight: bold;">int</span> n) {                               
+    <span style="color: #007788; font-weight: bold;">int</span> r <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span>;
+    <span style="color: #006699; font-weight: bold;">for</span>(<span style="color: #007788; font-weight: bold;">int</span> k <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span>; k <span style="color: #555555;">&lt;=</span> n; <span style="color: #555555;">++</span>k) r <span style="color: #555555;">*=</span> m;
+    <span style="color: #006699; font-weight: bold;">return</span> r;                                        
+}
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span> m, <span style="color: #007788; font-weight: bold;">int</span> n<span style="color: #555555;">&gt;</span>                              
+<span style="color: #006699; font-weight: bold;">struct</span> Power {
+    <span style="color: #006699; font-weight: bold;">static</span> <span style="color: #007788; font-weight: bold;">int</span> <span style="color: #006699; font-weight: bold;">const</span> value <span style="color: #555555;">=</span> m <span style="color: #555555;">*</span> Power<span style="color: #555555;">&lt;</span>m, n<span style="color: #555555;">-</span><span style="color: #ff6600;">1</span><span style="color: #555555;">&gt;::</span>value;
+};
+                          
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span> m<span style="color: #555555;">&gt;</span>                                     
+<span style="color: #006699; font-weight: bold;">struct</span> Power<span style="color: #555555;">&lt;</span>m, <span style="color: #ff6600;">0</span><span style="color: #555555;">&gt;</span> {                                   
+    <span style="color: #006699; font-weight: bold;">static</span> <span style="color: #007788; font-weight: bold;">int</span> <span style="color: #006699; font-weight: bold;">const</span> value <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span>;                       
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+	
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;	
+	
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"power(2, 10)= "</span> <span style="color: #555555;">&lt;&lt;</span> power(<span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">10</span>) <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Power&lt;2,10&gt;::value= "</span> <span style="color: #555555;">&lt;&lt;</span> Power<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">10</span><span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+	
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>If you want to read more details about both functions, read my previous post "<a href="https://www.modernescpp.com/index.php/template-metaprogramming-how-it-works">Template Metaprogramming - How it Works</a>".</p>
+<p>So far so good, but what is happening in the following example?</p>
+<p>&nbsp;</p>
+<p><!-- HTML generated using hilite.me --></p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// powerHybrid.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span> n<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">int</span> Power(<span style="color: #007788; font-weight: bold;">int</span> m){
+    <span style="color: #006699; font-weight: bold;">return</span> m <span style="color: #555555;">*</span> Power<span style="color: #555555;">&lt;</span>n<span style="color: #555555;">-</span><span style="color: #ff6600;">1</span><span style="color: #555555;">&gt;</span>(m);
+}
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;&gt;</span>
+<span style="color: #007788; font-weight: bold;">int</span> Power<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">0</span><span style="color: #555555;">&gt;</span>(<span style="color: #007788; font-weight: bold;">int</span> m){
+    <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #ff6600;">1</span>;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main() {
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Power&lt;0&gt;(10): "</span> <span style="color: #555555;">&lt;&lt;</span> Power<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">0</span><span style="color: #555555;">&gt;</span>(<span style="color: #ff6600;">20</span>) <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Power&lt;1&gt;(10): "</span> <span style="color: #555555;">&lt;&lt;</span> Power<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">1</span><span style="color: #555555;">&gt;</span>(<span style="color: #ff6600;">10</span>) <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Power&lt;2&gt;(10): "</span> <span style="color: #555555;">&lt;&lt;</span> Power<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">2</span><span style="color: #555555;">&gt;</span>(<span style="color: #ff6600;">10</span>) <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+}</pre>
+</div>
+<p>&nbsp;</p>
+<p>As expected, <code>Power</code> does its job.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/TemplateMetaprogrammingHybridProgramming/powerHybrid.png" alt="powerHybrid" width="350" height="226" style="display: block; margin-left: auto; margin-right: auto;" />&nbsp;</p>
+<p>Here is the riddle in short one more: Is <code>Power</code> a function or a metafunction?</p>
+<h2>Hybrid Programming</h2>
+<p>To make it short.</p>
+<p>The calls<code> Power&lt;0&gt;(10)</code>,<code> Power&lt;1&gt;(10)</code>, and <code>Power&lt;2&gt;(10)</code> use sharp and round brackets and calculate 10 to the power of 0, 1, and 2. This means, 0, 1, and 2 are compile-time arguments and 10 is a run-time argument. To say it differently: Power is at the same time function and a metafunction. Let me elaborate more on this point.</p>
+<h3>Power at Run Time</h3>
+<p>First, I can instantiate <code>Power</code> for 2, give it the name<code> Power2</code> and use it in a for-loop.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// powerHybridRuntime.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span> n<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">int</span> Power(<span style="color: #007788; font-weight: bold;">int</span> m){
+    <span style="color: #006699; font-weight: bold;">return</span> m <span style="color: #555555;">*</span> Power<span style="color: #555555;">&lt;</span>n<span style="color: #555555;">-</span><span style="color: #ff6600;">1</span><span style="color: #555555;">&gt;</span>(m);
+}
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;&gt;</span>
+<span style="color: #007788; font-weight: bold;">int</span> Power<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">0</span><span style="color: #555555;">&gt;</span>(<span style="color: #007788; font-weight: bold;">int</span> m){
+    <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #ff6600;">1</span>;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main() {
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    <span style="color: #006699; font-weight: bold;">auto</span> Power2of <span style="color: #555555;">=</span> Power<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">2</span><span style="color: #555555;">&gt;</span>;
+
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #007788; font-weight: bold;">int</span> i <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>; i <span style="color: #555555;">&lt;=</span> <span style="color: #ff6600;">20</span>; <span style="color: #555555;">++</span>i) {
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Power2of("</span> <span style="color: #555555;">&lt;&lt;</span> i <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">")= "</span>
+                  <span style="color: #555555;">&lt;&lt;</span> Power2of(i)  <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+     }
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+}</pre>
+</div>
+<p>&nbsp;</p>
+<p><code>Power2o</code>f enables it to calculate the squares of 0 ... 20 at run time.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/TemplateMetaprogrammingHybridProgramming/powerHybridRuntime.png" alt="powerHybridRuntime" width="396" height="617" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>Obviously, you cannot invoke <code>Power</code> with different template arguments in the for-loop. Template instantiation requires a constant expression. To make it short: The following use of Power fails with a compile-time error that "<code><span class="linked-compiler-output-line">the value of '<b>i</b>' is not usable in a constant expression</span></code>".</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<p style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #007788; font-weight: bold;">int</span> i <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>; i <span style="color: #555555;">&lt;=</span> <span style="color: #ff6600;">20</span>; <span style="color: #555555;">++</span>i) {</p>
+<p style="margin: 0; line-height: 125%;">&nbsp;&nbsp;&nbsp; std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Power&lt;"</span> <span style="color: #555555;">&lt;&lt;</span> i <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"&gt;(2)= "</span> <span style="color: #555555;">&lt;&lt;</span> Power<span style="color: #555555;">&lt;</span>i<span style="color: #555555;">&gt;</span>(<span style="color: #ff6600;">2</span>) <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;</p>
+<p style="margin: 0; line-height: 125%;">}</p>
+</div>
+<p>&nbsp;</p>
+<p>Honestly, there is a more interesting difference between a function and a metafunction.</p>
+<h3>Power at Compile Time</h3>
+<p>When you study the previous program <code>powerHybrid.cpp</code> in <a href="https://cppinsights.io/s/e81885b4">C++ Insights</a>, you see that each usage of Power with a different template argument creates a new type.</p>
+<p>This means that the invocation of<code> Power&lt;2&gt;(10)</code> causes the recursive template instantiation for <code>Power&lt;1&gt;(10)</code>, and <code>Power&lt;0&gt;(10)</code>. Here is the output of <a href="https://cppinsights.io/s/75ea99b9">C++ Insights</a>.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/TemplateMetaprogrammingHybridProgramming/TemplateInstantiation.png" alt="TemplateInstantiation" width="450" height="549" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>&nbsp;To sum up my observation. Each template instantiation creates a new type.</p>
+<h3>Creating New Types</h3>
+<p>When you use a template such as <code>Power</code>, <code>std::vector</code>, or <code>std::array</code>, you can invoke it with two kinds of arguments: function arguments and template arguments. The function arguments go into the round brackets (<code>( ... )</code>) and the template arguments go into the sharp brackets (<code>&lt;...&gt;</code>). The template arguments create new types. Or to put it the other way around. You can parameterize templates in two ways: at compile time with sharp brackets (<code>&lt;...&gt;</code>). and at run time with round brackets (<code>( ... )</code>.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">auto</span> res1 <span style="color: #555555;">=</span> Power<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">2</span><span style="color: #555555;">&gt;</span>(<span style="color: #ff6600;">10</span>);                       <span style="color: #0099ff; font-style: italic;">// (1)</span>
+<span style="color: #006699; font-weight: bold;">auto</span> res2 <span style="color: #555555;">=</span> Power<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">2</span><span style="color: #555555;">&gt;</span>(<span style="color: #ff6600;">11</span>);                       <span style="color: #0099ff; font-style: italic;">// (2)</span>
+<span style="color: #006699; font-weight: bold;">auto</span> rest3 <span style="color: #555555;">=</span> Power<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">3</span><span style="color: #555555;">&gt;</span>(<span style="color: #ff6600;">10</span>);                      <span style="color: #0099ff; font-style: italic;">// (3)</span>
+
+std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> myVec1(<span style="color: #ff6600;">10</span>);                    <span style="color: #0099ff; font-style: italic;">// (1)</span>
+std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> myVec2(<span style="color: #ff6600;">10</span>, <span style="color: #ff6600;">5</span>);                 <span style="color: #0099ff; font-style: italic;">// (2)</span>
+std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">double</span><span style="color: #555555;">&gt;</span> myDouble(<span style="color: #ff6600;">5</span>);                <span style="color: #0099ff; font-style: italic;">// (3)</span>
+
+std<span style="color: #555555;">::</span>array<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>, <span style="color: #ff6600;">3</span><span style="color: #555555;">&gt;</span> myArray1{ <span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>};          <span style="color: #0099ff; font-style: italic;">// (1)</span>
+std<span style="color: #555555;">::</span>array<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>, <span style="color: #ff6600;">3</span><span style="color: #555555;">&gt;</span> myArray2{ <span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>};          <span style="color: #0099ff; font-style: italic;">// (2)</span>
+std<span style="color: #555555;">::</span>array<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">double</span>, <span style="color: #ff6600;">3</span><span style="color: #555555;">&gt;</span> myArray3{ <span style="color: #ff6600;">1.1</span>, <span style="color: #ff6600;">2.2</span>, <span style="color: #ff6600;">3.3</span>}; <span style="color: #0099ff; font-style: italic;">// (3)</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<ul>
+<li>(1) creates a new <code>Power</code> instance,<code> std::vector</code> of length 10, or a <code>std::array</code> with three elements</li>
+<li>(2) reuses the already created types in the previous lines (1)</li>
+<li>(3) creates a new type</li>
+</ul>
+<p>A few of my German readers already pointed it out. My metafunction Power has a big flaw.</p>
+<h3>The Big Flaw</h3>
+<p>When I instantiated <code>Power</code> with a negative number or a too big number, I get undefined behavior.</p>
+<ol>
+<li><code>Power&lt;-1&gt;(10)</code> causes an infinite template instantiation because the boundary condition Power&lt;0&gt;(10) does not apply.</li>
+<li><code>Power&lt;200&gt;(10)</code> causes an <code>int</code> overflow.</li>
+</ol>
+<p>The first issues can be fixed by using a<code> static_assert</code> inside the <code>Power</code> template:<code> static_assert(n &gt;= 0, "exponent must be &gt;= 0");. </code>There is no simple solution for the second issue.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// powerHybridRuntimeOverflow.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span> n<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">int</span> Power(<span style="color: #007788; font-weight: bold;">int</span> m){
+    <span style="color: #006699; font-weight: bold;">return</span> m <span style="color: #555555;">*</span> Power<span style="color: #555555;">&lt;</span>n<span style="color: #555555;">-</span><span style="color: #ff6600;">1</span><span style="color: #555555;">&gt;</span>(m);
+}
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;&gt;</span>
+<span style="color: #007788; font-weight: bold;">int</span> Power<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">0</span><span style="color: #555555;">&gt;</span>(<span style="color: #007788; font-weight: bold;">int</span> m){
+    <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #ff6600;">1</span>;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main() {
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    <span style="color: #006699; font-weight: bold;">auto</span> Power10of <span style="color: #555555;">=</span> Power<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">10</span><span style="color: #555555;">&gt;</span>;
+
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #007788; font-weight: bold;">int</span> i <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>; i <span style="color: #555555;">&lt;=</span> <span style="color: #ff6600;">20</span>; <span style="color: #555555;">++</span>i) {
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Power10of("</span> <span style="color: #555555;">&lt;&lt;</span> i <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">")= "</span>
+                  <span style="color: #555555;">&lt;&lt;</span> Power10of(i)  <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+     }
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The overflow starts with<code> Power10of(9). pow(9, 10) is </code>3,486,784,40</p>
+<p><code> <br /></code></p>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/TemplateMetaprogrammingHybridProgramming/powerHybridRuntimeOverflow.png" alt="powerHybridRuntimeOverflow" width="450" height="526" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<h2>My Disclaimer</h2>
+<p>&nbsp;At the end of these three posts "<a href="https://www.modernescpp.com/index.php/template-metaprogramming-a-introduction">Template Metaprogramming - How it All Started</a>",&nbsp;"<a href="https://www.modernescpp.com/index.php/template-metaprogramming-how-it-works">Template Metaprogramming - How it Works</a>" about template metaprogramming, I have to make a disclaimer. I don't want that you use templates to program at compile time. Most of the time, <code>constexpr</code> (C++11) or <code>consteval</code> (C++20 is the better choice.</p>
+<p>I explained template metaprogramming for two reasons.</p>
+<ol>
+<li>Template metaprogramming helps you better understand templates and the process of template instantiation.</li>
+<li>The<a href="https://en.cppreference.com/w/cpp/header/type_traits"> type-traits library</a> applies the idea and uses the conventions of template metaprogramming.</li>
+</ol>
+<h2>What's next?</h2>
+<p>In my next post, I write about the<a href="https://en.cppreference.com/w/cpp/header/type_traits"> type-traits library</a>.&nbsp; The type-traits library (C++11) is template metaprogramming in a beautiful guise.</p>
+<p>&nbsp;</p>
+<p>{loadmoduleid 153}</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
