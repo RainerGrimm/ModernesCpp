@@ -1,0 +1,299 @@
+<p>I finished the last article on the Type-Traits library with the challenge of explaining the <code>std::is_base_of</code> and<code> std::is_convertible</code> functions. Today I'm excited to present the answer from Mr. Helmut Zeisel.</p>
+<hr id="system-readmore" />
+<p><img src="https://www.modernescpp.com/images/blog/Templates/TypeTraitsIsBaseOf/templatesTypeTraits.png" alt="templatesTypeTraits" width="650" height="412" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p><br />Before I present Mr. Zeisel's response, I would like to briefly repeat the challenge.</p>
+<h2>My challenge</h2>
+<p>Explain the two implementations of the type-traits functions<code> std::is_base_o</code>f and <code>std::is_convertible</code>.</p>
+<ul>
+<li><code>std::is_base_of</code>
+<ul><!-- HTML generated using hilite.me --></ul>
+</li>
+</ul>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">namespace</span> details {
+    <span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> B<span style="color: #555555;">&gt;</span>
+    std<span style="color: #555555;">::</span>true_type test_pre_ptr_convertible(<span style="color: #006699; font-weight: bold;">const</span> <span style="color: #006699; font-weight: bold;">volatile</span> B<span style="color: #555555;">*</span>);
+    <span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span><span style="color: #555555;">&gt;</span>
+    std<span style="color: #555555;">::</span>false_type test_pre_ptr_convertible(<span style="color: #006699; font-weight: bold;">const</span> <span style="color: #006699; font-weight: bold;">volatile</span> <span style="color: #007788; font-weight: bold;">void</span><span style="color: #555555;">*</span>);
+ 
+    <span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span>, <span style="color: #006699; font-weight: bold;">typename</span><span style="color: #555555;">&gt;</span>
+    <span style="color: #006699; font-weight: bold;">auto</span> test_pre_is_base_of(...) <span style="color: #555555;">-&gt;</span> std<span style="color: #555555;">::</span>true_type;
+    <span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> B, <span style="color: #006699; font-weight: bold;">typename</span> D<span style="color: #555555;">&gt;</span>
+    <span style="color: #006699; font-weight: bold;">auto</span> test_pre_is_base_of(<span style="color: #007788; font-weight: bold;">int</span>) <span style="color: #555555;">-&gt;</span>
+        decltype(test_pre_ptr_convertible<span style="color: #555555;">&lt;</span>B<span style="color: #555555;">&gt;</span>(<span style="color: #006699; font-weight: bold;">static_cast</span><span style="color: #555555;">&lt;</span>D<span style="color: #555555;">*&gt;</span>(nullptr)));
+}
+ 
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> Base, <span style="color: #006699; font-weight: bold;">typename</span> Derived<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">struct</span> is_base_of <span style="color: #555555;">:</span>
+    std<span style="color: #555555;">::</span>integral_constant<span style="color: #555555;">&lt;</span>
+        boolean,
+        std<span style="color: #555555;">::</span>is_class<span style="color: #555555;">&lt;</span>Base<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&amp;&amp;</span> std<span style="color: #555555;">::</span>is_class<span style="color: #555555;">&lt;</span>Derived<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&amp;&amp;</span>
+        decltype(details<span style="color: #555555;">::</span>test_pre_is_base_of<span style="color: #555555;">&lt;</span>Base, Derived<span style="color: #555555;">&gt;</span>(<span style="color: #ff6600;">0</span>))<span style="color: #555555;">::</span>value
+    <span style="color: #555555;">&gt;</span> { };
+</pre>
+</div>
+<p>&nbsp;</p>
+<ul>
+<ul>
+<li><code>std::is_convertible</code></li>
+<!-- HTML generated using hilite.me --></ul>
+</ul>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">namespace</span> detail {
+ 
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">T</span><span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">auto</span> test_returnable(<span style="color: #007788; font-weight: bold;">int</span>) <span style="color: #555555;">-&gt;</span> decltype(
+    <span style="color: #007788; font-weight: bold;">void</span>(<span style="color: #006699; font-weight: bold;">static_cast</span><span style="color: #555555;">&lt;</span>T(<span style="color: #555555;">*</span>)()<span style="color: #555555;">&gt;</span>(nullptr)), std<span style="color: #555555;">::</span>true_type{}
+);
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span>class<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">auto</span> test_returnable(...) <span style="color: #555555;">-&gt;</span> std<span style="color: #555555;">::</span>false_type;
+ 
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">From</span>, <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">To</span><span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">auto</span> test_implicitly_convertible(<span style="color: #007788; font-weight: bold;">int</span>) <span style="color: #555555;">-&gt;</span> decltype(
+    <span style="color: #007788; font-weight: bold;">void</span>(std<span style="color: #555555;">::</span>declval<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">void</span>(<span style="color: #555555;">&amp;</span>)(To)<span style="color: #555555;">&gt;</span>()(std<span style="color: #555555;">::</span>declval<span style="color: #555555;">&lt;</span>From<span style="color: #555555;">&gt;</span>())), std<span style="color: #555555;">::</span>true_type{}
+);
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span>class, class<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">auto</span> test_implicitly_convertible(...) <span style="color: #555555;">-&gt;</span> std<span style="color: #555555;">::</span>false_type;
+ 
+} <span style="color: #0099ff; font-style: italic;">// namespace detail</span>
+ 
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">From</span>, <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">To</span><span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">struct</span> is_convertible <span style="color: #555555;">:</span> std<span style="color: #555555;">::</span>integral_constant<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">bool</span>,
+    (decltype(detail<span style="color: #555555;">::</span>test_returnable<span style="color: #555555;">&lt;</span>To<span style="color: #555555;">&gt;</span>(<span style="color: #ff6600;">0</span>))<span style="color: #555555;">::</span>value <span style="color: #555555;">&amp;&amp;</span>
+     decltype(detail<span style="color: #555555;">::</span>test_implicitly_convertible<span style="color: #555555;">&lt;</span>From, To<span style="color: #555555;">&gt;</span>(<span style="color: #ff6600;">0</span>))<span style="color: #555555;">::</span>value) <span style="color: #555555;">||</span>
+    (std<span style="color: #555555;">::</span>is_void<span style="color: #555555;">&lt;</span>From<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&amp;&amp;</span> std<span style="color: #555555;">::</span>is_void<span style="color: #555555;">&lt;</span>To<span style="color: #555555;">&gt;::</span>value)
+<span style="color: #555555;">&gt;</span> {};
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Admittedly, there are significantly simpler challenges. Therefore, I only got one very good answer to <code>std::is_base_of</code>. However, it is worth studying the following explanation by Mr. Zeisel, as it is very instructive. I translated his German explanation into English and I kept his layout.</p>
+<h2><code>std::is_base_of</code></h2>
+<h3>Program1.cpp</h3>
+<p><code>std::is_base_of</code> is essentially based on some details of the C++ Function Overload Resolution rules, which can be found for example at <a href="https://en.cppreference.com/w/cpp/language/overload_resolution.">https://en.cppreference.com/w/cpp/language/overload_resolution.</a> for example. The first rule used in this is: "Conversion that converts pointer-to-derived to pointer-to-base is better than the conversion of pointer-to-derived to pointer-to-void,"</p>
+<p>An example of this is Program1.cpp</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// Program1.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #006699; font-weight: bold;">struct</span> Base {};
+<span style="color: #006699; font-weight: bold;">struct</span> Derived <span style="color: #555555;">:</span> <span style="color: #006699; font-weight: bold;">public</span> Base {};
+<span style="color: #006699; font-weight: bold;">struct</span> A {};
+<span style="color: #0099ff; font-style: italic;">// Conversion that converts pointer-to-derived to pointer-to-base</span>
+<span style="color: #0099ff; font-style: italic;">// is better than the conversion of pointer-to-derived to pointer-to-void,</span>
+<span style="color: #0099ff; font-style: italic;">// https://en.cppreference.com/w/cpp/language/overload_resolution</span>
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">f</span>(<span style="color: #007788; font-weight: bold;">void</span><span style="color: #555555;">*</span>)
+{
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"f(void*)"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+}
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">f</span>(<span style="color: #006699; font-weight: bold;">const</span> Base<span style="color: #555555;">*</span>)
+{
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"f(Base*)"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+}
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>()
+{
+    Derived d;
+    A a;
+    f(<span style="color: #555555;">&amp;</span>d);
+    f(<span style="color: #555555;">&amp;</span>a);
+    <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #ff6600;">0</span>;
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The output is</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">f(base<span style="color: #555555;">*</span>)
+f(<span style="color: #007788; font-weight: bold;">void</span><span style="color: #555555;">*</span>)
+</pre>
+</div>
+<p>&nbsp;</p>
+<h3>Program2.cpp</h3>
+<p><br />This rule can be used to distinguish a pointer to a derived class from another pointer. From this, a type trait can be constructed as in Program2.cpp:</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// Program2.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #006699; font-weight: bold;">namespace</span> details
+{
+    <span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> B<span style="color: #555555;">&gt;</span>
+    std<span style="color: #555555;">::</span>true_type test_pre_ptr_convertible(<span style="color: #006699; font-weight: bold;">const</span> <span style="color: #006699; font-weight: bold;">volatile</span> B <span style="color: #555555;">*</span>);
+    <span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span><span style="color: #555555;">&gt;</span>
+    std<span style="color: #555555;">::</span>false_type test_pre_ptr_convertible(<span style="color: #006699; font-weight: bold;">const</span> <span style="color: #006699; font-weight: bold;">volatile</span> <span style="color: #007788; font-weight: bold;">void</span> <span style="color: #555555;">*</span>);
+}
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> Base, <span style="color: #006699; font-weight: bold;">typename</span> Derived<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">struct</span> is_base_of <span style="color: #555555;">:</span> std<span style="color: #555555;">::</span>integral_constant<span style="color: #555555;">&lt;</span>
+                        <span style="color: #007788; font-weight: bold;">bool</span>,
+                        std<span style="color: #555555;">::</span>is_class<span style="color: #555555;">&lt;</span>Base<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&amp;&amp;</span> std<span style="color: #555555;">::</span>is_class<span style="color: #555555;">&lt;</span>Derived<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&amp;&amp;</span>
+                             decltype(details<span style="color: #555555;">::</span>test_pre_ptr_convertible<span style="color: #555555;">&lt;</span>Base<span style="color: #555555;">&gt;</span>
+                             (<span style="color: #006699; font-weight: bold;">static_cast</span><span style="color: #555555;">&lt;</span>Derived <span style="color: #555555;">*&gt;</span>(nullptr)))<span style="color: #555555;">::</span>value
+                        <span style="color: #555555;">&gt;</span> { };
+<span style="color: #006699; font-weight: bold;">struct</span> Base {};
+<span style="color: #006699; font-weight: bold;">struct</span> Derived <span style="color: #555555;">:</span> <span style="color: #006699; font-weight: bold;">public</span> Base {};
+<span style="color: #006699; font-weight: bold;">struct</span> A {};
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>()
+{
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>boolalpha;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Base is base of Derived: "</span>
+              <span style="color: #555555;">&lt;&lt;</span> is_base_of<span style="color: #555555;">&lt;</span>Base, Derived<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Derived is base of Base: "</span>
+              <span style="color: #555555;">&lt;&lt;</span> is_base_of<span style="color: #555555;">&lt;</span>Derived, Base<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Base is base of A: "</span>
+              <span style="color: #555555;">&lt;&lt;</span> is_base_of<span style="color: #555555;">&lt;</span>Base, A<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Base is base of Base: "</span>
+              <span style="color: #555555;">&lt;&lt;</span> is_base_of<span style="color: #555555;">&lt;</span>Base, Base<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Base is base of const Derived: "</span>
+              <span style="color: #555555;">&lt;&lt;</span> is_base_of<span style="color: #555555;">&lt;</span>Base, <span style="color: #006699; font-weight: bold;">const</span> Derived<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"int is base of int: "</span>
+              <span style="color: #555555;">&lt;&lt;</span> is_base_of<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>, <span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"void is base of void: "</span>
+              <span style="color: #555555;">&lt;&lt;</span> is_base_of<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">void</span>, <span style="color: #007788; font-weight: bold;">void</span><span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"void is base of Base: "</span> <span style="color: #555555;">&lt;</span> <span style="color: #555555;">&lt;</span> is_base_of<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">void</span>, Base<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>;
+    <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #ff6600;">0</span>;
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>t<code>est_pre_ptr_convertible</code> are two functions with different argument types and different types of return values. The functions are simply declared. An implementation of the function body is not necessary, since they are never actually called, but only at compile time the type of the return value is queried: <code>test_pre_ptr_convertible&lt;Base&gt;(static_cast&lt;Derived*&gt;(nullptr)</code>. If <code>Derived</code> is actually derived from <code>Base</code>, the function<code> test_pre_ptr_convertible(const volatile B*)</code> with return type <code>std::true_type</code> is selected; the return type is determined with <code>decltype</code> and the static variable value associated with the type has the value <code>true</code>. If <code>Derived</code> is not derived from <code>Base</code>, the function <code>test_pre_ptr_convertible(const volatile volatile*)</code> with return type <code>std::false_type</code> is selected and the corresponding static variable value has the value <code>false</code>.<br /><code></code><code>const volatile</code> is necessary so that <code>const</code> <code>Derived</code> or <code>volatile</code> <code>Derived</code> can be recognized as derived from <code>base</code>. In the implementation a class is also considered as base of its itself, so i<code>s_base_of&lt;base,base&gt;</code> returns <code>true</code>.<br />Since derivation only makes sense for classes, the following is used <code>std::is_class&lt;Base&gt;::value &amp;&amp; std::is_class&lt;Derived&gt;::value</code> so that e.g. <code>is_base_of&lt;int,int&gt;::value</code> returns <code>false</code>.</p>
+<h3>Program3.cpp</h3>
+<p>At first glance, it looks like Program2.cpp already does what it should. However, C++ supports multiple inheritance. Therefore it is possible that a base class occurs multiple times in the derivation hierarchy. This can be tested with Program3.cpp:</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// Program3.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #006699; font-weight: bold;">namespace</span> details
+{
+    <span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> B<span style="color: #555555;">&gt;</span>
+    std<span style="color: #555555;">::</span>true_type test_pre_ptr_convertible(<span style="color: #006699; font-weight: bold;">const</span> <span style="color: #006699; font-weight: bold;">volatile</span> B <span style="color: #555555;">*</span>);
+    <span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span><span style="color: #555555;">&gt;</span>
+    std<span style="color: #555555;">::</span>false_type test_pre_ptr_convertible(<span style="color: #006699; font-weight: bold;">const</span> <span style="color: #006699; font-weight: bold;">volatile</span> <span style="color: #007788; font-weight: bold;">void</span> <span style="color: #555555;">*</span>);
+}
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> Base, <span style="color: #006699; font-weight: bold;">typename</span> Derived<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">struct</span> is_base_of <span style="color: #555555;">:</span> std<span style="color: #555555;">::</span>integral_constant<span style="color: #555555;">&lt;</span>
+                        <span style="color: #007788; font-weight: bold;">bool</span>,
+                        std<span style="color: #555555;">::</span>is_class<span style="color: #555555;">&lt;</span>Base<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&amp;&amp;</span>
+                            std<span style="color: #555555;">::</span>is_class<span style="color: #555555;">&lt;</span>Derived<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&amp;&amp;<br />                            </span>decltype(details<span style="color: #555555;">::</span>test_pre_ptr_convertible<span style="color: #555555;">&lt;</span>Base<span style="color: #555555;">&gt;<br />                            </span>(<span style="color: #006699; font-weight: bold;">static_cast</span><span style="color: #555555;">&lt;</span>Derived <span style="color: #555555;">*&gt;</span>(nullptr)))<span style="color: #555555;">::</span>value<br />                        <span style="color: #555555;">&gt;</span>{ };
+<span style="color: #006699; font-weight: bold;">struct</span> Base {};
+<span style="color: #006699; font-weight: bold;">struct</span> Derived1 <span style="color: #555555;">:</span> <span style="color: #006699; font-weight: bold;">public</span> Base {};
+<span style="color: #006699; font-weight: bold;">struct</span> Derived2 <span style="color: #555555;">:</span> <span style="color: #006699; font-weight: bold;">public</span> Base { };
+<span style="color: #006699; font-weight: bold;">struct</span> Multi <span style="color: #555555;">:</span> <span style="color: #006699; font-weight: bold;">public</span> Derived1, <span style="color: #006699; font-weight: bold;">public</span> Derived2
+{
+};
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>()
+{
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>boolalpha;
+    <span style="color: #0099ff; font-style: italic;">// error: ‘Base’ is an ambiguous base of ‘Multi’</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Base is base of Multi: "</span>
+              <span style="color: #555555;">&lt;&lt;</span> is_base_of<span style="color: #555555;">&lt;</span>Base, Multi<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>;
+    <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #ff6600;">0</span>;
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The compiler now returns the error message<br /><code>error: 'Base' is an ambiguous base of 'Multi'</code></p>
+<h3>Program4.cpp</h3>
+<p><br />To get unambiguousness again, SFINAE and an extra level of indirection (in the form of the function <code>test_pre_is_base_of</code>) are useful:</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// Program4.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #006699; font-weight: bold;">namespace</span> details
+{
+    <span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> B<span style="color: #555555;">&gt;</span>
+    std<span style="color: #555555;">::</span>true_type test_pre_ptr_convertible(<span style="color: #006699; font-weight: bold;">const</span> <span style="color: #006699; font-weight: bold;">volatile</span> B <span style="color: #555555;">*</span>);
+    <span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span><span style="color: #555555;">&gt;</span>
+    std<span style="color: #555555;">::</span>false_type test_pre_ptr_convertible(<span style="color: #006699; font-weight: bold;">const</span> <span style="color: #006699; font-weight: bold;">volatile</span> <span style="color: #007788; font-weight: bold;">void</span> <span style="color: #555555;">*</span>);
+    <span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span>, <span style="color: #006699; font-weight: bold;">typename</span><span style="color: #555555;">&gt;</span>
+    <span style="color: #006699; font-weight: bold;">auto</span> test_pre_is_base_of() <span style="color: #555555;">-&gt;</span> std<span style="color: #555555;">::</span>true_type;
+    <span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> B, <span style="color: #006699; font-weight: bold;">typename</span> D<span style="color: #555555;">&gt;</span>
+    <span style="color: #006699; font-weight: bold;">auto</span> test_pre_is_base_of() <span style="color: #555555;">-&gt;</span> decltype(test_pre_ptr_convertible<span style="color: #555555;">&lt;</span>B<span style="color: #555555;">&gt;</span>(<span style="color: #006699; font-weight: bold;">static_cast</span><span style="color: #555555;">&lt;</span>D <span style="color: #555555;">*&gt;</span>(nullptr)));
+}
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> Base, <span style="color: #006699; font-weight: bold;">typename</span> Derived<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">struct</span> is_base_of <span style="color: #555555;">:</span> std<span style="color: #555555;">::</span>integral_constant<span style="color: #555555;">&lt;</span>
+                        <span style="color: #007788; font-weight: bold;">bool</span>,
+                        std<span style="color: #555555;">::</span>is_class<span style="color: #555555;">&lt;</span>Base<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&amp;&amp;</span> 
+                        std<span style="color: #555555;">::</span>is_class<span style="color: #555555;">&lt;</span>Derived<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&amp;&amp;</span> 
+                        decltype(details<span style="color: #555555;">::</span>test_pre_is_base_of<span style="color: #555555;">&lt;</span>Base, Derived<span style="color: #555555;">&gt;</span>())<span style="color: #555555;">::</span>value<br />                    <span style="color: #555555;">&gt; </span>{};
+<span style="color: #006699; font-weight: bold;">struct</span> Base {};
+<span style="color: #006699; font-weight: bold;">struct</span> Derived1 <span style="color: #555555;">:</span> <span style="color: #006699; font-weight: bold;">public</span> Base {};
+<span style="color: #006699; font-weight: bold;">struct</span> Derived2 <span style="color: #555555;">:</span> <span style="color: #006699; font-weight: bold;">public</span> Base {};
+<span style="color: #006699; font-weight: bold;">struct</span> Multi <span style="color: #555555;">:</span> <span style="color: #006699; font-weight: bold;">public</span> Derived1, <span style="color: #006699; font-weight: bold;">public</span> Derived2 {};
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>()
+{
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>boolalpha;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Base is base of Multi: "</span>
+              <span style="color: #555555;">&lt;&lt;</span> is_base_of<span style="color: #555555;">&lt;</span>Base, Multi<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>;
+    <span style="color: #0099ff; font-style: italic;">// error: call of overloaded ‘test_pre_is_base_of&lt;Derived2, Multi&gt;()’</span>
+    <span style="color: #0099ff; font-style: italic;">// is ambiguous</span>
+    <span style="color: #0099ff; font-style: italic;">// std::cout &lt;&lt; "Base is base of Derived1: "</span>
+    <span style="color: #0099ff; font-style: italic;">//&lt;&lt; is_base_of&lt;Base, Derived1&gt;::value &lt;&lt; "\n";</span>
+    <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #ff6600;">0</span>;
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>For the function call<br /><code>test_pre_is_base_of&lt;base,multi&gt;()</code><br />the two functions<br /><code>template &lt;typename B, typename D&gt;<br />&nbsp;&nbsp;&nbsp; auto test_pre_is_base_of() -&gt;<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; decltype(test_pre_ptr_convertible&lt;B&gt;(static_cast&lt;D*&gt;(nullptr)));</code><br />and<br /> <code>template&lt;typename, typename&gt;.<br /> auto test_pre_is_base_of() -&gt; std::true_type;</code><br />can be choosen. The function call<br /><code>test_pre_ptr_convertible&lt;base&gt;(static_cast&lt;multi*&gt;(nullptr))</code><br />calls<br />t<code>est_pre_ptr_convertible(const volatile Base*);</code><br />. But this is ambiguous since it is not clear to which of the two bases of <code>Multi</code> the pointer <code>Base</code>* should point. So this gives a "substitution failure". But since a "substitution failure" is not an "error", the other function<br />te<code>mplate &lt;typename, typename&gt;<br />&nbsp;&nbsp;&nbsp;&nbsp; auto test_pre_is_base_of() -&gt; std::true_type;</code><br />is checked. This is valid, so it returns<br /><code>decltype(details::test_pre_is_base_of&lt;base,multi&gt;())::value</code><br />returns the value true via this path.<br />Unfortunately, however, this type trait no longer works for simple base classes<br /><code>is_base_of&lt;base,derived1&gt;::value</code><br />because in this case both functions<br /><code>template &lt;typename B, typename D&gt;<br />&nbsp;&nbsp;&nbsp; auto test_pre_is_base_of() -&gt;<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; decltype(test_pre_ptr_convertible&lt;B&gt;(static_cast&lt;D*&gt;(nullptr)));</code><br />and<br />&nbsp;&nbsp;&nbsp; <code>template&lt;typename, typename&gt;<br />&nbsp; auto test_pre_is_base_of() -&gt; std::true_type;</code><br />are valid and equivalent according to the Function Overload Resolution rules. Therefore, to solve this problem, it is necessary to somehow enforce that first<br /><code>template &lt;typename B, typename D&gt;<br />&nbsp;&nbsp;&nbsp; auto test_pre_is_base_of() -&gt;<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; decltype(test_pre_ptr_convertible&lt;B&gt;(static_cast&lt;D*&gt;(nullptr)));</code><br />is selected, and<br /><code>template &lt;typename, typename&gt;<br />&nbsp;&nbsp;&nbsp; auto test_pre_is_base_of() -&gt; std::true_type;</code><br />is chosen only if the first function returns a substitution failure.</p>
+<h3>Program5.cpp</h3>
+<p><br />There is a solution for this as well: "A standard conversion sequence is always better than a user-defined conversion sequence or an ellipsis conversion sequence."</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// Program5.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #006699; font-weight: bold;">namespace</span> details
+{
+    <span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> B<span style="color: #555555;">&gt;</span>
+    std<span style="color: #555555;">::</span>true_type test_pre_ptr_convertible(<span style="color: #006699; font-weight: bold;">const</span> <span style="color: #006699; font-weight: bold;">volatile</span> B <span style="color: #555555;">*</span>);
+    <span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span><span style="color: #555555;">&gt;</span>
+    std<span style="color: #555555;">::</span>false_type test_pre_ptr_convertible(<span style="color: #006699; font-weight: bold;">const</span> <span style="color: #006699; font-weight: bold;">volatile</span> <span style="color: #007788; font-weight: bold;">void</span> <span style="color: #555555;">*</span>);
+    <span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span>, <span style="color: #006699; font-weight: bold;">typename</span><span style="color: #555555;">&gt;</span>
+    <span style="color: #006699; font-weight: bold;">auto</span> test_pre_is_base_of(...) <span style="color: #555555;">-&gt;</span> std<span style="color: #555555;">::</span>true_type;
+    <span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> B, <span style="color: #006699; font-weight: bold;">typename</span> D<span style="color: #555555;">&gt;</span>
+    <span style="color: #006699; font-weight: bold;">auto</span> test_pre_is_base_of(<span style="color: #007788; font-weight: bold;">int</span>) <span style="color: #555555;">-&gt;</span> decltype(test_pre_ptr_convertible<span style="color: #555555;">&lt;</span>B<span style="color: #555555;">&gt;</span>(<span style="color: #006699; font-weight: bold;">static_cast</span><span style="color: #555555;">&lt;</span>D <span style="color: #555555;">*&gt;</span>(nullptr)));
+}
+<span style="color: #0099ff; font-style: italic;">// A standard conversion sequence is always better</span>
+<span style="color: #0099ff; font-style: italic;">// than a user-defined conversion sequence</span>
+<span style="color: #0099ff; font-style: italic;">// or an ellipsis conversion sequence.</span>
+<span style="color: #0099ff; font-style: italic;">// https://en.cppreference.com/w/cpp/language/overload_resolution</span>
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> Base, <span style="color: #006699; font-weight: bold;">typename</span> Derived<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">struct</span> is_base_of <span style="color: #555555;">:</span> std<span style="color: #555555;">::</span>integral_constant<span style="color: #555555;">&lt;</span>
+                        <span style="color: #007788; font-weight: bold;">bool</span>,
+                        std<span style="color: #555555;">::</span>is_class<span style="color: #555555;">&lt;</span>Base<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&amp;&amp;</span> std<span style="color: #555555;">::</span>is_class<span style="color: #555555;">&lt;</span>Derived<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&amp;&amp;<br />                        </span>decltype(details<span style="color: #555555;">::</span>test_pre_is_base_of<span style="color: #555555;">&lt;</span>Base, Derived<span style="color: #555555;">&gt;</span>(<span style="color: #ff6600;">0</span>))<span style="color: #555555;">::</span>value<br />                   <span style="color: #555555;">&gt; </span>{};
+<span style="color: #006699; font-weight: bold;">struct</span> Base {};
+<span style="color: #006699; font-weight: bold;">struct</span> Derived1 <span style="color: #555555;">:</span> <span style="color: #006699; font-weight: bold;">public</span> Base {};
+<span style="color: #006699; font-weight: bold;">struct</span> Derived2 <span style="color: #555555;">:</span> <span style="color: #006699; font-weight: bold;">public</span> Base {};
+<span style="color: #006699; font-weight: bold;">struct</span> Multi <span style="color: #555555;">:</span> <span style="color: #006699; font-weight: bold;">public</span> Derived1, <span style="color: #006699; font-weight: bold;">public</span> Derived2{};
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>()
+{
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>boolalpha;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Base is base of Derived1: "</span>
+              <span style="color: #555555;">&lt;&lt;</span> is_base_of<span style="color: #555555;">&lt;</span>Base, Derived1<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Derived1 is base of Base: "</span>
+              <span style="color: #555555;">&lt;&lt;</span> is_base_of<span style="color: #555555;">&lt;</span>Derived1, Base<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Base is base of Derived2: "</span>
+              <span style="color: #555555;">&lt;&lt;</span> is_base_of<span style="color: #555555;">&lt;</span>Base, Derived2<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Derived2 is base of Base: "</span>
+              <span style="color: #555555;">&lt;&lt;</span> is_base_of<span style="color: #555555;">&lt;</span>Derived2, Base<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Derived1 is base of Multi: "</span>
+              <span style="color: #555555;">&lt;&lt;</span> is_base_of<span style="color: #555555;">&lt;</span>Derived1, Multi<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Derived2 is base of Multi: "</span>
+              <span style="color: #555555;">&lt;&lt;</span> is_base_of<span style="color: #555555;">&lt;</span>Derived2, Multi<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Base is base of Multi: "</span>
+              <span style="color: #555555;">&lt;&lt;</span> is_base_of<span style="color: #555555;">&lt;</span>Base, Multi<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>;
+    <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #ff6600;">0</span>;
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>If one uses<br />t<code>emplate &lt;typename B, typename D&gt;<br />&nbsp;&nbsp;&nbsp; auto test_pre_is_base_of(int) -&gt;<br />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; decltype(test_pre_ptr_convertible&lt;B&gt;(static_cast&lt;D*&gt;(nullptr)));</code><br />(i.e. a "standard conversion" to <code>int</code>), and<br /><code>template &lt;typename, typename&gt;<br />&nbsp;&nbsp;&nbsp; auto test_pre_is_base_of(...) -&gt; std::true_type;</code><br />(i.e. an "ellipsis"), then the first function (standard conversion) is selected preferentially and the second (ellipsis) actually only in the SFINAE case. So the type trait works both for multiple as well as for simple base classes.</p>
+<h2>What's next?</h2>
+<p>With the type traits library, you can not only check or compare types but also modify them. This is exactly what my next article will deal with.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>{loadmoduleid 153}</p>
