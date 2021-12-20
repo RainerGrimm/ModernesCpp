@@ -1,0 +1,131 @@
+<p>The type-traits library has two main goals: correctness and optimization. Today, I write about optimization.</p>
+<hr id="system-readmore" />
+<p><img src="https://www.modernescpp.com/images/blog/Templates/TypeTraitsOptimization/templatesTypeTraits.png" alt="templatesTypeTraits" width="650" height="412" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>This post is my last post in my miniseries about the type-traits library. I have already written the following posts:</p>
+<ul>
+<li><a href="https://www.modernescpp.com/index.php/the-type-traits-library-type-checks">The Type-Traits Library: Type Checks</a></li>
+<li><a href="https://www.modernescpp.com/index.php/the-type-traits-library-type-comparisons">The Type-Traits Library: Type Comparisons</a></li>
+<li><a href="https://www.modernescpp.com/index.php/the-type-traits-library-std-is-base-of">The Type-Traits Library:<code> std::is_base_of</code></a></li>
+<li><a href="https://www.modernescpp.com/index.php/the-type-traits-library">The Type-Traits Library: Correctness</a></li>
+</ul>
+<p>Before I start to write about optimization in C++, I want to tell a short anecdote. I often have the following conversation with my students in my classes:</p>
+<ul>
+<li>Me: Why do we have the feature ABC in C++?</li>
+<li>Student: I don't know.</li>
+<li>Me: If you don't have an answer, just say performance. This always works in C++.</li>
+</ul>
+<p>So, let me write about the type-traits library from the optimization perspective.</p>
+<h2>Optimization</h2>
+<p>The idea is quite straightforward and used in the Standard Template Library (STL). If the elements of a range are simple enough, the algorithms of the STL like <code><span style="font-family: courier new,courier;">std::copy, std::fill,</span></code> or&nbsp; <code><span style="font-family: courier new,courier;">std::equal </span></code>are directly applied to memory. Instead of using <span style="font-family: courier new,courier;">std::copy</span> to copy each element one by one, all is done in one big step. Internally, C functions like<code><span style="font-family: courier new,courier;"> <a href="http://en.cppreference.com/w/cpp/string/byte/memcmp">memcmp</a>, <a href="http://en.cppreference.com/w/cpp/string/byte/memset">memset</a>, </span></code><a href="http://en.cppreference.com/w/cpp/string/byte/memcpy"><span style="font-family: courier new,courier;"><code>memcpy</code>,</span> </a>or <code><a href="http://en.cppreference.com/w/cpp/string/byte/memmove"><span style="font-family: courier new,courier;">memmove</span></a></code> are used. The small difference between<code> <span style="font-family: courier new,courier;">memcpy</span></code> and <code><span style="font-family: courier new,courier;">memmove</span> </code>is that <code><span style="font-family: courier new,courier;">memmove</span> </code>can deal with overlapping memory areas. <span style="font-family: courier new,courier;"><br /></span></p>
+<p>The implementations of the algorithm <code><span style="font-family: courier new,courier;">std::copy</span>, <span style="font-family: courier new,courier;">std::fill,</span></code> or<code><span style="font-family: courier new,courier;"> std::equal</span></code> use a simple strategy.&nbsp; <code><span style="font-family: courier new,courier;">std::copy</span></code> is like a wrapper. This wrapper checks if the elements are simple enough. If so, the wrapper will delegate the&nbsp;work to the optimized copy function. If not, the conservative copy algorithm is used. This conservative one copies each element after the other. To make the right decision, the functions of the type-traits library are heavily used.</p>
+<p>The graphic shows the general strategy:</p>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/TypeTraitsOptimization/PerformanceDecision.png" alt="PerformanceDecision" width="400" height="384" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>&nbsp;</p>
+<p>That was the theory, but here is the practice. Which strategy is used by <code><span style="font-family: courier new,courier;">std::fill</span></code>?</p>
+<h2>std::fill</h2>
+<p><a href="http://en.cppreference.com/w/cpp/algorithm/fill"> std::fill&nbsp;</a>assigns each element in the range a value. The listing shows a GCC-inspired implementation of std::fill.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// fillGCC.cpp</span>
+ 
+<span style="color: #009999;">#include &lt;cstring&gt;</span>
+<span style="color: #009999;">#include &lt;chrono&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;type_traits&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">namespace</span> my{
+
+  <span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> I, <span style="color: #006699; font-weight: bold;">typename</span> T, <span style="color: #007788; font-weight: bold;">bool</span> b<span style="color: #555555;">&gt;</span>
+  <span style="color: #007788; font-weight: bold;">void</span> fill_impl(I first, I last, <span style="color: #006699; font-weight: bold;">const</span> T<span style="color: #555555;">&amp;</span> val, <span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span>integral_constant<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">bool</span>, b<span style="color: #555555;">&gt;&amp;</span>){
+    <span style="color: #006699; font-weight: bold;">while</span>(first <span style="color: #555555;">!=</span> last){
+      <span style="color: #555555;">*</span>first <span style="color: #555555;">=</span> val;
+      <span style="color: #555555;">++</span>first;
+    }
+  }
+
+  <span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;                                                              <span style="color: #0099ff;">// (2)</span></span>
+  <span style="color: #007788; font-weight: bold;">void</span> fill_impl(T<span style="color: #555555;">*</span> first, T<span style="color: #555555;">*</span> last, <span style="color: #006699; font-weight: bold;">const</span> T<span style="color: #555555;">&amp;</span> val, <span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span>true_type<span style="color: #555555;">&amp;</span>){
+    std<span style="color: #555555;">::</span>memset(first, val, last<span style="color: #555555;">-</span>first);
+  }
+
+  <span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">I</span>, <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">T</span><span style="color: #555555;">&gt;</span>
+  <span style="color: #006699; font-weight: bold;">inline</span> <span style="color: #007788; font-weight: bold;">void</span> fill(I first, I last, <span style="color: #006699; font-weight: bold;">const</span> T<span style="color: #555555;">&amp;</span> val){
+    <span style="color: #006699; font-weight: bold;">typedef</span> std<span style="color: #555555;">::</span>integral_constant<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">bool</span>,std<span style="color: #555555;">::</span>is_trivially_copy_assignable<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span><span style="color: #555555;">::</span>value <br />            <span style="color: #555555;">&amp;&amp;</span> (<span style="color: #006699; font-weight: bold;">sizeof</span>(T) <span style="color: #555555;">==</span> <span style="color: #ff6600;">1</span>)<span style="color: #555555;">&gt;</span> boolType;                                           <span style="color: #0099ff;">// (1)</span>
+    fill_impl(first, last, val, boolType());
+  }
+}
+
+<span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">int</span> arraySize <span style="color: #555555;">=</span> <span style="color: #ff6600;">100</span><span style="color: #aa0000; background-color: #ffaaaa;">'</span><span style="color: #ff6600;">000</span><span style="color: #aa0000; background-color: #ffaaaa;">'</span><span style="color: #ff6600;">000</span>;
+<span style="color: #007788; font-weight: bold;">char</span> charArray1[arraySize]<span style="color: #555555;">=</span> {<span style="color: #ff6600;">0</span>,};
+<span style="color: #007788; font-weight: bold;">char</span> charArray2[arraySize]<span style="color: #555555;">=</span> {<span style="color: #ff6600;">0</span>,};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+  <span style="color: #006699; font-weight: bold;">auto</span> begin <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>steady_clock<span style="color: #555555;">::</span>now();
+  my<span style="color: #555555;">::</span>fill(charArray1, charArray1 <span style="color: #555555;">+</span> arraySize,<span style="color: #ff6600;">1</span>);
+  <span style="color: #006699; font-weight: bold;">auto</span> last <span style="color: #555555;">=</span>  std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>steady_clock<span style="color: #555555;">::</span>now() <span style="color: #555555;">-</span> begin;
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span>  <span style="color: #cc3300;">"charArray1: "</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>duration<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">double</span><span style="color: #555555;">&gt;</span>(last).count() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" seconds</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>;
+
+  begin <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>steady_clock<span style="color: #555555;">::</span>now();
+  my<span style="color: #555555;">::</span>fill(charArray2, charArray2 <span style="color: #555555;">+</span> arraySize, <span style="color: #006699; font-weight: bold;">static_cast</span><span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">char</span><span style="color: #555555;">&gt;</span>(<span style="color: #ff6600;">1</span>));
+  last<span style="color: #555555;">=</span>  std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>steady_clock<span style="color: #555555;">::</span>now() <span style="color: #555555;">-</span> begin;
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span>  <span style="color: #cc3300;">"charArray2: "</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>duration<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">double</span><span style="color: #555555;">&gt;</span>(last).count() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" seconds</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>;
+
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Back to the code example. If the expression <span style="font-family: courier new,courier;">boolType()</span> in line (1) is <span style="font-family: courier new,courier;">true,</span> the optimized version of <span style="font-family: courier new,courier;">my::fill_impl</span> in lines 2 is used. This variant fills the entire memory of 100 million entries with the value 1.&nbsp; <span style="font-family: courier new,courier;">sizeof(char)</span> is 1.</p>
+<p>What's about the performance of the program? I compiled the program without optimization to measure the non-optimized performance.</p>
+<h3><img src="https://www.modernescpp.com/images/blog/Templates/TypeTraitsOptimization/fillGcc.png" alt="fillGcc" width="650" height="309" style="display: block; margin-left: auto; margin-right: auto;" /></h3>
+<p>The optimized version in line (2) is about ten times faster. Interestingly, when I enable full optimization, both variants are equally fast, because the compiler generates the same code for both variants. Also, the generic version (line (3)) uses <code>memset</code>: <code>fillGCC.cpp</code> with maximum optimization on<a href="https://godbolt.org/z/69b4aMrEM"> Compiler Explorer</a>.</p>
+<p>I presented an old GCC implementation of<code> std::fill,</code> because the newer ones are not so easy to read. Here are the essential parts of the GCC 6 implementation.</p>
+<h3><code>std::fill</code></h3>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// fill  </span>
+<span style="color: #0099ff; font-style: italic;">// Specialization: for char types we can use memset.                   </span>
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> _Tp<span style="color: #555555;">&gt;</span>
+  <span style="color: #006699; font-weight: bold;">inline</span> <span style="color: #006699; font-weight: bold;">typename</span>
+  __gnu_cxx<span style="color: #555555;">::</span>__enable_if<span style="color: #555555;">&lt;</span>__is_byte<span style="color: #555555;">&lt;</span>_Tp<span style="color: #555555;">&gt;::</span>__value, <span style="color: #007788; font-weight: bold;">void</span><span style="color: #555555;">&gt;::</span>__type     <span style="color: #0099ff; font-style: italic;">// (1)</span>
+  __fill_a(_Tp<span style="color: #555555;">*</span> __first, _Tp<span style="color: #555555;">*</span> __last, <span style="color: #006699; font-weight: bold;">const</span> _Tp<span style="color: #555555;">&amp;</span> __c)
+  {
+    <span style="color: #006699; font-weight: bold;">const</span> _Tp __tmp <span style="color: #555555;">=</span> __c;
+    <span style="color: #006699; font-weight: bold;">if</span> (<span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">size_t</span> __len <span style="color: #555555;">=</span> __last <span style="color: #555555;">-</span> __first)
+    __builtin_memset(__first, <span style="color: #006699; font-weight: bold;">static_cast</span><span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">unsigned</span> <span style="color: #007788; font-weight: bold;">char</span><span style="color: #555555;">&gt;</span>(__tmp), __len);
+  }
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The GCC 6 implementation uses SFINAE. The full specialization of the function template <code>__fill_a </code>use <code>__builtin_memset. </code>The key part in this implementation is line (1): <code>__gnu_cxx::__enable_if&lt;__is_byte&lt;_Tp&gt;::__value, void&gt;::__type. </code>Let me rewrite this expression in a human-readable way and use the official names.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">std<span style="color: #555555;">::</span>enable_if<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>is_byte<span style="color: #555555;">&lt;</span>Tp<span style="color: #555555;">&gt;::</span>value, <span style="color: #007788; font-weight: bold;">void</span><span style="color: #555555;">&gt;::</span>type
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The expression checks first if the template parameter TP is a byte:<code><a href="https://en.cppreference.com/w/cpp/types/byte">std::is_byte&lt;T&gt;::value</a></code>. If this expression evaluates to <code>true</code> thanks to<code></code> <a href="https://en.cppreference.com/w/cpp/types/enable_if">std::enable_if</a> from the type-traits library SFINAE kicks in. SFINAE stands for Substitution Failure Is Not An Error and applies during overload resolution of a function template. It means that if substituting the template parameter fails, the specialization is discarded from the overload set but this failure causes no compiler error. This means in this concrete case: When the condition <code><a href="https://en.cppreference.com/w/cpp/types/byte">std::is_byte&lt;T&gt;::value</a></code> returns false, this full specialization is discarded and another version of<code> __fill_a</code> is used.</p>
+<h2>What's next?</h2>
+<p>First, I make a <strong>Christmas break of two weeks</strong>. My next post will be published on 10th January 2022. I will write about <code>constexpr</code> functions because they have a lot in common with templates and become more powerful with C++20.</p>
+<p>Second, for a long time,I would like to improve my professional teaching of C++. Therefore, I plan to start a mentoring program for C++. Soon I will publish more details about my idea.</p>
+<p>&nbsp;</p>
+<p>{loadmoduleid 153}</p>
+<p>&nbsp;</p>
+<div id="simple-translate">
+<div>
+<div class="simple-translate-button isShow" style="background-image: url('moz-extension://981aa874-2db4-44d3-a97f-b02a72476831/icons/512.png'); height: 22px; width: 22px; top: 287px; left: 44px;">&nbsp;</div>
+<div class="simple-translate-panel" style="width: 300px; height: 200px; top: 0px; left: 0px; font-size: 13px; background-color: #ffffff;">
+<div class="simple-translate-result-wrapper" style="overflow: hidden;">
+<div class="simple-translate-move" draggable="draggable">&nbsp;</div>
+<div class="simple-translate-result-contents">
+<p class="simple-translate-result" dir="auto" style="color: #000000;">&nbsp;</p>
+<p class="simple-translate-candidate" dir="auto" style="color: #737373;">&nbsp;</p>
+</div>
+</div>
+</div>
+</div>
+</div>
