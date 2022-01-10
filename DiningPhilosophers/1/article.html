@@ -1,0 +1,318 @@
+<hr />
+<p>At Christmas time, I had a few nice discussions with<strong> Andre Adrian</strong>. He solved the classical dining philosopher's problem in various ways using modern C++. I'm convinced him to write an article about this classic synchronization issue and I'm happy to publish it in three consecutive posts.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p><img src="https://www.modernescpp.com/images/blog/DiningPhilosophers/1/An_illustration_of_the_dining_philosophers_problem.png" alt="An illustration of the dining philosophers problem" width="400" height="415" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>&nbsp;</p>
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; By Benjamin D. Esham / Wikimedia Commons, CC BY-SA 3.0, <a href="https://commons.wikimedia.org/w/index.php?curid=56559">https://commons.wikimedia.org/w/index.php?curid=56559</a></p>
+<p>&nbsp;</p>
+<div>
+<h2>Dining philosophers in C++ by Andre Adrian</h2>
+<div>
+<p>The dining philosophers' problem was described by Edsger W. Dijkstra. "Five philosophers, numbered from 0 through 4 are living in a house where the table laid for them, each philosopher having his own place at the table: Their only problem -besides those of philosophy- is that the dish served is a very difficult kind of spaghetti, that has to be eaten with two forks. There are two forks next to each plate, so that presents no difficulty: as a consequence, however, no two neighbors may be eating simultaneously." [ref 1971; Dijkstra; EWD310 Hierarchical Ordering of Sequential Processes; <a href="https://www.cs.utexas.edu/users/EWD/transcriptions/EWD03xx/EWD310.html">https://www.cs.utexas.edu/users/EWD/transcriptions/EWD03xx/EWD310.html</a>]</p>
+<div>&nbsp;</div>
+<div>
+<div>
+<p>We use the following problem description: 4 philosophers live a simple life. Every philosopher performs the same routine: he thinks for some random duration, gets his first fork, gets his second fork, eats for some random duration, puts down the forks, and starts thinking again. To make the problem interesting the 4 philosophers have only 4 forks. Philosopher number 1 has to take forks number 1 and 2 for eating. Philosopher 2 needs forks 2 and 3, and so on up to philosopher 4 who needs forks 4 and 1 for eating. After eating, the philosopher puts the forks back on the table.</p>
+<h2>Multiple Resource Use</h2>
+<p>&nbsp;As we go from problem description to programming, we translate philosophers to threads and forks to resources. In our first program - <code>dp_1.cpp</code> - we create 4 "philosopher" threads and 4 "fork" resource integers.</p>
+</div>
+</div>
+<div>&nbsp;</div>
+</div>
+</div>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+55</pre>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// dp_1.cpp</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;thread&gt;</span>
+<span style="color: #009999;">#include &lt;chrono&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">myrand</span>(<span style="color: #007788; font-weight: bold;">int</span> min, <span style="color: #007788; font-weight: bold;">int</span> max) {
+  <span style="color: #006699; font-weight: bold;">return</span> rand()<span style="color: #555555;">%</span>(max<span style="color: #555555;">-</span>min)<span style="color: #555555;">+</span>min;
+}
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">lock</span>(<span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&amp;</span> m) {
+  m<span style="color: #555555;">=</span><span style="color: #ff6600;">1</span>;
+}
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">unlock</span>(<span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&amp;</span> m) {
+  m<span style="color: #555555;">=</span><span style="color: #ff6600;">0</span>;
+}
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">phil</span>(<span style="color: #007788; font-weight: bold;">int</span> ph, <span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&amp;</span> ma, <span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&amp;</span> mb) {
+  <span style="color: #006699; font-weight: bold;">while</span>(<span style="color: #336666;">true</span>) {
+    <span style="color: #007788; font-weight: bold;">int</span> duration<span style="color: #555555;">=</span>myrand(<span style="color: #ff6600;">1000</span>, <span style="color: #ff6600;">2000</span>);
+    std<span style="color: #555555;">::</span>cout<span style="color: #555555;">&lt;&lt;</span>ph<span style="color: #555555;">&lt;&lt;</span><span style="color: #cc3300;">" thinks "</span><span style="color: #555555;">&lt;&lt;</span>duration<span style="color: #555555;">&lt;&lt;</span><span style="color: #cc3300;">"ms</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>;
+    std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>sleep_for(std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>milliseconds(duration));
+
+    lock(ma);
+    std<span style="color: #555555;">::</span>cout<span style="color: #555555;">&lt;&lt;</span><span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\t\t</span><span style="color: #cc3300;">"</span><span style="color: #555555;">&lt;&lt;</span>ph<span style="color: #555555;">&lt;&lt;</span><span style="color: #cc3300;">" got ma</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>;
+    std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>sleep_for(std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>milliseconds(<span style="color: #ff6600;">1000</span>));
+
+    lock(mb);
+    std<span style="color: #555555;">::</span>cout<span style="color: #555555;">&lt;&lt;</span><span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\t\t</span><span style="color: #cc3300;">"</span><span style="color: #555555;">&lt;&lt;</span>ph<span style="color: #555555;">&lt;&lt;</span><span style="color: #cc3300;">" got mb</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>;
+
+    duration<span style="color: #555555;">=</span>myrand(<span style="color: #ff6600;">1000</span>, <span style="color: #ff6600;">2000</span>);
+    std<span style="color: #555555;">::</span>cout<span style="color: #555555;">&lt;&lt;</span><span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\t\t\t\t</span><span style="color: #cc3300;">"</span><span style="color: #555555;">&lt;&lt;</span>ph<span style="color: #555555;">&lt;&lt;</span><span style="color: #cc3300;">" eats "</span><span style="color: #555555;">&lt;&lt;</span>duration<span style="color: #555555;">&lt;&lt;</span><span style="color: #cc3300;">"ms</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>;
+    std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>sleep_for(std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>milliseconds(duration));
+
+    unlock(mb);
+    unlock(ma);
+  }
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+  std<span style="color: #555555;">::</span>cout<span style="color: #555555;">&lt;&lt;</span><span style="color: #cc3300;">"dp_1</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>;
+  srand(time(nullptr));
+
+  <span style="color: #007788; font-weight: bold;">int</span> m1{<span style="color: #ff6600;">0</span>}, m2{<span style="color: #ff6600;">0</span>}, m3{<span style="color: #ff6600;">0</span>}, m4{<span style="color: #ff6600;">0</span>};
+
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t1([<span style="color: #555555;">&amp;</span>] {phil(<span style="color: #ff6600;">1</span>, m1, m2);});
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t2([<span style="color: #555555;">&amp;</span>] {phil(<span style="color: #ff6600;">2</span>, m2, m3);});
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t3([<span style="color: #555555;">&amp;</span>] {phil(<span style="color: #ff6600;">3</span>, m3, m4);});
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t4([<span style="color: #555555;">&amp;</span>] {phil(<span style="color: #ff6600;">4</span>, m4, m1);});
+
+  t1.join();
+  t2.join();
+  t3.join();
+  t4.join();
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div>
+<p>&nbsp;</p>
+<p>The <code>main() function</code> establishes random numbers in line 42. We set the random number generator seed value to the number of seconds since 1st January 1970. We define our fork resources in line 44. Then we start four threads beginning in line 46. To avoid premature thread termination we join the threads beginning in line 51. The thread function<code> phil()</code> has a forever loop. The <code>while(true)</code> statement is always <code>true</code>, therefore the thread will never terminate. The problem description says "he thinks for some random duration". First, we calculate a random duration with the function <code>myrand(</code>), see line 20 and line 6. The function <code>myrand()</code> produces a pseudo-random return value in the range of [min, max). For program trace, we log the philosopher's number, his current state of "he thinks" and the duration to the console. The <code>sleep_for()</code> statement lets the scheduler put the thread for the duration into the state waiting. In a "real" program application source code uses up time instead of <code>sleep_for()</code>.After the philosopher's thread thinking time is over, he "gets his first fork". See line 24. We use a function<code> lock()</code> to perform the "gets fork" thing. At the moment the function<code> lock()</code> is very simple because we don't know better. We just set the fork resource to the value 1. See line 10. After the philosopher thread obtained his first fork, he proudly announces the new state with a "<code>got ma</code>" console output. Now the thread "gets his second fork". See line 28. The corresponding console output is "<code>got mb</code>". The next state is "<code>he eats</code>". Again we determine the duration, produce a console output, and occupy the thread with a<code> sleep_for()</code>. See line 31. After the state "<code>he eats</code>" the philosopher puts down his forks. See lines 35 and 14. The<code> unlock()</code> function is again really simple and sets the resource back to 0.</p>
+<p>Please compile the program without compiler optimization. We will see the reason later. The console output of our program looks promising:</p>
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/DiningPhilosophers/1/dp_1.png" alt="dp 1" width="400" height="253" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+</div>
+<div>
+<p>Have we already solved the dining philosophers problem? Well, the program output is not detailed enough to answer this question.</p>
+<h2>Multiple Resource Use with Logging</h2>
+<p>We should add some more logging. At the moment the function<code> lock()</code> does not check if the fork is available before the resource is used. The improved version of <code>lock()</code> in program <code>dp_2.cpp</code> is:</p>
+</div>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">lock</span>(<span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&amp;</span> m) {
+  <span style="color: #006699; font-weight: bold;">if</span> (m) {
+    std<span style="color: #555555;">::</span>cout<span style="color: #555555;">&lt;&lt;</span><span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\t\t\t\t\t\t</span><span style="color: #cc3300;">ERROR lock</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>;
+  }
+  m<span style="color: #555555;">=</span><span style="color: #ff6600;">1</span>;
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<div>
+<div>Program version 2 produces the following output:</div>
+<div>&nbsp;</div>
+<div><img src="https://www.modernescpp.com/images/blog/DiningPhilosophers/1/dp_2.png" alt="dp 2" width="400" height="253" style="display: block; margin-left: auto; margin-right: auto;" /></div>
+<p>&nbsp;</p>
+</div>
+<div>
+<p>We see "<code>ERROR lock</code>" console output. This output tells us that two philosophers use the same resource at the same time. What can we do?</p>
+<h2>Erroneous Busy Waiting without Resource Hierarchy</h2>
+<p>We can change the if statement in<code> lock()</code> into a while statement. This while statement produces a spinlock. A spinlock is a fancy word for busy waiting. While the fork resource is in use, the thread is busy waiting for a change from the state in use to the state available. At this very moment, we set the fork resource again to state in use. In program <code>dp_3.cpp</code> we have:</p>
+<p>&nbsp;</p>
+</div>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">lock</span>(<span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&amp;</span> m) {
+  <span style="color: #006699; font-weight: bold;">while</span> (m)
+    ; <span style="color: #0099ff; font-style: italic;">// busy waiting</span>
+  m<span style="color: #555555;">=</span><span style="color: #ff6600;">1</span>;
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<div>
+<div>Please believe that this little change is still not a CORRECT solution for the dining philosophers' problem. We have no longer the wrong resource usage. But we have another problem. See program version 3 output:</div>
+<p>&nbsp;</p>
+<div><img src="https://www.modernescpp.com/images/blog/DiningPhilosophers/1/dp_3.png" alt="dp 3" width="400" height="253" style="display: block; margin-left: auto; margin-right: auto;" /></div>
+<div>
+<div>
+<p>&nbsp;</p>
+<p>Every philosopher thread takes his first fork resource and then can not take the second fork. What can we do? Andrew S. Tanenbaum wrote "Another way to avoid the circular wait is to provide a global numbering of all the resources. Now the rule is this: processes can request resources whenever they want to, but all requests must be made in numerical order." [ref 2006; Tanenbaum; Operating Systems. Design and Implementation, 3rd edition; chapter 3.3.5]</p>
+<h2>Erroneous Busy Waiting with Resource Hierarchy</h2>
+<p>This solution is known as resource hierarchy or partial ordering. For the dining philosophers problem, partial ordering is easy. The first fork taken has to be the fork with the lower number. For philosophers 1 to 3 the resources are taken in the correct order. Only philosopher thread 4 needs a change for correct partial ordering. First get fork resource 1, then get fork resource 4. See the main program in file<code> dp_4.cpp</code>:</p>
+</div>
+</div>
+</div>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+  std<span style="color: #555555;">::</span>cout<span style="color: #555555;">&lt;&lt;</span><span style="color: #cc3300;">"dp_4</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>;
+  srand(time(nullptr));
+
+  <span style="color: #007788; font-weight: bold;">int</span> m1{<span style="color: #ff6600;">0</span>}, m2{<span style="color: #ff6600;">0</span>}, m3{<span style="color: #ff6600;">0</span>}, m4{<span style="color: #ff6600;">0</span>};
+
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t1([<span style="color: #555555;">&amp;</span>] {phil(<span style="color: #ff6600;">1</span>, m1, m2);});
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t2([<span style="color: #555555;">&amp;</span>] {phil(<span style="color: #ff6600;">2</span>, m2, m3);});
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t3([<span style="color: #555555;">&amp;</span>] {phil(<span style="color: #ff6600;">3</span>, m3, m4);});
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t4([<span style="color: #555555;">&amp;</span>] {phil(<span style="color: #ff6600;">4</span>, m1, m4);});
+
+  t1.join();
+  t2.join();
+  t3.join();
+  t4.join();
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<div>
+<div>Program version 4 output looks fine:</div>
+<div>&nbsp;</div>
+<div><img src="https://www.modernescpp.com/images/blog/DiningPhilosophers/1/dp_4.png" alt="dp 4" width="400" height="253" style="display: block; margin-left: auto; margin-right: auto;" /></div>
+<div>
+<div>
+<div>&nbsp;</div>
+<p>Now there is no longer wrong resource usage now do we have a deadlock. We get brave and use compiler optimization. We want to have a good program that executes fast! This is program version 4 output with compiler optimization:</p>
+<div><img src="https://www.modernescpp.com/images/blog/DiningPhilosophers/1/dp_4opt.png" alt="dp 4opt" width="400" height="253" style="display: block; margin-left: auto; margin-right: auto;" /></div>
+</div>
+</div>
+</div>
+<div>
+<div>&nbsp;</div>
+<p>It is always the same philosopher thread that eats. Is it possible that the setting of compiler optimization can change the behavior of a program? Yes, it is possible. The philosopher threads read from memory the value of fork resource. The compiler optimization optimizes some of these memory reads away. Everything has a price!</p>
+<h2>Still Erroneous Busy Waiting with Resource Hierarchy</h2>
+<p>The programming language C++ has the atomic template to define an atomic type. If one thread writes to an atomic object while another thread reads from it, the behavior is well-defined. In file <code>dp_5.cpp</code> we use <code>atomic&lt;int&gt;</code> for the fork resources. See lines 11, 17, 21, and 47. We include<code> &lt;atomic&gt;</code> in line 5<code>:</code></p>
+<p>&nbsp;</p>
+</div>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// dp_5.cpp</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;thread&gt;</span>
+<span style="color: #009999;">#include &lt;chrono&gt;</span>
+<span style="color: #009999;">#include &lt;atomic&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">myrand</span>(<span style="color: #007788; font-weight: bold;">int</span> min, <span style="color: #007788; font-weight: bold;">int</span> max) {
+  <span style="color: #006699; font-weight: bold;">return</span> rand()<span style="color: #555555;">%</span>(max<span style="color: #555555;">-</span>min)<span style="color: #555555;">+</span>min;
+}
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">lock</span>(std<span style="color: #555555;">::</span>atomic<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;&amp;</span> m) {
+  <span style="color: #006699; font-weight: bold;">while</span> (m)
+    ; <span style="color: #0099ff; font-style: italic;">// busy waiting</span>
+  m<span style="color: #555555;">=</span><span style="color: #ff6600;">1</span>;
+}
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">unlock</span>(std<span style="color: #555555;">::</span>atomic<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;&amp;</span> m) {
+  m<span style="color: #555555;">=</span><span style="color: #ff6600;">0</span>;
+}
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">phil</span>(<span style="color: #007788; font-weight: bold;">int</span> ph, std<span style="color: #555555;">::</span>atomic<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;&amp;</span> ma, std<span style="color: #555555;">::</span>atomic<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;&amp;</span> mb) {
+  <span style="color: #006699; font-weight: bold;">while</span>(<span style="color: #336666;">true</span>) {
+    <span style="color: #007788; font-weight: bold;">int</span> duration<span style="color: #555555;">=</span>myrand(<span style="color: #ff6600;">1000</span>, <span style="color: #ff6600;">2000</span>);
+    std<span style="color: #555555;">::</span>cout<span style="color: #555555;">&lt;&lt;</span>ph<span style="color: #555555;">&lt;&lt;</span><span style="color: #cc3300;">" thinks "</span><span style="color: #555555;">&lt;&lt;</span>duration<span style="color: #555555;">&lt;&lt;</span><span style="color: #cc3300;">"ms</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>;
+    std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>sleep_for(std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>milliseconds(duration));
+
+    lock(ma);
+    std<span style="color: #555555;">::</span>cout<span style="color: #555555;">&lt;&lt;</span><span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\t\t</span><span style="color: #cc3300;">"</span><span style="color: #555555;">&lt;&lt;</span>ph<span style="color: #555555;">&lt;&lt;</span><span style="color: #cc3300;">" got ma</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>;
+    std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>sleep_for(std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>milliseconds(<span style="color: #ff6600;">1000</span>));
+
+    lock(mb);
+    std<span style="color: #555555;">::</span>cout<span style="color: #555555;">&lt;&lt;</span><span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\t\t</span><span style="color: #cc3300;">"</span><span style="color: #555555;">&lt;&lt;</span>ph<span style="color: #555555;">&lt;&lt;</span><span style="color: #cc3300;">" got mb</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>;
+
+    duration<span style="color: #555555;">=</span>myrand(<span style="color: #ff6600;">1000</span>, <span style="color: #ff6600;">2000</span>);
+    std<span style="color: #555555;">::</span>cout<span style="color: #555555;">&lt;&lt;</span><span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\t\t\t\t</span><span style="color: #cc3300;">"</span><span style="color: #555555;">&lt;&lt;</span>ph<span style="color: #555555;">&lt;&lt;</span><span style="color: #cc3300;">" eats "</span><span style="color: #555555;">&lt;&lt;</span>duration<span style="color: #555555;">&lt;&lt;</span><span style="color: #cc3300;">"ms</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>;
+    std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>sleep_for(std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>milliseconds(duration));
+
+    unlock(mb);
+    unlock(ma);
+  }
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+  std<span style="color: #555555;">::</span>cout<span style="color: #555555;">&lt;&lt;</span><span style="color: #cc3300;">"dp_5</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>;
+  srand(time(nullptr));
+
+  std<span style="color: #555555;">::</span>atomic<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> m1{<span style="color: #ff6600;">0</span>}, m2{<span style="color: #ff6600;">0</span>}, m3{<span style="color: #ff6600;">0</span>}, m4{<span style="color: #ff6600;">0</span>};
+
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t1([<span style="color: #555555;">&amp;</span>] {phil(<span style="color: #ff6600;">1</span>, m1, m2);});
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t2([<span style="color: #555555;">&amp;</span>] {phil(<span style="color: #ff6600;">2</span>, m2, m3);});
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t3([<span style="color: #555555;">&amp;</span>] {phil(<span style="color: #ff6600;">3</span>, m3, m4);});
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t4([<span style="color: #555555;">&amp;</span>] {phil(<span style="color: #ff6600;">4</span>, m1, m4);});
+
+  t1.join();
+  t2.join();
+  t3.join();
+  t4.join();
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The program version 5 output is:</p>
+<p>&nbsp;</p>
+<p><img src="https://www.modernescpp.com/images/blog/DiningPhilosophers/1/dp_5.png" alt="dp 5" width="400" height="253" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<div>
+<div>This output looks great. Now we have reached the limits of our testing methodology. There is still a<em> tiny chance for misbehavior</em>. The two operations "is a resource available" and "mark resource as in use" in the lock() function is atomic, but they are still two operations. Between these two operations, the scheduler can place a thread switch. And this thread switch at this most inconvenient time can produce very hard-to-find bugs in the program.</div>
+<div>&nbsp;</div>
+<h2>What's next?</h2>
+<p>The next installment of this dining philosopher problem solves the<em> tiny change of misbehavior</em>. So far, none of the programs have been correct.</p>
+<p>&nbsp;</p>
+<p>{loadmoduleid 153}</p>
+</div>
