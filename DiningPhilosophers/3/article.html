@@ -1,0 +1,340 @@
+<p>This post ends the mini-series about the dining philosophers problem by<strong> Andre Adrian</strong>. Today, he applies powerful locks and semaphores.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/DiningPhilosophers/3/An_illustration_of_the_dining_philosophers_problem.png" alt="An illustration of the dining philosophers problem" width="400" height="415" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p style="text-align: center;">By Benjamin D. Esham / Wikimedia Commons, CC BY-SA 3.0, <a href="https://commons.wikimedia.org/w/index.php?curid=56559">https://commons.wikimedia.org/w/index.php?curid=56559</a></p>
+<p><a href="https://commons.wikimedia.org/w/index.php?curid=56559"></a>Here is a quick reminder about where Andre's analysis ended last time.</p>
+<h2><code>std::lock_guard</code> and Synchronized Output with Resource Hierarchy</h2>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// dp_10.cpp</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;thread&gt;</span>
+<span style="color: #009999;">#include &lt;chrono&gt;</span>
+<span style="color: #009999;">#include &lt;mutex&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">myrand</span>(<span style="color: #007788; font-weight: bold;">int</span> min, <span style="color: #007788; font-weight: bold;">int</span> max) {
+  <span style="color: #006699; font-weight: bold;">return</span> rand()<span style="color: #555555;">%</span>(max<span style="color: #555555;">-</span>min)<span style="color: #555555;">+</span>min;
+}
+
+std<span style="color: #555555;">::</span>mutex mo;
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">phil</span>(<span style="color: #007788; font-weight: bold;">int</span> ph, std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&amp;</span> ma, std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&amp;</span> mb) {
+  <span style="color: #006699; font-weight: bold;">while</span>(<span style="color: #336666;">true</span>) {
+    <span style="color: #007788; font-weight: bold;">int</span> duration<span style="color: #555555;">=</span>myrand(<span style="color: #ff6600;">1000</span>, <span style="color: #ff6600;">2000</span>);
+    {
+      std<span style="color: #555555;">::</span>lock_guard<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span> g(mo);
+      std<span style="color: #555555;">::</span>cout<span style="color: #555555;">&lt;&lt;</span>ph<span style="color: #555555;">&lt;&lt;</span><span style="color: #cc3300;">" thinks "</span><span style="color: #555555;">&lt;&lt;</span>duration<span style="color: #555555;">&lt;&lt;</span><span style="color: #cc3300;">"ms</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>;
+    }
+    std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>sleep_for(std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>milliseconds(duration));
+
+    std<span style="color: #555555;">::</span>lock_guard<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span> ga(ma);
+    {
+      std<span style="color: #555555;">::</span>lock_guard<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span> g(mo);
+      std<span style="color: #555555;">::</span>cout<span style="color: #555555;">&lt;&lt;</span><span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\t\t</span><span style="color: #cc3300;">"</span><span style="color: #555555;">&lt;&lt;</span>ph<span style="color: #555555;">&lt;&lt;</span><span style="color: #cc3300;">" got ma</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>;
+    }
+    std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>sleep_for(std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>milliseconds(<span style="color: #ff6600;">1000</span>));
+
+    std<span style="color: #555555;">::</span>lock_guard<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span> gb(mb);
+    {
+      std<span style="color: #555555;">::</span>lock_guard<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span> g(mo);
+      std<span style="color: #555555;">::</span>cout<span style="color: #555555;">&lt;&lt;</span><span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\t\t</span><span style="color: #cc3300;">"</span><span style="color: #555555;">&lt;&lt;</span>ph<span style="color: #555555;">&lt;&lt;</span><span style="color: #cc3300;">" got mb</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>;
+    }
+
+    duration<span style="color: #555555;">=</span>myrand(<span style="color: #ff6600;">1000</span>, <span style="color: #ff6600;">2000</span>);
+    {
+      std<span style="color: #555555;">::</span>lock_guard<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span> g(mo);
+      std<span style="color: #555555;">::</span>cout<span style="color: #555555;">&lt;&lt;</span><span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\t\t\t\t</span><span style="color: #cc3300;">"</span><span style="color: #555555;">&lt;&lt;</span>ph<span style="color: #555555;">&lt;&lt;</span><span style="color: #cc3300;">" eats "</span><span style="color: #555555;">&lt;&lt;</span>duration<span style="color: #555555;">&lt;&lt;</span><span style="color: #cc3300;">"ms</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>;
+    }
+    std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>sleep_for(std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>milliseconds(duration));
+  }
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+  std<span style="color: #555555;">::</span>cout<span style="color: #555555;">&lt;&lt;</span><span style="color: #cc3300;">"dp_10</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>;
+  srand(time(nullptr));
+
+  std<span style="color: #555555;">::</span>mutex m1, m2, m3, m4;
+
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t1([<span style="color: #555555;">&amp;</span>] {phil(<span style="color: #ff6600;">1</span>, m1, m2);});
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t2([<span style="color: #555555;">&amp;</span>] {phil(<span style="color: #ff6600;">2</span>, m2, m3);});
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t3([<span style="color: #555555;">&amp;</span>] {phil(<span style="color: #ff6600;">3</span>, m3, m4);});
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t4([<span style="color: #555555;">&amp;</span>] {phil(<span style="color: #ff6600;">4</span>, m1, m4);});
+
+  t1.join();
+  t2.join();
+  t3.join();
+  t4.join();
+}
+</pre>
+</div>
+<div><br />
+<div>The global mutex mo controls the console output resource. Every cout statement is in its block and the<code> lock_guard(</code>) template ensures that console output is not garbled.</div>
+<div>&nbsp;</div>
+<div><img src="https://www.modernescpp.com/images/blog/DiningPhilosophers/3/dp_5.png" alt="dp 5" width="450" height="284" style="display: block; margin-left: auto; margin-right: auto;" /></div>
+</div>
+<div>
+<div>&nbsp;</div>
+<h2>A <code>std::unique_lock</code> using deferred locking<code><br /></code></h2>
+<div>&nbsp;</div>
+<div>C++ offers alternative solutions next to resource hierarchy. At the moment we have two separate operations to acquire the two resources. If there is only one operation to acquire the two resources, there is no longer the danger of deadlock. The first "all or nothing" solution uses<code> unique_lock()</code> with <code>defer_lock</code>. The real resource acquire happens in the <code>lock()</code> statement. See <code>dp_12.cpp:</code></div>
+<div>&nbsp;</div>
+</div>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">myrand</span>(<span style="color: #007788; font-weight: bold;">int</span> min, <span style="color: #007788; font-weight: bold;">int</span> max) {
+  <span style="color: #006699; font-weight: bold;">static</span> std<span style="color: #555555;">::</span>mt19937 rnd(std<span style="color: #555555;">::</span>time(nullptr));
+  <span style="color: #006699; font-weight: bold;">return</span> std<span style="color: #555555;">::</span>uniform_int_distribution<span style="color: #555555;">&lt;&gt;</span>(min,max)(rnd);
+}
+
+std<span style="color: #555555;">::</span>mutex mo;
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">phil</span>(<span style="color: #007788; font-weight: bold;">int</span> ph, std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&amp;</span> ma, std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&amp;</span> mb) {
+  <span style="color: #006699; font-weight: bold;">while</span>(<span style="color: #336666;">true</span>) {
+    <span style="color: #007788; font-weight: bold;">int</span> duration<span style="color: #555555;">=</span>myrand(<span style="color: #ff6600;">1000</span>, <span style="color: #ff6600;">2000</span>);
+    {
+      std<span style="color: #555555;">::</span>lock_guard<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span> g(mo);
+      std<span style="color: #555555;">::</span>cout<span style="color: #555555;">&lt;&lt;</span>ph<span style="color: #555555;">&lt;&lt;</span><span style="color: #cc3300;">" thinks "</span><span style="color: #555555;">&lt;&lt;</span>duration<span style="color: #555555;">&lt;&lt;</span><span style="color: #cc3300;">"ms</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>;
+    }
+    std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>sleep_for(std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>milliseconds(duration));
+
+    std<span style="color: #555555;">::</span>unique_lock<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span> ga(ma, std<span style="color: #555555;">::</span>defer_lock);
+    {
+      std<span style="color: #555555;">::</span>lock_guard<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span> g(mo);
+      std<span style="color: #555555;">::</span>cout<span style="color: #555555;">&lt;&lt;</span><span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\t\t</span><span style="color: #cc3300;">"</span><span style="color: #555555;">&lt;&lt;</span>ph<span style="color: #555555;">&lt;&lt;</span><span style="color: #cc3300;">" got ma</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>;
+    }
+    std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>sleep_for(std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>milliseconds(<span style="color: #ff6600;">1000</span>));
+
+    std<span style="color: #555555;">::</span>unique_lock<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span> gb(mb,std<span style="color: #555555;">::</span>defer_lock);
+    std<span style="color: #555555;">::</span>lock(ga, gb);
+    {
+      std<span style="color: #555555;">::</span>lock_guard<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span> g(mo);
+      std<span style="color: #555555;">::</span>cout<span style="color: #555555;">&lt;&lt;</span><span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\t\t</span><span style="color: #cc3300;">"</span><span style="color: #555555;">&lt;&lt;</span>ph<span style="color: #555555;">&lt;&lt;</span><span style="color: #cc3300;">" got mb</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>;
+    }
+
+    duration<span style="color: #555555;">=</span>myrand(<span style="color: #ff6600;">1000</span>, <span style="color: #ff6600;">2000</span>);
+    {
+      std<span style="color: #555555;">::</span>lock_guard<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span> g(mo);
+      std<span style="color: #555555;">::</span>cout<span style="color: #555555;">&lt;&lt;</span><span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\t\t\t\t</span><span style="color: #cc3300;">"</span><span style="color: #555555;">&lt;&lt;</span>ph<span style="color: #555555;">&lt;&lt;</span><span style="color: #cc3300;">" eats "</span><span style="color: #555555;">&lt;&lt;</span>duration<span style="color: #555555;">&lt;&lt;</span><span style="color: #cc3300;">"ms</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>;
+    }
+    std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>sleep_for(std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>milliseconds(duration));
+  }
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p><span class="VIiyi" lang="en"><span class="JLqJ4b ChMk0b" data-language-for-alternatives="en" data-language-to-translate-into="de" data-number-of-phrases="12" data-phrase-index="0">So far we have generated the random numbers using the<code> rand()</code> function.</span> <span class="JLqJ4b ChMk0b" data-language-for-alternatives="en" data-language-to-translate-into="de" data-number-of-phrases="12" data-phrase-index="1">This function is not reentrant.</span> <span class="JLqJ4b ChMk0b" data-language-for-alternatives="en" data-language-to-translate-into="de" data-number-of-phrases="12" data-phrase-index="2">Not reentrant means not threadable.</span> <span class="JLqJ4b ChMk0b" data-language-for-alternatives="en" data-language-to-translate-into="de" data-number-of-phrases="12" data-phrase-index="5">This error is fixed with a modified<code> myrand()</code> function.</span> <span class="JLqJ4b ChMk0b" data-language-for-alternatives="en" data-language-to-translate-into="de" data-number-of-phrases="12" data-phrase-index="6">The static function object <code>rnd</code> is a Mersenne Twister random number generator.</span> <span class="JLqJ4b ChMk0b" data-language-for-alternatives="en" data-language-to-translate-into="de" data-number-of-phrases="12" data-phrase-index="7">With static we avoid a global function object.</span> <span class="JLqJ4b ChMk0b" data-language-for-alternatives="en" data-language-to-translate-into="de" data-number-of-phrases="12" data-phrase-index="8">Scaling to a value between <code>min</code> and <code>max</code> is now done with <code>uniform_int_distribution&lt;&gt;</code>.</span> <span class="JLqJ4b ChMk0b" data-language-for-alternatives="en" data-language-to-translate-into="de" data-number-of-phrases="12" data-phrase-index="9">Using the library is better than writing your own code.</span><span class="JLqJ4b" data-language-for-alternatives="en" data-language-to-translate-into="de" data-number-of-phrases="12" data-phrase-index="10"> </span><span class="JLqJ4b ChMk0b" data-language-for-alternatives="en" data-language-to-translate-into="de" data-number-of-phrases="12" data-phrase-index="11">Who would have thought that simple things like cout output and random number are so difficult in programs with threads?</span></span></p>
+<div>
+<h2><code></code></h2>
+<h2>A <code>std::scoped_lock </code>with Resource Hierarchy</h2>
+<div>&nbsp;</div>
+<div>The second "all or nothing" solution is even more straightforward. The C++17 function<code> scoped_lock()</code> allows acquiring multiple resources. This powerful function gives us the shortest dining philosophers solution. See <code>dp_13.cpp</code>:</div>
+<div>&nbsp;</div>
+</div>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">phil</span>(<span style="color: #007788; font-weight: bold;">int</span> ph, std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&amp;</span> ma, std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&amp;</span> mb) {
+  <span style="color: #006699; font-weight: bold;">while</span>(<span style="color: #336666;">true</span>) {
+    <span style="color: #007788; font-weight: bold;">int</span> duration<span style="color: #555555;">=</span>myrand(<span style="color: #ff6600;">1000</span>, <span style="color: #ff6600;">2000</span>);
+    {
+      std<span style="color: #555555;">::</span>lock_guard<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span> g(mo);
+      std<span style="color: #555555;">::</span>cout<span style="color: #555555;">&lt;&lt;</span>ph<span style="color: #555555;">&lt;&lt;</span><span style="color: #cc3300;">" thinks "</span><span style="color: #555555;">&lt;&lt;</span>duration<span style="color: #555555;">&lt;&lt;</span><span style="color: #cc3300;">"ms</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>;
+    }
+    std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>sleep_for(std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>milliseconds(duration));
+
+    std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>sleep_for(std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>milliseconds(<span style="color: #ff6600;">1000</span>));
+    std<span style="color: #555555;">::</span>scoped_lock(ma, mb);
+
+    {
+      std<span style="color: #555555;">::</span>lock_guard<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span> g(mo);
+      std<span style="color: #555555;">::</span>cout<span style="color: #555555;">&lt;&lt;</span><span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\t\t</span><span style="color: #cc3300;">"</span><span style="color: #555555;">&lt;&lt;</span>ph<span style="color: #555555;">&lt;&lt;</span><span style="color: #cc3300;">" got ma, mb</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>;
+    }
+
+    duration<span style="color: #555555;">=</span>myrand(<span style="color: #ff6600;">1000</span>, <span style="color: #ff6600;">2000</span>);
+    {
+      std<span style="color: #555555;">::</span>lock_guard<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span> g(mo);
+      std<span style="color: #555555;">::</span>cout<span style="color: #555555;">&lt;&lt;</span><span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\t\t\t\t</span><span style="color: #cc3300;">"</span><span style="color: #555555;">&lt;&lt;</span>ph<span style="color: #555555;">&lt;&lt;</span><span style="color: #cc3300;">" eats "</span><span style="color: #555555;">&lt;&lt;</span>duration<span style="color: #555555;">&lt;&lt;</span><span style="color: #cc3300;">"ms</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>;
+    }
+    std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>sleep_for(std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>milliseconds(duration));
+  }
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<div>
+<div>There are more solutions. The original Dijkstra solution used one mutex, one semaphore per philosopher, and one state variable per philosopher. [ref 1971; Dijkstra; EWD310 Hierarchical Ordering of Sequential Processes; <a href="https://www.cs.utexas.edu/users/EWD/transcriptions/EWD03xx/EWD310.html">https://www.cs.utexas.edu/users/EWD/transcriptions/EWD03xx/EWD310.html</a>]. Andrew S. Tanenbaum provided a C language solution. [ref 2006; Tanenbaum; Operating Systems. Design and Implementation, 3rd edition; chapter 2.3.1]</div>
+<div>
+<div>
+<h2>The Original Dining Philosophers Problem using Semaphores</h2>
+</div>
+</div>
+<div>&nbsp;</div>
+<div>
+<div>
+<div>File <code>dp_14.cpp</code> is the Tanenbaum solution rewritten in C++20:</div>
+</div>
+</div>
+<div>&nbsp;</div>
+<div>&nbsp;</div>
+</div>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// dp_14.cpp</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;chrono&gt;</span>
+<span style="color: #009999;">#include &lt;thread&gt;</span>
+<span style="color: #009999;">#include &lt;mutex&gt;</span>
+<span style="color: #009999;">#include &lt;semaphore&gt;</span>
+<span style="color: #009999;">#include &lt;random&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">myrand</span>(<span style="color: #007788; font-weight: bold;">int</span> min, <span style="color: #007788; font-weight: bold;">int</span> max) {
+  <span style="color: #006699; font-weight: bold;">static</span> std<span style="color: #555555;">::</span>mt19937 rnd(std<span style="color: #555555;">::</span>time(nullptr));
+  <span style="color: #006699; font-weight: bold;">return</span> std<span style="color: #555555;">::</span>uniform_int_distribution<span style="color: #555555;">&lt;&gt;</span>(min,max)(rnd);
+}
+
+<span style="color: #006699; font-weight: bold;">enum</span> {
+  N<span style="color: #555555;">=</span><span style="color: #ff6600;">5</span>,                  <span style="color: #0099ff; font-style: italic;">// number of philosophers</span>
+  THINKING<span style="color: #555555;">=</span><span style="color: #ff6600;">0</span>,           <span style="color: #0099ff; font-style: italic;">// philosopher is thinking</span>
+  HUNGRY<span style="color: #555555;">=</span><span style="color: #ff6600;">1</span>,             <span style="color: #0099ff; font-style: italic;">// philosopher is trying to get forks</span>
+  EATING<span style="color: #555555;">=</span><span style="color: #ff6600;">2</span>,             <span style="color: #0099ff; font-style: italic;">// philosopher is eating</span>
+};
+
+<span style="color: #009999;">#define LEFT (i+N-1)%N  </span><span style="color: #0099ff; font-style: italic;">// number of i's left neighbor</span>
+<span style="color: #009999;">#define RIGHT (i+1)%N   </span><span style="color: #0099ff; font-style: italic;">// number of i's right neighbor</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> state[N];           <span style="color: #0099ff; font-style: italic;">// array to keep track of everyone's state</span>
+std<span style="color: #555555;">::</span>mutex mutex_;      <span style="color: #0099ff; font-style: italic;">// mutual exclusion for critical regions</span>
+std<span style="color: #555555;">::</span>binary_semaphore s[N]{<span style="color: #ff6600;">0</span>, <span style="color: #ff6600;">0</span>, <span style="color: #ff6600;">0</span>, <span style="color: #ff6600;">0</span>, <span style="color: #ff6600;">0</span>};
+                        <span style="color: #0099ff; font-style: italic;">// one semaphore per philosopher</span>
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">test</span>(<span style="color: #007788; font-weight: bold;">int</span> i)        <span style="color: #0099ff; font-style: italic;">// i: philosopher number, from 0 to N-1</span>
+{
+  <span style="color: #006699; font-weight: bold;">if</span> (state[i] <span style="color: #555555;">==</span> HUNGRY
+   <span style="color: #555555;">&amp;&amp;</span> state[LEFT] <span style="color: #555555;">!=</span> EATING <span style="color: #555555;">&amp;&amp;</span> state[RIGHT] <span style="color: #555555;">!=</span> EATING) {
+    state[i] <span style="color: #555555;">=</span> EATING;
+    s[i].release();
+  }
+}
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">take_forks</span>(<span style="color: #007788; font-weight: bold;">int</span> i)  <span style="color: #0099ff; font-style: italic;">// i: philosopher number, from 0 to N-1</span>
+{
+  mutex_.lock();        <span style="color: #0099ff; font-style: italic;">// enter critical region</span>
+  state[i] <span style="color: #555555;">=</span> HUNGRY;    <span style="color: #0099ff; font-style: italic;">// record fact that philosopher i is hungry</span>
+  test(i);              <span style="color: #0099ff; font-style: italic;">// try to acquire 2 forks</span>
+  mutex_.unlock();      <span style="color: #0099ff; font-style: italic;">// exit critical region</span>
+  s[i].acquire();       <span style="color: #0099ff; font-style: italic;">// block if forks were not acquired</span>
+}
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">put_forks</span>(<span style="color: #007788; font-weight: bold;">int</span> i)   <span style="color: #0099ff; font-style: italic;">// i: philosopher number, from 0 to N-1</span>
+{
+  mutex_.lock();        <span style="color: #0099ff; font-style: italic;">// enter critical region</span>
+  state[i] <span style="color: #555555;">=</span> THINKING;  <span style="color: #0099ff; font-style: italic;">// philosopher has finished eating</span>
+  test(LEFT);           <span style="color: #0099ff; font-style: italic;">// see if left neighbor can now eat</span>
+  test(RIGHT);          <span style="color: #0099ff; font-style: italic;">// see if right neighbor can now eat</span>
+  mutex_.unlock();      <span style="color: #0099ff; font-style: italic;">// exit critical region</span>
+}
+
+std<span style="color: #555555;">::</span>mutex mo;
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">think</span>(<span style="color: #007788; font-weight: bold;">int</span> i) {
+  <span style="color: #007788; font-weight: bold;">int</span> duration <span style="color: #555555;">=</span> myrand(<span style="color: #ff6600;">1000</span>, <span style="color: #ff6600;">2000</span>);
+  {
+		std<span style="color: #555555;">::</span>lock_guard<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span> g(mo);
+		std<span style="color: #555555;">::</span>cout<span style="color: #555555;">&lt;&lt;</span>i<span style="color: #555555;">&lt;&lt;</span><span style="color: #cc3300;">" thinks "</span><span style="color: #555555;">&lt;&lt;</span>duration<span style="color: #555555;">&lt;&lt;</span><span style="color: #cc3300;">"ms</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>;
+  }
+  std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>sleep_for(std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>milliseconds(duration));
+}
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">eat</span>(<span style="color: #007788; font-weight: bold;">int</span> i) {
+  <span style="color: #007788; font-weight: bold;">int</span> duration <span style="color: #555555;">=</span> myrand(<span style="color: #ff6600;">1000</span>, <span style="color: #ff6600;">2000</span>);
+  {
+		std<span style="color: #555555;">::</span>lock_guard<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span> g(mo);
+		std<span style="color: #555555;">::</span>cout<span style="color: #555555;">&lt;&lt;</span><span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\t\t\t\t</span><span style="color: #cc3300;">"</span><span style="color: #555555;">&lt;&lt;</span>i<span style="color: #555555;">&lt;&lt;</span><span style="color: #cc3300;">" eats "</span><span style="color: #555555;">&lt;&lt;</span>duration<span style="color: #555555;">&lt;&lt;</span><span style="color: #cc3300;">"ms</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>;
+  }
+  std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>sleep_for(std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>milliseconds(duration));
+}
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">philosopher</span>(<span style="color: #007788; font-weight: bold;">int</span> i) <span style="color: #0099ff; font-style: italic;">// i: philosopher number, from 0 to N-1</span>
+{
+  <span style="color: #006699; font-weight: bold;">while</span> (<span style="color: #336666;">true</span>) {        <span style="color: #0099ff; font-style: italic;">// repeat forever</span>
+    think(i);           <span style="color: #0099ff; font-style: italic;">// philosopher is thinking</span>
+    take_forks(i);      <span style="color: #0099ff; font-style: italic;">// acquire two forks or block</span>
+    eat(i);             <span style="color: #0099ff; font-style: italic;">// yum-yum, spaghetti</span>
+    put_forks(i);       <span style="color: #0099ff; font-style: italic;">// put both forks back on table</span>
+  }
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+  std<span style="color: #555555;">::</span>cout<span style="color: #555555;">&lt;&lt;</span><span style="color: #cc3300;">"dp_14</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>;
+
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t0([<span style="color: #555555;">&amp;</span>] {philosopher(<span style="color: #ff6600;">0</span>);});
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t1([<span style="color: #555555;">&amp;</span>] {philosopher(<span style="color: #ff6600;">1</span>);});
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t2([<span style="color: #555555;">&amp;</span>] {philosopher(<span style="color: #ff6600;">2</span>);});
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t3([<span style="color: #555555;">&amp;</span>] {philosopher(<span style="color: #ff6600;">3</span>);});
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t4([<span style="color: #555555;">&amp;</span>] {philosopher(<span style="color: #ff6600;">4</span>);});
+  t0.join();
+  t1.join();
+  t2.join();
+  t3.join();
+  t4.join();
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<div><br />
+<div>By the way, the semaphore is the oldest thread synchronization primitive. Dijkstra defined the P() and V() operation in 1965: "It is the P-operation, which represents the potential delay, viz. when a process initiates a P-operation on a semaphore, that at that moment is = 0, in that case, this P-operation cannot be completed until another process has performed a V-operation on the same semaphore and has given it the value '1'." Today P() is called<code> release()</code> and V() is called<code> acquire()</code>. [ref 1965; Dijkstra; EWD123 Cooperating sequential processes; <a href="https://www.cs.utexas.edu/users/EWD/transcriptions/EWD01xx/EWD123.html">https://www.cs.utexas.edu/users/EWD/transcriptions/EWD01xx/EWD123.html</a>]</div>
+<div>&nbsp;</div>
+<h2>A C++20 Compatible Semaphore</h2>
+<div>&nbsp;</div>
+<div>You need&nbsp; a C++20 compiler like LLVM (clang++) version 13.0.0 or newer to compile <code>dp_14.cpp</code>. Or you change the<code> #include &lt;semaphore</code>&gt; into <code>#include "semaphore.h"</code> and provide the following header file. Then a C++11 compiler is sufficient.</div>
+<div>&nbsp;</div>
+</div>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// semaphore.h</span>
+<span style="color: #009999;">#include &lt;mutex&gt;</span>
+<span style="color: #009999;">#include &lt;condition_variable&gt;</span>
+<span style="color: #009999;">#include &lt;limits&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">namespace</span> std {
+  <span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span><span style="color: #007788; font-weight: bold;">ptrdiff_t</span> least_max_value
+   <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>numeric_limits<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span><span style="color: #007788; font-weight: bold;">ptrdiff_t</span><span style="color: #555555;">&gt;::</span>max()<span style="color: #555555;">&gt;</span>
+  <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">counting_semaphore</span> {
+  <span style="color: #9999ff;">public:</span>
+    counting_semaphore(std<span style="color: #555555;">::</span><span style="color: #007788; font-weight: bold;">ptrdiff_t</span> desired) <span style="color: #555555;">:</span> counter(desired) {}
+
+    counting_semaphore(<span style="color: #006699; font-weight: bold;">const</span> counting_semaphore<span style="color: #555555;">&amp;</span>) <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">delete</span>;
+    counting_semaphore<span style="color: #555555;">&amp;</span> <span style="color: #006699; font-weight: bold;">operator</span><span style="color: #555555;">=</span>(<span style="color: #006699; font-weight: bold;">const</span> counting_semaphore<span style="color: #555555;">&amp;</span>) <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">delete</span>;
+
+    <span style="color: #006699; font-weight: bold;">inline</span> <span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">release</span>(<span style="color: #007788; font-weight: bold;">ptrdiff_t</span> update <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span>) {
+      std<span style="color: #555555;">::</span>unique_lock<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span> lock(mutex_);
+      counter <span style="color: #555555;">+=</span> update;
+      cv.notify_one();
+    }
+
+    <span style="color: #006699; font-weight: bold;">inline</span> <span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">acquire</span>() {
+      std<span style="color: #555555;">::</span>unique_lock<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span> lock(mutex_);
+      <span style="color: #006699; font-weight: bold;">while</span> (<span style="color: #ff6600;">0</span> <span style="color: #555555;">==</span> counter) cv.wait(lock);
+      <span style="color: #555555;">--</span>counter;
+    }
+
+  <span style="color: #9999ff;">private:</span>
+    <span style="color: #007788; font-weight: bold;">ptrdiff_t</span> counter;
+    std<span style="color: #555555;">::</span>mutex mutex_;
+    std<span style="color: #555555;">::</span>condition_variable cv;
+  };
+
+  <span style="color: #006699; font-weight: bold;">using</span> binary_semaphore <span style="color: #555555;">=</span> counting_semaphore<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">1</span><span style="color: #555555;">&gt;</span>;
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<div>
+<div>The C++ semaphore consists of a counter, a <code>mutex</code>, and a <code>condition_variable.</code> After 14 program versions, we leave this topic. The programs versions 1 to 6 have problems. I presented them to show bad multi-thread programming. Don't copy that!</div>
+<h2>What's next?</h2>
+<div><code> constexpr</code> functions have a lot in common with templates and become more powerful with C++20. I will write about them in my next post.</div>
+<div>&nbsp;</div>
+<div>{loadmoduleid 153}</div>
+<div>&nbsp;</div>
+</div>
