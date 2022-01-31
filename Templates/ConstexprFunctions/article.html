@@ -1,0 +1,182 @@
+<p>Today, I continue my story about programming at compile time. After template metaprogramming, the type-traits library, today's topic is <code>constexpr</code> functions in particular.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/ConstexprFunctions/constexpr.png" alt="constexpr" width="650" height="403" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>You may wonder why I write an additional post about <code>constexpr</code>. I have already written a few posts about <code>constexpr</code> in the last few years. Here is my motivation. First, I will show interesting similarities of <code>constexpr</code> functions and templates. Second, I want to write about the improved power of <code>constexpr</code> in C++20. And finally, I also discuss&nbsp;<code>consteval</code> in C++20. When some theory is not detailed enough in my posts, I will refer to previous posts. Let's start with a short recap before I dive into the new topics.</p>
+<h2>A Short Recap</h2>
+<p><code>constexpr</code> allows you to program at compile time with the typical C++-Syntax. Constant expressions with <code>constexpr</code> can have three forms.</p>
+<h4>Variables</h4>
+<ul>
+<ul>
+<li>are implicit <span style="font-family: courier new, courier;">const.</span></li>
+<li style="margin: 0; line-height: 125%;">have to be initialized by a constant expression.</li>
+</ul>
+</ul>
+<div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">           constexpr <span style="color: #00aaaa;">double</span> pi = <span style="color: #009999;">3.14</span>;
+</pre>
+</div>
+<h4>Functions</h4>
+<p>constexpr functions in C++14 are quite comfortable. They can</p>
+<ul>
+<li>invoke other <span style="font-family: courier new, courier;">constexpr</span> functions.</li>
+<li>can have variables that have to be initialized by a constant expression.</li>
+<li>can have conditional expressions or loops.</li>
+<li>are implicit <span style="font-family: courier new, courier;">inline.</span></li>
+<li>cannot have <span style="font-family: courier new, courier;">static</span> or <span style="font-family: courier new, courier;">thread_local</span> data.</li>
+</ul>
+<h4>User-defined types</h4>
+<ul>
+<li>have to have a constructor which is a constant expression.<span style="font-family: courier new, courier;"></span></li>
+<li>cannot have virtual functions<i>.</i></li>
+<li>cannot have a virtual base class.</li>
+</ul>
+<p>The rules for <span style="font-family: courier new, courier;">constexpr</span> functions or methods are quite simple. In short, I call both functions.</p>
+<p><span style="font-family: courier new, courier;">constexpr</span> functions can only depend on functionality which is a constant expression. Being a <span style="font-family: courier new, courier;">constexpr</span> function does not mean that the function is executed at compile time. It says, that the function has the potential to run at compile time. A <span style="font-family: courier new, courier;">constexpr</span> function can also run a run time. It's often a question of the compiler and the optimization level if a constexpr function runs at compile time or runtime. There are two contexts in which a <span style="font-family: courier new, courier;">constexpr</span> function <span style="font-family: courier new, courier;">func</span> has to run at compile time.</p>
+<ol>
+<li>The <span style="font-family: courier new, courier;">constexpr</span> function is executed in a context that is evaluated at compile time. This can be a <span style="font-family: courier new, courier;">static_assert</span> expression, such as with the type-traits library or the initialization of a C-array.</li>
+<li>The value of a <span style="font-family: courier new, courier;">constexpr</span> function is requested with <code>constexpr</code>: <span style="font-family: courier new, courier;">constexpr auto res = func(5)</span>;</li>
+</ol>
+<p>Here is a small example of the theory. The program <span style="font-family: courier new, courier;">constexpr14.cpp</span> calculates the greates common divisor of two numbers.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// constexpr14.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+constexpr <span style="color: #006699; font-weight: bold;">auto</span> <span style="color: #cc00ff;">gcd</span>(<span style="color: #007788; font-weight: bold;">int</span> a, <span style="color: #007788; font-weight: bold;">int</span> b){
+  <span style="color: #006699; font-weight: bold;">while</span> (b <span style="color: #555555;">!=</span> <span style="color: #ff6600;">0</span>){
+    <span style="color: #006699; font-weight: bold;">auto</span> t<span style="color: #555555;">=</span> b;
+    b<span style="color: #555555;">=</span> a <span style="color: #555555;">%</span> b;
+    a<span style="color: #555555;">=</span> t;
+  }
+  <span style="color: #006699; font-weight: bold;">return</span> a;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+  
+ std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> '\n';
+  
+  constexpr <span style="color: #007788; font-weight: bold;">int</span> i<span style="color: #555555;">=</span> gcd(<span style="color: #ff6600;">11</span>,<span style="color: #ff6600;"> 121</span>);     <span style="color: #0099ff; font-style: italic;">// (1)</span>
+  
+  <span style="color: #007788; font-weight: bold;">int</span> a<span style="color: #555555;">=</span> <span style="color: #ff6600;">11</span>;
+  <span style="color: #007788; font-weight: bold;">int</span> b<span style="color: #555555;">=</span> <span style="color: #ff6600;">121</span>;
+  <span style="color: #007788; font-weight: bold;">int</span> j<span style="color: #555555;">=</span> gcd(a, b);                  <span style="color: #0099ff; font-style: italic;">// (2)</span>
+
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"gcd(11,121): "</span> <span style="color: #555555;">&lt;&lt;</span> i <span style="color: #555555;">&lt;&lt;</span> '\n';
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"gcd(a,b): "</span> <span style="color: #555555;">&lt;&lt;</span> j <span style="color: #555555;">&lt;&lt;</span> '\n';
+  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> '\n';
+ 
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Line (1) calculates the result<span style="font-family: courier new, courier;"> i</span> at compile time, and line (2) <span style="font-family: courier new, courier;">j</span> at run time. The compiler would complain when I declare j as constexpr: <span style="font-family: courier new, courier;">constexpr int j = gcd(a, b)</span>. The problem would be that <span style="font-family: courier new, courier;">int'</span>s <span style="font-family: courier new, courier;">a</span>, and <span style="font-family: courier new, courier;">b</span> are not constant expressions.</p>
+<p>The output of the program should not surprise you.</p>
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/Templates/ConstexprFunctions/constexpr14.png" alt="constexpr14" width="400" height="242" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>The surprise may start now. Let me show you the magic with the <a href="https://godbolt.org/">Compiler Explorer.</a></p>
+<p><img src="https://www.modernescpp.com/images/blog/ModernCpp/CppCoreGuidelinesConstexpr/godbolt.png" alt="godbolt" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>&nbsp;</p>
+<p>Line (1) in the program <span style="font-family: courier new, courier;">constexpr14.cpp</span> boils down to the constant 11 in the following expression: <span style="font-family: courier new, courier;">mov DWORD PTR[rbp-4], 11</span> (line 33 in the screenshot). In contrast, line (2) is a function call: <span style="font-family: courier new, courier;">call gcd(int, int)</span> (line 41 in the screenshot).</p>
+<p>After this recap, let me continue with the similarities of <code>constexpr</code> functions and templates metaprogramming.</p>
+<h2>Template Metaprogramming</h2>
+<p>constexpr functions have a lot in common with template metaprogramming. If you are not familiar with template metaprogramming, my following three previous posts should give you an idea.</p>
+<ul>
+<li><a href="https://www.modernescpp.com/index.php/template-metaprogramming-a-introduction">Template Metaprogramming - How it All Started</a></li>
+<li><a href="https://www.modernescpp.com/index.php/template-metaprogramming-how-it-works">Template Metaprogramming - How it Works</a></li>
+<li><a href="https://www.modernescpp.com/index.php/template-metaprogramming-hybrid-programming">Template Metaprogramming - Hybrid Programming</a></li>
+</ul>
+<p>Here is the big picture comparing <code>constexpr</code> functions with template metaprogramming:</p>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/ConstexprFunctions/comparisonConstexprTemplateMetaprogramming.png" alt="TemplateMetaprogrammingVersusConstexprOld" width="600" height="179" style="display: block; margin-left: auto; margin-right: auto;" />I want to add a few remarks to my table.</p>
+<ul>
+<li>A template metaprogram runs at compile, but a <code>constexpr</code> function&nbsp;can run at compile time or runtime.</li>
+<li>Arguments of a template metaprogram can be types, non-types such as <code>int</code>, or templates.</li>
+<li>There is no state at compile time and, therefore, no modification. This means template metaprogramming is programming in a pure functional style. Here are the characteristics from the functional style perspective:<br />
+<ul>
+<li>In template metaprogramming, instead of modifying a value, you return a new value each time.</li>
+<li>Controlling a for a loop by incrementing a variable such as i is not possible at compile-time: <code>for (int i; i &lt;= 10; ++i)</code>. Template metaprogramming, therefore, replaces loops with recursion.</li>
+<li>In template metaprogramming, conditional execution is replaced by template specialization.</li>
+</ul>
+</li>
+</ul>
+<p>Admittedly, this comparison was quite concise. A pictural comparison of a metafunction (see <a href="https://www.modernescpp.com/index.php/template-metaprogramming-how-it-works">Template Metaprogramming - How it Works</a><a href="https://www.modernescpp.com/index.php/c-core-guidelines-programming-at-compile-time">) </a>and a <span style="font-family: courier new, courier;">constexpr</span> function should answer the open questions. Both functions calculate the factorial of a number.</p>
+<ul>
+<li>The function arguments of a<span style="font-family: courier new, courier;"> constexpr</span> function correspond to template arguments of a metafunction.</li>
+</ul>
+<p>&nbsp;</p>
+<p><img src="https://www.modernescpp.com/images/blog/ModernCpp/CppCoreGuidelinesConstexpr/comparison1.png" alt="comparison1" width="600" height="283" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>&nbsp;</p>
+<ul>
+<li>&nbsp;A <span style="font-family: courier new, courier;">constexpr</span> function can have variables and modify them. A metafunction generates a new value.</li>
+</ul>
+<p><img src="https://www.modernescpp.com/images/blog/ModernCpp/CppCoreGuidelinesConstexpr/comparison2.png" alt="comparison2" width="600" height="260" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<ul>
+<li>&nbsp;A metafunction uses recursion to simulate a loop.</li>
+</ul>
+<p><img src="https://www.modernescpp.com/images/blog/ModernCpp/CppCoreGuidelinesConstexpr/comparison3.png" alt="comparison3" width="600" height="262" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<ul>
+<li>Instead of an end condition, a metafunction uses a full specialization of a template to end a loop. Additionally, a metafunction uses partial or full specialization to perform conditional execution, such as if statements.</li>
+</ul>
+<p><img src="https://www.modernescpp.com/images/blog/ModernCpp/CppCoreGuidelinesConstexpr/comparison4.png" alt="comparison4" width="600" height="267" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<ul>
+<li>&nbsp;Instead of an updated value <span style="font-family: courier new, courier;">res,</span> the metafunction generates in each iteration a new <span style="font-family: courier new, courier;">value.</span>&nbsp;<img src="https://www.modernescpp.com/images/blog/ModernCpp/CppCoreGuidelinesConstexpr/comparison5.png" alt="comparison5" width="500" height="226" style="display: block; margin-left: auto; margin-right: auto;" /></li>
+</ul>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<ul>
+<li>A metafunction has no return statement. It uses the value as a return value.</li>
+</ul>
+<h3><img src="https://www.modernescpp.com/images/blog/ModernCpp/CppCoreGuidelinesConstexpr/comparison6.png" alt="comparison6" width="600" height="261" style="display: block; margin-left: auto; margin-right: auto;" /></h3>
+<p>&nbsp;constexpr functions and templates have more in common.</p>
+<h2>Template Instantiation</h2>
+<p>Once more, when you want to know the details about template instantiation, read my previous post "<a href="https://www.modernescpp.com/index.php/template-instantiation">Template Instantiation</a>".&nbsp; Let me only emphasize the crucial facts.</p>
+<p>A template such as i<code>sSmaller</code> is two times syntactically checked:</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">bool</span> isSmaller(T fir, T sec){
+    <span style="color: #006699; font-weight: bold;">return</span> fir <span style="color: #555555;">&lt;</span> sec;
+}
+
+isSmaller(<span style="color: #ff6600;">5</span>, <span style="color: #ff6600;">10</span>);       <span style="color: #0099ff; font-style: italic;">// (1)</span>
+
+std<span style="color: #555555;">::</span>unordered_set<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> set1;
+std<span style="color: #555555;">::</span>unordered_set<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> set2;
+isSmaller(set1, set2);  <span style="color: #0099ff; font-style: italic;">// (2)</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<ul>
+<li>First, the syntax of the template definition is checked. This check is not required, but allowed and typically down by compilers.</li>
+<li>Second, the compiler deduces the template arguments from the function arguments. It creates in this process for each template argument a concrete function and checks its syntax. This instantiation process fails in the case of<code> std::unordered_set&lt;int</code>&gt; (2) because the data type does not support the &lt; operator.</li>
+</ul>
+<p><code>constexpr</code> functions are also two times checked for syntax.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">constexpr <span style="color: #006699; font-weight: bold;">auto</span> <span style="color: #cc00ff;">gcd</span>(<span style="color: #007788; font-weight: bold;">int</span> a, <span style="color: #007788; font-weight: bold;">int</span> b){
+  <span style="color: #006699; font-weight: bold;">while</span> (b <span style="color: #555555;">!=</span> <span style="color: #ff6600;">0</span>){
+    <span style="color: #006699; font-weight: bold;">auto</span> t<span style="color: #555555;">=</span> b;
+    b<span style="color: #555555;">=</span> a <span style="color: #555555;">%</span> b;
+    a<span style="color: #555555;">=</span> t;
+  }
+  <span style="color: #006699; font-weight: bold;">return</span> a;
+}
+
+
+constexpr <span style="color: #007788; font-weight: bold;">int</span> i<span style="color: #555555;">=</span> gcd(<span style="color: #ff6600;">11</span>,<span style="color: #ff6600;"> 121</span>);     <span style="color: #0099ff; font-style: italic;">// (1)</span>
+  
+<span style="color: #007788; font-weight: bold;">int</span> a<span style="color: #555555;">=</span> <span style="color: #ff6600;">11</span>;
+<span style="color: #007788; font-weight: bold;">int</span> b<span style="color: #555555;">=</span> <span style="color: #ff6600;">121</span>;<br />constexpr <span style="color: #007788; font-weight: bold;">int</span> j<span style="color: #555555;">=</span> gcd(a, b);        <span style="color: #0099ff; font-style: italic;">// (2)</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<ul>
+<li>First, the compiler checks if the function <code>gcd</code> can potentially run at compile time. This means, essentially, that all dependencies of a constexpr function such as the invoked function must be <code>constexpr</code>.</li>
+<li>The compiler has to check for each invocation of <code>gcd</code> that the arguments are constant expressions. Consequentially, the first call (1) is valid but not the second on (2).</li>
+</ul>
+<p>In the end, templates and constexpr functions are also quite similar regarding the visibility of their definition.</p>
+<h2>Visibility</h2>
+<p>When you instantiate a template, its definition must be visible. The same holds for <code>constexpr</code> function. When you invoke a <code>constexpr</code> function, its definition must be visible.</p>
+<h2><code>What's Next?</code></h2>
+<p>In the next post, I write about <code>constexpr</code> functions in C++20 and the C++20 keyword <code>consteval</code>.</p>
+<p>&nbsp;</p>
+<p>{loadmoduleid 153}</p>
