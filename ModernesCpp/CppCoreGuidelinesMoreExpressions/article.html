@@ -1,14 +1,14 @@
 <p>I know the headline to this post is a little bit boring: More Rules for Expressions. Honestly, this post is about code hygiene, because I will mainly write about pointers.</p>
 <hr id="system-readmore" />
 <p>&nbsp;</p>
-<p><img src="images/blog/ModernCpp/CppCoreGuidelinesMoreExpressions/dental.png" alt="dental" width="400" height="234" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p><img src="https://www.modernescpp.com/images/blog/ModernCpp/CppCoreGuidelinesMoreExpressions/dental.png" alt="dental" width="400" height="234" style="display: block; margin-left: auto; margin-right: auto;" /></p>
 <p>Let's have a look at my plan for today.</p>
 <ul style="margin-top: 0px; margin-bottom: 1rem; color: #515151; font-family: 'PT Sans', Helvetica, Arial, sans-serif; font-size: 20px; font-style: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing: 0px; background-color: #ffffff;">
 <li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Res-ptr" style="color: #268bd2; text-decoration: none;">ES.42: Keep use of pointers simple and straightforward</a></li>
 <li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Res-magic" style="color: #268bd2; text-decoration: none;">ES.45: Avoid “magic constants”; use symbolic constants</a></li>
 <li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Res-magic" style="color: #268bd2; text-decoration: none;"></a><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Res-nullptr" style="color: #268bd2; text-decoration: none;">ES.47: Use&nbsp;<code class="highlighter-rouge no-highlight" style="font-family: 'Roboto Mono', monospace; padding: 0.2em; font-size: 18px; background-color: #f9f9f9;">nullptr</code>&nbsp;rather than&nbsp;<code class="highlighter-rouge no-highlight" style="font-family: 'Roboto Mono', monospace; padding: 0.2em; font-size: 18px; background-color: #f9f9f9;">0</code>&nbsp;or&nbsp;<code class="highlighter-rouge no-highlight" style="font-family: 'Roboto Mono', monospace; padding: 0.2em; font-size: 18px; background-color: #f9f9f9;">NULL</code></a></li>
 </ul>
-<p>I will start with a very import rule.</p>
+<p>I will start with a very important rule.</p>
 <h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Res-ptr" style="color: #268bd2; text-decoration: none;">ES.42: Keep use of pointers simple and straightforward</a></h3>
 <p>Let me cite the words of the guidelines: "<em>Complicated pointer manipulation is a major source of errors</em>.". Why should we care? Of course, our legacy code is full of functionality such as this example:</p>
 <div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
@@ -35,8 +35,8 @@ f(myArray, <span style="color: #ff6600;">100</span>),      <span style="color: #
 </pre>
 </div>
 <p>&nbsp;</p>
-<p>The main issue with&nbsp;this code is that the caller&nbsp;must&nbsp;provide the&nbsp;correct length of the&nbsp;C-array. If not, we&nbsp;have undefined behaviour.</p>
-<p>Think about the last lines (1) and (2) for a few seconds. We start with an array and remove its type information by passing it to the function f. This process is called an array to pointer decay and is the reason for a lot of errors. Maybe we had a bad day and we&nbsp;count the number of elements wrong or the size of C-array changed. Anyway, the result is always the same: undefined behaviour. The same argumentation will also hold for a C-string.</p>
+<p>The main issue with&nbsp;this code is that the caller&nbsp;must&nbsp;provide the&nbsp;correct length of the&nbsp;C-array. If not, we&nbsp;have undefined behavior.</p>
+<p>Think about the last lines (1) and (2) for a few seconds. We start with an array and remove its type information by passing it to the function f. This process is called an array to pointer decay and is the reason for a lot of errors. Maybe we had a bad day and we&nbsp;count the number of elements wrong or the size of C-array changed. Anyway, the result is always the same: undefined behavior. The same argumentation will also hold for a C-string.</p>
 <p>What should we do? We should use the right data type. The Guidelines suggests using&nbsp;gsl<span style="font-family: 'courier new', courier;">:</span>:span<span style="font-family: 'courier new', courier;"></span>type from the <a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#S-gsl">Guidelines Support Library</a>&nbsp;(GSL). Have a look here:</p>
 <div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
 <pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">f</span>(span<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> a) <span style="color: #0099ff; font-style: italic;">// BETTER: use span in the function declaration</span>
@@ -115,7 +115,7 @@ f(myArray, <span style="color: #ff6600;">100</span>),      <span style="color: #
 </div>
 <p>&nbsp;</p>
 <p>The <span style="font-family: 'courier new', courier;">std:</span>:<span style="font-family: 'courier new', courier;">array::at</span> Operator will check at runtime its bounds. If <span style="font-family: 'courier new', courier;">pos &gt;= size()</span>, you will get an <a href="http://en.cppreference.com/w/cpp/error/out_of_range"><span style="font-family: 'courier new', courier;">std::out_of_range</span></a><span style="color: #000000; font-family: DejaVuSans, 'DejaVu Sans', arial, sans-serif; font-size: 12.8px; font-style: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing: 0px; background-color: #ffffff; float: none;">&nbsp;exception.&nbsp;</span><span style="color: #000000; font-family: DejaVuSans, 'DejaVu Sans', arial, sans-serif; font-size: 12.8px; font-style: normal; font-weight: 400; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing: 0px; background-color: #ffffff; float: none;">If you look carefully at the <span style="font-family: 'courier new', courier;">spanVersusArray.cpp</span>&nbsp;program, you will notice two issues. First, the expression (1) is more verbose than the gsl<span style="font-family: 'courier new', courier;">:</span>:span version and second, the size of the <span style="font-family: 'courier new', courier;">std:</span>:array is part of the signature of the function&nbsp;<span style="font-family: 'courier new', courier;">f.</span> This is really bad. I can only use f with the type <span style="font-family: 'courier new', courier;">std:</span>:array<span style="font-family: 'courier new', courier;">&lt;int, 100&gt;</span>.&nbsp; In this case, the checks of the array size inside the function are superfluous.&nbsp;</span></p>
-<p>To your rescue, C++ has templates; therefore, it's easy to overcome the type restrictions but staying type-safe.</p>
+<p>To your rescue, C++ has templates; therefore, it's easy to overcome the type restrictions but stay type-safe.</p>
 <p>&nbsp;</p>
 <div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
 <pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// at.cpp</span>
@@ -169,12 +169,12 @@ f(myArray, <span style="color: #ff6600;">100</span>),      <span style="color: #
 </pre>
 </div>
 <p>&nbsp;</p>
-<p>Now, the function f works for <span style="font-family: 'courier new', courier;">std:</span>:array's of different sizes and types (lines (1) and (2)) but also for an <span style="font-family: 'courier new', courier;">std:</span>:vector<span style="font-family: 'courier new', courier;"></span>(3) or an&nbsp;<span style="font-family: 'courier new', courier;">std:</span>:string&nbsp;(4). This container have in common, that their data is stored in a&nbsp;continuous memory block. This will no hold <span style="font-family: 'courier new', courier;">std::deque;</span> therefore, the call <span style="font-family: 'courier new', courier;">a.data()</span> in expression (5) fails. An std<span style="font-family: 'courier new', courier;">:</span>:deque is a kind of doubly linked list of small memory blocks.</p>
-<p>&nbsp;<img src="images/blog/ModernCpp/CppCoreGuidelinesMoreExpressions/deque.png" alt="deque" width="500" height="38" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>Now, the function f works for <span style="font-family: 'courier new', courier;">std:</span>:array's of different sizes and types (lines (1) and (2)) but also for a <span style="font-family: 'courier new', courier;">std:</span>:vector<span style="font-family: 'courier new', courier;"></span>(3) or a <span style="font-family: 'courier new', courier;">std:</span>:string&nbsp;(4). This container has in common, that their data is stored in a&nbsp;contiguous memory block. This will no hold <span style="font-family: 'courier new', courier;">std::deque;</span> therefore, the call <span style="font-family: 'courier new', courier;">a.data()</span> in expression (5) fails. An std<span style="font-family: 'courier new', courier;">:</span>:deque is a kind of doubly-linked list of small memory blocks.</p>
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/ModernCpp/CppCoreGuidelinesMoreExpressions/deque.png" alt="deque" width="500" height="38" style="display: block; margin-left: auto; margin-right: auto;" /></p>
 <p>The expression&nbsp;<span style="font-family: 'courier new', courier;">T::value_type</span> (5) helps me to get the underlying value type of each container. <span style="font-family: 'courier new', courier;">T</span> is a so-called dependent type because <span style="font-family: 'courier new', courier;">T</span> is a type parameter of the function template <span style="font-family: 'courier new', courier;">f</span>. This is the reason, I have to give the compiler a hint that <span style="font-family: 'courier new', courier;">T::value_type</span> is actually a type:&nbsp;<span style="font-family: 'courier new', courier;">typename T::value_type</span>.</p>
 <h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Res-magic" style="color: #268bd2; text-decoration: none;">ES.45: Avoid “magic constants”; use symbolic constants</a></h3>
 <p>This is obvious: A symbolic constant says more than a magic constant.&nbsp;</p>
-<p>The guidelines starts with a magic constant, continuous with a symbolic constant, and finishes with a range-based for loop.&nbsp;</p>
+<p>The guidelines start with a magic constant, continue with a symbolic constant, and finish with a range-based for loop.&nbsp;</p>
 <div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
 <pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #007788; font-weight: bold;">int</span> m <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span>; m <span style="color: #555555;">&lt;=</span> <span style="color: #ff6600;">12</span>; <span style="color: #555555;">++</span>m)        <span style="color: #0099ff; font-style: italic;">// don't: magic constant 12</span>
     cout <span style="color: #555555;">&lt;&lt;</span> month[m] <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
@@ -198,53 +198,8 @@ constexpr <span style="color: #007788; font-weight: bold;">int</span> last_month
 <p>In the case of the ranged-based for loop, it is not possible to make an <a href="https://en.wikipedia.org/wiki/Off-by-one_error">off-by-one </a>error.&nbsp;&nbsp;</p>
 <p>Let me directly jump to the rule ES.47. I want to put the rules for conversion including ES.46 in a separate post.</p>
 <h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Res-nullptr" style="color: #268bd2; text-decoration: none;"><span style="color: #268bd2;">ES.47: Use&nbsp;</span><code class="highlighter-rouge no-highlight" style="font-family: 'Roboto Mono', monospace; padding: 0.2em; font-size: 18px; background-color: #f9f9f9;">nullptr</code><span style="color: #268bd2;">&nbsp;rather than&nbsp;</span><code class="highlighter-rouge no-highlight" style="font-family: 'Roboto Mono', monospace; padding: 0.2em; font-size: 18px; background-color: #f9f9f9;">0</code><span style="color: #268bd2;">&nbsp;or&nbsp;</span><code class="highlighter-rouge no-highlight" style="font-family: 'Roboto Mono', monospace; padding: 0.2em; font-size: 18px; background-color: #f9f9f9;">NULL</code></a></h3>
-<p>There are a lot of reasons to use a <span style="font-family: 'courier new', courier;">nullptr</span> instead the number 0 or the macro <span style="font-family: 'courier new', courier;">NULL</span>. In particular, 0 or <span style="font-family: 'courier new', courier;">NULL</span> will not work in generic. I have already written a post about this three kinds of null pointer. Here are the details: <a href="index.php/the-null-pointer-constant-nullptr">The Null Pointer Constant <span style="font-family: 'courier new', courier;">nullptr</span></a>.</p>
+<p>There are a lot of reasons to use a <span style="font-family: 'courier new', courier;">nullptr</span> instead of the number 0 or the macro <span style="font-family: 'courier new', courier;">NULL</span>. In particular, 0 or <span style="font-family: 'courier new', courier;">NULL</span> will not work in generic. I have already written a post about these three kinds of null pointers. Here are the details: <a href="https://www.modernescpp.com/index.php/the-null-pointer-constant-nullptr">The Null Pointer Constant <span style="font-family: 'courier new', courier;">nullptr</span></a>.</p>
 <h2>What's next?</h2>
-<p>How many explicit casts do we have in modern C++? Maybe your number is 4 but this is the wrong number. In C++11 we have 6 explicit cast. When I Include the GSL, we have 8 explicit casts. I will write about the 8&nbsp; casts in the next post.</p>
+<p>How many explicit casts do we have in modern C++? Maybe your number is 4 but this is the wrong number. In C++11 we have 6 explicit casts. When I Include the GSL, we have 8 explicit casts. I will write about the 8&nbsp; casts in the next post.</p>
 <p>&nbsp;</p>
-<p>&nbsp;</p>
-<p>&nbsp;</p>
-<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Eric Pederson, Paul Baxter, Carlos Gomes Martinho, and&nbsp;SAI RAGHAVENDRA PRASAD POOSA.</strong></p>
-<p><strong>&nbsp;</strong></p>
-<p>&nbsp;</p>
-<table border="0" style="width: 800px; height: 250px;" cellpadding="8"><caption>
-<h2>Get your e-book at leanpub:</h2>
-</caption>
-<tbody>
-<tr>
-<td>
-<h4><strong>The C++ Standard Library</strong></h4>
-</td>
-<td>&nbsp;</td>
-<td>
-<h4><strong>Concurrency With Modern C++</strong></h4>
-</td>
-<td style="width: 5px;">&nbsp;</td>
-<td>
-<h4><strong>Get Both as one Bundle</strong></h4>
-</td>
-</tr>
-<tr>
-<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img src="images/books/cover.png" alt="cover" width="173" height="220" style="border: medium none #000000;" /></a></td>
-<td style="text-align: center;">&nbsp;</td>
-<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
-<td style="width: 5px; text-align: center;">&nbsp;</td>
-<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
-</tr>
-<tr>
-<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
-<td style="width: 15px;">&nbsp;</td>
-<td>
-<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
-<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
-</td>
-<td style="width: 15px;">&nbsp;</td>
-<td>
-<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
-<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
-<p>In sum, you get more than 550 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
-</div>
-&nbsp;</td>
-</tr>
-</tbody>
-</table>
+<p>{loadmoduleid 153}</p>
