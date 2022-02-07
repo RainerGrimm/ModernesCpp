@@ -1,0 +1,162 @@
+<p>With C++20, <code>constexpr</code> became way more powerful. Additionally, we have&nbsp; <code>consteval</code> functions in C++20 that are quite similar to <code>constexpr</code> functions.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/Templates/constexprConstevalFunctions/constexpr.png" alt="constexpr" width="650" height="403" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>Let me first describe a feature in C++20 that surprised me the most.</p>
+<h2><code>constexpr</code> Containers and Algorithms of the Standard Template Library</h2>
+<p>C++20 supports the <code>constexpr</code> containers<code> std::vector</code> and<code> std::string</code>, where <code>constexpr</code> means that the member functions of both containers can be applied at compile time. Additionally, the more than<br /><a href="https://en.cppreference.com/w/cpp/algorithm">100 classical algorithms of the Standard Template Library</a> are declared as <code>constexpr</code>. Consequently, you can sort a <code>std::vector</code> of ints at compile time.</p>
+<p>Let's see what this means:</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// constexprVector.cpp</span>
+
+<span style="color: #009999;">#include &lt;algorithm&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+
+constexpr <span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">maxElement</span>() {
+    std<span style="color: #555555;">::</span>vector myVec <span style="color: #555555;">=</span> {<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">3</span>};        <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    std<span style="color: #555555;">::</span>sort(myVec.begin(), myVec.end());
+    <span style="color: #006699; font-weight: bold;">return</span> myVec.back();
+}
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span>  <span style="color: #cc3300;">'\n'</span>;
+
+    constexpr <span style="color: #007788; font-weight: bold;">int</span> maxValue <span style="color: #555555;">=</span> maxElement();
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"maxValue: "</span> <span style="color: #555555;">&lt;&lt;</span> maxValue <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    constexpr <span style="color: #007788; font-weight: bold;">int</span> maxValue2 <span style="color: #555555;">=</span> [] {
+        std<span style="color: #555555;">::</span>vector myVec <span style="color: #555555;">=</span> {<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">3</span>};    <span style="color: #0099ff; font-style: italic;">// (2)</span>
+        std<span style="color: #555555;">::</span>sort(myVec.begin(), myVec.end()) ;
+        <span style="color: #006699; font-weight: bold;">return</span> myVec.back();
+    }(); 
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"maxValue2: "</span> <span style="color: #555555;">&lt;&lt;</span> maxValue2 <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The two containers <code>std::vector</code> (line (1) and (2)) are sorted at compile time using <code>constexpr</code>-declared functions. In the first case, the function <code>maxElement</code> returns the last element of the vector<code> myVec</code>, which is its maximum value. In the second case, I use an immediately-invoked lambda that is declared<code> constexpr.</code> Here is the output of the program:</p>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/constexprConstevalFunctions/constexprVector.png" alt="constexprVector" width="150" height="73" style="display: block; margin-left: auto; margin-right: auto;" /><code></code></p>
+<p>The crucial idea for <code>constexpr</code> containers is transient allocation.</p>
+<h3>Transient Allocation</h3>
+<p>Transient allocation means that memory allocated at compile time must also be released at compile time. Consequently, the compiler can detect a mismatch of allocation and deallocation in a <code>constexpr</code> function. The following example applies transient allocation.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// transientAllocation.cpp</span>
+
+<span style="color: #009999;">#include &lt;memory&gt;</span>
+
+constexpr <span style="color: #006699; font-weight: bold;">auto</span> <span style="color: #cc00ff;">correctRelease</span>() {  
+     <span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">*</span> p <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">new</span> <span style="color: #007788; font-weight: bold;">int</span>[<span style="color: #ff6600;">2020</span>];
+     <span style="color: #006699; font-weight: bold;">delete</span> [] p;
+     <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #ff6600;">2020</span>;
+}
+
+constexpr <span style="color: #006699; font-weight: bold;">auto</span> <span style="color: #cc00ff;">forgottenRelease</span>() { <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    <span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">*</span> p <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">new</span> <span style="color: #007788; font-weight: bold;">int</span>[<span style="color: #ff6600;">2020</span>];  
+    <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #ff6600;">2020</span>;
+}
+
+constexpr <span style="color: #006699; font-weight: bold;">auto</span> <span style="color: #cc00ff;">falseRelease</span>() {     <span style="color: #0099ff; font-style: italic;">// (3)</span>
+    <span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">*</span> p <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">new</span> <span style="color: #007788; font-weight: bold;">int</span>[<span style="color: #ff6600;">2020</span>];
+    <span style="color: #006699; font-weight: bold;">delete</span> p;                      <em> <span style="color: #0099ff;">// (2)</span></em>
+    <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #ff6600;">2020</span>;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    constexpr <span style="color: #007788; font-weight: bold;">int</span> res1 <span style="color: #555555;">=</span> correctRelease();
+    constexpr <span style="color: #007788; font-weight: bold;">int</span> res2 <span style="color: #555555;">=</span> forgottenRelease();
+    constexpr <span style="color: #007788; font-weight: bold;">int</span> res3 <span style="color: #555555;">=</span> falseRelease();
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The small program has two serious issues. First, the memory in the <code>constexpr</code> function<code> forgottenRelease</code> (line (1)) is not released. Second, the non-array deallocation (line 3) in the <code>constexpr</code> function <code>falseRelease</code> (line (3)) does not match with the array allocation. Consequentially, the compilation fails.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/constexprConstevalFunctions/transientAllocation.png" alt="transientAllocation" width="600" height="169" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>With C++20, we got <code>consteval</code> functions that are quite similar to <code>contexpr</code> functions.</p>
+<h2><code>consteval</code> Functions</h2>
+<p>Often developers are irritated because they don't know if a<code> constexpr</code> function is executed at run time or at compile time. Let's consider the following code snippet.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%;">constexpr <span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">constexprFunction</span>(<span style="color: #007788; font-weight: bold;">int</span> arg) {
+    <span style="color: #006699; font-weight: bold;">return</span> arg <span style="color: #555555;">*</span> arg;
+}
+
+static_assert(constexprFunction(<span style="color: #ff6600;">10</span>) <span style="color: #555555;">==</span> <span style="color: #ff6600;">100</span>);                     <span style="color: #0099ff; font-style: italic;">// (1)</span>
+<span style="color: #007788; font-weight: bold;">int</span> arrayNewWithConstExpressiomFunction[constexprFunction(<span style="color: #ff6600;">100</span>)]; <span style="color: #0099ff; font-style: italic;">// (2)</span>
+constexpr <span style="color: #007788; font-weight: bold;">int</span> prod <span style="color: #555555;">=</span> constexprFunction(<span style="color: #ff6600;">100</span>);                     <span style="color: #0099ff; font-style: italic;">// (3)</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> a <span style="color: #555555;">=</span> <span style="color: #ff6600;">100</span>;
+<span style="color: #007788; font-weight: bold;">int</span> runTime <span style="color: #555555;">=</span> constexprFunction(a);                              <em><span style="color: #0099ff;">// (4)</span></em>
+
+<span style="color: #007788; font-weight: bold;">int</span> runTimeOrCompiletime <span style="color: #555555;">=</span> constexprFunction(<span style="color: #ff6600;">100</span>);               <span style="color: #0099ff; font-style: italic;">// (5)</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p><code>constexprFunction</code> is, as its name suggests, a <code>constexpr</code> function.</p>
+<ol>
+<li>A constexpr function must run at compile time, when used in a <code>constexpr</code> context or the result is requested at compile time. line (1) and line (2) are <code>constexpr</code> contexts. Line (3), on the contrary, requires the function execution of <code>constexprFuncion</code> on compile time.</li>
+<li>The call<code> constexprFunction(a)&nbsp;</code> (line 4) must be executed at compile time because a is not a constant expression.</li>
+<li>Line 5 is the interesting case. There are no requirements for the function execution. Therefore, the call constexprFunction(100) (line 5) can be executed at run time or at compile time. From the C++ standard perspective, both is fine.</li>
+</ol>
+<p>In contrast to a <code>constexpr</code> function, a <code>consteval</code> function can only be executed at compile time.</p>
+<p><code>consteval</code> creates a so-called immediate function.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">consteval <span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">sqr</span>(<span style="color: #007788; font-weight: bold;">int</span> n) {
+    <span style="color: #006699; font-weight: bold;">return</span> n <span style="color: #555555;">*</span> n;
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Each invocation of an immediate function creates a compile-time constant.&nbsp; <code>consteval</code> cannot be applied to destructors or functions that allocate or deallocate. A <code>consteval</code> function is as a <code>constexpr</code> function implicitly inline and has to fulfill the requirements for a <code>constexpr</code> function.</p>
+<p>The requirements of a <code>constexpr</code> function in C++14 and, therefore, a <code>consteval</code> function are:</p>
+<ul>
+<li>A <code>consteval</code> (<code>constexpr</code>) can
+<ul>
+<li>have conditional jump instructions or loop instructions.</li>
+<li>have more than one instruction.</li>
+<li>invoke constexpr functions. A <code>consteval</code> function can only invoke a <code>constexpr</code> function but not the other way around.</li>
+<li>use fundamental data types as variables that have to be initialized with a constant expression.</li>
+</ul>
+</li>
+<li>A <code>consteval</code> (<code>constexpr</code>) function cannot
+<ul>
+<li>have static or<code> thread_local</code> data.</li>
+<li>have a try block nor a goto instruction.</li>
+<li>invoke or use non-<code>consteval</code> functions or non-<code>constexpr</code> data.</li>
+</ul>
+</li>
+</ul>
+<p>There is one interesting use-case that <code>consteval</code> enables. You can initialize a local non-constant variable at compile time.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// compileTimeInitializationLocal.cpp</span>
+
+consteval <span style="color: #006699; font-weight: bold;">auto</span> <span style="color: #cc00ff;">doubleMe</span>(<span style="color: #006699; font-weight: bold;">auto</span> val) {
+  <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #ff6600;">2</span> <span style="color: #555555;">*</span> val;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+<span style="color: #006699; font-weight: bold;">auto</span> res <span style="color: #555555;">=</span> doubleMe(<span style="color: #ff6600;">1010</span>);  <em><span style="color: #0099ff;">// (1)</span></em>
+<span style="color: #555555;">++</span>res;                     <span style="color: #0099ff; font-style: italic;">// 2021 (2)</span>
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The local <code>res</code> is initialized at compile time (line 1) and modified at run time (line 2). On the contrary, if the function <code>doubleMe</code> is declared as <code>constexpr</code>, it could be executed at run time.</p>
+<h2>What's next?</h2>
+<p>Before I dive into the new topic block design with templates, I want to present in the next post the C++17 feature<code> constexpr if. constexpr if&nbsp;</code>enables it to conditionally compile source code and can also be used for nice tricks at compile time.</p>
+<p>&nbsp;</p>
+<p>{loadmoduleid 153}</p>
+<p>&nbsp;</p>
