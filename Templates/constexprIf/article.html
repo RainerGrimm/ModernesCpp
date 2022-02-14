@@ -1,0 +1,155 @@
+<p>In today's post, I want to introduce a very interesting C++17 feature: <code>constexpr if. constexpr if</code> enables it to conditionally compile source code and can also be used for nice tricks at compile time.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/constexprIf/constexprIf.png" alt="constexprIf" width="650" height="413" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>Introducing <code>constexpr if</code> is straightforward.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">auto</span> getValue(T t) {
+    <span style="color: #006699; font-weight: bold;">if</span> constexpr (std<span style="color: #555555;">::</span>is_pointer_v<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span>)     <em><span style="color: #0099ff;"> // (1)</span></em>
+        <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #555555;">*</span>t; <span style="color: #0099ff; font-style: italic;">// deduces return type to int for T = int*</span>
+    <span style="color: #006699; font-weight: bold;">else                                    </span><span style="color: #006699;"> </span><span style="color: #006699;"><em><span style="color: #0099ff;">// (2)</span></em></span>
+        <span style="color: #006699; font-weight: bold;">return</span> t;  <span style="color: #0099ff; font-style: italic;">// deduces return type to int for T = int</span>
+}
+</pre>
+</div>
+<!-- HTML generated using hilite.me -->
+<p>&nbsp;</p>
+<p>The code snippet shows one interesting fact about<code> constexpr if</code>: Although it is called <code>constexpr if</code>, it is used as <code>if constexpr</code>: <code>if constexpr (std::is_pointer_v&lt;T&gt;</code>).</p>
+<p>If<code> T</code> is a pointer, the if branch in line (1) will be compiled. If not, the else branch in line (2). Two points are important to mention. The function<code> getValue</code> has two different return types and both branches of the <code>if</code> the statement have to be valid.</p>
+<p>The expression in constexpr if has to be a compile time predicate. A compile time predicate is a function that returns a boolean and runs at compile time. I used in the code snippet a function from the <a href="https://en.cppreference.com/w/cpp/header/type_traits">type-traits library</a>. Alternatively, in C++20 you can use a concept. Here is the equivalent example using the concept<code> std::integral:</code></p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">auto</span> get_value(T t) {
+    <span style="color: #006699; font-weight: bold;">if</span> constexpr (std<span style="color: #555555;">::</span>integral<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span>)          <span style="color: #0099ff; font-style: italic;">// (1)</span>
+        <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #555555;">*</span>t; <span style="color: #0099ff; font-style: italic;">// deduces return type to int for T = int*</span>
+    <span style="color: #006699; font-weight: bold;">else</span>                                     <span style="color: #0099ff; font-style: italic;">// (2)</span>
+        <span style="color: #006699; font-weight: bold;">return</span> t;  <span style="color: #0099ff; font-style: italic;">// deduces return type to int for T = int</span>
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>I see, the two code snippets are not so impressive. Let me continue with template metaprogramming.</p>
+<p>Thanks to<code> constexpr if</code>, template metaprogramming often easier to write and read.</p>
+<h2>Template Metaprogramming with <code>constexpr if</code></h2>
+<p>Metaprogramming is programming on programs. C++ applies metaprogramming at compile time. It started in C++98 with template metaprogramming, was formalized in C++11 with the type-traits library, and since C++11 has steadily improved.</p>
+<p>Here is the "Hello World" of template metaprogramming: calculating the factorial of a number:</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// factorial.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span> N<span style="color: #555555;">&gt;</span>                                                                 <span style="color: #0099ff; font-style: italic;">// (2)</span>
+<span style="color: #006699; font-weight: bold;">struct</span> Factorial{
+    <span style="color: #006699; font-weight: bold;">static</span> <span style="color: #007788; font-weight: bold;">int</span> <span style="color: #006699; font-weight: bold;">const</span> value <span style="color: #555555;">=</span> N <span style="color: #555555;">*</span> Factorial<span style="color: #555555;">&lt;</span>N<span style="color: #555555;">-</span><span style="color: #ff6600;">1</span><span style="color: #555555;">&gt;::</span>value;
+};
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;&gt;</span>                                                                      <span style="color: #0099ff; font-style: italic;">// (3)</span>
+<span style="color: #006699; font-weight: bold;">struct</span> Factorial<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">1</span><span style="color: #555555;">&gt;</span>{
+    <span style="color: #006699; font-weight: bold;">static</span> <span style="color: #007788; font-weight: bold;">int</span> <span style="color: #006699; font-weight: bold;">const</span> value <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span>;
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> '\n';
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Factorial&lt;5&gt;::value: "</span> <span style="color: #555555;">&lt;&lt;</span> Factorial<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">5</span><span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> '\n'<span style="color: #555555;"></span>;    <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Factorial&lt;10&gt;::value: "</span> <span style="color: #555555;">&lt;&lt;</span> Factorial<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">10</span><span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> '\n'<span style="color: #555555;"></span>;  <em><span style="color: #0099ff;">// (4)</span></em>
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> '\n'<span style="color: #555555;"></span>;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The call<code> factorial&lt;5&gt;::value</code> (line 1) causes the instantiation of the primary or general template (line 2). During this instantiation, <code>Factorial&lt;4&gt;::value</code> will be instantiated. This recursion will end if the fully specialized class template<code> Factorial&lt;1&gt; </code>kicks in (line 3).</p>
+<p>If you want to know more about template metaprogramming, read my previous posts:</p>
+<ol>
+<li><a href="https://www.modernescpp.com/index.php/template-metaprogramming-a-introduction">Template Metaprogramming - How it All Started</a></li>
+<li><a href="https://www.modernescpp.com/index.php/template-metaprogramming-how-it-works">Template Metaprogramming - How it Works</a></li>
+<li><a href="https://www.modernescpp.com/index.php/template-metaprogramming-hybrid-programming">Template Metaprogramming - Hybrid Programming</a></li>
+</ol>
+<p>Let me rewrite the program using <code>constexpr i</code>f:</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// factorialConstexprIf.cpp</span>
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span> N<span style="color: #555555;">&gt;</span>                                              <span style="color: #0099ff; font-style: italic;">// (1)</span>
+<span style="color: #006699; font-weight: bold;">struct</span> Factorial{
+    <span style="color: #006699; font-weight: bold;">static</span> <span style="color: #007788; font-weight: bold;">int</span> <span style="color: #006699; font-weight: bold;">const</span> value <span style="color: #555555;">=</span> N <span style="color: #555555;">*</span> Factorial<span style="color: #555555;">&lt;</span>N<span style="color: #555555;">-</span><span style="color: #ff6600;">1</span><span style="color: #555555;">&gt;::</span>value;
+};
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;&gt;</span>                                                   <span style="color: #0099ff; font-style: italic;">// (2)</span>
+<span style="color: #006699; font-weight: bold;">struct</span> Factorial<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">1</span><span style="color: #555555;">&gt;</span>{
+    <span style="color: #006699; font-weight: bold;">static</span> <span style="color: #007788; font-weight: bold;">int</span> <span style="color: #006699; font-weight: bold;">const</span> value <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span>;
+};
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span> N<span style="color: #555555;">&gt;</span>                                              <span style="color: #0099ff; font-style: italic;">// (3)</span>
+constexpr <span style="color: #007788; font-weight: bold;">int</span> factorial() {
+    <span style="color: #006699; font-weight: bold;">if</span> constexpr (N <span style="color: #555555;">&gt;=</span> <span style="color: #ff6600;">2</span>) 
+        <span style="color: #006699; font-weight: bold;">return</span> N <span style="color: #555555;">*</span> factorial<span style="color: #555555;">&lt;</span>N<span style="color: #555555;">-</span><span style="color: #ff6600;">1</span><span style="color: #555555;">&gt;</span>();
+    <span style="color: #006699; font-weight: bold;">else</span> 
+        <span style="color: #006699; font-weight: bold;">return</span> N;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main(){
+    
+    static_assert(Factorial<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">5</span><span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">==</span> factorial<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">5</span><span style="color: #555555;">&gt;</span>());     <span style="color: #0099ff; font-style: italic;">// (4)             </span>
+    static_assert(Factorial<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">10</span><span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">==</span> factorial<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">10</span><span style="color: #555555;">&gt;</span>());   <span style="color: #0099ff; font-style: italic;">// (4)</span>
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The primary template of <code>Factorial</code> (line 1) becomes the if condition in the <code>constexpr</code> function <code>factorial</code> (line 3), and the full specialization of <code>Factorial</code> for 1 (line 2) becomes the else case in the <code>constexpr</code> function factorial (line 3). Of course, the class template <code>Factorial</code> and the <code>constexpr</code> function <code>factorial</code> return the same result and are executed at compile time (line 4). To make it short, I prefer the constexpr function using<code> constexpr if</code> because it reads almost such as a usual function.</p>
+<p>Let's do it once more. Here is the infamous Fibonacci function based template metaprogramming (<code>Fibonacci</code>) and <code>constexpr if (fibonacci).<br /></code></p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// fibonacciConstexprIf.cpp</span>
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span> N<span style="color: #555555;">&gt;</span>
+constexpr <span style="color: #007788; font-weight: bold;">int</span> fibonacci()
+{
+    <span style="color: #006699; font-weight: bold;">if</span> constexpr (N<span style="color: #555555;">&gt;=</span><span style="color: #ff6600;">2</span>)
+        <span style="color: #006699; font-weight: bold;">return</span> fibonacci<span style="color: #555555;">&lt;</span>N<span style="color: #555555;">-</span><span style="color: #ff6600;">1</span><span style="color: #555555;">&gt;</span>() <span style="color: #555555;">+</span> fibonacci<span style="color: #555555;">&lt;</span>N<span style="color: #555555;">-</span><span style="color: #ff6600;">2</span><span style="color: #555555;">&gt;</span>();
+    <span style="color: #006699; font-weight: bold;">else</span>
+        <span style="color: #006699; font-weight: bold;">return</span> N;
+}
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span> N<span style="color: #555555;">&gt;</span>                                                  <span style="color: #0099ff; font-style: italic;">// (1)            </span>
+<span style="color: #006699; font-weight: bold;">struct</span> Fibonacci{
+    <span style="color: #006699; font-weight: bold;">static</span> <span style="color: #007788; font-weight: bold;">int</span> <span style="color: #006699; font-weight: bold;">const</span> value <span style="color: #555555;">=</span> Fibonacci<span style="color: #555555;">&lt;</span>N<span style="color: #555555;">-</span><span style="color: #ff6600;">1</span><span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">+</span> Fibonacci<span style="color: #555555;">&lt;</span>N<span style="color: #555555;">-</span><span style="color: #ff6600;">2</span><span style="color: #555555;">&gt;::</span>value;
+};
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;&gt;</span>                                                      <span style="color: #0099ff; font-style: italic;">// (2)                </span>
+<span style="color: #006699; font-weight: bold;">struct</span> Fibonacci<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">1</span><span style="color: #555555;">&gt;</span>{
+    <span style="color: #006699; font-weight: bold;">static</span> <span style="color: #007788; font-weight: bold;">int</span> <span style="color: #006699; font-weight: bold;">const</span> value <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span>;
+};
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;&gt;</span>                                                      <span style="color: #0099ff; font-style: italic;">// (3)                </span>
+<span style="color: #006699; font-weight: bold;">struct</span> Fibonacci<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">0</span><span style="color: #555555;">&gt;</span>{
+    <span style="color: #006699; font-weight: bold;">static</span> <span style="color: #007788; font-weight: bold;">int</span> <span style="color: #006699; font-weight: bold;">const</span> value <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>;
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    static_assert(fibonacci<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">7</span><span style="color: #555555;">&gt;</span>() <span style="color: #555555;">==</span> <span style="color: #ff6600;">13</span>);
+    static_assert(fibonacci<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">7</span><span style="color: #555555;">&gt;</span>() <span style="color: #555555;">==</span> Fibonacci<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">7</span><span style="color: #555555;">&gt;::</span>value);
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The <code>constexpr</code> function <code>fibonacci</code> is straightforward to read. The entire functionality is in one function body. In contrast, the template metaprogram <code>Fibonacci</code> requires the three classes. The primary template (line 1) and the two full specializations for the values 1 and 0 (lines 2 and 3).</p>
+<h2>More Information about my Mentoring Program "Fundamentals for C++ Professionals"</h2>
+<p>I created the platform for my new mentoring on <a href="https://www.modernescpp.org/">https://www.modernescpp.org/</a>. You can skip through each of the 28 lessons. I also presented the 6th lesson about move semantics and perfect forwarding in the post '<a href="https://www.modernescpp.org/moredetails/">More Information about my Mentoring Program "Fundamentals for C++ Professionals"'</a>. Here are the next steps before I start the mentoring program.</p>
+<ul>
+<li><strong>Beginning of March</strong>: online information session about my mentoring program, where you can also ask your questions</li>
+<li><strong>Middle of March:</strong> my mentoring program opens for registration</li>
+<li><strong>April:</strong> the registration for the mentoring program closes, and the mentoring program starts</li>
+</ul>
+<p>If you want to stay informed, write an e-mail to <span id="cloaka8aba3920e2314502dad0e30d36d79d0"><a href="mailto:info@ModernesCpp.de">info@ModernesCpp.de</a></span> with the subject "Mentoring". Write me also an e-mail if you need more information.</p>
+<h2>What's Next?</h2>
+<p>Templates are a powerful tool and, therefore, provide new design choices. In my next post, I write about static and dynamic polymorphism.</p>
