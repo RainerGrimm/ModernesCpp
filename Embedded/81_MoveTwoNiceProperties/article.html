@@ -1,8 +1,8 @@
-<p>I will talk about two nice properties of the move semantic in this post that are not so often mentioned. Containers of the standard template library (STL) can have non-copyable elements. The copy semantic is the fallback for the move semantic. Irritated? I hope so!</p>
+<p>I will talk about two nice properties of the move semantic in this post that is not so often mentioned. Containers of the standard template library (STL) can have non-copyable elements. The copy semantic is the fallback for the move semantic. Irritated? I hope so!</p>
 <hr id="system-readmore" />
 <p>&nbsp;</p>
-<h2>Moving instead of copying</h2>
-<p>Do you remember the program<span style="font-family: courier new,courier;"> packagedTask.cpp</span> from the post <a href="index.php/asynchronous-callable-wrappers">Asynchronous callable wrappers</a>? Of course, not. Here, once more.</p>
+<h2>Moving Instead of Copying</h2>
+<p>Do you remember the program<span style="font-family: courier new,courier;"> packagedTask.cpp</span> from the post <a href="https://www.modernescpp.com/index.php/asynchronous-callable-wrappers">Asynchronous callable wrappers</a>? Of course, not. Here, once more.</p>
 <h3>Moving elements in a container</h3>
 <div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
 <table>
@@ -154,9 +154,9 @@
 <p>&nbsp;</p>
 <p>I'm not interested in the fact that the program calculates the sum of the numbers from 0 .. 10000 in four threads.</p>
 <p>I'm interested in&nbsp;a completely different property of<span style="font-family: courier new,courier;"> std:::packaged_task. std::packaged_task</span> is not copyable. The reason is simple. The copy constructor and copy assignment operator are set to <span style="font-family: courier new,courier;">delete</span>. You can read the details here: <a href="http://en.cppreference.com/w/cpp/thread/packaged_task">cppreference.com</a>.</p>
-<p>How is it possible to use <span style="font-family: courier new,courier;">std::package_task</span> as element in a container of the STL? Containers of the STL wants to own their elements. Therefore, I move via <span style="font-family: courier new,courier;">std::move</span> the s<span style="font-family: courier new,courier;">td::package_task</span> objects (line 41 - 44) into the container<span style="font-family: courier new,courier;"> std::deque.</span> Consequently, I have to use move semantic in line 52 and 54 because I can not copy the <span style="font-family: courier new,courier;">std::package_task.</span></p>
-<p>But that is not the end of the story. If an algorithm of the STL uses under the hood no copy semantic, you can apply it to containers with non-copyable elements. If the algorithm uses internally copy semantic, you will get a compiler error.</p>
-<h3>Algorithm on only moveable elements&nbsp;</h3>
+<p>How is it possible to use <span style="font-family: courier new,courier;">std::package_task</span> as an element in a container of the STL? Containers of the STL want to own their elements. Therefore, I move via <span style="font-family: courier new,courier;">std::move</span> the s<span style="font-family: courier new,courier;">td::package_task</span> objects (line 41 - 44) into the container<span style="font-family: courier new,courier;"> std::deque.</span> Consequently, I have to use the move semantic in line 52 and 54 because I can not copy the <span style="font-family: courier new,courier;">std::package_task.</span></p>
+<p>But that is not the end of the story. If an algorithm of the STL uses under the hood no copy semantic, you can apply it to containers with non-copyable elements. If the algorithm uses internally copy semantics, you will get a compiler error.</p>
+<h3>The algorithm on only moveable elements&nbsp;</h3>
 <p>In the next example, I make it very simple. I define a simple wrapper <span style="font-family: courier new,courier;">MyInt</span> for natural numbers.<span style="font-family: courier new,courier;"><br /></span><span style="font-family: courier new,courier;"></span></p>
 <!-- HTML generated using hilite.me -->
 <div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
@@ -213,8 +213,8 @@
 </td>
 <td>
 <pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// moveAlgorithm.cpp</span>
-
-<span style="color: #0000ff;">#include &lt;algorithm&gt;</span>
+<span style="color: #0000ff;">#include &lt;numeric&gt; </span>
+<span style="color: #0000ff;">#include &lt;algorithm&gt; </span>
 <span style="color: #0000ff;">#include &lt;iostream&gt;</span>
 <span style="color: #0000ff;">#include &lt;utility&gt;</span>
 <span style="color: #0000ff;">#include &lt;vector&gt;</span>
@@ -266,10 +266,13 @@ private:
 </div>
 <p>&nbsp;</p>
 <p>I only declaratively use <span style="font-family: courier new,courier;">delete</span> (line 13 and 14) for the copy semantic and <span style="font-family: courier new,courier;">default</span> (line 17 and 18) for the move semantic. Therefore, the compiler will do the right job for me. I implement only the constructor and the getter <span style="font-family: courier new,courier;">getVal</span> (line 20 - 22). Although my type is non-copyable I use it in a <span style="font-family: courier new,courier;">std::for_each</span> (line 36) and <span style="font-family: courier new,courier;">std::accumulate</span> (line 40) algorithm of the STL.</p>
-<p>There are not big surprises.</p>
-<p><img src="images/blog/EmbeddedProgrammierung/MoveSemanticTwoNiceProperties/moveAlgorithm.png" alt="moveAlgorithm" style="margin: 15px;" /></p>
+<p>There are no big surprises.</p>
+<p><img src="https://www.modernescpp.com/images/blog/EmbeddedProgrammierung/MoveSemanticTwoNiceProperties/moveAlgorithm.png" alt="moveAlgorithm" style="margin: 15px;" /></p>
+<h4>The program will not compile with cl.exe</h4>
+<p>Unfortunately, the program will not compile with a recent cl.exe Compiler (19.10.24807.0 (x86)). Microsoft <span style="font-family: Courier New,Courier,monospace;">std::accumulate </span>versions use under the hood copy semantics. This is opposite to recent GCC or clang compilers, which uses move semantic. But cl.exe is right.<a href="http://en.cppreference.com/w/cpp/algorithm/accumulate"> std::accumulate&nbsp;</a> requires that T must be copied assignable and copy constructible. This will not hold for <span style="font-family: Courier;">MyInt</span>. This issue is still under discussion: <a href="https://gcc.gnu.org/onlinedocs/libstdc%2B%2B/ext/lwg-active.html">https://gcc.gnu.org/onlinedocs/libstdc%2B%2B/ext/lwg-active.html</a></p>
+<p>&nbsp;</p>
 <p>The copy semantic is a fallback for the move semantic. What does that mean?</p>
-<h2>Copy semantic as fallback for the move semantic</h2>
+<h2>Copy Semantics as a Fallback for Move Semantics</h2>
 <p>If I write an algorithm that internally uses move semantic, I can apply that algorithm on non-copyable types. I have only to change my type<span style="font-family: courier new,courier;"> MyInt.</span></p>
 <p>&nbsp;</p>
 <!-- HTML generated using hilite.me -->
@@ -395,26 +398,22 @@ private:
 </table>
 </div>
 <p>&nbsp;</p>
-<p><span style="font-family: courier new,courier;">MyInt </span>has a user-defined copy constructor and copy assignment operator. Therefore, the compiler will not automatically generate a move constructor or move assignment operator. You can read the details here (<a href="http://en.cppreference.com/w/cpp/language/move_constructor">move semantic</a>) or can ask the type traits library (line 40 and 41) for help. Sadly, my GCC don't support this function of the type traits library. So I have to use a more recent GCC 5.2. The key point is that instances of <span style="font-family: courier new,courier;">MyInt</span> can be used in the function template <span style="font-family: courier new,courier;">swapMove</span> (line 7 - 12) although these instances don't support move semantic.&nbsp;</p>
+<p><span style="font-family: courier new,courier;">MyInt </span>has a user-defined copy constructor and copy assignment operator. Therefore, the compiler will not automatically generate a move constructor or move assignment operator. You can read the details here (<a href="http://en.cppreference.com/w/cpp/language/move_constructor">move semantic</a>) or can ask the type traits library (lines 40 and 41) for help. Sadly, my GCC doesn't support this function of the type traits library. So I have to use a more recent GCC 5.2. The key point is that instances of <span style="font-family: courier new,courier;">MyInt</span> can be used in the function template <span style="font-family: courier new,courier;">swapMove</span> (line 7 - 12) although these instances don't support move semantic.&nbsp;</p>
 <p>&nbsp;</p>
-<p><img src="images/blog/EmbeddedProgrammierung/MoveSemanticTwoNiceProperties/copyFallbackMove.png" alt="copyFallbackMove" width="896" height="252" style="margin: 15px;" /></p>
+<p><img src="https://www.modernescpp.com/images/blog/EmbeddedProgrammierung/MoveSemanticTwoNiceProperties/copyFallbackMove.png" alt="copyFallbackMove" width="896" height="252" style="margin: 15px;" /></p>
 <p>&nbsp;</p>
-<p>The reason is. A rvalue can be bound to</p>
+<p>The reason is: A rvalue can be bound to</p>
 <ul>
 <li>a constant lvalue reference.</li>
 <li>a non-constant rvalue reference.</li>
 </ul>
-<p>The non-constant rvalue reference has higher priority than the constant lvalue reference.<span id="transmark"></span> A copy constructor or a copy assignment operator expect its arguments as constant lvalue reference. A move constructor or a move assignment operator expect its arguments as non-constant rvalue reference. What sound a little bit confusing has a very nice property.&nbsp;</p>
+<p>The non-constant rvalue reference has a higher priority than the constant lvalue reference.<span id="transmark"></span> A copy constructor or a copy assignment operator expects its arguments as a constant lvalue reference. A move constructor or a move assignment operator expects its arguments as a non-constant rvalue reference. What sounds a little bit confusing has a very nice property.&nbsp;</p>
 <h3>Keep the performance in your mind</h3>
-<p>You can implement functions like <span style="font-family: courier new,courier;">swapMove</span> with move semantic in mind. If your data types are not moveable the functions will also work for only copyable types. The compiler will use the classic copy semantic as fallback. Therefore, you can quite comfortable migrate an old C++ code base to modern C++. Your program is in the first iteration correct and in the second iteration fast.</p>
+<p>You can implement functions like <span style="font-family: courier new,courier;">swapMove</span> with move semantic in mind. If your data types are not moveable the functions will also work for only copyable types. The compiler will use the classic copy semantic as a fallback. Therefore, you can quite comfortably migrate an old C++ codebase to modern C++. Your program is in the first iteration correct and in the second iteration fast.</p>
 <p>&nbsp;</p>
 <h2>What's next?</h2>
-<p>Writing function temples that can identically forward their arguments, was a " <em>... a heretofore unsolved problem in C++.</em>". (Bjarne Stroustrup). Was, because since C++11 <span style="font-family: courier new,courier;">std::forward</span> we can use perfect forwarding. Read the details in the next post</p>
+<p>Writing function temples that can identically forward their arguments, was a " <em>... a heretofore unsolved problem in C++.</em>". (Bjarne Stroustrup). This was because since C++11 <span style="font-family: courier new,courier;">std::forward</span> we can use perfect forwarding. Read the details in the <a href="https://www.modernescpp.com/index.php/perfect-forwarding">next post.</a></p>
 <p><br />&nbsp;</p>
 <p>&nbsp;</p>
-<p>&nbsp;</p>
-<p>&nbsp;</p>
-<p>Hier geht es zum Source Code aller Artikel.<span style="font-family: courier new,courier;"> <a href="index.php/source-code-repository">Source Code Repository</a></span></p>
-<p>&nbsp;</p>
-<p>{tooltip} <img src="images/books/title_page_small.png" alt="title page small" width="80" height="101" />{end-texte}<img src="images/books/title_page_small.png" alt="title page small" style="margin: 3px;" /> Go to <a href="https://leanpub.com/cpplibrary"> </a><a href="https://leanpub.com/cpplibrary">Leanpub/cpplibrary</a> <a href="https://leanpub.com/cpplibrary"> </a><strong>"What every professional C++ programmer should know about the C++ standard library".</strong> <a href="https://leanpub.com/cpplibrary"></a>{end-tooltip} &nbsp; <strong><span class="h3">Get your e-book.</span></strong></p>
+<p>&nbsp;{loadmoduleid 153}</p>
 <p>&nbsp;</p>
