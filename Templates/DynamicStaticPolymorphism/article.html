@@ -1,0 +1,257 @@
+<p>Polymorphism is the property that different types support the same interface. In C++, we distinguish between dynamic polymorphism and static polymorphism.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/Templates/StaticDynamicPolymorphism/StaticDynamic.png" alt="StaticDynamic" width="650" height="394" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>Now, we are done with the basics, details, and techniques around templates, let me write about the design with templates. There are many types of <a href="https://en.wikipedia.org/wiki/Polymorphism_(computer_science)">polymorphism</a> but I want to concentrate on one aspect. Does the polymorphism dispatch happen at run time or at compile time? Run-time polymorphism is based on object orientation and virtual functions in C++, compile-time polymorphism is based on templates.</p>
+<p>Both polymorphisms have pros and cons that I discuss in the following post.</p>
+<h2>Dynamic Polymorphism</h2>
+<p>Here are the key facts. Dynamic Polymorphism takes place at run time, it is based on object orientation and enables us to separate between the interface and the implementation of a class hierarchy. To get late binding, dynamic dispatch, or dispatch at run time, you need two ingredients: virtuality and an indirection such as a pointer or a reference.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #009999;"><span style="color: #0099ff; font-style: italic;">// dispatchDynamicPolymorphism.cpp</span><br /><br />#include &lt;chrono&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">auto</span> start <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>steady_clock<span style="color: #555555;">::</span>now();
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">writeElapsedTime</span>(){
+    <span style="color: #006699; font-weight: bold;">auto</span> now <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>steady_clock<span style="color: #555555;">::</span>now();
+    std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>duration<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">double</span><span style="color: #555555;">&gt;</span> diff <span style="color: #555555;">=</span> now <span style="color: #555555;">-</span> start;
+  
+    std<span style="color: #555555;">::</span>cerr <span style="color: #555555;">&lt;&lt;</span> diff.count() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" sec. elapsed: "</span>;
+}
+
+<span style="color: #006699; font-weight: bold;">struct</span> MessageSeverity{                         
+	<span style="color: #006699; font-weight: bold;">virtual</span> <span style="color: #007788; font-weight: bold;">void</span> writeMessage() <span style="color: #006699; font-weight: bold;">const</span> {         
+		std<span style="color: #555555;">::</span>cerr <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"unexpected"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+	}
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> MessageInformation<span style="color: #555555;">:</span> MessageSeverity{     
+	<span style="color: #007788; font-weight: bold;">void</span> writeMessage() <span style="color: #006699; font-weight: bold;">const</span> override {        
+		std<span style="color: #555555;">::</span>cerr <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"information"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+	}
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> MessageWarning<span style="color: #555555;">:</span> MessageSeverity{         
+	<span style="color: #007788; font-weight: bold;">void</span> writeMessage() <span style="color: #006699; font-weight: bold;">const</span> override {        
+		std<span style="color: #555555;">::</span>cerr <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"warning"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+	}
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> MessageFatal<span style="color: #555555;">:</span> MessageSeverity{};
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">writeMessageReference</span>(<span style="color: #006699; font-weight: bold;">const</span> MessageSeverity<span style="color: #555555;">&amp;</span> messServer){  <span style="color: #0099ff;"><em> // (1)</em></span>
+	
+	writeElapsedTime();
+	messServer.writeMessage();
+	
+}
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">writeMessagePointer</span>(<span style="color: #006699; font-weight: bold;">const</span> MessageSeverity<span style="color: #555555;">*</span> messServer){    <span style="color: #0099ff; font-style: italic;">// (2)</span>
+	
+	writeElapsedTime();
+	messServer<span style="color: #555555;">-&gt;</span>writeMessage();
+	
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  
+    MessageInformation messInfo;
+    MessageWarning messWarn;
+    MessageFatal messFatal;
+  
+    MessageSeverity<span style="color: #555555;">&amp;</span> messRef1 <span style="color: #555555;">=</span> messInfo;       <em><span style="color: #0099ff;"> // (3)</span> </em>     
+    MessageSeverity<span style="color: #555555;">&amp;</span> messRef2 <span style="color: #555555;">=</span> messWarn;      <em><span style="color: #0099ff;">  // (4)</span></em>
+    MessageSeverity<span style="color: #555555;">&amp;</span> messRef3 <span style="color: #555555;">=</span> messFatal;      <em><span style="color: #0099ff;"> // (5)</span></em>
+  
+    writeMessageReference(messRef1);              
+    writeMessageReference(messRef2);
+    writeMessageReference(messRef3);
+  
+    std<span style="color: #555555;">::</span>cerr <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  
+    MessageSeverity<span style="color: #555555;">*</span> messPoin1 <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">new</span> MessageInformation;   <em><span style="color: #0099ff;">// (6)</span></em>
+    MessageSeverity<span style="color: #555555;">*</span> messPoin2 <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">new</span> MessageWarning;      <em> <span style="color: #0099ff;">// (7)</span></em>
+    MessageSeverity<span style="color: #555555;">*</span> messPoin3 <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">new</span> MessageFatal;        <em> <span style="color: #0099ff;">// (8)</span></em>
+  
+    writeMessagePointer(messPoin1);               
+    writeMessagePointer(messPoin2);
+    writeMessagePointer(messPoin3);
+  
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The function <code>writeMessageReference</code> (line 1) or <code>writeMessagePointer</code> (line 2) require a reference or a pointer to an object of type<code> MessageSeverity</code>. Classes, publicly derived from <code>MessageSeverity</code> such as <code>MessageInformation</code>, <code>MessageWarning</code>, or <code>MessageFatal</code> support the so-called&nbsp;<a href="https://en.wikipedia.org/wiki/Liskov_substitution_principle">Liskov substitution principle</a>. This means that a <code>MessageInformation</code>, <code>MessageWarning</code>, or a <code>MessageFatal</code> is a <code>MessageSeverity</code>.</p>
+<p>Here is the output of the program.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/StaticDynamicPolymorphism/dispatchDyamicPolymorphis.png" alt="dispatchDyamicPolymorphis" width="450" height="303" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>&nbsp;</p>
+<p>You may ask yourself why the member function <code>writeMessage</code> of the derived class and not the base class is called? Here, late binding kicks in. The following explanation applies to lines (3) to (8). For simplicity, I only write about line (6): <code>MessageSeverity* messPoin1 = new MessageInformation</code>. messPoint1 has essentially two types. A static type <code>MessageSeverity</code> and a dynamic type <code>MessageInformation</code>. The static type <code>MessageSeverity</code> stands for its interface and the dynamic type<code> MessageInformation</code> for its implementation. The static type is used at compile time and the dynamic type at run time. At run time, messPoint1 is of type <code>MessageInformation</code>; therefore, the virtual function <code>writeMessage</code> of <code>MessageInformation</code> is called. Once more, dynamic dispatch requires an indirection such as a pointer or reference and virtuality.</p>
+<p>I regard this kind of polymorphism as a<strong> contract-driven design.</strong> A function such as <code>writeMessagePointer</code> requires, that each object has to support that it is publicly derived from <code>MessageSeverity</code>. If this contract is not fulfilled, the compiler complains.</p>
+<p>In contrast to contract-driven design, we also have a<strong> behavioral-driven design</strong> with static polymorphism.</p>
+<h2>Static Polymorphism</h2>
+<p>Let me start with a short detour.</p>
+<p><img src="https://www.modernescpp.com/images/blog/ModernCpp/CppCoreGuidelinesTypeErasure/snake-312561_1280.png" alt="snake 312561 1280" width="200" height="178" style="margin: 20px; float: left;" /></p>
+<p>In Python, you care about behavior and not about formal interfaces. This idea is well-known as <a href="https://en.wikipedia.org/wiki/Duck_typing">duck typing. </a>To make it short, the expression goes back to the poem from <a href="https://de.wikipedia.org/wiki/James_Whitcomb_Riley">James </a><a href="https://de.wikipedia.org/wiki/James_Whitcomb_Riley">Whitcomb</a><a href="https://de.wikipedia.org/wiki/James_Whitcomb_Riley"> Rileys:</a> Here it is:</p>
+<p>“When I see a bird that walks like a duck and swims like a duck and quacks like a duck, I call that bird a duck.”</p>
+<p>What does that mean? Imagine a function <code>acceptOnlyDucks</code>&nbsp;that only accepts ducks as an argument. In statically typed languages such as C++, all types which are derived from&nbsp; <code>Duck</code> can be used to invoke the function. In Python, all types, which behave like <code>Duck</code>'s, can be used to invoke the function. To make it more concrete. If a bird behaves like a&nbsp; <code>Duck,</code> it is a <code>Duck</code>. There is often a proverb used in Python to describe this behavior quite well.</p>
+<p>Don't ask for permission, ask for forgiveness.</p>
+<p>In the case of our Duck, this means, that you invoke the function <code>acceptsOnlyDucks</code> with a bird and hope for the best. If something bad happens, you catch the exception with an except clause. Typically, this strategy works very well and very fast in Python.</p>
+<p>Okay, this is the end of my detour. Maybe you wonder why I wrote about duck typing in this C++ post? The reason is quite straightforward. Thanks to templates, we have duck typing in C++.</p>
+<p>This means, that you can refactor the previous program <code>disptachStaticPolymorphism.cpp</code> using duck typing.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #009999;"><span style="color: #3366ff;">// duckTyping.cpp</span><br /><br />#include &lt;chrono&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">auto</span> start <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>steady_clock<span style="color: #555555;">::</span>now();
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">writeElapsedTime</span>(){
+    <span style="color: #006699; font-weight: bold;">auto</span> now <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>steady_clock<span style="color: #555555;">::</span>now();
+    std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>duration<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">double</span><span style="color: #555555;">&gt;</span> diff <span style="color: #555555;">=</span> now <span style="color: #555555;">-</span> start;
+  
+    std<span style="color: #555555;">::</span>cerr <span style="color: #555555;">&lt;&lt;</span> diff.count() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" sec. elapsed: "</span>;
+}
+
+<span style="color: #006699; font-weight: bold;">struct</span> MessageSeverity{
+  <span style="color: #007788; font-weight: bold;">void</span> writeMessage() <span style="color: #006699; font-weight: bold;">const</span> {
+      std<span style="color: #555555;">::</span>cerr <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"unexpected"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  }
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> MessageInformation {
+  <span style="color: #007788; font-weight: bold;">void</span> writeMessage() <span style="color: #006699; font-weight: bold;">const</span> {              
+    std<span style="color: #555555;">::</span>cerr <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"information"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  }
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> MessageWarning {
+  <span style="color: #007788; font-weight: bold;">void</span> writeMessage() <span style="color: #006699; font-weight: bold;">const</span> {               
+    std<span style="color: #555555;">::</span>cerr <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"warning"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  }
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> MessageFatal<span style="color: #555555;">:</span> MessageSeverity{};     
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">void</span> writeMessage(T<span style="color: #555555;">&amp;</span> messServer){    <span style="color: #0099ff; font-style: italic;">// (1)                   </span>
+	
+	writeElapsedTime();                                   
+	messServer.writeMessage();                            
+	
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main(){
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  
+    MessageInformation messInfo;
+    writeMessage(messInfo);
+    
+    MessageWarning messWarn;
+    writeMessage(messWarn);
+
+    MessageFatal messFatal;
+    writeMessage(messFatal);
+  
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The function template <code>writeMessage</code> (line 1) applies duck typing. <code>writeMessage</code> assumes, that all objects messServer support the member function <code>writeMessage</code>. If not, the compilation would fail. The main difference to Python is that the error happens in C++ at compile time, but in Python at run time. Finally, here is the output of the program.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/StaticDynamicPolymorphism/duckTyping.png" alt="duckTyping" width="400" height="228" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>The function <code>writeMessage</code> behaves polymorphic, but is neither type-safe nor writes a readable error message in case of an error. At least, I can easily fix the last issue with concepts in C++20. You can read more about concepts in my previous posts about <a href="https://www.modernescpp.com/index.php/tag/concepts">concepts</a>. In the following example, I define and use the concept<code> MessageServer</code> (line 1).</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// duckTypingWithConcept.cpp</span>
+
+<span style="color: #009999;">#include &lt;chrono&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>   <span style="color: #0099ff; font-style: italic;">// (1)</span>
+concept MessageServer <span style="color: #555555;">=</span> requires(T t) {
+    t.writeMessage();
+};
+
+<span style="color: #006699; font-weight: bold;">auto</span> start <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>steady_clock<span style="color: #555555;">::</span>now();
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">writeElapsedTime</span>(){
+    <span style="color: #006699; font-weight: bold;">auto</span> now <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>steady_clock<span style="color: #555555;">::</span>now();
+    std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>duration<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">double</span><span style="color: #555555;">&gt;</span> diff <span style="color: #555555;">=</span> now <span style="color: #555555;">-</span> start;
+  
+    std<span style="color: #555555;">::</span>cerr <span style="color: #555555;">&lt;&lt;</span> diff.count() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" sec. elapsed: "</span>;
+}
+
+<span style="color: #006699; font-weight: bold;">struct</span> MessageSeverity{
+  <span style="color: #007788; font-weight: bold;">void</span> writeMessage() <span style="color: #006699; font-weight: bold;">const</span> {
+      std<span style="color: #555555;">::</span>cerr <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"unexpected"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  }
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> MessageInformation {
+  <span style="color: #007788; font-weight: bold;">void</span> writeMessage() <span style="color: #006699; font-weight: bold;">const</span> {              
+    std<span style="color: #555555;">::</span>cerr <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"information"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  }
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> MessageWarning {
+  <span style="color: #007788; font-weight: bold;">void</span> writeMessage() <span style="color: #006699; font-weight: bold;">const</span> {               
+    std<span style="color: #555555;">::</span>cerr <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"warning"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  }
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> MessageFatal<span style="color: #555555;">:</span> MessageSeverity{};     
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span>MessageServer T<span style="color: #555555;">&gt;</span>   <span style="color: #0099ff; font-style: italic;">// (2)</span>
+<span style="color: #007788; font-weight: bold;">void</span> writeMessage(T<span style="color: #555555;">&amp;</span> messServer){                       
+	
+	writeElapsedTime();                                   
+	messServer.writeMessage();                            
+	
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main(){
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  
+    MessageInformation messInfo;
+    writeMessage(messInfo);
+    
+    MessageWarning messWarn;
+    writeMessage(messWarn);
+
+    MessageFatal messFatal;
+    writeMessage(messFatal);
+  
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The concept MessageServer (line 1) requires that an object <code>t</code> of type <code>T</code> has to support the call<code> t.writeMessage. </code>Line (2) applies the concept in the function template <code>writeMessage</code>.</p>
+<h2>What's next?</h2>
+<p>So far, I have only written about the polymorphic behavior of templates but not static polymorphism. This changes in my next post. I present the so-called CRTP idiom. CRTP stands for the <strong>C</strong>uriously<strong> R</strong>ecurring <strong>T</strong>emplate <strong>P</strong>attern and means a technique in C++ in which you inherit a class <code>Derived</code> from a template class <code>Base</code> and <code>Base</code> has <code>Derived</code> as a template parameter:</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Base</span>
+{
+    ...
+};
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Derived</span> <span style="color: #555555;">:</span> <span style="color: #006699; font-weight: bold;">public</span> Base<span style="color: #555555;">&lt;</span>Derived<span style="color: #555555;">&gt;</span>
+{
+    ...
+};
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>{loadmoduleid 153}</p>
