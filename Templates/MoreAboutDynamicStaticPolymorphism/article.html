@@ -1,0 +1,240 @@
+<p>In my last post "<a href="https://www.modernescpp.com/">Dynamic and Static Polymorphism</a>", I introduced dynamic polymorphism. Today, I continue with static polymorphism and present are very interesting idiom in C++: curiously recurring template pattern (CRTP).</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/Templates/MoreAboutStaticDynamicPolymorphism/StaticDynamic.png" alt="StaticDynamic" width="650" height="394" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>A short recap. This is where I left in my last post.</p>
+<p>Dynamic Polymorphism is based on object orientation and enables us to separate between the interface and the implementation of a class hierarchy. To get late dynamic dispatch, you need two ingredients: virtuality and an indirection such as a pointer or a reference. The following program exemplified dynamic polymorphism:</p>
+<p><!-- HTML generated using hilite.me --></p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #009999;"><span style="color: #0099ff; font-style: italic;">// dispatchDynamicPolymorphism.cpp</span><br /><br />#include &lt;chrono&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">auto</span> start <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>steady_clock<span style="color: #555555;">::</span>now();
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">writeElapsedTime</span>(){
+    <span style="color: #006699; font-weight: bold;">auto</span> now <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>steady_clock<span style="color: #555555;">::</span>now();
+    std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>duration<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">double</span><span style="color: #555555;">&gt;</span> diff <span style="color: #555555;">=</span> now <span style="color: #555555;">-</span> start;
+  
+    std<span style="color: #555555;">::</span>cerr <span style="color: #555555;">&lt;&lt;</span> diff.count() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" sec. elapsed: "</span>;
+}
+
+<span style="color: #006699; font-weight: bold;">struct</span> MessageSeverity{                         
+	<span style="color: #006699; font-weight: bold;">virtual</span> <span style="color: #007788; font-weight: bold;">void</span> writeMessage() <span style="color: #006699; font-weight: bold;">const</span> {         
+		std<span style="color: #555555;">::</span>cerr <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"unexpected"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+	}
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> MessageInformation<span style="color: #555555;">:</span> MessageSeverity{     
+	<span style="color: #007788; font-weight: bold;">void</span> writeMessage() <span style="color: #006699; font-weight: bold;">const</span> override {        
+		std<span style="color: #555555;">::</span>cerr <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"information"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+	}
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> MessageWarning<span style="color: #555555;">:</span> MessageSeverity{         
+	<span style="color: #007788; font-weight: bold;">void</span> writeMessage() <span style="color: #006699; font-weight: bold;">const</span> override {        
+		std<span style="color: #555555;">::</span>cerr <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"warning"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+	}
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> MessageFatal<span style="color: #555555;">:</span> MessageSeverity{};
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">writeMessageReference</span>(<span style="color: #006699; font-weight: bold;">const</span> MessageSeverity<span style="color: #555555;">&amp;</span> messServer){  <span style="color: #0099ff;"><em> // (1)</em></span>
+	
+	writeElapsedTime();
+	messServer.writeMessage();
+	
+}
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">writeMessagePointer</span>(<span style="color: #006699; font-weight: bold;">const</span> MessageSeverity<span style="color: #555555;">*</span> messServer){    <span style="color: #0099ff; font-style: italic;">// (2)</span>
+	
+	writeElapsedTime();
+	messServer<span style="color: #555555;">-&gt;</span>writeMessage();
+	
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  
+    MessageInformation messInfo;
+    MessageWarning messWarn;
+    MessageFatal messFatal;
+  
+    MessageSeverity<span style="color: #555555;">&amp;</span> messRef1 <span style="color: #555555;">=</span> messInfo;       <em><span style="color: #0099ff;"> </span></em>     
+    MessageSeverity<span style="color: #555555;">&amp;</span> messRef2 <span style="color: #555555;">=</span> messWarn;      <em><span style="color: #0099ff;">  </span></em>
+    MessageSeverity<span style="color: #555555;">&amp;</span> messRef3 <span style="color: #555555;">=</span> messFatal;      
+  
+    writeMessageReference(messRef1);              
+    writeMessageReference(messRef2);
+    writeMessageReference(messRef3);
+  
+    std<span style="color: #555555;">::</span>cerr <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  
+    MessageSeverity<span style="color: #555555;">*</span> messPoin1 <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">new</span> MessageInformation;   
+    MessageSeverity<span style="color: #555555;">*</span> messPoin2 <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">new</span> MessageWarning;      <em> </em>
+    MessageSeverity<span style="color: #555555;">*</span> messPoin3 <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">new</span> MessageFatal;        <em> </em>
+  
+    writeMessagePointer(messPoin1);               
+    writeMessagePointer(messPoin2);
+    writeMessagePointer(messPoin3);
+  
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Static polymorphism is based on templates. Let me refactor the program using the<strong> C</strong>uriously <strong>R</strong>ecurring<strong> T</strong>emplate<strong> P</strong>attern (CRTP).</p>
+<h2>Static Polymorphism</h2>
+<p>Before I refactor the previous program<code> dispatchDynamicPolymorphism.cpp, </code>here is the key idea of CRTP: A class <code>Derived</code> derives from a class template <code>Base</code> and <code>Base</code> has <code>Derived</code> as a template argument.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Base</span>
+{
+    ...
+};
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Derived</span> <span style="color: #555555;">:</span> <span style="color: #006699; font-weight: bold;">public</span> Base<span style="color: #555555;">&lt;</span>Derived<span style="color: #555555;">&gt;</span>
+{
+    ...
+};
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Here is the pure nature of CRTP:</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// crtp.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> Derived<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">struct</span> Base{
+  <span style="color: #007788; font-weight: bold;">void</span> interface(){                <em><span style="color: #0099ff;">              // (2)</span></em>
+    <span style="color: #006699; font-weight: bold;">static_cast</span><span style="color: #555555;">&lt;</span>Derived<span style="color: #555555;">*&gt;</span>(<span style="color: #006699; font-weight: bold;">this</span>)<span style="color: #555555;">-&gt;</span>implementation();
+  }
+  <span style="color: #007788; font-weight: bold;">void</span> implementation(){                       <em><span style="color: #0099ff;"> // (3)</span></em>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Implementation Base"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  }
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> Derived1<span style="color: #555555;">:</span> Base<span style="color: #555555;">&lt;</span>Derived1<span style="color: #555555;">&gt;</span>{
+  <span style="color: #007788; font-weight: bold;">void</span> implementation(){
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Implementation Derived1"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  }
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> Derived2<span style="color: #555555;">:</span> Base<span style="color: #555555;">&lt;</span>Derived2<span style="color: #555555;">&gt;</span>{
+  <span style="color: #007788; font-weight: bold;">void</span> implementation(){
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Implementation Derived2"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  }
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> Derived3<span style="color: #555555;">:</span> Base<span style="color: #555555;">&lt;</span>Derived3<span style="color: #555555;">&gt;</span>{};             <em><span style="color: #0099ff;">// (4)</span></em>
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>                          <span style="color: #0099ff; font-style: italic;">// (1)</span>
+<span style="color: #007788; font-weight: bold;">void</span> execute(T<span style="color: #555555;">&amp;</span> base){
+    base.interface();
+}
+
+
+<span style="color: #007788; font-weight: bold;">int</span> main(){
+  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> '\n';
+  
+  Derived1 d1;
+  execute(d1);
+    
+  Derived2 d2;
+  execute(d2);
+  
+  Derived3 d3;
+  execute(d3);
+  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> '\n';
+  
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>I use in the function template <code>execute</code> (line 1) static polymorphism. Each&nbsp;<span style="font-family: courier new,courier;">base</span> invoked the method<code> base.interface</code><span style="font-family: courier new,courier;">.</span> The member function <code>Base::interface</code> (line 2) is the key point of the CRTP idiom. The member function dispatches to the implementation of the derived class<em></em>: <span style="font-family: courier new,courier;">static_cast&lt;Derived*&gt;(this)-&gt;implementation()</span>.&nbsp; That is possible because the method will be instantiated when called. At this point in time the derived classes <code>Derived1, Derived2</code>, and Derived3 are fully defined. Therefore, the method <span style="font-family: courier new,courier;"><span style="font-family: courier new,courier;">Base::interface</span> </span>can use the implementation of its derived classes. Pretty interesting is the member function <span style="font-family: courier new,courier;">Base::implementation</span> (line 3). This function plays the role of a default implementation for the static polymorphism for the class&nbsp; <code>Derived3 </code>(line 4).</p>
+<p>Here is the output of the program:</p>
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/Templates/MoreAboutStaticDynamicPolymorphism/crtpNew.png" alt="crtp" width="250" height="207" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>Now, let me take the next step and refactor the program <code>dispatchDynamicPolymorphism.cpp.</code></p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// dispatchStaticPolymorphism.cpp</span>
+
+<span style="color: #009999;">#include &lt;chrono&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">auto</span> start <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>steady_clock<span style="color: #555555;">::</span>now();
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">writeElapsedTime</span>(){
+    <span style="color: #006699; font-weight: bold;">auto</span> now <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>steady_clock<span style="color: #555555;">::</span>now();
+    std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>duration<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">double</span><span style="color: #555555;">&gt;</span> diff <span style="color: #555555;">=</span> now <span style="color: #555555;">-</span> start;
+  
+    std<span style="color: #555555;">::</span>cerr <span style="color: #555555;">&lt;&lt;</span> diff.count() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" sec. elapsed: "</span>;
+}
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> ConcreteMessage<span style="color: #555555;">&gt;</span>                        <span style="color: #0099ff; font-style: italic;">// (1)</span>
+<span style="color: #006699; font-weight: bold;">struct</span> MessageSeverity{
+  <span style="color: #007788; font-weight: bold;">void</span> writeMessage(){                                     <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    <span style="color: #006699; font-weight: bold;">static_cast</span><span style="color: #555555;">&lt;</span>ConcreteMessage<span style="color: #555555;">*&gt;</span>(<span style="color: #006699; font-weight: bold;">this</span>)<span style="color: #555555;">-&gt;</span>writeMessageImplementation();
+  }
+  <span style="color: #007788; font-weight: bold;">void</span> writeMessageImplementation() <span style="color: #006699; font-weight: bold;">const</span> {
+    std<span style="color: #555555;">::</span>cerr <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"unexpected"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  }
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> MessageInformation<span style="color: #555555;">:</span> MessageSeverity<span style="color: #555555;">&lt;</span>MessageInformation<span style="color: #555555;">&gt;</span>{
+  <span style="color: #007788; font-weight: bold;">void</span> writeMessageImplementation() <span style="color: #006699; font-weight: bold;">const</span> {               <span style="color: #0099ff; font-style: italic;">// (3)</span>
+    std<span style="color: #555555;">::</span>cerr <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"information"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  }
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> MessageWarning<span style="color: #555555;">:</span> MessageSeverity<span style="color: #555555;">&lt;</span>MessageWarning<span style="color: #555555;">&gt;</span>{
+  <span style="color: #007788; font-weight: bold;">void</span> writeMessageImplementation() <span style="color: #006699; font-weight: bold;">const</span> {               <span style="color: #0099ff; font-style: italic;">// (4)</span>
+    std<span style="color: #555555;">::</span>cerr <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"warning"</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  }
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> MessageFatal<span style="color: #555555;">:</span> MessageSeverity<span style="color: #555555;">&lt;</span>MessageFatal<span style="color: #555555;">&gt;</span>{};     <span style="color: #0099ff; font-style: italic;">// (5)</span>
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">void</span> writeMessage(T<span style="color: #555555;">&amp;</span> messServer){                       
+	
+    writeElapsedTime();                                   
+    messServer.writeMessage();                            <span style="color: #0099ff; font-style: italic;">// (6)</span>
+	
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main(){
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+  
+    MessageInformation messInfo;
+    writeMessage(messInfo);
+    
+    MessageWarning messWarn;
+    writeMessage(messWarn);
+	
+    MessageFatal messFatal;
+    writeMessage(messFatal);
+  
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>In this case, all concrete classes (lines 3, 4, and 5) derive from the base class <code>MessageSeverity</code>. The member function <code>writeMessage </code>is the interface that dispatches to the concrete implementations <code>writeMessageImplementation</code>. To achieve this, the object will be upcasted to the <code>ConcreteMessage:&nbsp;&nbsp;static_cast&lt;ConcreteMessage*&gt;(this)-&gt;writeMessageImplementation();</code><span style="font-family: 'courier new', courier;">. </span>This is the static dispatch at compile time, and coined the name for this technique: static polymorphism.</p>
+<p>To be honest, it took me time to get used to it, but applying the static polymorphism in line (6) is quite easy.</p>
+<p>In the end, I want to compare dynamic and static polymorphism in a few words:</p>
+<h2>Dynamic Versus Static Polymorphism<a href="https://www.modernescpp.com/Dynamic%20and%20Static%20Polymorphism"></a></h2>
+<p>Dynamic polymorphism happens at run time and static polymorphism at compile time. Dynamic polymorphism requires typically a pointer indirection at run time (read the post "<a href="https://medium.com/@abhichavhan/demystifying-virtual-functions-vtable-and-vptr-in-c-bf56f11f7cc7">Demystifying virtual functions, Vtable, and VPTR in C++</a>"), but static polymorphism has no performance costs at run time. Admittedly, there is a reason why the idiom curiously recurring template pattern (CRTP) has the name curious inside. For beginners, the idiom is quite challenging to understand. So, what should you use?</p>
+<p>First of all, don't overestimate the costs of a virtual dispatch. In most cases, you can ignore them. For the details, read the excellent paper "<a href="http://www.open-std.org/jtc1/sc22/wg21/docs/TR18015.pdf">Technical Report on C++ Performance</a>". It's pretty dated but has in section 5.3.3 interesting numbers about the additional costs of virtual function calls. If you are still concerned about performance, there is only one cure: measure. Put your performance tests under version control and always rerun them if something in your setup consisting of your hardware, compiler, or compiler version changes, because this invalidates your previous performance numbers.</p>
+<p>In the end, code is way more often read the written. Therefore, you should use the techniques your team is most comfortable with. &nbsp;</p>
+<h2>What's next?</h2>
+<p><a href="https://en.wikipedia.org/wiki/Mixin">Mixins</a> are a popular technique in Python. They allow you to change the behavior of a class using multiple inheritances. Thanks to CRTP, we also have mixins in C++. Read about them in my next post.</p>
+<p>&nbsp;</p>
+<p>{loadmoduleid 153}</p>
+<p>&nbsp;</p>
