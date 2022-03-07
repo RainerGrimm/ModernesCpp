@@ -1,0 +1,213 @@
+<p>Thanks to C++20, lambdas become more powerful. From the various lambda improvements, template parameters for lambdas are my favorite ones.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/Cpp20/MorePowerfulLambdas/TimelineCpp20CoreLanguage.png" alt="TimelineCpp20CoreLanguage" width="650" height="259" style="display: block; margin-left: auto; margin-right: auto;" />Lambdas support with C++20 template parameters, can be default-constructed and support copy-assignment, when they have no state, and can be used in unevaluated contexts. Additionally, they detect when you implicitly copy the <span style="font-family: courier new, courier;">this</span> pointer. This means a significant cause of undefined behavior with lambdas is gone.</p>
+<p>Let's start with template parameters for lambdas.</p>
+<h2>Template Parameter for Lambdas</h2>
+<p>Admittedly, the differences between typed lambdas, generic lambdas, and template lambdas (template parameter for lambdas) are subtle.</p>
+<h3>Four lambda variations</h3>
+<p>The following program presents four variations of the <span style="font-family: courier new, courier;">add</span> function using lambdas for their implementation.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// templateLambda.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;string&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">auto</span> sumInt <span style="color: #555555;">=</span> [](<span style="color: #007788; font-weight: bold;">int</span> fir, <span style="color: #007788; font-weight: bold;">int</span> sec) { <span style="color: #006699; font-weight: bold;">return</span> fir <span style="color: #555555;">+</span> sec; };            <span style="color: #0099ff; font-style: italic;">// only to int convertible types    (C++11)</span>
+<span style="color: #006699; font-weight: bold;">auto</span> sumGen <span style="color: #555555;">=</span> [](<span style="color: #006699; font-weight: bold;">auto</span> fir, <span style="color: #006699; font-weight: bold;">auto</span> sec) { <span style="color: #006699; font-weight: bold;">return</span> fir <span style="color: #555555;">+</span> sec; };          <span style="color: #0099ff; font-style: italic;">// arbitrary types                  (C++14)</span>
+<span style="color: #006699; font-weight: bold;">auto</span> sumDec <span style="color: #555555;">=</span> [](<span style="color: #006699; font-weight: bold;">auto</span> fir, decltype(fir) sec) { <span style="color: #006699; font-weight: bold;">return</span> fir <span style="color: #555555;">+</span> sec; }; <span style="color: #0099ff; font-style: italic;">// arbitrary, but convertible types (C++14)</span>
+<span style="color: #006699; font-weight: bold;">auto</span> sumTem <span style="color: #555555;">=</span> []<span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>(T fir, T sec) { <span style="color: #006699; font-weight: bold;">return</span> fir <span style="color: #555555;">+</span> sec; };    <span style="color: #0099ff; font-style: italic;">// arbitrary, but identical types   (C++20)</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+                                                                        <span style="color: #0099ff; font-style: italic;">    // (1)</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"sumInt(2000, 11): "</span> <span style="color: #555555;">&lt;&lt;</span> sumInt(<span style="color: #ff6600;">2000</span>, <span style="color: #ff6600;">11</span>) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;  
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"sumGen(2000, 11): "</span> <span style="color: #555555;">&lt;&lt;</span> sumGen(<span style="color: #ff6600;">2000</span>, <span style="color: #ff6600;">11</span>) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"sumDec(2000, 11): "</span> <span style="color: #555555;">&lt;&lt;</span> sumDec(<span style="color: #ff6600;">2000</span>, <span style="color: #ff6600;">11</span>) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"sumTem(2000, 11): "</span> <span style="color: #555555;">&lt;&lt;</span> sumTem(<span style="color: #ff6600;">2000</span>, <span style="color: #ff6600;">11</span>) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+                                                                            <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    std<span style="color: #555555;">::</span>string hello <span style="color: #555555;">=</span> <span style="color: #cc3300;">"Hello "</span>;
+    std<span style="color: #555555;">::</span>string world <span style="color: #555555;">=</span> <span style="color: #cc3300;">"world"</span>; 
+    <span style="color: #0099ff; font-style: italic;">// std::cout &lt;&lt; "sumInt(hello, world): " &lt;&lt; sumInt(hello, world) &lt;&lt; std::endl; ERROR</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"sumGen(hello, world): "</span> <span style="color: #555555;">&lt;&lt;</span> sumGen(hello, world) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"sumDec(hello, world): "</span> <span style="color: #555555;">&lt;&lt;</span> sumDec(hello, world) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"sumTem(hello, world): "</span> <span style="color: #555555;">&lt;&lt;</span> sumTem(hello, world) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+                                                                             <span style="color: #0099ff; font-style: italic;">// (3)</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"sumInt(true, 2010): "</span> <span style="color: #555555;">&lt;&lt;</span> sumInt(<span style="color: #336666;">true</span>, <span style="color: #ff6600;">2010</span>) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"sumGen(true, 2010): "</span> <span style="color: #555555;">&lt;&lt;</span> sumGen(<span style="color: #336666;">true</span>, <span style="color: #ff6600;">2010</span>) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"sumDec(true, 2010): "</span> <span style="color: #555555;">&lt;&lt;</span> sumDec(<span style="color: #336666;">true</span>, <span style="color: #ff6600;">2010</span>) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl; <span style="color: #0099ff; font-style: italic;"></span> 
+    <span style="color: #0099ff; font-style: italic;">// std::cout &lt;&lt; "sumTem(true, 2010): " &lt;&lt; sumTem(true, 2010) &lt;&lt; std::endl; ERROR</span>
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Before I show the presumably astonishing output of the program, I want to compare the four lambdas.</p>
+<ul>
+<li><span style="font-family: courier new, courier;">sumInt</span>
+<ul>
+<li>C++11</li>
+<li>typed lambda</li>
+<li>accepts only to <span style="font-family: courier new, courier;">int</span> convertible type</li>
+</ul>
+</li>
+<li><span style="font-family: courier new, courier;">sumGen</span> <br />
+<ul>
+<li>C++14</li>
+<li>generic lambda</li>
+<li>accepts all types</li>
+</ul>
+</li>
+<li><span style="font-family: courier new, courier;">sumDec</span>
+<ul>
+<li>C++14</li>
+<li>generic lambda</li>
+<li>the second type must be convertible to the first type</li>
+</ul>
+</li>
+<li><span style="font-family: courier new, courier;">sumTem</span><br />
+<ul>
+<li>C++20</li>
+<li>template lambda</li>
+<li>the first type and the second type must be the same</li>
+</ul>
+<div>&nbsp;</div>
+</li>
+</ul>
+<p>What does this mean for template arguments with different types? Of course, each lambda accepts <span style="font-family: courier new, courier;">int</span>'s (1), and the typed lambda <span style="font-family: courier new, courier;">sumInt</span> does not accept strings (2).</p>
+<p>Invoking the lambdas with the <span style="font-family: 'courier new', courier;">bool</span> true and the <span style="font-family: 'courier new', courier;">int</span> 2010&nbsp;may be surprising (3).</p>
+<ul>
+<li><span style="font-family: courier new, courier;">sumInt</span> returns 2011 because <span style="font-family: courier new, courier;">true</span> is integral promoted to <span style="font-family: courier new, courier;">int</span>.</li>
+<li>sumGen returns 2011 because true is integral promoted to <span style="font-family: courier new, courier;">int</span>. There is a subtle difference between <span style="font-family: courier new, courier;">sumInt</span> and <span style="font-family: courier new, courier;">sumGen</span>, which I present in a few lines.</li>
+<li><span style="font-family: courier new, courier;">sumDec</span> returns 2. Why? The type of the second parameter <span style="font-family: courier new, courier;">sec</span> becomes the type of the first parameter <span style="font-family: courier new, courier;">fir: t</span>hanks to<span style="font-family: courier new, courier;"> (decltype(fir) sec), </span>the compiler deduces the type of <span style="font-family: courier new, courier;">fir</span> and makes it to the type of <span style="font-family: courier new, courier;">sec. </span>Consequently, <span style="font-family: courier new, courier;">2010</span> is converted to true. In the expression <span style="font-family: courier new, courier;">fir + sec,</span> <span style="font-family: courier new, courier;">fir</span> is integral promoted to <span style="font-family: courier new, courier;">1</span>. Finally, the result is <span style="font-family: courier new, courier;">2</span>.</li>
+<li><span style="font-family: courier new, courier;">sumTem</span> is not valid.</li>
+</ul>
+<p>Thanks to the <a href="https://godbolt.org/">Compiler Explorer</a> and GCC, here is the output of the program.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Cpp20/MorePowerfulLambdas/templateLambda.png" alt="templateLambda" width="350" height="299" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>There is an interesting difference between <span style="font-family: courier new, courier;">sumInt</span> and <span style="font-family: courier new, courier;">sumGen</span>. The integral promotion of the true value happens in the case of <span style="font-family: courier new, courier;">sumInt</span> on the caller-side, but the integral promotion of the <span style="font-family: courier new, courier;">true</span> value happens in the case of <span style="font-family: courier new, courier;">sumGen</span> in the arithmetic expression <span style="font-family: courier new, courier;">fir + sec</span>. Here is the essential part of the program once more</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">auto</span> sumInt <span style="color: #555555;">=</span> [](<span style="color: #007788; font-weight: bold;">int</span> fir, <span style="color: #007788; font-weight: bold;">int</span> sec) { <span style="color: #006699; font-weight: bold;">return</span> fir <span style="color: #555555;">+</span> sec; };            
+<span style="color: #006699; font-weight: bold;">auto</span> sumGen <span style="color: #555555;">=</span> [](<span style="color: #006699; font-weight: bold;">auto</span> fir, <span style="color: #006699; font-weight: bold;">auto</span> sec) { <span style="color: #006699; font-weight: bold;">return</span> fir <span style="color: #555555;">+</span> sec; };         
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+  
+  sumInt(<span style="color: #336666;">true</span>, <span style="color: #ff6600;">2010</span>);
+  sumGen(<span style="color: #336666;">true</span>, <span style="color: #ff6600;">2010</span>);
+  
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>When I use the code snippet in <a href="https://cppinsights.io/s/3ec92b0b">C++ Insights</a>&nbsp;(link to the program)&nbsp;it shows the difference. I only show the crucial part of the compiler-generated code.</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">__lambda_1_15</span>
+{
+  <span style="color: #9999ff;">public:</span> 
+  <span style="color: #006699; font-weight: bold;">inline</span> <span style="color: #0099ff; font-style: italic;">/*constexpr */</span> <span style="color: #007788; font-weight: bold;">int</span> <span style="color: #006699; font-weight: bold;">operator</span>()(<span style="color: #007788; font-weight: bold;">int</span> fir, <span style="color: #007788; font-weight: bold;">int</span> sec) <span style="color: #006699; font-weight: bold;">const</span>
+  {
+    <span style="color: #006699; font-weight: bold;">return</span> fir <span style="color: #555555;">+</span> sec;
+  }
+  
+};
+
+__lambda_1_15 sumInt <span style="color: #555555;">=</span> __lambda_1_15{};
+            
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">__lambda_2_15</span>
+{
+  <span style="color: #9999ff;">public:</span> 
+  <span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">type_parameter_0_0</span>, <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">type_parameter_0_1</span><span style="color: #555555;">&gt;</span>
+  <span style="color: #006699; font-weight: bold;">inline</span> <span style="color: #0099ff; font-style: italic;">/*constexpr */</span> <span style="color: #006699; font-weight: bold;">auto</span> <span style="color: #006699; font-weight: bold;">operator</span>()(type_parameter_0_0 fir, type_parameter_0_1 sec) <span style="color: #006699; font-weight: bold;">const</span>
+  {
+    <span style="color: #006699; font-weight: bold;">return</span> fir <span style="color: #555555;">+</span> sec;
+  }
+  
+  <span style="color: #aa0000; background-color: #ffaaaa;">#</span>ifdef INSIGHTS_USE_TEMPLATE
+  <span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;&gt;</span>
+  <span style="color: #006699; font-weight: bold;">inline</span> <span style="color: #0099ff; font-style: italic;">/*constexpr */</span> <span style="color: #007788; font-weight: bold;">int</span> <span style="color: #006699; font-weight: bold;">operator</span>()(<span style="color: #007788; font-weight: bold;">bool</span> fir, <span style="color: #007788; font-weight: bold;">int</span> sec) <span style="color: #006699; font-weight: bold;">const</span>
+  {
+    <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #006699; font-weight: bold;">static_cast</span><span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span>(fir) <span style="color: #555555;">+</span> sec;                  <span style="color: #0099ff; font-style: italic;">// (2)</span>
+  }
+  <span style="color: #aa0000; background-color: #ffaaaa;">#</span>endif
+  
+};
+
+__lambda_2_15 sumGen <span style="color: #555555;">=</span> __lambda_2_15{};
+         
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>()
+{
+  sumInt.<span style="color: #006699; font-weight: bold;">operator</span>()(<span style="color: #006699; font-weight: bold;">static_cast</span><span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span>(<span style="color: #336666;">true</span>), <span style="color: #ff6600;">2010</span>);       <span style="color: #0099ff; font-style: italic;">// (1)</span>
+  sumGen.<span style="color: #006699; font-weight: bold;">operator</span>()(<span style="color: #336666;">true</span>, <span style="color: #ff6600;">2010</span>);
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>I assume you know that the compiler generates a function object out of a lambda. If you don't know, Andreas Fertig wrote a few posts about his tool C++ Insights on my blog. One post is about lambdas: <a href="https://www.modernescpp.com/index.php/category/cppinsight">C++ Insights posts</a>.</p>
+<p>When you carefully study the code-snippet, you see the difference. sumInt performs the integral promotion on the call-side (1) but <span style="font-family: courier new, courier;">sumGen</span> does it in the arithmetic expressions (2).</p>
+<p>Honestly, this example was very enlightening for me and hopefully, also for you. A more typical use-case for template lambdas is the usage of containers in lambdas.</p>
+<h3>Template Parameter for Containers</h3>
+<p>The following program presents lambdas accepting a container. Each lambda returns the size of the container.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// templateLambdaVector.cpp</span>
+
+<span style="color: #009999;">#include &lt;concepts&gt;</span>
+<span style="color: #009999;">#include &lt;deque&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;string&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">auto</span> lambdaGeneric <span style="color: #555555;">=</span> [](<span style="color: #006699; font-weight: bold;">const</span> <span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;</span> container) { <span style="color: #006699; font-weight: bold;">return</span> container.size(); };  
+<span style="color: #006699; font-weight: bold;">auto</span> lambdaVector <span style="color: #555555;">=</span> []<span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>(<span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;&amp;</span> vec) { <span style="color: #006699; font-weight: bold;">return</span> vec.size(); };
+<span style="color: #006699; font-weight: bold;">auto</span> lambdaVectorIntegral <span style="color: #555555;">=</span> []<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>integral T<span style="color: #555555;">&gt;</span>(<span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;&amp;</span> vec) { <span style="color: #006699; font-weight: bold;">return</span> vec.size(); };
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>deque deq{<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>};                     <span style="color: #0099ff; font-style: italic;">// (1)</span>                 
+    std<span style="color: #555555;">::</span>vector vecDouble{<span style="color: #ff6600;">1.1</span>, <span style="color: #ff6600;">2.2</span>, <span style="color: #ff6600;">3.3</span>, <span style="color: #ff6600;">4.4</span>};   <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    std<span style="color: #555555;">::</span>vector vecInt{<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">5</span>};           <span style="color: #0099ff; font-style: italic;">// (1)</span>
+  
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"lambdaGeneric(deq): "</span> <span style="color: #555555;">&lt;&lt;</span> lambdaGeneric(deq) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    <span style="color: #0099ff; font-style: italic;">// std::cout &lt;&lt; "lambdaVector(deq): " &lt;&lt; lambdaVector(deq) &lt;&lt; std::endl;                  ERROR</span>
+    <span style="color: #0099ff; font-style: italic;">// std::cout &lt;&lt; "lambdaVectorIntegral(deq): " &lt;&lt; lambdaVectorIntegral(deq) &lt;&lt; std::endl;  ERROR</span>
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"lambdaGeneric(vecDouble): "</span> <span style="color: #555555;">&lt;&lt;</span> lambdaGeneric(vecDouble) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"lambdaVector(vecDouble): "</span> <span style="color: #555555;">&lt;&lt;</span> lambdaVector(vecDouble) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    <span style="color: #0099ff; font-style: italic;">// std::cout &lt;&lt; "lambdaVectorIntegral(vecDouble): " &lt;&lt; lambdaVectorIntegral(vecDouble) &lt;&lt; std::endl;</span>
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+     
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"lambdaGeneric(vecInt): "</span> <span style="color: #555555;">&lt;&lt;</span> lambdaGeneric(vecInt) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"lambdaVector(vecInt): "</span> <span style="color: #555555;">&lt;&lt;</span> lambdaVector(vecInt) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"lambdaVectorIntegral(vecInt): "</span> <span style="color: #555555;">&lt;&lt;</span> lambdaVectorIntegral(vecInt) <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p><span style="font-family: courier new, courier;">lambdaGeneric</span> can be invoked with any data type that has a member function <span style="font-family: courier new, courier;">size()</span>. <span style="font-family: courier new, courier;">lambdaVector</span> is more specific: it only accepts <span style="font-family: courier new, courier;">a std::vector.</span> <span style="font-family: courier new, courier;">lambdaVectorIntegral</span> uses C++20 concept <span style="font-family: courier new, courier;">std::integral</span>. Consequently, it accepts only a <span style="font-family: 'courier new', courier;">std::vector</span> using integral types such as <span style="font-family: 'courier new', courier;">int</span>. To use it, I have to include the header <span style="font-family: courier new, courier;">&lt;concepts&gt;</span>. I assume the small program is self-explanatory.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Cpp20/MorePowerfulLambdas/templateLambdaVector.png" alt="templateLambdaVector" width="300" height="202" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>There is one feature in the program <span style="font-family: courier new, courier;">templateLambdaVector.cpp,</span> that you have probably missed. Since C++17, the compiler can deduce the type of a class template from its arguments (1). Consequently, instead of the verbose <span style="font-family: courier new, courier;">std::vector&lt;int&gt; myVec{1, 2, 3}</span> you can simply write <span style="font-family: courier new, courier;">std::vector myVec{1, 2, 3}</span>.</p>
+<h2>What's next?</h2>
+<p>My <a href="https://www.modernescpp.com/index.php/the-c-standard-library-the-third-edition-includes-c-20">next post </a>will be about the remaining lambda improvements in C++20.</p>
+<p>&nbsp;</p>
+<p>{loadmoduleid 153}</p>
+<div id="simple-translate">&nbsp;</div>
