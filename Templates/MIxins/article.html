@@ -1,0 +1,204 @@
+<p>In my previous&nbsp; post "More about Dynamic and Static Polymorphism", I used the Curiously Recurring Template Pattern (CRTP) to implement static polymorphism. Another typical use case for CRTP are mixins.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/Templates/Mixins/crtp.png" alt="StaticDynamic" width="650" height="401" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p><a href="https://en.wikipedia.org/wiki/Mixin">Mixins</a> are a popular idea in the design of classes to mix in new code. Therefore, it's an often-used technique in Python to change the behavior of a class by using multiple inheritances. In contrary to C++ it is legal in Python to have more than one definition of a method in a class hierarchy. Python uses simply that method that is first in the <a href="https://docs.python.org/3/glossary.html#term-method-resolution-order">Method Resolution Order </a>(MRO).</p>
+<p>You can implement mixins in C++ by using CRTP. A prominent example is the class<code> std::enable_shared_from_this</code>.</p>
+<h2><code>std::enable_shared_from_this</code></h2>
+<p>Let's see <code>std::enable_shared_from</code> this and, therefore, CRTP applied.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// enableShared.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;memory&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">ShareMe</span><span style="color: #555555;">:</span> <span style="color: #006699; font-weight: bold;">public</span> std<span style="color: #555555;">::</span>enable_shared_from_this<span style="color: #555555;">&lt;</span>ShareMe<span style="color: #555555;">&gt; </span>{  <em><span style="color: #0099ff;">// (1)</span></em>
+<span style="color: #9999ff;">public:</span>
+  std<span style="color: #555555;">::</span>shared_ptr<span style="color: #555555;">&lt;</span>ShareMe<span style="color: #555555;">&gt;</span> getShared(){
+    <span style="color: #006699; font-weight: bold;">return</span> shared_from_this();                                <em><span style="color: #0099ff;">  // (2)</span></em>
+  }
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+  std<span style="color: #555555;">::</span>shared_ptr<span style="color: #555555;">&lt;</span>ShareMe<span style="color: #555555;">&gt;</span> shareMe(<span style="color: #006699; font-weight: bold;">new</span> ShareMe);
+  std<span style="color: #555555;">::</span>shared_ptr<span style="color: #555555;">&lt;</span>ShareMe<span style="color: #555555;">&gt;</span> shareMe1<span style="color: #555555;">=</span> shareMe<span style="color: #555555;">-&gt;</span>getShared();     <em><span style="color: #0099ff;"> // (3)</span></em>
+  {
+    <span style="color: #006699; font-weight: bold;">auto</span> shareMe2(shareMe1);
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"shareMe.use_count(): "</span>  <span style="color: #555555;">&lt;&lt;</span> shareMe.use_count() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  }
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"shareMe.use_count(): "</span>  <span style="color: #555555;">&lt;&lt;</span> shareMe.use_count() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  
+  shareMe1.reset();
+  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"shareMe.use_count(): "</span>  <span style="color: #555555;">&lt;&lt;</span> shareMe.use_count() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>By using the class&nbsp;<code>std::enable_shared_from_this</code> you can create objects that return a&nbsp; <code>std::shared_ptr</code> to itself. To get it, you have to derive your class <code>MySharedClass</code> public from <code>std::enable_shared_from_this</code> (line 1). Now, your class <code>MySharedClass</code> has a member function<code> shared_from_this</code> (line 2) for creating <code>std::shared_ptr</code> to its objects. The call <code>shareMe-&gt;getShared()</code> (line 3) creates a new smart pointer. The member function <code>getShared</code> internally uses the function <code>shared_from_this</code> (line 2). The following screenshot shows the creation of the shared pointer.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/Mixins/enabledShared.png" alt="enabledShared" width="397" height="208" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>&nbsp;</p>
+<p>If you want to learn more about smart pointers, read my previous posts:<a href="https://www.modernescpp.com/index.php/tag/smart-pointers"> smart pointers</a>.</p>
+<p>How do mixin classes work in C++? Let me introduce a typical use case.</p>
+<h2>Extending a Class with all Relational Operators</h2>
+<p>Imagine, you want to implement all six comparison operators for your data type.&nbsp; (Of course, with C++20 the compiler can auto-generate them:&nbsp; <a href="https://www.modernescpp.com/C++20:%20The%20Three-Way%20Comparison%20Operator">C++20: The Three-Way Comparison Operator</a>). So far, you have only implemented the smaller operator (&lt;). You know, that you can derive all other five comparison operators (<code>&lt;=, &gt;, &gt;=, ==</code> , and<code> !=</code>) from the smaller operator. Applying this idea and using CRTP save you many keyboard strokes.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// mixins.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;string&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> Derived<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">struct</span> Relational {
+    <span style="color: #006699; font-weight: bold;">friend</span> <span style="color: #007788; font-weight: bold;">bool</span> <span style="color: #006699; font-weight: bold;">operator</span> <span style="color: #555555;">&gt;</span> (Derived <span style="color: #006699; font-weight: bold;">const</span><span style="color: #555555;">&amp;</span> op1, Derived <span style="color: #006699; font-weight: bold;">const</span><span style="color: #555555;">&amp;</span> op2){
+       <span style="color: #006699; font-weight: bold;">return</span> op2 <span style="color: #555555;">&lt;</span> op1;
+    }
+    <span style="color: #006699; font-weight: bold;">friend</span> <span style="color: #007788; font-weight: bold;">bool</span> <span style="color: #006699; font-weight: bold;">operator</span> <span style="color: #555555;">==</span> (Derived <span style="color: #006699; font-weight: bold;">const</span><span style="color: #555555;">&amp;</span> op1, Derived <span style="color: #006699; font-weight: bold;">const</span><span style="color: #555555;">&amp;</span> op2){
+        <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #555555;">!</span>(op1 <span style="color: #555555;">&lt;</span> op2) <span style="color: #555555;">&amp;&amp;</span> <span style="color: #555555;">!</span>(op2 <span style="color: #555555;">&lt;</span> op1);
+    }
+    <span style="color: #006699; font-weight: bold;">friend</span> <span style="color: #007788; font-weight: bold;">bool</span> <span style="color: #006699; font-weight: bold;">operator</span> <span style="color: #555555;">!=</span> (Derived <span style="color: #006699; font-weight: bold;">const</span><span style="color: #555555;">&amp;</span> op1, Derived <span style="color: #006699; font-weight: bold;">const</span><span style="color: #555555;">&amp;</span> op2){
+        <span style="color: #006699; font-weight: bold;">return</span> (op1 <span style="color: #555555;">&lt;</span> op2) <span style="color: #555555;">||</span> (op2 <span style="color: #555555;">&lt;</span> op1);
+    }
+    <span style="color: #006699; font-weight: bold;">friend</span> <span style="color: #007788; font-weight: bold;">bool</span> <span style="color: #006699; font-weight: bold;">operator</span> <span style="color: #555555;">&lt;=</span> (Derived <span style="color: #006699; font-weight: bold;">const</span><span style="color: #555555;">&amp;</span> op1, Derived <span style="color: #006699; font-weight: bold;">const</span><span style="color: #555555;">&amp;</span> op2){ 
+        <span style="color: #006699; font-weight: bold;">return</span> (op1 <span style="color: #555555;">&lt;</span> op2) <span style="color: #555555;">||</span> (op1 <span style="color: #555555;">==</span> op2);
+    }
+    <span style="color: #006699; font-weight: bold;">friend</span> <span style="color: #007788; font-weight: bold;">bool</span> <span style="color: #006699; font-weight: bold;">operator</span> <span style="color: #555555;">&gt;=</span> (Derived <span style="color: #006699; font-weight: bold;">const</span><span style="color: #555555;">&amp;</span> op1, Derived <span style="color: #006699; font-weight: bold;">const</span><span style="color: #555555;">&amp;</span> op2){
+        <span style="color: #006699; font-weight: bold;">return</span> (op1 <span style="color: #555555;">&gt;</span> op2) <span style="color: #555555;">||</span> (op1 <span style="color: #555555;">==</span> op2);
+    }
+};
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Apple</span><span style="color: #555555;">:</span> <span style="color: #006699; font-weight: bold;">public</span> Relational<span style="color: #555555;">&lt;</span>Apple<span style="color: #555555;">&gt;</span>{
+<span style="color: #9999ff;">public:</span>
+    <span style="color: #006699; font-weight: bold;">explicit</span> Apple(<span style="color: #007788; font-weight: bold;">int</span> s)<span style="color: #555555;">:</span> size{s}{};
+    <span style="color: #006699; font-weight: bold;">friend</span> <span style="color: #007788; font-weight: bold;">bool</span> <span style="color: #006699; font-weight: bold;">operator</span> <span style="color: #555555;">&lt;</span> (Apple <span style="color: #006699; font-weight: bold;">const</span><span style="color: #555555;">&amp;</span> a1, Apple <span style="color: #006699; font-weight: bold;">const</span><span style="color: #555555;">&amp;</span> a2){    <em><span style="color: #0099ff;">// (1)</span></em>
+        <span style="color: #006699; font-weight: bold;">return</span> a1.size <span style="color: #555555;">&lt;</span> a2.size;
+    }
+<span style="color: #9999ff;">private:</span>
+    <span style="color: #007788; font-weight: bold;">int</span> size;
+};
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Man</span><span style="color: #555555;">:</span> <span style="color: #006699; font-weight: bold;">public</span> Relational<span style="color: #555555;">&lt;</span>Man<span style="color: #555555;">&gt;</span>{                                <em><span style="color: #0099ff;"> // (3)</span></em>
+<span style="color: #9999ff;">public:</span>
+    <span style="color: #006699; font-weight: bold;">explicit</span> Man(<span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span>string<span style="color: #555555;">&amp;</span> n)<span style="color: #555555;">:</span> name{n}{}
+    <span style="color: #006699; font-weight: bold;">friend</span> <span style="color: #007788; font-weight: bold;">bool</span> <span style="color: #006699; font-weight: bold;">operator</span> <span style="color: #555555;">&lt;</span> (Man <span style="color: #006699; font-weight: bold;">const</span><span style="color: #555555;">&amp;</span> m1, Man <span style="color: #006699; font-weight: bold;">const</span><span style="color: #555555;">&amp;</span> m2){         <em><span style="color: #0099ff;">// (2)</span></em>
+        <span style="color: #006699; font-weight: bold;">return</span> m1.name <span style="color: #555555;">&lt;</span> m2.name;
+    }
+<span style="color: #9999ff;">private:</span>
+    std<span style="color: #555555;">::</span>string name;
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>boolalpha <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  
+  Apple apple1{<span style="color: #ff6600;">5</span>};
+  Apple apple2{<span style="color: #ff6600;">10</span>}; 
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"apple1 &lt; apple2: "</span> <span style="color: #555555;">&lt;&lt;</span> (apple1 <span style="color: #555555;">&lt;</span> apple2) <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"apple1 &gt; apple2: "</span> <span style="color: #555555;">&lt;&lt;</span> (apple1 <span style="color: #555555;">&gt;</span> apple2) <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"apple1 == apple2: "</span> <span style="color: #555555;">&lt;&lt;</span> (apple1 <span style="color: #555555;">==</span> apple2) <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"apple1 != apple2: "</span> <span style="color: #555555;">&lt;&lt;</span> (apple1 <span style="color: #555555;">!=</span> apple2) <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"apple1 &lt;= apple2: "</span> <span style="color: #555555;">&lt;&lt;</span> (apple1 <span style="color: #555555;">&lt;=</span> apple2) <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"apple1 &gt;= apple2: "</span> <span style="color: #555555;">&lt;&lt;</span> (apple1 <span style="color: #555555;">&gt;=</span> apple2) <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    
+  Man man1{<span style="color: #cc3300;">"grimm"</span>};
+  Man man2{<span style="color: #cc3300;">"jaud"</span>};
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"man1 &lt; man2: "</span> <span style="color: #555555;">&lt;&lt;</span> (man1 <span style="color: #555555;">&lt;</span> man2) <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>; 
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"man1 &gt; man2: "</span> <span style="color: #555555;">&lt;&lt;</span> (man1 <span style="color: #555555;">&gt;</span> man2) <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>; 
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"man1 == man2: "</span> <span style="color: #555555;">&lt;&lt;</span> (man1 <span style="color: #555555;">==</span> man2) <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>; 
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"man1 != man2: "</span> <span style="color: #555555;">&lt;&lt;</span> (man1 <span style="color: #555555;">!=</span> man2) <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"man1 &lt;= man2: "</span> <span style="color: #555555;">&lt;&lt;</span> (man1 <span style="color: #555555;">&lt;=</span> man2) <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"man1 &gt;= man2: "</span> <span style="color: #555555;">&lt;&lt;</span> (man1 <span style="color: #555555;">&gt;=</span> man2) <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>I've implemented for the <code>Apple</code> and <code>Man</code> the smaller operator (lines 1 and 2).&nbsp; For simplicity, I only use the class <code>Man</code> in my argumentation.&nbsp; Man is <code>public</code> derived from the class <code>Relational&lt;Man&gt;</code> (line 3) using CRTP. The class <code>Relational</code> supports the five missing relational operators (<code>&lt;=, &lt;,&gt;=, ==</code>, and<code> !=</code>).&nbsp; The five relations operators are mapped onto the less operator of Man (line 2).&nbsp;</p>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/Mixins/mixins.png" alt="mixins" width="401" height="462" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>Honestly, I like the name mixins for this idiom. The class <code>Relational</code> mixes the remaining relational operators into the class <code>Man</code>.</p>
+<p>The characteristic of CRTP is that a class <code>Derived</code> derives from a class template <code>Base</code> and <code>Base</code> has <code>Derived</code> as a template argument:</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Derived</span> <span style="color: #555555;">:</span> <span style="color: #006699; font-weight: bold;">public</span> Base<span style="color: #555555;">&lt;</span>Derived<span style="color: #555555;">&gt;</span>      <span style="color: #0099ff; font-style: italic;">// (1)</span>
+{
+    ...
+};
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Derivedwrong</span> <span style="color: #555555;">:</span> <span style="color: #006699; font-weight: bold;">public</span> Base<span style="color: #555555;">&lt;</span>Derived<span style="color: #555555;">&gt;</span> <span style="color: #0099ff; font-style: italic;">// (2)</span>
+{
+    ...
+};
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>How can you ensure that you are not erroneously derived the wrong class <code>DervivedWrong </code>from <code>Base&lt;Derived&gt;</code> such as in line 2?</p>
+<h2>Checked CRTP</h2>
+<p>The trick is straightforward: make the constructor of <code>Base</code> private.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// crtpCheck.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> Derived<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">struct</span> Base{
+  <span style="color: #007788; font-weight: bold;">void</span> interface(){
+    <span style="color: #006699; font-weight: bold;">static_cast</span><span style="color: #555555;">&lt;</span>Derived<span style="color: #555555;">*&gt;</span>(<span style="color: #006699; font-weight: bold;">this</span>)<span style="color: #555555;">-&gt;</span>implementation();
+  }
+<span style="color: #9999ff;">private:</span>
+    Base() <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">default</span>;            <em> <span style="color: #0099ff;">// (2)</span></em>
+    <span style="color: #006699; font-weight: bold;">friend</span> Derived;             <em><span style="color: #0099ff;">  // (2)</span></em>
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> Derived1<span style="color: #555555;">:</span> Base<span style="color: #555555;">&lt;</span>Derived1<span style="color: #555555;">&gt;</span>{
+  <span style="color: #007788; font-weight: bold;">void</span> implementation(){
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Implementation Derived1"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  }
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> Derived2<span style="color: #555555;">:</span> Base<span style="color: #555555;">&lt;</span>Derived1<span style="color: #555555;">&gt;</span>{   <em><span style="color: #0099ff;">// (3)</span></em>
+  <span style="color: #007788; font-weight: bold;">void</span> implementation(){
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Implementation Derived1"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  }
+};
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">void</span> execute(T<span style="color: #555555;">&amp;</span> base){
+    base.interface();
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main(){
+  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  
+  Derived1 d1;
+  execute(d1);
+    
+  Derived2 d2;
+  execute(d2);
+  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p><code>Base</code> has a private default constructor (line 1). Only class <code>Base</code> itself or the friend <code>Derived</code> (line 2) can invoke the default constructor. Consequentially, the call<code> Derived2 d2</code> (line 3) fails, because<code> Derived2</code> is derived from <code>Base&lt;Derived1&gt;</code>. Here is the error message from GCC:</p>
+<h2><img src="https://www.modernescpp.com/images/blog/Templates/Mixins/crtpCheck.png" alt="crtpCheck" width="650" height="201" style="display: block; margin-left: auto; margin-right: auto;" /></h2>
+<h2>What's next?</h2>
+<p>The Curiously Recurring Template Pattern (CRTP) is not easy to understand, but very powerful. The same holds for expression templates. Expression templates allow you to get rid of superfluous temporaries.</p>
+<p>&nbsp;</p>
+<p>{loadmoduleid 153}</p>
+<p>&nbsp;</p>
