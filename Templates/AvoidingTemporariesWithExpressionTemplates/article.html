@@ -1,0 +1,248 @@
+<p>Expression templates are typically used in linear algebra and are&nbsp; "structures representing a computation at compile-time, which structures are evaluated only as needed to produce efficient code for the entire computation" (<a href="https://en.wikipedia.org/wiki/Expression_templates">https://en.wikipedia.org/wiki/Expression_templates</a>). In other words, expression templates are only evaluated when needed.&nbsp;</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/Templates/AvoidingTemporariesWithExpressionTemplates/ExpressionTemplates.jpg" alt="ExpressionTemplates" width="650" height="403" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>I provide you with this post only the key ideas of expression templates. To use them, you should study further content such as</p>
+<ul>
+<li>C++ Templates: The Complete Guide by David Vandervoorde, Nicolai M. Josuttis, and Douglas Gregor (<a href="http://www.tmplbook.com/">http://www.tmplbook.com/</a>)</li>
+<li>Boost Basic Linear Algebra Library (<a href="https://www.boost.org/doc/libs/1_59_0/libs/numeric/ublas/doc/index.html">https://www.boost.org/doc/libs/1_59_0/libs/numeric/ublas/doc/index.html</a>)</li>
+<li>Expression Templates Revisited by Klaus Iglberger (<a href="https://www.youtube.com/watch?v=hfn0BVOegac">https://www.youtube.com/watch?v=hfn0BVOegac</a>). Klaus's talk demystifies many performance-related myths about expression templates.</li>
+</ul>
+<p>What problem do expression templates solve? Thanks to expression templates, you can get rid of superfluous temporary objects in expressions. What do I mean with superfluous temporary objects? My implementation of the class <span style="font-family: courier new,courier;">MyVector.</span></p>
+<h2>A first naive Approach</h2>
+<p><span style="font-family: courier new,courier;">MyVector</span> is a simple wrapper for a&nbsp; <span style="font-family: courier new,courier;">std::vector&lt;T&gt;.</span> The wrapper has two constructors (lines 1 and 2), knows its length (line 3), and supports the reading (line 4) and writing (line 4) by index.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// vectorArithmeticOperatorOverloading.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">MyVector</span>{
+  std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span> cont;   
+
+<span style="color: #9999ff;">public:</span>
+  <span style="color: #0099ff; font-style: italic;">// MyVector with initial size</span>
+  MyVector(<span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span><span style="color: #007788; font-weight: bold;">size_t</span> n) <span style="color: #555555;">:</span> cont(n){}                                          <em><span style="color: #0099ff;"> // (1)</span></em>
+
+  <span style="color: #0099ff; font-style: italic;">// MyVector with initial size and value</span>
+  MyVector(<span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span><span style="color: #007788; font-weight: bold;">size_t</span> n, <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">double</span> initialValue) <span style="color: #555555;">:</span> cont(n, initialValue){} <em><span style="color: #0099ff;"> // (2)</span></em>
+  
+  <span style="color: #0099ff; font-style: italic;">// size of underlying container</span>
+  std<span style="color: #555555;">::</span><span style="color: #007788; font-weight: bold;">size_t</span> size() <span style="color: #006699; font-weight: bold;">const</span>{                                                          <em><span style="color: #0099ff;"> // (3)</span></em>
+    <span style="color: #006699; font-weight: bold;">return</span> cont.size(); 
+  }
+
+  <span style="color: #0099ff; font-style: italic;">// index operators</span>
+  T <span style="color: #006699; font-weight: bold;">operator</span>[](<span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span><span style="color: #007788; font-weight: bold;">size_t</span> i) <span style="color: #006699; font-weight: bold;">const</span>{                                           <em><span style="color: #0099ff;"> // (4)</span></em>
+    <span style="color: #006699; font-weight: bold;">return</span> cont[i]; 
+  }
+
+  T<span style="color: #555555;">&amp;</span> <span style="color: #006699; font-weight: bold;">operator</span>[](<span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span><span style="color: #007788; font-weight: bold;">size_t</span> i){                                                <span style="color: #0099ff;"><em> // (5)</em></span>
+    <span style="color: #006699; font-weight: bold;">return</span> cont[i]; 
+  }
+
+};
+
+<span style="color: #0099ff; font-style: italic;">// function template for the + operator</span>
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span> 
+MyVector<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span> <span style="color: #006699; font-weight: bold;">operator</span><span style="color: #555555;">+</span> (<span style="color: #006699; font-weight: bold;">const</span> MyVector<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;&amp;</span> a, <span style="color: #006699; font-weight: bold;">const</span> MyVector<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;&amp;</span> b){                  <em><span style="color: #0099ff;"> // (6)</span></em>
+  MyVector<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span> result(a.size());
+  <span style="color: #006699; font-weight: bold;">for</span> (std<span style="color: #555555;">::</span><span style="color: #007788; font-weight: bold;">size_t</span> s <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>; s <span style="color: #555555;">&lt;=</span> a.size(); <span style="color: #555555;">++</span>s){
+    result[s] <span style="color: #555555;">=</span> a[s] <span style="color: #555555;">+</span> b[s];
+  }
+  <span style="color: #006699; font-weight: bold;">return</span> result;
+}
+
+<span style="color: #0099ff; font-style: italic;">// function template for the * operator</span>
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+MyVector<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span> <span style="color: #006699; font-weight: bold;">operator</span><span style="color: #555555;">*</span> (<span style="color: #006699; font-weight: bold;">const</span> MyVector<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;&amp;</span> a, <span style="color: #006699; font-weight: bold;">const</span> MyVector<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;&amp;</span> b){                  <em><span style="color: #0099ff;">// (7)</span></em>
+   MyVector<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span> result(a.size());
+  <span style="color: #006699; font-weight: bold;">for</span> (std<span style="color: #555555;">::</span><span style="color: #007788; font-weight: bold;">size_t</span> s <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>; s <span style="color: #555555;">&lt;=</span> a.size(); <span style="color: #555555;">++</span>s){
+    result[s] <span style="color: #555555;">=</span> a[s] <span style="color: #555555;">*</span> b[s]; 
+  }
+  <span style="color: #006699; font-weight: bold;">return</span> result;
+}
+
+<span style="color: #0099ff; font-style: italic;">// function template for &lt;&lt; operator</span>
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+std<span style="color: #555555;">::</span>ostream<span style="color: #555555;">&amp;</span> <span style="color: #006699; font-weight: bold;">operator</span><span style="color: #555555;">&lt;&lt;</span>(std<span style="color: #555555;">::</span>ostream<span style="color: #555555;">&amp;</span> os, <span style="color: #006699; font-weight: bold;">const</span> MyVector<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;&amp;</span> cont){                 <em><span style="color: #0099ff;">// (8)</span></em>
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #007788; font-weight: bold;">int</span> i <span style="color: #555555;">= </span><span style="color: #ff6600;">0</span>; i <span style="color: #555555;">&lt;</span> cont.size(); <span style="color: #555555;">++</span>i) {
+    os <span style="color: #555555;">&lt;&lt;</span> cont[i] <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">' '</span>;
+  }
+  os <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  <span style="color: #006699; font-weight: bold;">return</span> os;
+} 
+
+<span style="color: #007788; font-weight: bold;">int</span> main(){
+
+  MyVector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">double</span><span style="color: #555555;">&gt;</span> x(<span style="color: #ff6600;">10</span>, <span style="color: #ff6600;">5.4</span>);
+  MyVector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">double</span><span style="color: #555555;">&gt;</span> y(<span style="color: #ff6600;">10</span>, <span style="color: #ff6600;">10.3</span>);
+
+  MyVector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">double</span><span style="color: #555555;">&gt;</span> result(<span style="color: #ff6600;">10</span>);
+  
+  result <span style="color: #555555;">=</span> x <span style="color: #555555;">+</span> x <span style="color: #555555;">+</span> y <span style="color: #555555;">*</span> y;
+  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> result <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Thanks to the overloaded + operator (line 6), the overloaded&nbsp; * operator (line 7), and the overloaded output operator (line 8) the objects <span style="font-family: courier new,courier;">x, y,</span> and <span style="font-family: courier new,courier;">result</span> behave like numbers.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/AvoidingTemporariesWithExpressionTemplates/vectorArithmeticOperatorOverloading.png" alt="vectorArithmeticOperatorOverloading" width="600" height="175" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>Why is this implementation naive? The answer is in the expression&nbsp; <span style="font-family: courier new,courier;">result =</span> <span style="font-family: courier new,courier;">x + x + y * y.&nbsp;</span> In order to evaluate the expression, three temporary objects are needed to hold the result of each arithmetic expression.<span style="font-family: courier new,courier;"><br /></span></p>
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/Templates/AvoidingTemporariesWithExpressionTemplates/Temporaries.png" alt="Temporaries" width="400" height="263" style="margin: 15px auto; display: block;" /></p>
+<p>How can I get rid of the temporaries? The idea is simple. Instead of performing the vector operations greedy, I&nbsp; create the expression tree for <span style="font-family: courier new,courier;">result[i] </span>at compile time lazily. Lazy evaluation means that an expression is only evaluated when needed.&nbsp;</p>
+<h2>Expression templates&nbsp;</h2>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/AvoidingTemporariesWithExpressionTemplates/ExpressionTree.png" alt="ExpressionTree" width="400" height="207" style="margin: 15px auto; display: block;" /></p>
+<p>There are no temporaries need for the expression&nbsp; <span style="font-family: courier new,courier;">result[i] =</span>&nbsp; <span style="font-family: courier new,courier;">x[i] + x[i] + y[i] * y[i]<span style="font-family: arial,helvetica,sans-serif;">.&nbsp; </span></span>The assignment triggers the evaluation. Sad to say, but the code is even in this simple usage not so easy to digest. <span style="font-family: courier new,courier;"><span style="font-family: arial,helvetica,sans-serif;"><br /></span></span></p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// vectorArithmeticExpressionTemplates.cpp</span>
+
+<span style="color: #009999;">#include &lt;cassert&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T, <span style="color: #006699; font-weight: bold;">typename</span> Cont<span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span> <span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">MyVector</span>{
+  Cont cont;   
+
+<span style="color: #9999ff;">public:</span>
+  <span style="color: #0099ff; font-style: italic;">// MyVector with initial size</span>
+  MyVector(<span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span><span style="color: #007788; font-weight: bold;">size_t</span> n) <span style="color: #555555;">:</span> cont(n){}
+
+  <span style="color: #0099ff; font-style: italic;">// MyVector with initial size and value</span>
+  MyVector(<span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span><span style="color: #007788; font-weight: bold;">size_t</span> n, <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">double</span> initialValue) <span style="color: #555555;">:</span> cont(n, initialValue){}
+
+  <span style="color: #0099ff; font-style: italic;">// Constructor for underlying container</span>
+  MyVector(<span style="color: #006699; font-weight: bold;">const</span> Cont<span style="color: #555555;">&amp;</span> other) <span style="color: #555555;">:</span> cont(other){}
+
+  <span style="color: #0099ff; font-style: italic;">// assignment operator for MyVector of different type</span>
+  <span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T2, <span style="color: #006699; font-weight: bold;">typename</span> R2<span style="color: #555555;">&gt;                                      <span style="color: #0099ff; font-style: italic;">// (3)</span></span>
+  MyVector<span style="color: #555555;">&amp;</span> <span style="color: #006699; font-weight: bold;">operator</span><span style="color: #555555;">=</span>(<span style="color: #006699; font-weight: bold;">const</span> MyVector<span style="color: #555555;">&lt;</span>T2, R2<span style="color: #555555;">&gt;&amp;</span> other){
+    assert(size() <span style="color: #555555;">==</span> other.size());
+    <span style="color: #006699; font-weight: bold;">for</span> (std<span style="color: #555555;">::</span><span style="color: #007788; font-weight: bold;">size_t</span> i <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>; i <span style="color: #555555;">&lt;</span> cont.size(); <span style="color: #555555;">++</span>i) cont[i] <span style="color: #555555;">=</span> other[i];
+    <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">this</span>;
+  }
+
+  <span style="color: #0099ff; font-style: italic;">// size of underlying container</span>
+  std<span style="color: #555555;">::</span><span style="color: #007788; font-weight: bold;">size_t</span> size() <span style="color: #006699; font-weight: bold;">const</span>{ 
+    <span style="color: #006699; font-weight: bold;">return</span> cont.size(); 
+  }
+
+  <span style="color: #0099ff; font-style: italic;">// index operators</span>
+  T <span style="color: #006699; font-weight: bold;">operator</span>[](<span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span><span style="color: #007788; font-weight: bold;">size_t</span> i) <span style="color: #006699; font-weight: bold;">const</span>{ 
+    <span style="color: #006699; font-weight: bold;">return</span> cont[i]; 
+  }
+
+  T<span style="color: #555555;">&amp;</span> <span style="color: #006699; font-weight: bold;">operator</span>[](<span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span><span style="color: #007788; font-weight: bold;">size_t</span> i){ 
+    <span style="color: #006699; font-weight: bold;">return</span> cont[i]; 
+  }
+
+  <span style="color: #0099ff; font-style: italic;">// returns the underlying data</span>
+  <span style="color: #006699; font-weight: bold;">const</span> Cont<span style="color: #555555;">&amp;</span> data() <span style="color: #006699; font-weight: bold;">const</span>{ 
+    <span style="color: #006699; font-weight: bold;">return</span> cont; 
+  }
+
+  Cont<span style="color: #555555;">&amp;</span> data(){ 
+    <span style="color: #006699; font-weight: bold;">return</span> cont; 
+  }
+};
+
+<span style="color: #0099ff; font-style: italic;">// MyVector + MyVector</span>
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T, <span style="color: #006699; font-weight: bold;">typename</span> Op1 , <span style="color: #006699; font-weight: bold;">typename</span> Op2<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">MyVectorAdd</span>{
+  <span style="color: #006699; font-weight: bold;">const</span> Op1<span style="color: #555555;">&amp;</span> op1;
+  <span style="color: #006699; font-weight: bold;">const</span> Op2<span style="color: #555555;">&amp;</span> op2;
+
+<span style="color: #9999ff;">public:</span>
+  MyVectorAdd(<span style="color: #006699; font-weight: bold;">const</span> Op1<span style="color: #555555;">&amp;</span> a, <span style="color: #006699; font-weight: bold;">const</span> Op2<span style="color: #555555;">&amp;</span> b)<span style="color: #555555;">:</span> op1(a), op2(b){}
+
+  T <span style="color: #006699; font-weight: bold;">operator</span>[](<span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span><span style="color: #007788; font-weight: bold;">size_t</span> i) <span style="color: #006699; font-weight: bold;">const</span>{ 
+    <span style="color: #006699; font-weight: bold;">return</span> op1[i] <span style="color: #555555;">+</span> op2[i]; 
+  }
+
+  std<span style="color: #555555;">::</span><span style="color: #007788; font-weight: bold;">size_t</span> size() <span style="color: #006699; font-weight: bold;">const</span>{ 
+    <span style="color: #006699; font-weight: bold;">return</span> op1.size(); 
+  }
+};
+
+<span style="color: #0099ff; font-style: italic;">// elementwise MyVector * MyVector</span>
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span> <span style="color: #006699; font-weight: bold;">typename</span> T, <span style="color: #006699; font-weight: bold;">typename</span> Op1 , <span style="color: #006699; font-weight: bold;">typename</span> Op2 <span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">MyVectorMul</span> {
+  <span style="color: #006699; font-weight: bold;">const</span> Op1<span style="color: #555555;">&amp;</span> op1;
+  <span style="color: #006699; font-weight: bold;">const</span> Op2<span style="color: #555555;">&amp;</span> op2;
+
+<span style="color: #9999ff;">public:</span>
+  MyVectorMul(<span style="color: #006699; font-weight: bold;">const</span> Op1<span style="color: #555555;">&amp;</span> a, <span style="color: #006699; font-weight: bold;">const</span> Op2<span style="color: #555555;">&amp;</span> b )<span style="color: #555555;">:</span> op1(a), op2(b){}
+
+  T <span style="color: #006699; font-weight: bold;">operator</span>[](<span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span><span style="color: #007788; font-weight: bold;">size_t</span> i) <span style="color: #006699; font-weight: bold;">const</span>{ 
+    <span style="color: #006699; font-weight: bold;">return</span> op1[i] <span style="color: #555555;">*</span> op2[i]; 
+  }
+
+  std<span style="color: #555555;">::</span><span style="color: #007788; font-weight: bold;">size_t</span> size() <span style="color: #006699; font-weight: bold;">const</span>{ 
+    <span style="color: #006699; font-weight: bold;">return</span> op1.size(); 
+  }
+};
+
+<span style="color: #0099ff; font-style: italic;">// function template for the + operator</span>
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T, <span style="color: #006699; font-weight: bold;">typename</span> R1, <span style="color: #006699; font-weight: bold;">typename</span> R2<span style="color: #555555;">&gt;</span>
+MyVector<span style="color: #555555;">&lt;</span>T, MyVectorAdd<span style="color: #555555;">&lt;</span>T, R1, R2<span style="color: #555555;">&gt;</span> <span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">operator</span><span style="color: #555555;">+</span> (<span style="color: #006699; font-weight: bold;">const</span> MyVector<span style="color: #555555;">&lt;</span>T, R1<span style="color: #555555;">&gt;&amp;</span> a, <span style="color: #006699; font-weight: bold;">const</span> MyVector<span style="color: #555555;">&lt;</span>T, R2<span style="color: #555555;">&gt;&amp;</span> b){
+  <span style="color: #006699; font-weight: bold;">return</span> MyVector<span style="color: #555555;">&lt;</span>T, MyVectorAdd<span style="color: #555555;">&lt;</span>T, R1, R2<span style="color: #555555;">&gt;</span> <span style="color: #555555;">&gt;</span>(MyVectorAdd<span style="color: #555555;">&lt;</span>T, R1, R2 <span style="color: #555555;">&gt;</span>(a.data(), b.data()));   <em><span style="color: #0099ff;">// (1)
+}</span></em>
+
+<span style="color: #0099ff; font-style: italic;">// function template for the * operator</span>
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T, <span style="color: #006699; font-weight: bold;">typename</span> R1, <span style="color: #006699; font-weight: bold;">typename</span> R2<span style="color: #555555;">&gt;</span>
+MyVector<span style="color: #555555;">&lt;</span>T, MyVectorMul<span style="color: #555555;">&lt;</span> T, R1, R2<span style="color: #555555;">&gt;</span> <span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">operator</span><span style="color: #555555;">*</span> (<span style="color: #006699; font-weight: bold;">const</span> MyVector<span style="color: #555555;">&lt;</span>T, R1<span style="color: #555555;">&gt;&amp;</span> a, <span style="color: #006699; font-weight: bold;">const</span> MyVector<span style="color: #555555;">&lt;</span>T, R2<span style="color: #555555;">&gt;&amp;</span> b){
+   <span style="color: #006699; font-weight: bold;">return</span> MyVector<span style="color: #555555;">&lt;</span>T, MyVectorMul<span style="color: #555555;">&lt;</span>T, R1, R2<span style="color: #555555;">&gt;</span> <span style="color: #555555;">&gt;</span>(MyVectorMul<span style="color: #555555;">&lt;</span>T, R1, R2 <span style="color: #555555;">&gt;</span>(a.data(), b.data()));  <em><span style="color: #0099ff;">// (2)</span></em>
+}
+
+<span style="color: #0099ff; font-style: italic;">// function template for &lt; operator</span>
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+std<span style="color: #555555;">::</span>ostream<span style="color: #555555;">&amp;</span> <span style="color: #006699; font-weight: bold;">operator</span><span style="color: #555555;">&lt;&lt;</span>(std<span style="color: #555555;">::</span>ostream<span style="color: #555555;">&amp;</span> os, <span style="color: #006699; font-weight: bold;">const</span> MyVector<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;&amp;</span> cont){  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #007788; font-weight: bold;">int</span> i <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>; i <span style="color: #555555;">&lt;</span> cont.size(); <span style="color: #555555;">++</span>i) {
+    os <span style="color: #555555;">&lt;&lt;</span> cont[i] <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">' '</span>;
+  }
+  os <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  <span style="color: #006699; font-weight: bold;">return</span> os;
+} 
+
+<span style="color: #007788; font-weight: bold;">int</span> main(){
+
+  MyVector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">double</span><span style="color: #555555;">&gt;</span> x(<span style="color: #ff6600;">10</span>,<span style="color: #ff6600;">5.4</span>);
+  MyVector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">double</span><span style="color: #555555;">&gt;</span> y(<span style="color: #ff6600;">10</span>,<span style="color: #ff6600;">10.3</span>);
+
+  MyVector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">double</span><span style="color: #555555;">&gt;</span> result(<span style="color: #ff6600;">10</span>);
+  
+  result<span style="color: #555555;">=</span> x <span style="color: #555555;">+</span> x <span style="color: #555555;">+</span> y <span style="color: #555555;">*</span> y;                                                        
+  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> result <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The key difference between the first naive implementation and this implementation with expression templates is that the overloaded + and + operators return in the case of the expression tree proxy objects. These proxies represent the expression trees (lines 1 and 2). The expression trees are only created but not evaluated. Lazy, of course. The assignment operator (line 3) triggers the evaluation of the expression tree that needs no temporaries.</p>
+<p>The result is the same.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/AvoidingTemporariesWithExpressionTemplates/vectorArithmeticExpressionTemplates.png" alt="vectorArithmeticExpressionTemplates" width="600" height="175" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>&nbsp;</p>
+<p>Thanks to the compiler explorer, I can visualize the magic of the program <span style="font-family: courier new,courier;">vectorArithmeticExpressionTemplates.cpp</span>.</p>
+<h3>Under the hood</h3>
+<p>Here are the essential assembler instructions for the final assignment in the main function: <code>result<span style="color: #555555;">=</span> x <span style="color: #555555;">+</span> x <span style="color: #555555;">+</span> y <span style="color: #555555;">*</span> y</code>.</p>
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/Templates/AvoidingTemporariesWithExpressionTemplates/godbolt.png" alt="godbolt" width="650" height="163" style="margin: 15px auto; display: block;" /></p>
+<p>The expression tree in the assembler snippet locks quite scary, but with a sharp eye, you can see the structure. For simplicity reasons, I ignored <span style="font-family: courier new,courier;">std::allocator</span> in my graphic.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Functional/ExpressionTemplates/Exression.png" alt="Exression" width="600" height="286" style="margin: 15px auto; display: block;" /></p>
+<h2>What's next?</h2>
+<p>A policy is a generic function or class whose behavior can be configured. Let me introduce them in my next post.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>{loadmoduleid 153}</p>
+<p>&nbsp;</p>
