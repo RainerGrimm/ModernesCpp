@@ -1,0 +1,211 @@
+<p>Thanks to templates, there are new ways of software design. Policies and traits are two commonly used idioms in C++.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/Templates/PolicyAndTraits/PolicyAndTraits.png" alt="PolicyAndTraits" width="650" height="398" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>Policy and traits are often used in one sentence. Let me start with policies.</p>
+<h2>Policy</h2>
+<p>A policy is a generic function or class whose behavior can be configured. Typically, there are default values for the policy parameters. <code>std::vector</code> and<code> std::unordered_map</code> exemplifies this.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">T</span>, <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Allocator</span> <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>allocator<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;&gt;</span>          <em><span style="color: #3366ff;">// (1)</span></em>
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">vector</span>; 
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Key</span>,
+    <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">T</span>,
+    <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Hash</span> <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>hash<span style="color: #555555;">&lt;</span>Key<span style="color: #555555;">&gt;</span>,                              <em><span style="color: #3366ff;"> // (3)</span></em>
+    <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">KeyEqual</span> <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>equal_to<span style="color: #555555;">&lt;</span>Key<span style="color: #555555;">&gt;</span>,                      <em><span style="color: #3366ff;"> // (4)</span></em>
+    <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">allocator</span> <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>allocator<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>pair<span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">const</span> Key, T<span style="color: #555555;">&gt;&gt;</span>  <em><span style="color: #3366ff;">// (2)</span></em>
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">unordered_map</span>;
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>This means each container has a default allocator for its elements depending on<code> T</code> (line 1) or on <code>std::pair&lt;const Key, T&gt;</code> (line 2). Additionally,<code> std::unorderd_map</code> has a default hash function (line 3) and a default equal function (4). The hash function calculates the hash value based on the key and the equal function deals with collisions in the buckets. My previous post "<a href="https://www.modernescpp.com/index.php/hash-functions">Hash Functions</a>" gives you more information about<code> std::unordered_map</code>.</p>
+<p>Let me use a user-defined data type <code>MyInt</code> as a key in a<code> std::unordered_map. </code></p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// MyIntAsKey.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;unordered_map&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">struct</span> MyInt{
+    <span style="color: #006699; font-weight: bold;">explicit</span> MyInt(<span style="color: #007788; font-weight: bold;">int</span> v)<span style="color: #555555;">:</span>val(v){}
+    <span style="color: #007788; font-weight: bold;">int</span> val;
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    std<span style="color: #555555;">::</span>unordered_map<span style="color: #555555;">&lt;</span>MyInt, <span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> myMap{ {MyInt(<span style="color: #555555;">-</span><span style="color: #ff6600;">2</span>), <span style="color: #555555;">-</span><span style="color: #ff6600;">2</span>}, {MyInt(<span style="color: #555555;">-</span><span style="color: #ff6600;">1</span>), <span style="color: #555555;">-</span><span style="color: #ff6600;">1</span>}, 
+                                          {MyInt(<span style="color: #ff6600;">0</span>), <span style="color: #ff6600;">0</span>}, {MyInt(<span style="color: #ff6600;">1</span>), <span style="color: #ff6600;">1</span>} };
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n\n</span><span style="color: #cc3300;">"</span>;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The compilation fails pretty wordily because <code>MyInt</code> does not support the hash function nor the equal function.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/PolicyAndTraits/MyIntAsKey.png" alt="MyIntAsKey" width="700" height="390" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>Now, the policy kicks in. You can replace the policy parameters. The following class <code>MyInt</code> can, therefore, be used as a key in a <code>std::unordered_map.</code></p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// templatesPolicy.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;unordered_map&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">struct</span> MyInt{
+    <span style="color: #006699; font-weight: bold;">explicit</span> MyInt(<span style="color: #007788; font-weight: bold;">int</span> v)<span style="color: #555555;">:</span>val(v){}
+    <span style="color: #007788; font-weight: bold;">int</span> val;
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> MyHash{                                                        <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    std<span style="color: #555555;">::</span><span style="color: #007788; font-weight: bold;">size_t</span> <span style="color: #006699; font-weight: bold;">operator</span>()(MyInt m) <span style="color: #006699; font-weight: bold;">const</span> {
+        std<span style="color: #555555;">::</span>hash<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> hashVal;
+        <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc00ff;">hashVal</span>(m.val);
+    }
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> MyEqual{
+    <span style="color: #007788; font-weight: bold;">bool</span> <span style="color: #006699; font-weight: bold;">operator</span> () (<span style="color: #006699; font-weight: bold;">const</span> MyInt<span style="color: #555555;">&amp;</span> fir, <span style="color: #006699; font-weight: bold;">const</span> MyInt<span style="color: #555555;">&amp;</span> sec) <span style="color: #006699; font-weight: bold;">const</span> {      <span style="color: #0099ff; font-style: italic;">// (2)</span>
+        <span style="color: #006699; font-weight: bold;">return</span> fir.val <span style="color: #555555;">==</span> sec.val;
+    }
+};
+
+std<span style="color: #555555;">::</span>ostream<span style="color: #555555;">&amp;</span> <span style="color: #006699; font-weight: bold;">operator</span> <span style="color: #555555;">&lt;&lt;</span> (std<span style="color: #555555;">::</span>ostream<span style="color: #555555;">&amp;</span> strm, <span style="color: #006699; font-weight: bold;">const</span> MyInt<span style="color: #555555;">&amp;</span> myIn){     <span style="color: #0099ff; font-style: italic;">// (3)</span>
+    strm <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"MyInt("</span> <span style="color: #555555;">&lt;&lt;</span> myIn.val <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">")"</span>;
+    <span style="color: #006699; font-weight: bold;">return</span> strm;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main(){
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    <span style="color: #006699; font-weight: bold;">typedef</span> std<span style="color: #555555;">::</span>unordered_map<span style="color: #555555;">&lt;</span>MyInt, <span style="color: #007788; font-weight: bold;">int</span>, MyHash, MyEqual<span style="color: #555555;">&gt;</span> MyIntMap;  <span style="color: #0099ff; font-style: italic;">// (4)</span>
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"MyIntMap: "</span>;
+    MyIntMap myMap{{MyInt(<span style="color: #555555;">-</span><span style="color: #ff6600;">2</span>), <span style="color: #555555;">-</span><span style="color: #ff6600;">2</span>}, {MyInt(<span style="color: #555555;">-</span><span style="color: #ff6600;">1</span>), <span style="color: #555555;">-</span><span style="color: #ff6600;">1</span>}, {MyInt(<span style="color: #ff6600;">0</span>), <span style="color: #ff6600;">0</span>}, {MyInt(<span style="color: #ff6600;">1</span>), <span style="color: #ff6600;">1</span>}};
+
+    <span style="color: #006699; font-weight: bold;">for</span>(<span style="color: #006699; font-weight: bold;">auto</span> m <span style="color: #555555;">:</span> myMap) std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'{'</span> <span style="color: #555555;">&lt;&lt;</span> m.first <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">", "</span> <span style="color: #555555;">&lt;&lt;</span> m.second <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"}"</span>;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n\n</span><span style="color: #cc3300;">"</span>;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>I implemented the hash function (line 1), and the equal function (line 2) as a function object, and overloaded, for convenience reasons, the output operator (line 3). Line 4 creates out of all components a new type<code> MyIntMap</code> that uses<code> MyInt</code> as key. The following screenshot shows the output of the instance<code> myMa</code>p.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/PolicyAndTraits/templatesPolicy.png" alt="templatesPolicy" width="500" height="161" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>There are two typical ways to implement policies: composition and inheritance.</p>
+<h3>Composition</h3>
+<p>The following class <code>Message</code> uses composition to configure its output device during compile time.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// policyComposition.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;fstream&gt;</span>
+<span style="color: #009999;">#include &lt;string&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> OutputPolicy<span style="color: #555555;">&gt;                   <em> <span style="color: #0099ff;">// (1)</span></em></span>
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Message</span> {
+ <span style="color: #9999ff;">public:</span>
+    <span style="color: #007788; font-weight: bold;">void</span> write(<span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span>string<span style="color: #555555;">&amp;</span> mess) <span style="color: #006699; font-weight: bold;">const</span> {
+        outPolicy.print(mess);                     <em><span style="color: #0099ff;"> // (2)</span></em>
+    }
+ <span style="color: #9999ff;">private:</span>
+    OutputPolicy outPolicy;   
+};
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">WriteToCout</span> {                                <em><span style="color: #0099ff;"> // (5)</span></em>
+ <span style="color: #9999ff;">public:</span>
+    <span style="color: #007788; font-weight: bold;">void</span> print(<span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span>string<span style="color: #555555;">&amp;</span> message) <span style="color: #006699; font-weight: bold;">const</span> {
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> message <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    }
+};
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">WriteToFile</span> {                               <em><span style="color: #0099ff;">  // (6)</span></em>
+ <span style="color: #9999ff;">public:</span>
+    <span style="color: #007788; font-weight: bold;">void</span> print(<span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span>string<span style="color: #555555;">&amp;</span> message) <span style="color: #006699; font-weight: bold;">const</span> {
+        std<span style="color: #555555;">::</span>ofstream myFile;
+        myFile.open(<span style="color: #cc3300;">"policyComposition.txt"</span>);
+        myFile <span style="color: #555555;">&lt;&lt;</span> message <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    }
+};
+
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    Message<span style="color: #555555;">&lt;</span>WriteToCout<span style="color: #555555;">&gt;</span> messageCout;          <em><span style="color: #0099ff;">    // (3)</span></em>
+    messageCout.write(<span style="color: #cc3300;">"Hello world"</span>);
+
+    Message<span style="color: #555555;">&lt;</span>WriteToFile<span style="color: #555555;">&gt;</span> messageFile;         <em><span style="color: #0099ff;">     // (4)</span></em>
+    messageFile.write(<span style="color: #cc3300;">"Hello world"</span>);
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The class Message has the template parameter OutputPolicy (line 1) as policy. A call of its member function <code>write</code> delegates directly to its member <code>outPolicy</code> (line 2). You can create two different <code>Message</code> instances (lines 3 and 4). One writing to count (line 5), and one writing to a file (line 6).</p>
+<p>The screenshot shows the write operation to <code>cout</code> and the file<code> policyComposition.txt</code>.</p>
+<h3><img src="https://www.modernescpp.com/images/blog/Templates/PolicyAndTraits/policyComposition.png" alt="policyComposition" width="400" height="165" style="display: block; margin-left: auto; margin-right: auto;" /></h3>
+<h3>Inheritance</h3>
+<p>The inheritance based implementation is quite similar to the composite based in the file<code> policyComposition.cpp</code>. The main difference is that the composite-based implementation has the policy, but the inheritance-based implementation derives from its policy.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// policyInheritance.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;fstream&gt;</span>
+<span style="color: #009999;">#include &lt;string&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> OutputPolicy<span style="color: #555555;">&gt;  <span style="color: #555555;"><em>                </em></span></span>
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Message</span> <span style="color: #555555;">:</span> <span style="color: #006699; font-weight: bold;">private</span> OutputPolicy {            <em><span style="color: #0099ff;">// (1) </span></em>
+ <span style="color: #9999ff;">public:</span>
+    <span style="color: #007788; font-weight: bold;">void</span> write(<span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span>string<span style="color: #555555;">&amp;</span> mess) <span style="color: #006699; font-weight: bold;">const</span> {
+        print(mess);                             <em><span style="color: #0099ff;"> // (2)</span></em>
+    }
+ <span style="color: #9999ff;">private:</span>
+    <span style="color: #006699; font-weight: bold;">using</span> OutputPolicy<span style="color: #555555;">::</span>print;
+};
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">WriteToCout</span> {
+ <span style="color: #9999ff;">protected:</span>
+    <span style="color: #007788; font-weight: bold;">void</span> print(<span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span>string<span style="color: #555555;">&amp;</span> message) <span style="color: #006699; font-weight: bold;">const</span> {
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> message <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    }
+};
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">WriteToFile</span> {
+ <span style="color: #9999ff;">protected:</span>
+    <span style="color: #007788; font-weight: bold;">void</span> print(<span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span>string<span style="color: #555555;">&amp;</span> message) <span style="color: #006699; font-weight: bold;">const</span> {
+        std<span style="color: #555555;">::</span>ofstream myFile;
+        myFile.open(<span style="color: #cc3300;">"policyInheritance.txt"</span>);
+        myFile <span style="color: #555555;">&lt;&lt;</span> message <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    }
+};
+
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    Message<span style="color: #555555;">&lt;</span>WriteToCout<span style="color: #555555;">&gt;</span> messageCout;
+    messageCout.write(<span style="color: #cc3300;">"Hello world"</span>);
+
+    Message<span style="color: #555555;">&lt;</span>WriteToFile<span style="color: #555555;">&gt;</span> messageFile;
+    messageFile.write(<span style="color: #cc3300;">"Hello world"</span>);
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Instead of the previous implementation of the class <code>Message</code>, this one derives from its template parameter privately and introduces the private inherited <code>print</code> function into the class scope. I skip the output of the program for obvious reasons. Okay. I hear your question: Should I use composition or inheritance for implementing a policy-based design?</p>
+<h3>Composition or Inheritance</h3>
+<p>In general, I prefer composition above inheritance. In general, but for a policy-based design you should consider inheritance.</p>
+<p>If&nbsp; <code>OutputPolicy</code> is empty, you can benefit from the so-called <a href="https://en.cppreference.com/w/cpp/language/ebo">empty base class optimization</a>. Empty means that <code>OutputPolicy</code> has no non-static data members, and no non-empty base classes. Consequentially, <code>OutputPolicy</code> does not add anything to the size of <code>Message</code>. On the contrary, when <code>Message</code> has the member <code>OutputPolicy</code>, <code>OutputPolicy</code> adds at least one byte to the size of <code>Message</code>. My argument may not sound convincing, but often a class uses more than one policy.</p>
+<h2>What's next?</h2>
+<p>Traits are class templates that pull properties out of a generic type. I will write more about them in my next post.</p>
+<p>&nbsp;</p>
+<p>{loadmoduleid 153}</p>
