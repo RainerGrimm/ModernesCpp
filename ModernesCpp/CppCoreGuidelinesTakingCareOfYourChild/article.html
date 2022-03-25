@@ -1,8 +1,8 @@
-<p>When you create a new child thread, you have to answer an important question: should you wait for the child or&nbsp;detach yourself from it? If you detach yourself from the newly created child, and your child uses variables which are bound to your lifetime as creator a new question arises: Will the variables stay valid during the lifetime of the child thread?</p>
+<p>When you create a new child thread, you have to answer an important question: should you wait for the child or&nbsp;detach yourself from it? If you detach yourself from the newly created child, and your child uses variables that are bound to your life as creator a new question arises: Will the variables stay valid during the lifetime of the child thread?</p>
 <hr id="system-readmore" />
-<p>&nbsp;If you don't carefully handle the lifetime and the variables of your child thread, you will end with high probability in undefined behaviour.</p>
-<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesTakingCareOfYourChild/gleise.jpg" alt="gleise" width="700" height="466" /></p>
-<p>Here are&nbsp;the&nbsp;rules for today that deal exactly with the lifetime issues of the child thread and its variables.</p>
+<p>&nbsp;If you don't carefully handle the lifetime and the variables of your child thread, you will end with a high probability of undefined behavior.</p>
+<p><img src="https://www.modernescpp.com/images/blog/ModernCpp/CppCoreGuidelinesTakingCareOfYourChild/gleise.jpg" alt="gleise" width="700" height="466" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>Here are&nbsp;the&nbsp;rules for today that deal exactly with the life issues of the child thread and its variables.</p>
 <ul>
 <li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rconc-join">CP.23: Think of a joining <code class="highlighter-rouge no-highlight">thread</code> as a scoped container</a></li>
 <li><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rconc-detach">CP.24: Think of a <code class="highlighter-rouge no-highlight">thread</code> as a global container</a></li>
@@ -57,12 +57,12 @@
 </pre>
 </div>
 <p>&nbsp;</p>
-<p>The only difference between the functions <span style="font-family: courier new, courier;">some_fct</span> (1) and <span style="font-family: courier new, courier;">some_fct2</span> (2) is that the first variations joins it's created thread but the second variation detaches all created thread.</p>
+<p>The only difference between the functions <span style="font-family: courier new, courier;">some_fct</span> (1) and <span style="font-family: courier new, courier;">some_fct2</span> (2) is that the first variations join its created thread but the second variation detaches all created threads.</p>
 <p>First of all, you have to join or detach the child thread. If you won't do it, you will get a <span style="font-family: courier new, courier;">std::terminate</span> exception in the destructor of the child thread. I will write about this issue in the next rule CP.25.</p>
 <p>Here is the difference between joining of detaching a child thread:</p>
 <ul>
-<li>To<strong> join</strong> a thread means according to the guidelines that your thread is a kind of scoped container. What? The reason is that the <span style="font-family: courier new, courier;">thr.join()</span> call on a thread <span style="font-family: courier new, courier;">thr</span> is a synchronisation point. <span style="font-family: courier new, courier;">thr.join()</span> guarantees that the creator of the thread will wait until its child is done. To put it the other way around. The child thread <span style="font-family: courier new, courier;">thr</span> can use all variables (state) of the enclosing scope, in which it was created. Consequently, all calls of the function&nbsp;<span style="font-family: 'courier new', courier;">f</span> are well defined.</li>
-<li>To the contrary, this will not hold if you <strong>detach</strong> all your child threads. Detaching means, you will lose the handle to your child and your child can even outlive you. Due to this fact, it's only safe to use in the child thread variables with global scope. According to the guidelines, your child thread is a kind of global container. Using variables from the enclosing scope is,&nbsp;in this case, undefined behaviour.</li>
+<li>To<strong> join</strong> a thread means according to the guidelines that your thread is a kind of scoped container. What? The reason is that the <span style="font-family: courier new, courier;">thr.join()</span> call on a thread <span style="font-family: courier new, courier;">thr</span> is a synchronization point. <span style="font-family: courier new, courier;">thr.join()</span> guarantees that the creator of the thread will wait until its child is done. To put it the other way around. The child thread <span style="font-family: courier new, courier;">thr</span> can use all variables (state) of the enclosing scope, in which it was created. Consequently, all calls of the function&nbsp;<span style="font-family: 'courier new', courier;">f</span> are well defined.</li>
+<li>On the contrary, this will not hold if you <strong>detach</strong> all your child threads. Detaching means, you will lose the handle to your child and your child can even outlive you. Due to this fact, it's only safe to use in the child thread variables with global scope. According to the guidelines, your child thread is a kind of global container. Using variables from the enclosing scope is,&nbsp;in this case, undefined behavior.</li>
 </ul>
 <p>If you&nbsp;are irritated by a detached thread, let me give you&nbsp;an analogy. When you create a file and you lose the handle to the file, the file will still exist. The same holds for a detached thread. If you detach a thread, the "thread of execution" will continue to run but you lost the handle to the "thread of execution". You may guess it: <span style="font-family: courier new, courier;">t0</span> is just the handle to the thread of execution that was started with the call <span style="font-family: courier new, courier;">std::thread t0(f, &amp;x).</span></p>
 <p>As I already mentioned it you have to join or detach the child thread.</p>
@@ -83,7 +83,7 @@
 </div>
 <p>&nbsp;</p>
 <p>The execution of the program ends abruptly.</p>
-<p><img style="display: block; margin-left: auto; margin-right: auto;" src="images/blog/ModernCpp/CppCoreGuidelinesTakingCareOfYourChild/threadForgetJoin.png" alt="threadForgetJoin" width="400" height="143" /></p>
+<p><img src="https://www.modernescpp.com/images/blog/ModernCpp/CppCoreGuidelinesTakingCareOfYourChild/threadForgetJoin.png" alt="threadForgetJoin" width="400" height="143" style="display: block; margin-left: auto; margin-right: auto;" /></p>
 <p>And now the explanation:</p>
 <p>The lifetime of the created thread <span style="font-family: 'courier new', courier;">t</span> ends with its callable unit. The creator has two choices. First: it waits, until its child is done (<span style="font-family: courier new, courier;">t.join()</span>). Second: it detaches itself from its child: <span style="font-family: courier new, courier;">t.detach()</span>. A thread <span style="font-family: courier new, courier;">t </span>with a&nbsp;callable unit&nbsp; - you can create threads without callable units - is called joinable if neither a t.join() or t.detach() call happened. The destructor of a joinable thread throws a std<span style="font-family: 'courier new', courier;">::terminate</span> exception which ends in&nbsp;<span style="font-family: courier new, courier;">std::abort</span>. Therefore, the program terminates.</p>
 <article>The rule is called "Prefer <span style="font-family: courier new, courier;">gsl::joining_thread</span> over <span style="font-family: courier new, courier;">std::thread" </span>because a <span style="font-family: courier new, courier;">gsl::joinging_thread</span> joins automatically at the end of its scope. Sad to say but I found no implementation of the gsl<span style="font-family: 'courier new', courier;">::joining_thread</span> in the <a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#S-gsl">guidelines support library</a>. Thanks to the <span style="font-family: courier new, courier;">scoped_thread</span> from <a href="https://www.justsoftwaresolutions.co.uk/blog/">Anthony Williams</a> this is not really a problem:
@@ -123,8 +123,8 @@
 <p>&nbsp;</p>
 <p>The <span style="font-family: 'courier new', courier;">scoped_thread</span> checks in its constructor if the given thread is joinable and joins in its destructor the given thread.</p>
 <h3><a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rconc-detached_thread">CP.26: Don’t <code class="highlighter-rouge no-highlight">detach()</code> a thread</a></h3>
-<p>This rule sounds strange. The C++11 standard supports it to detach a thread but we should not do it! The reason is that detaching a thread can be quite challenging. As rule C.25 said:&nbsp;<a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rconc-detach">CP.24: Think of a <code class="highlighter-rouge no-highlight">thread</code> as a global container</a>. Of course, this means you are totally fine if you use only variables with global scope in the detached threads. NO!</p>
-<p>Even object with static duration can be critical. For example, have a look at this small program that has undefined behaviour.</p>
+<p>This rule sounds strange. The C++11 standard supports it to detach a thread but we should not do it! The reason is that detaching a thread can be quite challenging. As rule C.25 said:&nbsp;<a href="http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rconc-detach">CP.24: Think of an <code class="highlighter-rouge no-highlight">thread</code> as a global container</a>. Of course, this means you are totally fine if you use only variables with global scope in the detached threads. NO!</p>
+<p>Even objects with static duration can be critical. For example, have a look at this small program that has undefined behavior.</p>
 <div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
 <pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">#include &lt;iostream&gt;<br />#include &lt;string&gt;<br />#include &lt;thread&gt;<br /><br />void</span> <span style="color: #cc00ff;">func</span>(){
   std<span style="color: #555555;">::</span>string s{<span style="color: #cc3300;">"C++11"</span>};
@@ -134,53 +134,11 @@
 </pre>
 </div>
 <p>&nbsp;</p>
-<p>This is easy. The lambda function takes s by reference. This is undefined behaviour because the child thread t uses the variables s which goes out of scope. STOP! This is the obvious problem but the hidden issue is<span style="font-family: courier new, courier;"> std::cout. std::cout</span><span style="font-family: courier new, courier;"> </span>has static duration. This means, the lifetime of <span style="font-family: courier new, courier;">std::cout</span> ends with the end of the program and we have, additionally, a&nbsp;<a href="index.php/race-condition-versus-data-race">race condition</a>: thread t may use <span style="font-family: courier new, courier;">std::cout</span> at this time.&nbsp;</p>
+<p>This is easy. The lambda function takes s by reference. This is undefined behavior because the child thread t uses the variable s which goes out of scope. STOP! This is the obvious problem but the hidden issue is<span style="font-family: courier new, courier;"> std::cout. std::cout</span><span style="font-family: courier new, courier;"> </span>has a static duration. This means, the lifetime of <span style="font-family: courier new, courier;">std::cout</span> ends with the end of the program and we have, additionally, a&nbsp;<a href="https://www.modernescpp.com/index.php/race-condition-versus-data-race">race condition</a>: thread t may use <span style="font-family: courier new, courier;">std::cout</span> at this time.&nbsp;</p>
 <h2>What's next?</h2>
-<p>We are not yet done with the rules to concurrency in the C++ core guidelines. In the <a href="index.php/c-core-guidelines-the-remaining-rules-to-concurrency">next post</a>, more rules will follow: they are about passing data to threads, sharing ownership between thread, and the costs of thread creation and destruction.</p>
+<p>We are not yet done with the rules to concurrency in the C++ core guidelines. In the <a href="https://www.modernescpp.com/index.php/c-core-guidelines-the-remaining-rules-to-concurrency">next post</a>, more rules will follow: they are about passing data to threads, sharing ownership between threads, and the costs of thread creation and destruction.</p>
 <p>&nbsp;</p>
 <p>&nbsp;</p>
 <p>&nbsp;</p>
-<p><strong>Thanks a lot to my <a href="https://www.patreon.com/rainer_grimm">Patreon Supporters</a></strong><strong>: Eric Pederson, Paul Baxter, &nbsp;Sai Raghavendra Prasad Poosa, Meeting C++, Matt Braun, Avi Lachmish, Adrian Muntea, and Roman Postanciuc. <span class="sc-bxivhb huvVuj" style="color: #052d49; font-family: America, sans-serif; letter-spacing: inherit; margin: 0px; position: relative; text-align: inherit; text-transform: inherit; text-shadow: none; font-weight: 400; font-size: 1rem; line-height: 1.5;"><span class="sc-bxivhb fjhgUr" style="color: #052d49; font-family: America, sans-serif; letter-spacing: inherit; margin: 0px; position: relative; text-align: inherit; text-transform: inherit; text-shadow: none; font-weight: bold; font-size: 1rem; line-height: 1.5;"></span></span><span class="sc-bxivhb huvVuj" style="color: #052d49; font-family: America, sans-serif; letter-spacing: inherit; margin: 0px; position: relative; text-align: inherit; text-transform: inherit; text-shadow: none; font-weight: 400; font-size: 1rem; line-height: 1.5;"><span class="sc-bxivhb fjhgUr" style="color: #052d49; font-family: America, sans-serif; letter-spacing: inherit; margin: 0px; position: relative; text-align: inherit; text-transform: inherit; text-shadow: none; font-weight: bold; font-size: 1rem; line-height: 1.5;"></span></span><br /></strong></p>
-<p><strong>&nbsp;</strong></p>
 <p>&nbsp;</p>
-<table style="width: 800px; height: 250px;" border="0" cellpadding="8"><caption>
-<h2>Get your e-book at leanpub:</h2>
-</caption>
-<tbody>
-<tr>
-<td>
-<h4><strong>The C++ Standard Library</strong></h4>
-</td>
-<td>&nbsp;</td>
-<td>
-<h4><strong>Concurrency With Modern C++</strong></h4>
-</td>
-<td style="width: 5px;">&nbsp;</td>
-<td>
-<h4><strong>Get Both as one Bundle</strong></h4>
-</td>
-</tr>
-<tr>
-<td style="text-align: center;"><a href="https://leanpub.com/cpplibrary"><img style="border: medium none #000000;" src="images/books/cover.png" alt="cover" width="173" height="220" /></a></td>
-<td style="text-align: center;">&nbsp;</td>
-<td style="text-align: center;"><a href="https://leanpub.com/concurrencywithmodernc"><img src="images/books/ConcurrencyCoverFrame.png" alt="ConcurrencyCoverFrame" width="173" height="223" /></a></td>
-<td style="width: 5px; text-align: center;">&nbsp;</td>
-<td style="width: 5px; text-align: center;"><a href="https://leanpub.com/b/thecstandardlibraryandconcurrencywithmodernc"><img src="images/books/bundle.png" alt="bundle" width="300" height="192" /></a><a href="https://leanpub.com/cpplibrary"></a></td>
-</tr>
-<tr>
-<td>With <strong>C++11,</strong> <strong>C++14, and C++17</strong> we got a lot of new C++ libraries. In addition, the existing ones are greatly improved. The key idea of my book is to give you the necessary information to the current C++ libraries in about 200 pages.</td>
-<td style="width: 15px;">&nbsp;</td>
-<td>
-<p style="text-align: justify;"><strong>C++11</strong> is the first C++ standard that deals with concurrency. The story goes on with <strong>C++17</strong> and will continue with <strong>C++20</strong>.</p>
-<p style="text-align: justify;">I'll give you a detailed insight in the current and the upcoming concurrency in C++. This insight includes the theory and a lot of practice with more the 100 source files.</p>
-</td>
-<td style="width: 15px;">&nbsp;</td>
-<td>
-<div class="about-bundle__blurb" data-reactid=".bi7877yjsc.2.1.0.5.0.1.0">
-<p>Get my books "<strong>The C++ Standard Library</strong>" (including C++17) and "<strong>Concurrency with Modern C++</strong>" in a bundle.</p>
-<p>In sum, you get more than 550 pages full of modern C++ and more than 100 source files presenting concurrency in practice.</p>
-</div>
-&nbsp;</td>
-</tr>
-</tbody>
-</table>
+<p>{loadmoduleid 153}</p>
