@@ -1,12 +1,12 @@
-<p>A thread gets its data by copy or by reference. Per default, you should use per copy. Why? In case your thread gets its data per reference, you have to be extremely careful about the lifetime of the arguments.</p>
+<p>A thread gets its data by copy or by reference. By default, you should use by copy. Why? In case your thread gets its data by reference, you have to be extremely careful about the lifetime of the arguments.</p>
 <hr id="system-readmore" />
 <p>&nbsp;</p>
 <h2>Thread arguments</h2>
 <p>A thread is a <a href="https://en.wikipedia.org/wiki/Variadic_template">variadic template</a>. So it can get an arbitrary number of arguments.</p>
-<p>But now to the difference between getting the argument per copy or per reference.</p>
+<p>But now to the difference between getting the argument by copy or by reference.</p>
 <p>&nbsp;</p>
 <div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
-    <pre style="margin: 0; line-height: 125%;">std::string s{<span style="color: #a31515;">"C++11"</span>}
+<pre style="margin: 0; line-height: 125%;">std::string s{<span style="color: #a31515;">"C++11"</span>}
 
 std::<span style="color: #0000ff;">thread</span> t([=]{ std::cout &lt;&lt; s &lt;&lt; std::endl;});
 t.join();
@@ -16,17 +16,17 @@ t2.detach()
 </pre>
 </div>
 <p>&nbsp;</p>
-<p>Precisely said, it is not the thread that gets the arguments in this example, but the lambda function. But that makes no difference for my argumentation. So the first thread t1 gets its data per copy (<span style="font-family: courier new,courier;">[=]</span>), and the second thread t2 gets its data per reference (<span style="font-family: courier new,courier;">[&amp;]</span>).</p>
-<p>What dangers are hidden in these lines? Thread t2 gets its string s per reference and is afterwards detached from the lifetime of its creator. On the one hand the lifetime of the string is bound to the lifetime of the invocation context, and on the other hand the lifetime of the global object<span style="font-family: courier new,courier;"> std::cout</span> is bound the lifetime of<span style="font-family: courier new,courier;"> the main </span>thread. So it may happen that the lifetime of the string s or the lifetime of <span style="font-family: courier new,courier;">std::cout</span> is shorter than the lifetime of the thread t2. Now we are deep in the area of undefined behaviour.</p>
-<p>Not convinced? Let's have a closer look, how undefined behaviour may look like.</p>
+<p>Precisely said, it is not the thread that gets the arguments in this example, but the lambda function. But that makes no difference for my argumentation. So the first thread t1 gets its data per copy (<span style="font-family: courier new,courier;">[=]</span>), and the second thread t2 gets its data by reference (<span style="font-family: courier new,courier;">[&amp;]</span>).</p>
+<p>What dangers are hidden in these lines? Thread t2 gets its string s by reference and is afterward detached from the lifetime of its creator. On the one hand, the lifetime of the string is bound to the lifetime of the invocation context, and on the other hand, the lifetime of the global object<span style="font-family: courier new,courier;"> std::cout</span> is bound to the lifetime of<span style="font-family: courier new,courier;"> the main </span>thread. So it may happen that the lifetime of the string s or the lifetime of <span style="font-family: courier new,courier;">std::cout</span> is shorter than the lifetime of the thread t2. Now we are deep in the area of undefined behavior.</p>
+<p>Not convinced? Let's have a closer look, what undefined behavior may look like.</p>
 <p>&nbsp;</p>
 <!-- HTML generated using hilite.me -->
 <div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
-    <table>
-        <tbody>
-            <tr>
-                <td>
-                    <pre style="margin: 0; line-height: 125%;"> 1
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
  2
  3
  4
@@ -59,9 +59,9 @@ t2.detach()
 31
 32
 33</pre>
-                </td>
-                <td>
-                    <pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// threadArguments.cpp</span>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// threadArguments.cpp</span>
 
 <span style="color: #0000ff;">#include &lt;chrono&gt;</span>
 <span style="color: #0000ff;">#include &lt;iostream&gt;</span>
@@ -95,20 +95,20 @@ t2.detach()
 
 }
 </pre>
-                </td>
-            </tr>
-        </tbody>
-    </table>
+</td>
+</tr>
+</tbody>
+</table>
 </div>
 <p>&nbsp;</p>
-<p>The question is, which value does <span style="font-family: courier new,courier;">valSleeper</span> have in line 26 <span style="font-family: courier new,courier;">valSleeper</span> is a global variable. The thread t gets as work package a function object of type <span style="font-family: courier new,courier;">Sleeper</span> together with the variable <span style="font-family: courier new,courier;">valSleeper</span> and the number 5 (line 27<span id="transmark"></span>). The crucial observation is, that the thread gets <span style="font-family: courier new,courier;">valSleeper</span> by reference (line 9) and will be detached from the lifetime of the main thread (line 28). Then it will execute the call operator of the function object (line 10 - 16). In this method, it counts from 0 to 5, sleeps in each iteration 1/10 of a second and increments i by k. At the end, it displays its ID on the screen. Following Adam Riese (a German proverb), the result must be 1000 +&nbsp; 6 * 5 = 1030.</p>
+<p>The question is, which value does <span style="font-family: courier new,courier;">valSleeper</span> have in line 26 <span style="font-family: courier new,courier;">valSleeper</span> is a global variable. The thread t gets as work package a function object of type <span style="font-family: courier new,courier;">Sleeper</span> together with the variable <span style="font-family: courier new,courier;">valSleeper</span> and the number 5 (line 27). The crucial observation is, that the thread gets <span style="font-family: courier new,courier;">valSleeper</span> by reference (line 9) and will be detached from the lifetime of the main thread (line 28). Then it will execute the call operator of the function object (line 10 - 16). In this method, it counts from 0 to 5, sleeps in each iteration 1/10 of a second, and increments i by k. In the end, it displays its ID on the screen. Following Adam Riese (a German proverb), the result must be 1000 +&nbsp; 6 * 5 = 1030.</p>
 <p>But, what happened? Something is going totally wrong.&nbsp;</p>
-<p><img src="images/blog/Threads/DatenuebergabeAnThreads/Sleeper.png" alt="Sleeper" style="margin: 15px;" /></p>
-<p>There are two issues. On the one hand, <span style="font-family: courier new,courier;">valSleeper</span> is 1000, on the other hand, the ID is missing on the console. So, that is undefined behaviour. The reason is that the lifetime of the main thread ends, before the child thread has performed its calculation or written its ID to <span style="font-family: courier new,courier;">std::cout</span>.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Threads/DatenuebergabeAnThreads/Sleeper.png" alt="Sleeper" style="margin: 15px;" /></p>
+<p>There are two issues. On the one hand, <span style="font-family: courier new,courier;">valSleeper</span> is 1000, on the other hand, the ID is missing on the console. So, that is undefined behaviour. The reason is that the lifetime of the main thread ends before the child thread has performed its calculation or written its ID to <span style="font-family: courier new,courier;">std::cout</span>.</p>
 <p>In case, the main thread waits via<span style="font-family: courier new,courier;"> t.join()</span> until this child thread is done with its work, we get the expected result.</p>
 <p>&nbsp;</p>
 <div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
-    <pre style="margin: 0; line-height: 125%;"><span style="color: #2b91af;">int</span> main(){
+<pre style="margin: 0; line-height: 125%;"><span style="color: #2b91af;">int</span> main(){
 
   std::cout &lt;&lt; std::endl;
 
@@ -123,9 +123,9 @@ t2.detach()
 </pre>
 </div>
 <p>&nbsp;</p>
-<p><img src="images/blog/Threads/DatenuebergabeAnThreads/Sleeper2.png" alt="Sleeper2" style="margin: 15px;" /></p>
+<p><img src="https://www.modernescpp.com/images/blog/Threads/DatenuebergabeAnThreads/Sleeper2.png" alt="Sleeper2" style="margin: 15px;" /></p>
 <h2>What's next?</h2>
-<p>Thinking about the lifetime of the threads is by far not the only issue with threads. Both threads, the main thread and the child thread share two objects. That is <span style="font-family: courier new,courier;">std::cout</span> and the variable <span style="font-family: courier new,courier;">valSleeper.</span> Now, I described the classical recipe for a data race or - to say it differently - for undefined behaviour. In the <a href="index.php/data-for-threads">next post</a> I will deal with shared variables between threads. (<strong>Proofreader Arne Mertz, <strong> Alexey Elymanov</strong></strong>)</p>
+<p>Thinking about the lifetime of the threads is by far not the only issue with threads. Both threads, the main thread, and the child thread share two objects. That is <span style="font-family: courier new,courier;">std::cout</span> and the variable <span style="font-family: courier new,courier;">valSleeper.</span> Now, I described the classical recipe for a data race or - to say it differently - for undefined behavior. In the <a href="https://www.modernescpp.com/index.php/threads-sharing-data">next post</a>, I will deal with shared variables between threads. (<strong>Proofreader Arne Mertz, <strong> Alexey Elymanov</strong></strong>)</p>
 <p>&nbsp;</p>
-<p>Would you like to have all articles for the weekend? Source included.</p>
-<p>{loadmodule mod_acymailing,Neue Artikel zum Wochenende}</p>
+<p>&nbsp;</p>
+<p>{loadmoduleid 153}</p>
