@@ -1,0 +1,139 @@
+<p>Tag Dispatching enables it to choose a function based on the type characteristics. This decision takes place at compile time and is based on traits.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/Templates/TraitsAndTagDispatching/PolicyAndTraits.png" alt="PolicyAndTraits" width="650" height="398" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>Tag dispatching is based on traits. Consequentially, I want to write a few words about traits.</p>
+<h2>Traits</h2>
+<p>Traits are class templates that provide characteristics of a generic type. They can extract one or more characteristics of a class template.</p>
+<p>You may already assume it, the metafunctions from the<a href="https://en.cppreference.com/w/cpp/header/type_traits"> type-traits</a> library are typical examples of traits in C++. I have already written a few posts about them. Here are they:</p>
+<ol>
+<li><a href="https://www.modernescpp.com/index.php/the-type-traits-library-type-checks">Type Checks</a></li>
+<li><a href="https://www.modernescpp.com/index.php/the-type-traits-library-type-comparisons">Type Comparisons</a></li>
+<li><a href="https://www.modernescpp.com/index.php/the-type-traits-library-std-is-base-of"><code>std::is_base_of</code></a></li>
+<li><a href="https://www.modernescpp.com/index.php/the-type-traits-library">Correctness</a></li>
+<li><a href="https://www.modernescpp.com/index.php/the-type-traits-library-performance">Performance</a></li>
+</ol>
+<p>&nbsp;Before I directly jump in this post in tag dispatching, I want to introduce the<a href="https://en.cppreference.com/w/cpp/iterator/iterator_traits"> iterator traits</a>. The following code snippet shows their partial specialization for pointers:</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span> 
+<span style="color: #006699; font-weight: bold;">struct</span> iterator_traits<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">*&gt;</span> { 
+    <span style="color: #006699; font-weight: bold;">using</span> difference_type <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span><span style="color: #007788; font-weight: bold;">ptrdiff_t</span>; 
+    <span style="color: #006699; font-weight: bold;">using</span> value_type <span style="color: #555555;">=</span> T; 
+    <span style="color: #006699; font-weight: bold;">using</span> pointer <span style="color: #555555;">=</span> T<span style="color: #555555;">*</span>; 
+    <span style="color: #006699; font-weight: bold;">using</span> reference <span style="color: #555555;">=</span> T<span style="color: #555555;">&amp;</span>; 
+    <span style="color: #006699; font-weight: bold;">using</span> iterator_category <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>random_access_iterator_tag; 
+};
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The iterator categories build the following hierarchy:</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">struct</span> input_iterator_tag{}; 
+<span style="color: #006699; font-weight: bold;">struct</span> output_iterator_tag{}; 
+<span style="color: #006699; font-weight: bold;">struct</span> forward_iterator_tag<span style="color: #555555;">:</span> <span style="color: #006699; font-weight: bold;">public</span> input_iterator_tag{}; 
+<span style="color: #006699; font-weight: bold;">struct</span> bidirectional_iterator_tag<span style="color: #555555;">:</span> <span style="color: #006699; font-weight: bold;">public</span> forward_iterator_tag{}; 
+<span style="color: #006699; font-weight: bold;">struct</span> random_access_iterator_tag<span style="color: #555555;">:</span> <span style="color: #006699; font-weight: bold;">public</span> bidirectional_iterator_tag{}; 
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>&nbsp;The various iterator categories correspond to the container of the Standard Template Library.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/TraitsAndTagDispatching/IteratorCategories.png" alt="IteratorCategories" width="550" height="332" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>The following relation holds for the iterator categories and their support operations. A random-access iterator is a bidirectional iterator, and a bidirectional iterator is a forward iterator. This means <code>std::array, std::vector,</code> and <code>std::string</code> support a random-access iterator, but not <code>std::deque</code>.</p>
+<h2>Tag Dispatching</h2>
+<p>Now, I can apply tag dispatching and implement a fine-tailored <code>advance_</code> algorithm optimized for the used container. First of all, <a href="https://en.cppreference.com/w/cpp/iterator/advance"><code>std::advance</code></a> is already part of the standard template library:</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span> <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">InputIt</span>, <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Distance</span> <span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">void</span> advance( InputIt<span style="color: #555555;">&amp;</span> it, Distance n );            (until C<span style="color: #555555;">++</span><span style="color: #ff6600;">17</span>)
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span> <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">InputIt</span>, <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Distance</span> <span style="color: #555555;">&gt;</span>
+constexpr <span style="color: #007788; font-weight: bold;">void</span> advance( InputIt<span style="color: #555555;">&amp;</span> it, Distance n );  (since C<span style="color: #555555;">++</span><span style="color: #ff6600;">17</span>)
+</pre>
+</div>
+<p>&nbsp;</p>
+<p><code>std::advance</code> increments a given iterator <code>it</code> by<code> n</code> elements. If n is negative, the iterator is decremented. Consequentially, the container providing the iterator must be in this case bidirectional.</p>
+<p>Here is my implementation of <code>advance_</code>:</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// advance_.cpp</span>
+
+<span style="color: #009999;">#include &lt;iterator&gt;</span>
+<span style="color: #009999;">#include &lt;forward_list&gt;</span>
+<span style="color: #009999;">#include &lt;list&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> InputIterator, <span style="color: #006699; font-weight: bold;">typename</span> Distance<span style="color: #555555;">&gt;</span>                    
+<span style="color: #007788; font-weight: bold;">void</span> advance_impl(InputIterator<span style="color: #555555;">&amp;</span> i, Distance n, std<span style="color: #555555;">::</span>input_iterator_tag) {
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"InputIterator used"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>; 
+    <span style="color: #006699; font-weight: bold;">while</span> (n<span style="color: #555555;">--</span>) <span style="color: #555555;">++</span>i;
+}
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> BidirectionalIterator, <span style="color: #006699; font-weight: bold;">typename</span> Distance<span style="color: #555555;">&gt;</span>            <span style="color: #0099ff; font-style: italic;">  </span>
+<span style="color: #007788; font-weight: bold;">void</span> advance_impl(BidirectionalIterator<span style="color: #555555;">&amp;</span> i, Distance n, std<span style="color: #555555;">::</span>bidirectional_iterator_tag) {
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"BidirectionalIterator used"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    <span style="color: #006699; font-weight: bold;">if</span> (n <span style="color: #555555;">&gt;=</span> <span style="color: #ff6600;">0</span>) 
+        <span style="color: #006699; font-weight: bold;">while</span> (n<span style="color: #555555;">--</span>) <span style="color: #555555;">++</span>i;
+    <span style="color: #006699; font-weight: bold;">else</span> 
+        <span style="color: #006699; font-weight: bold;">while</span> (n<span style="color: #555555;">++</span>) <span style="color: #555555;">--</span>i;
+}
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> RandomAccessIterator, <span style="color: #006699; font-weight: bold;">typename</span> Distance<span style="color: #555555;">&gt;</span>             
+<span style="color: #007788; font-weight: bold;">void</span> advance_impl(RandomAccessIterator<span style="color: #555555;">&amp;</span> i, Distance n, std<span style="color: #555555;">::</span>random_access_iterator_tag) {
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"RandomAccessIterator used"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    i <span style="color: #555555;">+=</span> n;                                                             // (5)
+}
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> InputIterator, <span style="color: #006699; font-weight: bold;">typename</span> Distance<span style="color: #555555;">&gt;</span>                    <span style="color: #0099ff; font-style: italic;">// (4)</span>
+<span style="color: #007788; font-weight: bold;">void</span> advance_(InputIterator<span style="color: #555555;">&amp;</span> i, Distance n) {
+    <span style="color: #006699; font-weight: bold;">typename</span> std<span style="color: #555555;">::</span>iterator_traits<span style="color: #555555;">&lt;</span>InputIterator<span style="color: #555555;">&gt;::</span>iterator_category category;    
+    advance_impl(i, n, category);                                               
+}
+  
+<span style="color: #007788; font-weight: bold;">int</span> main(){
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    
+    std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> myVec{<span style="color: #ff6600;">0</span>, <span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">5</span>, <span style="color: #ff6600;">6</span>, <span style="color: #ff6600;">7</span>, <span style="color: #ff6600;">8</span>, <span style="color: #ff6600;">9</span>};               <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    <span style="color: #006699; font-weight: bold;">auto</span> myVecIt <span style="color: #555555;">=</span> myVec.begin();                                               
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"*myVecIt: "</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #555555;">*</span>myVecIt <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    advance_(myVecIt, <span style="color: #ff6600;">5</span>);
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"*myVecIt: "</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #555555;">*</span>myVecIt <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    
+    std<span style="color: #555555;">::</span>list<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> myList{<span style="color: #ff6600;">0</span>, <span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">5</span>, <span style="color: #ff6600;">6</span>, <span style="color: #ff6600;">7</span>, <span style="color: #ff6600;">8</span>, <span style="color: #ff6600;">9</span>};                <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    <span style="color: #006699; font-weight: bold;">auto</span> myListIt <span style="color: #555555;">=</span> myList.begin();                                             
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"*myListIt: "</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #555555;">*</span>myListIt <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    advance_(myListIt, <span style="color: #ff6600;">5</span>);
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"*myListIt: "</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #555555;">*</span>myListIt <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    
+    std<span style="color: #555555;">::</span>forward_list<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> myForwardList{<span style="color: #ff6600;">0</span>, <span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">5</span>, <span style="color: #ff6600;">6</span>, <span style="color: #ff6600;">7</span>, <span style="color: #ff6600;">8</span>, <span style="color: #ff6600;">9</span>}; <span style="color: #0099ff; font-style: italic;">// (3)</span>
+    <span style="color: #006699; font-weight: bold;">auto</span> myForwardListIt <span style="color: #555555;">=</span> myForwardList.begin();                               
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"*myForwardListIt: "</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #555555;">*</span>myForwardListIt <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    advance_(myForwardListIt, <span style="color: #ff6600;">5</span>);
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"*myForwardListIt: "</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #555555;">*</span>myForwardListIt <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>I use in the example a <code>std::vector</code> (line 1), a <code>std::list</code> (line 2), and a<code> std::forward_list</code> (line 3). A <code>std::vector</code> supports a random-access iterator, a <code>std::list</code> a bidirectional iterator, and a <code>std::forward_list</code> a forward iterator. The call <code> std<span style="color: #555555;">::</span>iterator_traits<span style="color: #555555;">&lt;</span>InputIterator<span style="color: #555555;">&gt;::</span>iterator_category category</code>; in the function <code>advance_&nbsp; </code>(line 4) determines the supported iterator category based on the given iterator. The final call <code>advance_impl(i, n, category) </code>finally dispatches to the most specialized overload of the implementation function<code> advance_impl.</code></p>
+<p>To visualize the dispatch, I added a short message to implementation functions <code>advance_imp</code>l.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/TraitsAndTagDispatching/advance_.png" alt="advance " width="300" height="316" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>What are the advantages of such a fine-tuned advance implementation?</p>
+<ol>
+<li><strong>Type safety</strong>: The compiler decides which version of <code>advance_impl</code> is used. Consequentially, you cannot invoke an implementation requiring a bidirectional iterator with a forward iterator. Backward iterating with a forward iterator is undefined behavior.</li>
+<li><strong>Performance</strong>: Putting a forward iterator or a bidirectional iterator n position further requires n increment operation. Its complexity is, therefore, linear. This observation does not hold for a random access iterator: Pointer arithmetic such as<code> i <span style="color: #555555;">+=</span> n</code> (line 5) is a constant operation.</li>
+</ol>
+<h2>What's next?</h2>
+<p>In my next post, I bridge dynamic polymorphism (object orientation) with static polymorphism (templates) to introduce a pretty sophisticated technique: type erasure.</p>
+<h2>The Future of Modernes C++</h2>
+<p>The type erasure post will be my last post about templates for now. To get the previous ones, use the <a href="https://www.modernescpp.com/index.php/der-einstieg-in-modernes-c#h9-templates">TOC </a>or the category&nbsp;<a href="https://www.modernescpp.com/index.php/category/templates">Templates</a>. Afterward, I continue to write about C++20 and will peek into the C++23 future. If you have some interesting post ideas, please write me an e-mail: <a href="mailto:Rainer.Grimm@modernescpp.de">Rainer.Grimm@modernescpp.de</a>.</p>
+<p>{loadmoduleid 153}</p>
+<p>&nbsp;</p>
