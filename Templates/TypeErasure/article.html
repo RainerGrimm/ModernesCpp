@@ -1,0 +1,249 @@
+<p><span lang="DE"> Type erasure based on templates is a pretty sophisticated technique. It allows you to bridge dynamic polymorphism (object orientation) with static polymorphism (templates).<br /></span></p>
+<hr id="system-readmore" />
+<p><img src="https://www.modernescpp.com/images/blog/Templates/TypeErasure/PolicyAndTraits.png" alt="PolicyAndTraits" width="650" height="398" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>First: What does type erasure mean?</p>
+<ul>
+<li><strong>Type Erasure: </strong>Type Erasure enables you to use various concrete types through a single generic interface.</li>
+</ul>
+<p>You already quite often used type erasure in C++ or C. The C-ish type erasure is a void pointer; object orientation is the classical C++-ish way of type erasure. Let's start with a <code>void</code> pointer.</p>
+<h2><code>Void</code> Pointer</h2>
+<p>Let's have a closer look at the declaration of <code>std::qsort</code>:</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">qsort</span>(<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #555555;">*</span>ptr, std<span style="color: #555555;">::</span><span style="color: #007788; font-weight: bold;">size_t</span> count, std<span style="color: #555555;">::</span><span style="color: #007788; font-weight: bold;">size_t</span> size, cmp);
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>with:</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">cmp</span>(<span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">void</span> <span style="color: #555555;">*</span>a, <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">void</span> <span style="color: #555555;">*</span>b);
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The comparison function <code>cmp </code>should return a</p>
+<ul>
+<li>negative integer: the&nbsp;first argument is less than the second</li>
+<li>zero: both arguments are equal</li>
+<li>positive integer: the&nbsp;first argument is greater than the second</li>
+</ul>
+<p>Thanks to the <code>void</code> pointer, <code>std::qsort</code> is generally applicable but also quite error-prone.</p>
+<p>Maybe you want to sort a <code>std::vector&lt;int&gt;,</code> but you used a comparator for C-strings. The compiler can not catch this error because the necessary type information is missing. Consequentially, you end with undefined behavior.</p>
+<p>In C++ we can do better:</p>
+<h2>Object Orientation</h2>
+<p>Here is a straightforward example, which serves as a starting point for further variation.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// typeErasureOO.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;string&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">struct</span> BaseClass{                                       <span style="color: #0099ff; font-style: italic;">// (2)</span>
+	<span style="color: #006699; font-weight: bold;">virtual</span> std<span style="color: #555555;">::</span>string getName() <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>;
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> Bar<span style="color: #555555;">:</span> BaseClass{                                  <span style="color: #0099ff; font-style: italic;">// (4)</span>
+	std<span style="color: #555555;">::</span>string getName() <span style="color: #006699; font-weight: bold;">const</span> override {
+	    <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc3300;">"Bar"</span>;
+	}
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> Foo<span style="color: #555555;">:</span> BaseClass{                                  <span style="color: #0099ff; font-style: italic;">// (4)</span>
+	std<span style="color: #555555;">::</span>string getName() <span style="color: #006699; font-weight: bold;">const</span> override{
+	    <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc3300;">"Foo"</span>;
+	}
+};
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">printName</span>(std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">const</span> BaseClass<span style="color: #555555;">*&gt;</span> vec){      <span style="color: #0099ff; font-style: italic;">// (3)</span>
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> v<span style="color: #555555;">:</span> vec) std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> v<span style="color: #555555;">-&gt;</span>getName() <span style="color: #555555;">&lt;&lt;</span> '\n';
+}
+
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+	
+	std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> '\n';
+	
+	Foo foo;
+	Bar bar; 
+	
+	std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">const</span> BaseClass<span style="color: #555555;">*&gt;</span> vec{<span style="color: #555555;">&amp;</span>foo, <span style="color: #555555;">&amp;</span>bar};   <span style="color: #0099ff; font-style: italic;">// (1)</span>
+	
+	printName(vec);
+	
+	std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt; </span>'\n';
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p><code>std::vector&lt;const Base*&gt;</code> (line 1) has a pointer to a constant <code>BaseClass</code>. <code>BaseClass</code> is an abstract base class used in line (3). <code>Foo</code> and <code>Bar</code> (line 4) are the concrete classes.</p>
+<p>The output of the program is as expected.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/TypeErasure/typeErasureOO.png" alt="typeErasureOO" width="350" height="208" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p id="firstHeading" class="firstHeading" lang="en">To say it more formally. <code>Foo </code>and <code>Bar </code>implement the interface of the <code>BaseClass </code>and can, therefore, be used instead of BaseClass<code>.</code> This principle is called <a href="https://en.wikipedia.org/wiki/Liskov_substitution_principle">Liskov substitution principle</a> and is type erasure in OO.</p>
+<p>In object-orientated&nbsp; programming, you implement an interface. In generic programming, such as templates, you are not interested in interfaces; you are interested in behavior. Read more about the difference between interface-driven and behavior-driven design in my previous post, "<a href="https://www.modernescpp.com/index.php/dynamic-and-static-polymorphism">Dynamic and Static Polymorphism</a>".</p>
+<p>Type erasure with templates bridges the gap between dynamic polymorphism and static polymorphism.</p>
+<h2>Type Erasure</h2>
+<p>Let me start with a prominent example of type erasure:<code> std::function</code>.<code> std::function</code> is a polymorphic function wrapper. It can accept everything that behaves like a function. To be more precise. This everything can be any callable such as a function, a function object, a function object created by <code>std::bind</code>, or just a lambda expression.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// callable.cpp</span>
+
+<span style="color: #009999;">#include &lt;cmath&gt;</span>
+<span style="color: #009999;">#include &lt;functional&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;map&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">double</span> <span style="color: #cc00ff;">add</span>(<span style="color: #007788; font-weight: bold;">double</span> a, <span style="color: #007788; font-weight: bold;">double</span> b){
+	<span style="color: #006699; font-weight: bold;">return</span> a <span style="color: #555555;">+</span> b;
+}
+
+<span style="color: #006699; font-weight: bold;">struct</span> Sub{
+	<span style="color: #007788; font-weight: bold;">double</span> <span style="color: #006699; font-weight: bold;">operator</span>()(<span style="color: #007788; font-weight: bold;">double</span> a, <span style="color: #007788; font-weight: bold;">double</span> b){
+		<span style="color: #006699; font-weight: bold;">return</span> a <span style="color: #555555;">-</span> b;
+	}
+};
+
+<span style="color: #007788; font-weight: bold;">double</span> <span style="color: #cc00ff;">multThree</span>(<span style="color: #007788; font-weight: bold;">double</span> a, <span style="color: #007788; font-weight: bold;">double</span> b, <span style="color: #007788; font-weight: bold;">double</span> c){
+	<span style="color: #006699; font-weight: bold;">return</span> a <span style="color: #555555;">*</span> b <span style="color: #555555;">*</span> c;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+    
+    <span style="color: #006699; font-weight: bold;">using</span> <span style="color: #006699; font-weight: bold;">namespace</span> std<span style="color: #555555;">::</span>placeholders;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> '\n';
+
+    std<span style="color: #555555;">::</span>map<span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">char</span> , std<span style="color: #555555;">::</span>function<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">double</span>(<span style="color: #007788; font-weight: bold;">double</span>, <span style="color: #007788; font-weight: bold;">double</span>)<span style="color: #555555;">&gt;&gt;</span> dispTable{  <span style="color: #0099ff; font-style: italic;">// (1)</span>
+        {<span style="color: #cc3300;">'+'</span>, add },                                         <span style="color: #0099ff; font-style: italic;">// (2)</span>
+        {<span style="color: #cc3300;">'-'</span>, Sub() },                                       <span style="color: #0099ff; font-style: italic;">// (3)</span>
+        {<span style="color: #cc3300;">'*'</span>, std<span style="color: #555555;">::</span>bind(multThree, <span style="color: #ff6600;">1</span>, _1, _2) },             <span style="color: #0099ff; font-style: italic;">// (4)</span>
+        {<span style="color: #cc3300;">'/'</span>,[](<span style="color: #007788; font-weight: bold;">double</span> a, <span style="color: #007788; font-weight: bold;">double</span> b){ <span style="color: #006699; font-weight: bold;">return</span> a <span style="color: #555555;">/</span> b; }}};      <span style="color: #0099ff; font-style: italic;">// (5)</span>
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"3.5 + 4.5 = "</span> <span style="color: #555555;">&lt;&lt;</span> dispTable[<span style="color: #cc3300;">'+'</span>](<span style="color: #ff6600;">3.5</span>, <span style="color: #ff6600;">4.5</span>) <span style="color: #555555;">&lt;&lt;</span> '\n';
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"3.5 - 4.5 = "</span> <span style="color: #555555;">&lt;&lt;</span> dispTable[<span style="color: #cc3300;">'-'</span>](<span style="color: #ff6600;">3.5</span>, <span style="color: #ff6600;">4.5</span>) <span style="color: #555555;">&lt;&lt;</span> '\n';
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"3.5 * 4.5 = "</span> <span style="color: #555555;">&lt;&lt;</span> dispTable[<span style="color: #cc3300;">'*'</span>](<span style="color: #ff6600;">3.5</span>, <span style="color: #ff6600;">4.5</span>) <span style="color: #555555;">&lt;&lt;</span> '\n';
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"3.5 / 4.5 = "</span> <span style="color: #555555;">&lt;&lt;</span> dispTable[<span style="color: #cc3300;">'/'</span>](<span style="color: #ff6600;">3.5</span>, <span style="color: #ff6600;">4.5</span>) <span style="color: #555555;">&lt;&lt;</span> '\n';
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> '\n';
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>I use a dispatch table (line 1) that maps characters to callables in this example. A callable can be a function (line 1), a function object (lines 2 and 3), a function object created by <code>std::bind</code> (line 4), or a lambda expression (line 5). The key point of <code>std::function</code> is that it accepts all different <em>function-like types</em> and erases their types. <code>std::function</code> requires from its callable that it takes two <code>double's</code> and returns a <code>double: std::function&lt;double(double, double)&gt;.</code></p>
+<p>To complete the example, here is the output.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/TypeErasure/callable.png" alt="callable" width="350" height="240" style="display: block; margin-left: auto; margin-right: auto;" />After this first introduction to type erasure, I want to implement the program <code>typeErasureOO.cpp</code> using type erasure based on templates.</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// typeErasure.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;memory&gt;</span>
+<span style="color: #009999;">#include &lt;string&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Object</span> {                                              <span style="color: #0099ff; font-style: italic;">// (2)</span>
+	 
+<span style="color: #9999ff;">public:</span>
+    <span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>                                   <span style="color: #0099ff; font-style: italic;">// (3)</span>
+    Object(<span style="color: #006699; font-weight: bold;"></span>T<span style="color: #555555;">&amp;&amp;</span> obj)<span style="color: #555555;">:</span> object(std<span style="color: #555555;">::</span>make_shared<span style="color: #555555;">&lt;</span>Model<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;&gt;</span>(std<span style="color: #555555;">::forward&lt;T&gt;</span>(obj))){}
+      
+    std<span style="color: #555555;">::</span>string getName() <span style="color: #006699; font-weight: bold;">const</span> {                           <span style="color: #0099ff; font-style: italic;">// (4)</span>
+        <span style="color: #006699; font-weight: bold;">return</span> object<span style="color: #555555;">-&gt;</span>getName(); 
+    }
+	
+   <span style="color: #006699; font-weight: bold;">struct</span> Concept {                                         <span style="color: #0099ff; font-style: italic;">// (5)</span>
+       <span style="color: #006699; font-weight: bold;">virtual</span> <span style="color: #555555;">~</span>Concept() {}
+	   <span style="color: #006699; font-weight: bold;">virtual</span> std<span style="color: #555555;">::</span>string getName() <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>;
+   };
+
+   <span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span> <span style="color: #006699; font-weight: bold;">typename</span> T <span style="color: #555555;">&gt;</span>                                   <span style="color: #0099ff; font-style: italic;">// (6)</span>
+   <span style="color: #006699; font-weight: bold;">struct</span> Model <span style="color: #555555;">:</span> Concept {
+       Model(<span style="color: #006699; font-weight: bold;">const</span> T<span style="color: #555555;">&amp;</span> t) <span style="color: #555555;">:</span> object(t) {}
+	   std<span style="color: #555555;">::</span>string getName() <span style="color: #006699; font-weight: bold;">const</span> override {
+		   <span style="color: #006699; font-weight: bold;">return</span> object.getName();
+	   }
+     <span style="color: #9999ff;">private:</span>
+       T object;
+   };
+
+   std<span style="color: #555555;">::</span>shared_ptr<span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">const</span> Concept<span style="color: #555555;">&gt;</span> object;
+};
+
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">printName</span>(std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span>Object<span style="color: #555555;">&gt;</span> vec){                    <span style="color: #0099ff; font-style: italic;">// (7)</span>
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> v<span style="color: #555555;">:</span> vec) std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> v.getName() <span style="color: #555555;">&lt;&lt;</span> '\n';
+}
+
+<span style="color: #006699; font-weight: bold;">struct</span> Bar{
+    std<span style="color: #555555;">::</span>string getName() <span style="color: #006699; font-weight: bold;">const</span> {                           <span style="color: #0099ff; font-style: italic;">// (8)</span>
+        <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc3300;">"Bar"</span>;
+    }
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> Foo{
+    std<span style="color: #555555;">::</span>string getName() <span style="color: #006699; font-weight: bold;">const</span> {                           <span style="color: #0099ff; font-style: italic;">// (8)</span>
+        <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc3300;">"Foo"</span>;
+    }
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+	
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> '\n';
+	
+    std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span>Object<span style="color: #555555;">&gt;</span> vec{Object(Foo()), Object(Bar())};  <span style="color: #0099ff; font-style: italic;">// (1)</span>
+	
+    printName(vec);
+	
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> '\n';
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Okay, what is happening here? Don't be irritated by the names <code>Object</code>, <code>Concept</code>, and <code>Model</code>. They are typically used for type erasure in the literature. So I stick with them.</p>
+<p><code>std:</code>:vector uses instances (line 1) of type <code>Object</code> (line 2) and not pointers, such as in the first OO example. These instances can be created with arbitrary types because they have a generic constructor (line 3). <code>Object</code> has the member function <code>getName</code> (4) that directly forwards to the <code>getName </code>of <code>object</code>. <code>object</code> is of type <code>std::shared_ptr&lt;const Concept&gt;</code>. The member function <code>getName </code>of <code>Concept</code> is pure virtual (line 5).&nbsp;Therefore, the <code>getName</code> method of Model (line 6) is used due to virtual dispatch. The <code>getName </code>member functions of <code>Bar </code>and <code>Foo </code>(line 8) are applied in the <code>printName </code>function (line7).</p>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/TypeErasure/typeErasureRun.png" alt="typeErasure" width="350" height="208" style="display: block; margin-left: auto; margin-right: auto;" />Of course, this implementation is type-safe. So what happens in case of an error:</p>
+<h2>Error messages</h2>
+<p>Here is the incorrect implementation:</p>
+<p>&nbsp;</p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">struct</span> Bar{
+    std<span style="color: #555555;">::</span>string get() <span style="color: #006699; font-weight: bold;">const</span> {                             <span style="color: #0099ff; font-style: italic;">// (1)</span>
+        <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc3300;">"Bar"</span>;
+    }
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> Foo{
+    std<span style="color: #555555;">::</span>string get_name() <span style="color: #006699; font-weight: bold;">const</span> {                        <span style="color: #0099ff; font-style: italic;">// (2)</span>
+        <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc3300;">"Foo"</span>;
+    }
+};
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>I renamed the method <code>getName </code>of <code>Bar </code>and <code>Foo</code> to <code>get </code>(line 1) and to <code>get_name</code> (line 2).<code>&nbsp;</code></p>
+<p>Here are the error messages, copied with the <a href="https://godbolt.org/">Compiler Explorer. </a></p>
+<p>All three compilers, g++, clang++, and MS compiler cl.exe, come directly to the point.</p>
+<h4>Clang 14.0.0</h4>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/TypeErasure/clang.jpg" alt="clang" width="650" height="95" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<h4>GCC 11.2</h4>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/TypeErasure/gcc.jpg" alt="gcc" width="650" height="62" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>&nbsp;</p>
+<h4>MSVC 19.31</h4>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/TypeErasure/msvc.jpg" alt="msvc" width="650" height="46" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>&nbsp;</p>
+<p>What are the pros and cons of these three techniques for type erasure?</p>
+<h2>Pros and Cons</h2>
+<p><img src="https://www.modernescpp.com/images/blog/Templates/TypeErasure/typeErasure.png" alt="PolicyAndTraits" width="1054" height="177" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<h3><code>void</code> Pointer</h3>
+<p><code>void</code> Pointers are the C-ish way to provide one interface for different types. They give you complete flexibility. You don't need a common base class, and they are easy to implement. On the contrary, you lose all type information and, therefore, type safety.</p>
+<h3>Object Orientation</h3>
+<p>Object orientation is the C++-is way to provide one interface for different types. If you are accustomed to object-orientated programming, this is your typical way to design software systems. OO is challenging to implement but type safe. It requires an interface and publicly derived implementations.</p>
+<h3>Type Erasure</h3>
+<p>Type erasure is a type-safe generic way to provide one interface for different types. The different types don't need a common base class and are unrelated.&nbsp; Type erasure is pretty sophisticated to implement.</p>
+<h3>Performance</h3>
+<p>I ignored one point in my comparison: performance. Object orientation and type erasure are based on virtual inheritance. Consequentially, there is one pointer indirection happening at run time. Does this mean object orientation and type erasure is slower than the void Pointer? I'm not sure. You have to measure it in the concrete use case. When you use a void Pointer, you lose all type information. Therefore, the compiler can not make any assumptions about the used types and generate optimized code. The performance questions can only be answered with a performance test.</p>
+<h2>What's Next?</h2>
+<p>I wrote almost 50 posts about <a href="https://www.modernescpp.com/index.php/category/templates">templates </a>in the last year. During that time, I learned a lot more about C++20. Therefore, I continue to write about C++20 and peek into the next C++ standard: C++23.</p>
+<p>&nbsp;</p>
+<p>&nbsp;{loadmoduleid 153}</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
