@@ -1,0 +1,303 @@
+<p>In my last post "<a href="https://www.modernescpp.com/index.php/defining-concepts-with-requires-expressions">Defining Concepts with Requires Expressions</a>", I exemplified how you can use requires expressions to define concepts. Requires expressions can also be used as a standalone feature when a compile-time predicate is required.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/Cpp20/RequiresExpressionsAsStandaloneFeature/TimelineCpp20Concepts.png" alt="TimelineCpp20Concepts" width="650" height="255" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>Typical use-cases for compile-time predicates are<code> static_assert</code>, <code>constexpr if</code>, or a requires clause. A compile--time predicate is an expression that returns at compile time a boolean. Let me start this post with C++11.</p>
+<h2><code>static_assert</code></h2>
+<div>
+<div><code>static_assert</code> requires a compile-time predicate and a message displayed when the compile-time predicate fails. With C++17, the message is optional. With C++20, this compile-predicate can be a requires expression.</div>
+<div>&nbsp;</div>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// staticAssertRequires.cpp</span>
+
+<span style="color: #009999;">#include &lt;concepts&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">struct</span> Fir {                   <span style="color: #0099ff; font-style: italic;">// (4)</span>
+    <span style="color: #007788; font-weight: bold;">int</span> count() <span style="color: #006699; font-weight: bold;">const</span> {
+        <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #ff6600;">2020</span>;
+    }
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> Sec {
+    <span style="color: #007788; font-weight: bold;">int</span> size() <span style="color: #006699; font-weight: bold;">const</span> {
+        <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #ff6600;">2021</span>;
+    }
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+   
+    Fir fir;
+    static_assert(requires(Fir fir){ { fir.count() } <span style="color: #555555;">-&gt;</span> std<span style="color: #555555;">::</span>convertible_to<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span>; });     <span style="color: #0099ff; font-style: italic;">// (1)</span>
+
+    Sec sec;
+    static_assert(requires(Sec sec){ { sec.count() } <span style="color: #555555;">-&gt;</span> std<span style="color: #555555;">::</span>convertible_to<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span>; });     <span style="color: #0099ff; font-style: italic;">// (2)</span>
+
+    <span style="color: #007788; font-weight: bold;">int</span> third;
+    static_assert(requires(<span style="color: #007788; font-weight: bold;">int</span> third){ { third.count() } <span style="color: #555555;">-&gt;</span> std<span style="color: #555555;">::</span>convertible_to<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span>; }); <span style="color: #0099ff; font-style: italic;">// (3)</span>
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+}
+</pre>
+</div>
+</div>
+<div>&nbsp;</div>
+<div>
+<div>
+<div>The requires expressions (lines 1, 2, and 3) check if the object has a member function <code>count</code> and its result is convertible to<code> int</code>. This check is only valid for the class <code>First</code> (lines 4). On the contrary, the checks in lines (2) and (3) fail.</div>
+<div><img src="https://www.modernescpp.com/images/blog/Cpp20/RequiresExpressionsAsStandaloneFeature/staticAssertRequires.png" alt="staticAssertRequires" width="600" height="163" style="display: block; margin-left: auto; margin-right: auto;" /></div>
+<div>&nbsp;</div>
+</div>
+</div>
+<div>
+<div>Maybe, you want to compile code depending on a compile-time check. In this case, the C++17 feature <code>constexpr if</code> combined with requires expressions provides you the necessary tool.</div>
+<h2><code>constexpr if</code></h2>
+<div>
+<div><code>constexpr if</code> allows it to compile source code conditionally. For the condition, the requires expression comes into play. All branches of the if statement have to be valid.</div>
+<br />
+<div>Thanks to <code>constexpr if</code>, you can define functions that inspect their arguments at compile time and generated different functionality based on their analysis.</div>
+<div>&nbsp;</div>
+<div>&nbsp;</div>
+</div>
+</div>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// constexprIfRequires.cpp</span>
+
+<span style="color: #009999;">#include &lt;concepts&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">struct</span> First {
+    <span style="color: #007788; font-weight: bold;">int</span> count() <span style="color: #006699; font-weight: bold;">const</span> {
+        <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #ff6600;">2020</span>;
+    }
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> Second {
+    <span style="color: #007788; font-weight: bold;">int</span> size() <span style="color: #006699; font-weight: bold;">const</span> {
+        <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #ff6600;">2021</span>;
+    }
+};
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">int</span> getNumberOfElements(T t) {
+
+    <span style="color: #006699; font-weight: bold;">if</span> constexpr (requires(T t){ { t.count() } <span style="color: #555555;">-&gt;</span> std<span style="color: #555555;">::</span>convertible_to<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span>; }) {   <span style="color: #0099ff;"><em>// (1)</em></span>
+        <span style="color: #006699; font-weight: bold;">return</span> t.count();
+    }
+    <span style="color: #006699; font-weight: bold;">if</span> constexpr (requires(T t){ { t.size() } <span style="color: #555555;">-&gt;</span> std<span style="color: #555555;">::</span>convertible_to<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span>; }) {   <span style="color: #0099ff;"><em> // (2)</em></span>
+        <span style="color: #006699; font-weight: bold;">return</span> t.size();
+    }
+    <span style="color: #006699; font-weight: bold;">else</span> <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #ff6600;">42</span>;                                                               <span style="color: #0099ff;"> <em>// (3)</em></span>
+
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+   
+    First first;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"getNumberOfElements(first): "</span>  <span style="color: #555555;">&lt;&lt;</span> getNumberOfElements(first) <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    Second second;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"getNumberOfElements(second): "</span>  <span style="color: #555555;">&lt;&lt;</span> getNumberOfElements(second) <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    <span style="color: #007788; font-weight: bold;">int</span> third;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"getNumberOfElements(third): "</span> <span style="color: #555555;">&lt;&lt;</span> getNumberOfElements(third) <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<div>
+<div>Lines (1) and (2) are crucial in this code example. In line (1), the requires expressions determine if the variable <code>t</code> has a member function <code>count</code>, that returns an <code>int</code>. Accordingly, line (2) determines if the variable<code> t</code> has a member function <code>size</code>. The else statement in line (3) is applied as a fallback.</div>
+<div>&nbsp;</div>
+<div><img src="https://www.modernescpp.com/images/blog/Cpp20/RequiresExpressionsAsStandaloneFeature/constexprIfRequires.png" alt="constexprIfRequires" width="450" height="223" style="display: block; margin-left: auto; margin-right: auto;" /></div>
+<h2>Requires Clause</h2>
+<p>First of all, I have to answer the question: What is a requires clause?</p>
+<p>There are essentially four ways to use a concept such as <code>std::integral</code>.</p>
+</div>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// conceptsIntegralVariations.cpp</span>
+
+<span style="color: #009999;">#include &lt;concepts&gt;</span>
+<span style="color: #009999;">#include &lt;type_traits&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;      </span>
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>                          <span style="color: #0099ff; font-style: italic;">// (1)                          </span>
+requires std<span style="color: #555555;">::</span>integral<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span>                     
+auto gcd(T a, T b) {
+    <span style="color: #006699; font-weight: bold;">if</span>( b <span style="color: #555555;">==</span> <span style="color: #ff6600;">0</span> ) <span style="color: #006699; font-weight: bold;">return</span> a;
+    <span style="color: #006699; font-weight: bold;">else</span> <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc00ff;">gcd</span>(b, a <span style="color: #555555;">%</span> b);
+}
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>                          <span style="color: #0099ff; font-style: italic;">// (2)        </span>
+auto gcd1(T a, T b) requires std<span style="color: #555555;">::</span>integral<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span> {  
+    <span style="color: #006699; font-weight: bold;">if</span>( b <span style="color: #555555;">==</span> <span style="color: #ff6600;">0</span> ) <span style="color: #006699; font-weight: bold;">return</span> a; 
+    <span style="color: #006699; font-weight: bold;">else</span> <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc00ff;">gcd1</span>(b, a <span style="color: #555555;">%</span> b);
+}
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>integral T<span style="color: #555555;">&gt;</span>                     <span style="color: #0099ff; font-style: italic;">// (3)        </span>
+auto gcd2(T a, T b) {
+    <span style="color: #006699; font-weight: bold;">if</span>( b <span style="color: #555555;">==</span> <span style="color: #ff6600;">0</span> ) <span style="color: #006699; font-weight: bold;">return</span> a; 
+    <span style="color: #006699; font-weight: bold;">else</span> <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc00ff;">gcd2</span>(b, a <span style="color: #555555;">%</span> b);
+}
+                                           
+<span style="color: #006699; font-weight: bold;">auto</span> gcd3(std<span style="color: #555555;">::</span>integral <span style="color: #006699; font-weight: bold;">auto</span> a, <span style="color: #0099ff; font-style: italic;">// (4)</span>
+          std<span style="color: #555555;">::</span>integral <span style="color: #006699; font-weight: bold;">auto</span> b) { 
+    <span style="color: #006699; font-weight: bold;">if</span>( b <span style="color: #555555;">==</span> <span style="color: #ff6600;">0</span> ) <span style="color: #006699; font-weight: bold;">return</span> a; 
+    <span style="color: #006699; font-weight: bold;">else</span> <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc00ff;">gcd3</span>(b, a <span style="color: #555555;">%</span> b);
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main(){
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"gcd(100, 10)= "</span>  <span style="color: #555555;">&lt;&lt;</span>  gcd(<span style="color: #ff6600;">100</span>, <span style="color: #ff6600;">10</span>)  <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"gcd1(100, 10)= "</span> <span style="color: #555555;">&lt;&lt;</span>  gcd1(<span style="color: #ff6600;">100</span>, <span style="color: #ff6600;">10</span>)  <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"gcd2(100, 10)= "</span> <span style="color: #555555;">&lt;&lt;</span>  gcd2(<span style="color: #ff6600;">100</span>, <span style="color: #ff6600;">10</span>)  <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"gcd3(100, 10)= "</span> <span style="color: #555555;">&lt;&lt;</span>  gcd3(<span style="color: #ff6600;">100</span>, <span style="color: #ff6600;">10</span>)  <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<div>
+<div>Thanks to the header<code> &lt;concepts</code>&gt;, I can use the concept <code>std::integral</code>. The concept is fulfilled if <code>T</code> is <a href="https://www.modernescpp.com/https:/en.cppreference.com/w/cpp/types/is_integral">integral</a>. The function name <code>gcd</code> stands for the greatest-common-divisor algorithm based on the&nbsp;<a href="https://en.wikipedia.org/wiki/Euclid">Euclidean</a> algorithm.</div>
+<br />
+<div>Here are the four ways to use concepts:</div>
+</div>
+<ol>
+<li>&nbsp;Requires clause (line 1)</li>
+<li>Trailing requires clause (line 2)</li>
+<li>Constrained template parameter (line 3)</li>
+<li>Abbreviated function template (line 4)</li>
+</ol>
+<div>
+<div>For simplicity reasons, each function template returns <code>auto</code>. There is a semantic difference between the function templates<code> gcd, gcd1, gcd2</code>, and the function <code>gcd3</code>. In the case of <code>gcd, gcd1, or gcd2</code>, arguments <code>a</code> and <code>b</code> must have the same type. This does not hold for the function <code>gcd3</code>. Parameters<code> a</code> and<code> b</code> can have different types but must both fulfill the concept <code>std::integral.</code></div>
+<div>&nbsp;</div>
+<div><img src="https://www.modernescpp.com/images/blog/Cpp20/RequiresExpressionsAsStandaloneFeature/conceptsIntegralVariationsLocal.png" alt="conceptsIntegralVariations" width="500" height="250" style="display: block; margin-left: auto; margin-right: auto;" /></div>
+</div>
+<p>&nbsp;</p>
+<div>
+<div>The functions <code>gcd</code> and <code>gcd1</code> use requires clauses.</div>
+<div>&nbsp;</div>
+<div>There is an interesting fact about requires clauses. You can use any compile-time predicate as an expression. I check in the following requirces clause, if an int as a non-type template parameter is smaller than 20.</div>
+<div>&nbsp;</div>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// requiresClause.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">unsigned</span> <span style="color: #007788; font-weight: bold;">int</span> i<span style="color: #555555;">&gt;</span>
+requires (i <span style="color: #555555;">&lt;=</span> <span style="color: #ff6600;">20</span>)            <em><span style="color: #0099ff;"> // (1)</span></em>
+<span style="color: #007788; font-weight: bold;">int</span> sum(<span style="color: #007788; font-weight: bold;">int</span> j) {
+    <span style="color: #006699; font-weight: bold;">return</span> i <span style="color: #555555;">+</span> j;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"sum&lt;20&gt;(2000): "</span> <span style="color: #555555;">&lt;&lt;</span> sum<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">20</span><span style="color: #555555;">&gt;</span>(<span style="color: #ff6600;">2000</span>) <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>,
+    <span style="color: #0099ff; font-style: italic;">// std::cout &lt;&lt; "sum&lt;23&gt;(2000): " &lt;&lt; sum&lt;23&gt;(2000) &lt;&lt; '\n',  // ERROR </span>
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+}
+</pre>
+</div>
+<div>&nbsp;</div>
+<div>
+<div>
+<div>The compile-time predicate used in line (1) exemplifies an interesting point: the requirement is applied to the non-type<code> i</code>, and not on a type as usual.</div>
+<div>&nbsp;</div>
+<div><img src="https://www.modernescpp.com/images/blog/Cpp20/RequiresExpressionsAsStandaloneFeature/requiresClause.png" alt="requiresClause" width="200" height="43" style="display: block; margin-left: auto; margin-right: auto;" /></div>
+<div>&nbsp;</div>
+<div>
+<div>When you use the commented-out line in the <code>main</code> program, the clang compiler reports the following error:</div>
+<div>&nbsp;</div>
+<div><img src="https://www.modernescpp.com/images/blog/Cpp20/RequiresExpressionsAsStandaloneFeature/requiresClauseError.png" alt="requiresClauseError" width="600" height="160" style="display: block; margin-left: auto; margin-right: auto;" /></div>
+</div>
+</div>
+</div>
+<div>&nbsp;</div>
+<div>Here are more details about non-type template parameters: "<a href="https://www.modernescpp.com/index.php/alias-templates-and-template-parameters">Alias Templates and Template Parameters</a>".</div>
+<div>&nbsp;</div>
+<div>Typically, you use a concept in a requires clause, but there is more: <code>requires requires</code> or anonymous concepts</div>
+<h3><code>requires requires</code> or anonymous concepts</h3>
+<div>&nbsp;</div>
+<div>
+<div>
+<div>You can define an anonymous concept and directly use it. In general, you should not do it. Anonymous concepts make your code hard to read, and you cannot reuse your concepts.</div>
+<div>&nbsp;</div>
+</div>
+</div>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+    requires <span style="color: #ff0000;">requires (T x) { x + x; } </span>
+auto add(T a, T b) { <br /><span style="color: #006699; font-weight: bold;">    return</span> a <span style="color: #555555;">+</span> b; <br />}
+</pre>
+</div>
+</div>
+<p>&nbsp;</p>
+<div>
+<div>The function template defines its concept ad-hoc. The function template <code>add </code>uses a requires expression (<span style="color: #ff0000;"><code>requires(T x) { x + x; }</code></span> ) inside a requires clause. The anonymous concept is equivalent to the following concept Addable.</div>
+<div>&nbsp;</div>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+concept Addable <span style="color: #555555;">=</span> requires (T a, T b) {
+    a <span style="color: #555555;">+</span> b; 
+};
+</pre>
+</div>
+<div>&nbsp;</div>
+<div>Consequentially, the following four implementations of the function template <code>add</code> are equivalent to the previous one:</div>
+<div>&nbsp;</div>
+<div>&nbsp;</div>
+</div>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>  <span style="color: #0099ff; font-style: italic;">// requires clause</span>
+    requires Addable<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">auto</span> add(T a, T b) { 
+    <span style="color: #006699; font-weight: bold;">return</span> a <span style="color: #555555;">+</span> b; 
+}
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>  <span style="color: #0099ff; font-style: italic;">// trailing requires clause</span>
+<span style="color: #006699; font-weight: bold;">auto</span> add(T a, T b) requires Addable<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span> { 
+    <span style="color: #006699; font-weight: bold;">return</span> a <span style="color: #555555;">+</span> b; 
+} 
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span>Addable T<span style="color: #555555;">&gt;</span>   <span style="color: #0099ff; font-style: italic;">// constrained template parameter</span>
+<span style="color: #006699; font-weight: bold;">auto</span> add(T a, T b){ 
+    <span style="color: #006699; font-weight: bold;">return</span> a <span style="color: #555555;">+</span> b; 
+} 
+                     <span style="color: #0099ff; font-style: italic;">// abbreviated function template</span>
+<span style="color: #006699; font-weight: bold;">auto</span> add(Addable <span style="color: #006699; font-weight: bold;">auto</span> a, Addable <span style="color: #006699; font-weight: bold;">auto</span> b) {
+    <span style="color: #006699; font-weight: bold;">return</span> a <span style="color: #555555;">+</span> b;
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>As a short reminder: The last implementation based on abbreviated function templates syntax can deal with values having different types.</p>
+<p>I want to emphasize it once more:<strong> Concepts should encapsulate general ideas and give them a self-explanatory name for reuse. They are invaluable for maintaining code. Anonymous concepts read more like syntactic constraints on template parameters and should be avoided.</strong></p>
+<h2>What's next?</h2>
+<div>
+<div>Using a concept in<code> static_assert(Concept&lt;T&gt;</code>) is essentially a test if the type<code> T</code> fulfills the concept. Let's see how we can use this in my next post.</div>
+<div>&nbsp;</div>
+<div>{loadmoduleid 153}</div>
+</div>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
