@@ -1,0 +1,65 @@
+<p><code>static_assert</code> allows you to check at compile time if a type<code> T</code> fulfills the <code>Concept</code>:<code> static_assert(Concept&lt;T&gt;)</code>.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/Cpp20/TestTypesWithConcepts/TimelineCpp20Concepts.png" alt="TimelineCpp20Concepts" width="650" height="255" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>Before I dive into concepts in my next post, I want to motivate their use.</p>
+<p>When I discuss move semantics in my classes, I introduce the idea of the Big Six. The Big Six control the life-cycle of objects: creation, copy, move, and destruction. Here are the six special member functions for a type <code>X</code>.</p>
+<ul>
+<li>Default constructor:<code> X()</code></li>
+<li>Copy constructor: <code>X(const X&amp;)</code></li>
+<li>Copy assignment: <code>operator = (const X&amp;)</code></li>
+<li>Move constructor: <code>X(X&amp;&amp;)</code></li>
+<li>Move assignment:<code> operator = (X&amp;&amp;)</code></li>
+<li>Destructor:<code> ~(X)</code></li>
+</ul>
+<p>By default, the compiler can generate the Big Six if needed. You can define the six special member functions, but can also ask explicitly the compiler to provide them with <code>= default</code> or delete them with <code>=delete. </code>If you can, you should avoid defining any default operations. This rule is also known as <strong>the rule of zero</strong>. That means, that you can avoid writing any custom constructor,<br />copy/move constructors, assignment operators, or destructors by using types that support the appropriate copy/move semantics. This applies to the built-in types <code>bool</code> or <code>double</code>, but also the containers of the standard template library such as<code> std::vector</code> or<code> std::string</code>.<code><br /></code></p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Named_map</span> {
+ <span style="color: #9999ff;">public:</span>
+    <span style="color: #0099ff; font-style: italic;">// ... no default operations declared ...</span>
+ <span style="color: #9999ff;">private:</span>
+    std<span style="color: #555555;">::</span>string name;
+    std<span style="color: #555555;">::</span>map<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>, <span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> rep;
+};
+
+Named_map nm;       <span style="color: #0099ff; font-style: italic;">// default construct</span>
+Named_map nm2 {nm}; <span style="color: #0099ff; font-style: italic;">// copy construct</span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The default construction and the copy construction work because they are already defined for <code>std::string</code> and <code>std::map</code>. When the compiler auto-generates for the example the copy constructor for a class, it invokes the copy constructor for all members and all bases of the class.</p>
+<p>The fun start, when you define<code></code> or <code>=delete</code> one of the special member functions because the Big Six are closely related. Due to this relation, you have to define or<code> =delete</code> all six. Consequently, this rule is called<strong> the rule of six</strong>. Sometimes, you hear <strong>the rule of five</strong>, because the default constructor is special, and, therefore, sometimes excluded. Let me weaken this rule a bit: <strong>When you define or =delete any default operation, you have to think about all six</strong>. Defining a special member can mean both: You implement the special member function, or you request it from the compiler using<code> =default</code>.</p>
+<p>I wrote that the compiler can generate the Big Six if needed. Now, I have to clarify what I mean: This is only true if you don't define or<code> =delete</code> any special member function because there are pretty sophisticated dependencies between the six special member functions.</p>
+<p>Here is exactly the point when the discussions in my classes start: How can I be sure that my type X supports move semantics? Of course, you want that your type X supports move semantics.</p>
+<p>Move semantics has two big benefits:</p>
+<ul>
+<li>Cheap move operations are used instead of expensive copy operations</li>
+<li>Move operations require no memory allocation and, therefore, a<code> std::bad_alloc</code> exception is not possible</li>
+</ul>
+<p>There are essentially two ways to check if a type supports the Big Six: Study the dependencies, or define and use a concept <code>BigSix</code>.</p>
+<p>First. let's study the dependencies between the Big Six:</p>
+<h2>Dependencies between the Big Six</h2>
+<p>Howard Hinnant developed in his talk at the <a href="https://members.accu.org/index.php/conferences/accu_conference_2014">ACCU 2014</a> conference an overview of the automatically generated special member functions. Here is a screenshot of his completel table:</p>
+<p><img src="https://www.modernescpp.com/images/blog/Cpp20/TestTypesWithConcepts/DefaultDelete.png" alt="DefaultDelete" width="650" height="419" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>&nbsp;</p>
+<p>Howard's table demands a deep explanation.</p>
+<p>First of all, user-declared means for one of these six special member functions that you define it explicitly or request it from the compiler with <code>=default</code>. Deletion of the special member<br />function with <code>=delete</code> is also regarded as defined. Essentially, when you just use the name, it counts as user declared.</p>
+<p><br />When you define any constructor, you get no default constructor. A default constructor is a constructor which can be invoked without an argument.</p>
+<p><br />When you define or delete a default constructor with<code> =default</code> or<code> =delete</code>, no other of the six special member functions are affected.</p>
+<p>When you define or delete a destructor, a copy constructor, or a copy assignment operator with <code>=defaul</code>t or <code>=delete</code>, you get no compiler-generated move constructor and move assignment operator. This means move operations such as move construction or move assignment fall back to copy operations such as copy construction or copy assignment. This fallback automatism is marked red in the table. Additionally, the red marked copy operations are deprecated.</p>
+<p>When you define or delete with <code>=default</code> or <code>=delete</code> a move constructor or a move assignment operator, you get only the defined<code> =default</code> or <code>=delete</code> move constructor or move assignment operator. Consequently, the copy constructor and the copy assignment operator are set to <code>=delete</code>. Invoking a copy operation such as copy construction or copy assignment causes, therefore, a compilation error.</p>
+<p>Due to this dependency hell, I give the following general rule in my classes:<strong> Make your user-defined types as simple as possible and go for abstraction. Let the compile do the complicated stuff.<br /></strong></p>
+<h2>Go for Abstraction</h2>
+<p>Here are a few consequences of this rule:</p>
+<ul>
+<li>Don't declare any special member function if necessary.</li>
+<li>Use a<code> std::array</code> instead of a C-array in your class. A <code>std::array</code> supports the Big Six.</li>
+<li>Use a<code> std::unique_ptr</code> or a<code> std::shared_ptr</code> in a class, but not a raw pointer. The compiler-generated copy constructor and copy assignment operator for a raw pointer make <a href="https://stackoverflow.com/questions/184710/what-is-the-difference-between-a-deep-copy-and-a-shallow-copy">a shallow copy but not a deep copy</a>. This means only the pointer is copied but not its content. Using a<code> std::unique_ptr</code> or <code>std::shared_ptr</code> in a user-defined type directly expresses your intent. A <code>std::unique_ptr</code> cannot be copied, and, therefore, the class cannot be copied. A <code>std::shared_ptr</code>, and, therefore, the class can be copied.</li>
+<li>If you have a user-defined type in your class that disables the auto-generation of the Big Six, you have two options. Implement the special member functions for this user-defined type, or refactor your class into two classes. Don't let one user-defined type infect your class design.</li>
+</ul>
+<p>Let me end my general rule with an anecdote: I once did a code review for a friend. He asked me to analyze his code before it goes into production. He used a union in this central class. I call this class, encapsulating the union, for simplicity <code>WrapperClass</code>. The used union was a so-called tagged union. Meaning, that the<code> WrapperClass</code> keeps track of the currently used type of the union. If you want to know more about unions, read my previous post "<a href="http://www.modernescpp.com/index.php/c-core-guidelines-rules-for-unions">C++ Core Guidelines: Rules for Unions</a>". Finally, the<code> WrapperClass</code> consisted of about 800 lines of code to support the Big Six. Essentially, he had to implement the six special member functions in eight variations, because the union could have eight different types. Additionally, he implemented a few convenience functions to compare instances of <code>WrapperClass</code>. When I analyzed the class, it was immediately clear: this is a<a href="https://en.wikipedia.org/wiki/Code_smell"> code smell</a> and a reason for refactoring. I asked him if he can use C++17. The answer was yes, and I replaced the union with a <a href="https://en.cppreference.com/w/cpp/utility/variant">std::variant</a>. Additionally, I added a generic constructor. The result was that the<code> WrapperClass</code> went from 800 lines of code to 40 lines of code. <code>std::variant</code> supports the six special member functions and the six comparison operators by design.</p>
+<h2>What's next?</h2>
+<p>Maybe, you don't want to study the dependencies between the six special member functions. In my next post, I continue this story and define and use the concept BigSix to decide at compile time if a given type supports all six special member functions.&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;{loadmoduleid 153}</p>
+<p>&nbsp;</p>
