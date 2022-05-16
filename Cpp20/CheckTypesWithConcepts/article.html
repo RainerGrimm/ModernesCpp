@@ -1,0 +1,171 @@
+<p>Concepts are a powerful and elegant tool to check at compile time if a type fulfills. Thanks to<code> static_assert</code>, you can use concepts as a standalone feature: <code>static_assert(Concept&lt;T&gt;)</code>.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/Cpp20/CheckTypesWithConcepts/TimelineCpp20Concepts.png" alt="TimelineCpp20Concepts" width="650" height="255" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>I often have the question in my C++ class: How can I be sure that my data type is moveable? Well, you can either study the dependencies between the Big Six, or you can define and use the concept Big Six. I presented in my last post "<a href="https://www.modernescpp.com/index.php/test-types-with-concepts">Check Types with Concepts - The Motivation</a>" the first part of the answer and explained the very sophisticated dependencies between the Big Six. As a reminder, here are the Big Six, including move semantics:</p>
+<ul>
+<li>Default constructor:<code> X()</code></li>
+<li>Copy constructor: <code>X(const X&amp;)</code></li>
+<li>Copy assignment: <code>operator = (const X&amp;)</code></li>
+<li>Move constructor: <code>X(X&amp;&amp;)</code></li>
+<li>Move assignment:<code> operator = (X&amp;&amp;)</code></li>
+<li>Destructor:<code> ~(X)</code></li>
+</ul>
+<p>Today, I want to define and use the concept Big Six.</p>
+<p>Before I do that, I have a short disclaimer: C++20 already supports the concepts <code>std::semiregular</code> and<code> std::regular</code>.</p>
+<h2><code>std::semiregular</code> and <code>std::regular</code></h2>
+<p>A semiregular type has to support the Big Six and must be swappable:</p>
+<ul>
+<li>Default constructor:<code> X()</code></li>
+<li>Copy constructor: <code>X(const X&amp;)</code></li>
+<li>Copy assignment: <code>operator = (const X&amp;)</code></li>
+<li>Move constructor: <code>X(X&amp;&amp;)</code></li>
+<li>Move assignment:<code> operator = (X&amp;&amp;)</code></li>
+<li>Destructor:<code> ~(X)</code></li>
+<li>Swappable:<code> swap(X&amp;, X&amp;)</code></li>
+</ul>
+<p>Additionally,<code> std::regular</code> requires for a type<code> X</code> that it supports the concept <code>std::semiregular</code> and is equality comparable.</p>
+<ul>
+<li>Default constructor:<code> X()</code></li>
+<li>Copy constructor: <code>X(const X&amp;)</code></li>
+<li>Copy assignment: <code>operator = (const X&amp;)</code></li>
+<li>Move constructor: <code>X(X&amp;&amp;)</code></li>
+<li>Move assignment:<code> operator = (X&amp;&amp;)</code></li>
+<li>Destructor:<code> ~(X)</code></li>
+<li>Swappable:<code> swap(X&amp;, Y&amp;)</code></li>
+<li>Equality comparable:<code> bool operator == (const X&amp;, const X&amp;)</code></li>
+</ul>
+<p>That said, there is essentially no reason to define the concept BigSix. Just use the concept <code>std::semiregular,</code> because you get the swappable property for free. Here is a C++11 implementation of <code>std::swap</code>:</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">void</span> swap(T<span style="color: #555555;">&amp;</span> a, T<span style="color: #555555;">&amp;</span> b) noexcept {
+    T tmp(std<span style="color: #555555;">::</span>move(a));  // move constructor
+    a <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>move(b);     // move assignment
+    b <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>move(tmp);   // move assignment
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>When you invoke<code> swap(a, b)</code>, the compiler applies move semantics to its arguments <code>a</code> and <code>b</code>. Consequentially, a type supporting the concept BigSix also supports swappable and, therefore, supports the concept <code>std::semiregular</code>.</p>
+<p>Now, let me implement the concept BigSix.</p>
+<h2>The Concept BigSix</h2>
+<p>Thanks to the <a href="https://en.cppreference.com/w/cpp/header/type_traits">type traits functions</a>, implementing the concept BigSix is a no-brainer. In the first step, I define the type traits <code>isBigSix</code> and in the second step, I use it directly to define the concept <code>BigSix</code>. Here we are:</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// bigSixConcept.cpp</span>
+
+<span style="color: #009999;">#include &lt;algorithm&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;type_traits&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">struct</span> isBigSix<span style="color: #555555;">:</span> std<span style="color: #555555;">::</span>integral_constant<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">bool</span>,
+                                      std<span style="color: #555555;">::</span>is_default_constructible<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&amp;&amp;</span>
+                                      std<span style="color: #555555;">::</span>is_copy_constructible<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&amp;&amp;</span>
+                                      std<span style="color: #555555;">::</span>is_copy_assignable<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&amp;&amp;</span>
+                                      std<span style="color: #555555;">::</span>is_move_constructible<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&amp;&amp;</span>
+                                      std<span style="color: #555555;">::</span>is_move_assignable<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&amp;&amp;</span>
+                                      std<span style="color: #555555;">::</span>is_destructible<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value<span style="color: #555555;">&gt;</span>{};
+
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+concept BigSix <span style="color: #555555;">=</span> isBigSix<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value;
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span>BigSix T<span style="color: #555555;">&gt;</span>                                   <span style="color: #0099ff; font-style: italic;">// (1)</span>
+<span style="color: #007788; font-weight: bold;">void</span> swap(T<span style="color: #555555;">&amp;</span> a, T<span style="color: #555555;">&amp;</span> b) noexcept {
+    T tmp(std<span style="color: #555555;">::</span>move(a));
+    a <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>move(b);
+    b <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>move(tmp);
+}
+
+<span style="color: #006699; font-weight: bold;">struct</span> MyData{                                        <span style="color: #0099ff; font-style: italic;">// (2)</span>
+  MyData() <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">default</span>;
+  MyData(<span style="color: #006699; font-weight: bold;">const</span> MyData<span style="color: #555555;">&amp;</span> ) <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">default</span>;
+  MyData<span style="color: #555555;">&amp;</span> <span style="color: #006699; font-weight: bold;">operator</span><span style="color: #555555;">=</span>(<span style="color: #006699; font-weight: bold;">const</span> MyData<span style="color: #555555;">&amp;</span> m) <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">default</span>;
+
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    MyData a, b;
+    swap(a, b);                                             <span style="color: #0099ff; font-style: italic;">// (3)</span>
+
+    static_assert(BigSix<span style="color: #555555;">&lt;</span>MyData<span style="color: #555555;">&gt;</span>, <span style="color: #cc3300;">"BigSix not supported"</span>);  <span style="color: #0099ff; font-style: italic;">// (4)</span>
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Now, my function <code>swap</code> requires, that the type parameter T supports the concept BigSix (line 1). In line 3, I invoke the function <code>swap</code> with arguments of type <code>MyData</code>. Additionally, I explicitly check in line 4 if <code>MyData</code> supports the concept <code>BigSix</code>.<code> MyData</code> (line 2) has a default constructor and supports copy semantics. The program can be compiled and executed.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Cpp20/CheckTypesWithConcepts/BigSixConcept.png" alt="BigSixConcept" width="600" height="176" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>&nbsp;</p>
+<p>Does this mean that <code>MyData </code>supports the concept <code>BigSix</code> and is, therefore, moved inside my function <code>swap</code>? Yes, <code>MyData</code> supports the concept BigSix, but no, <code>MyData</code> is not moved inside my function <code>swap</code>. Copy semantic kicks in as a fallback for move semantics.</p>
+<p>Here is a slightly modified program.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// bigSixConceptComments.cpp</span>
+
+<span style="color: #009999;">#include &lt;algorithm&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;type_traits&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">struct</span> isBigSix<span style="color: #555555;">:</span> std<span style="color: #555555;">::</span>integral_constant<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">bool</span>,
+                                      std<span style="color: #555555;">::</span>is_default_constructible<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&amp;&amp;</span>
+                                      std<span style="color: #555555;">::</span>is_copy_constructible<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&amp;&amp;</span>
+                                      std<span style="color: #555555;">::</span>is_copy_assignable<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&amp;&amp;</span>
+                                      std<span style="color: #555555;">::</span>is_move_constructible<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&amp;&amp;</span>
+                                      std<span style="color: #555555;">::</span>is_move_assignable<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&amp;&amp;</span>
+                                      std<span style="color: #555555;">::</span>is_destructible<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value<span style="color: #555555;">&gt;</span>{};
+
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+concept BigSix <span style="color: #555555;">=</span> isBigSix<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>value;
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span>BigSix T<span style="color: #555555;">&gt;</span>                                   
+<span style="color: #007788; font-weight: bold;">void</span> swap(T<span style="color: #555555;">&amp;</span> a, T<span style="color: #555555;">&amp;</span> b) noexcept {
+    T tmp(std<span style="color: #555555;">::</span>move(a));
+    a <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>move(b);
+    b <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>move(tmp);
+}
+
+<span style="color: #006699; font-weight: bold;">struct</span> MyData{                                        
+    MyData() <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">default</span>;
+    MyData(<span style="color: #006699; font-weight: bold;">const</span> MyData<span style="color: #555555;">&amp;</span> ) {
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"copy constructor</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>;
+    }
+    MyData<span style="color: #555555;">&amp;</span> <span style="color: #006699; font-weight: bold;">operator</span><span style="color: #555555;">=</span>(<span style="color: #006699; font-weight: bold;">const</span> MyData<span style="color: #555555;">&amp;</span> m) {
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"copy assignment operator</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>;
+        <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">this</span>;
+    }
+
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    MyData a, b;
+    swap(a, b);       
+    
+    static_assert(BigSix<span style="color: #555555;">&lt;</span>MyData<span style="color: #555555;">&gt;</span>, <span style="color: #cc3300;">"BigSix not supported"</span>);                             
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>I added comments to the copy constructor and copy assignment operator of <code>MyData</code>. Executing the program shows, that both special member functions are used:</p>
+<p><img src="https://www.modernescpp.com/images/blog/Cpp20/CheckTypesWithConcepts/BigSixConceptComments.png" alt="BigSixConceptComments" width="400" height="209" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>By the way, this observation is already documented in cppreference.com. For example, a note about the type trait <a href="https://en.cppreference.com/w/cpp/types/is_move_constructible">std::is_move_constructible </a>states: "<em>Types without a move constructor, but with a copy constructor that accepts const T&amp; arguments, satisfy std::is_move_constructible.</em>"</p>
+<p>Okay, we are back to square one. We can decide if a type supports the BigSix, but we cannot decide if a type is really moved. If you want to know if your type supports move semantics and not that copy semantics is used as a fallback for move semantics, you have to study the dependency table of my previous post: "<a href="https://www.modernescpp.com/index.php/test-types-with-concepts">Check Types with Concepts - The Motivation</a>".</p>
+<h2>What's next?</h2>
+<p>In my next post, I want to continue my story with ranges. Additionally, ranges will get many improvements in C++23.</p>
+<p>&nbsp;</p>
+<p>{loadmoduleid 153}</p>
+<p>&nbsp;</p>
