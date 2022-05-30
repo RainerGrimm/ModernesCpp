@@ -1,0 +1,151 @@
+<p>The algorithms of the ranges library are lazy, can work directly on the container, and can easily be composed. But they have more to offer: projections. A projection is a mapping of a set into a subset. Let me show you in this post what that means:</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/Cpp20/ProjectionWithRanges/TimelineCpp20.png" alt="TimelineCpp20" width="650" height="248" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>I ended my last post "<a href="https://www.modernescpp.com/index.php/the-ranges-library-in-c-20-a-deep-dive">The Ranges Libary in C++20: More Details</a>" with a comparison of<a href="https://en.cppreference.com/w/cpp/algorithm/sort"><code> std::sort</code></a> and <code>std::ranges::sort</code>. Here are the two overloads of <code>std::ranges::sort</code>:</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"> 
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>random_access_iterator I, std<span style="color: #555555;">::</span>sentinel_for<span style="color: #555555;">&lt;</span>I<span style="color: #555555;">&gt;</span> S,
+         <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Comp</span> <span style="color: #555555;">=</span> ranges<span style="color: #555555;">::</span>less, <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Proj</span> <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>identity<span style="color: #555555;">&gt;</span>
+requires std<span style="color: #555555;">::</span>sortable<span style="color: #555555;">&lt;</span>I, Comp, Proj<span style="color: #555555;">&gt;</span>
+constexpr I sort(I first, S last, Comp comp <span style="color: #555555;">=</span> {}, Proj proj <span style="color: #555555;">=</span> {});
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span>ranges<span style="color: #555555;">::</span>random_access_range R, <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Comp</span> <span style="color: #555555;">=</span> ranges<span style="color: #555555;">::</span>less, 
+          <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Proj</span> <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>identity<span style="color: #555555;">&gt;</span>
+requires std<span style="color: #555555;">::</span>sortable<span style="color: #555555;">&lt;</span>ranges<span style="color: #555555;">::</span><span style="color: #007788; font-weight: bold;">iterator_t</span><span style="color: #555555;">&lt;</span>R<span style="color: #555555;">&gt;</span>, Comp, Proj<span style="color: #555555;">&gt;</span>
+constexpr ranges<span style="color: #555555;">::</span><span style="color: #007788; font-weight: bold;">borrowed_iterator_t</span><span style="color: #555555;">&lt;</span>R<span style="color: #555555;">&gt;</span> sort(R<span style="color: #555555;">&amp;&amp;</span> r, Comp comp <span style="color: #555555;">=</span> {}, Proj proj <span style="color: #555555;">=</span> {});
+</pre>
+</div>
+<p>&nbsp;</p>
+<div>
+<div>When you study the first overload, you notice that it takes a sortable range<code> R</code>, a predicate <code>Comp</code>, and a projection <code>Proj</code>. The predicate <code>Comp</code> uses for default <a href="https://en.cppreference.com/w/cpp/utility/functional/ranges/less">ranges::less</a>, and the projection <code>Proj</code> the identity <a href="https://en.cppreference.com/w/cpp/utility/functional/identity">std::identity</a> that does return its arguments unchanged. <code>std::identity</code> that was added with C++20 is a function object defined in the header &lt;<a href="https://en.cppreference.com/w/cpp/header/functional">functional</a>&gt;.</div>
+<div>&nbsp;</div>
+<div>In short, here are the components:</div>
+<div>&nbsp;</div>
+<ul>
+<li>Comparators: <code>Comp </code>(binary functions that returns a boolean)<code><br /></code></li>
+<li>Projections: <code>Proj </code>(mapping of a set into a subset)<code><br /></code></li>
+<li>Sentinel:<code> std::sentinel_for&lt;I&gt;</code> (a special value that indicates&nbsp; the end of a sequence)<code><br /></code></li>
+<li>Concepts: <code>std::random_access_iterator, std::sortable&lt;I, Comp, Proj&gt;</code>, and <code>std::sentinel_for&lt;I&gt;</code></li>
+</ul>
+<p>In contrast, the second overload does not return an Iterator I, but a<code> ranges::borrowed_iterator_t</code>. Of course, this is also a concept and guarantees that the returned iterator is safe to use afterward. Consequentially, we call this iterator a safe iterator. I will write more about <code>std::ranges::borrowed_iterator_t</code> in an upcoming post.</p>
+<p>A projection is a mapping of a set into a subset. What does this mean?</p>
+<h2>Projection</h2>
+<div>The algorithms of the ranges library operate directly on the container. This is due to the fact, that the projection is by default&nbsp;<a href="https://en.cppreference.com/w/cpp/utility/functional/identity">std::identity</a>.</div>
+<div>&nbsp;</div>
+<div>In the following example, I apply a projection to the data type <code>PhoneBookEntry</code>.</div>
+<div>&nbsp;</div>
+<div>&nbsp;</div>
+</div>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// rangeProjection.cpp</span>
+
+<span style="color: #009999;">#include &lt;algorithm&gt;</span>
+<span style="color: #009999;">#include &lt;functional&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+ 
+<span style="color: #006699; font-weight: bold;">struct</span> PhoneBookEntry{                                                   <em><span style="color: #0099ff;">// (1)</span></em>
+    std<span style="color: #555555;">::</span>string name;
+    <span style="color: #007788; font-weight: bold;">int</span> number;
+};
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">printPhoneBook</span>(<span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span>PhoneBookEntry<span style="color: #555555;">&gt;&amp;</span> phoneBook) {
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">const</span> <span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;</span> entry<span style="color: #555555;">:</span> phoneBook) std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"("</span> <span style="color: #555555;">&lt;&lt;</span> entry.name <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">", "</span> 
+                                                        <span style="color: #555555;">&lt;&lt;</span> entry.number <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">")"</span>;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n\n</span><span style="color: #cc3300;">"</span>;
+}
+ 
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span>PhoneBookEntry<span style="color: #555555;">&gt;</span> phoneBook{ {<span style="color: #cc3300;">"Brown"</span>, <span style="color: #ff6600;">111</span>}, {<span style="color: #cc3300;">"Smith"</span>, <span style="color: #ff6600;">444</span>}, 
+    {<span style="color: #cc3300;">"Grimm"</span>, <span style="color: #ff6600;">666</span>}, {<span style="color: #cc3300;">"Butcher"</span>, <span style="color: #ff6600;">222</span>}, {<span style="color: #cc3300;">"Taylor"</span>, <span style="color: #ff6600;">555</span>}, {<span style="color: #cc3300;">"Wilson"</span>, <span style="color: #ff6600;">333</span>} };
+
+    std<span style="color: #555555;">::</span>ranges<span style="color: #555555;">::</span>sort(phoneBook, {}, <span style="color: #555555;">&amp;</span>PhoneBookEntry<span style="color: #555555;">::</span>name);   <span style="color: #0099ff; font-style: italic;">// ascending by name (2)</span>
+    printPhoneBook(phoneBook);
+
+    std<span style="color: #555555;">::</span>ranges<span style="color: #555555;">::</span>sort(phoneBook, std<span style="color: #555555;">::</span>ranges<span style="color: #555555;">::</span>greater() , 
+                      <span style="color: #555555;">&amp;</span>PhoneBookEntry<span style="color: #555555;">::</span>name);                  <span style="color: #0099ff; font-style: italic;">// descending by name (3)</span>
+    printPhoneBook(phoneBook);
+
+    std<span style="color: #555555;">::</span>ranges<span style="color: #555555;">::</span>sort(phoneBook, {}, <span style="color: #555555;">&amp;</span>PhoneBookEntry<span style="color: #555555;">::</span>number); <span style="color: #0099ff; font-style: italic;">// ascending by number (4)</span>
+    printPhoneBook(phoneBook);
+
+     std<span style="color: #555555;">::</span>ranges<span style="color: #555555;">::</span>sort(phoneBook, std<span style="color: #555555;">::</span>ranges<span style="color: #555555;">::</span>greater(), 
+                       <span style="color: #555555;">&amp;</span>PhoneBookEntry<span style="color: #555555;">::</span>number);              <span style="color: #0099ff; font-style: italic;">// descending by number (5)</span>
+    printPhoneBook(phoneBook);
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p><code>phoneBook</code> (line 1) has structs of type <code>PhoneBookEntry</code> (line 1). A <code>PhoneBookEntry</code> consists of a <code>name</code> and a&nbsp;<code>number</code>. Thanks to projections, the <code>phoneBook</code> can be sorted in ascending order by <code>name</code> (line 2), descending order by <code>name</code> (line 3), ascending order by <code>number</code> (line 4), and descending order by <code>number</code> (line 5). The empty curly braces in the expression <code>std::ranges::sort(phoneBook, {}, &amp;PhoneBookEntry::name)</code> cause the default construction of the sorting criteria that is in this case <code>std::less</code>.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Cpp20/ProjectionWithRanges/rangeProjection.png" alt="rangeProjection" width="600" height="260" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>When your projection is more demanding, you can use a callable such as a lambda expression.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// rangeProjectionCallable.cpp</span>
+
+<span style="color: #009999;">#include &lt;algorithm&gt;</span>
+<span style="color: #009999;">#include &lt;functional&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+ 
+<span style="color: #006699; font-weight: bold;">struct</span> PhoneBookEntry{ 
+    std<span style="color: #555555;">::</span>string name;
+    <span style="color: #007788; font-weight: bold;">int</span> number;
+};
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">printPhoneBook</span>(<span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span>PhoneBookEntry<span style="color: #555555;">&gt;&amp;</span> phoneBook) {
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">const</span> <span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;</span> entry<span style="color: #555555;">:</span> phoneBook) std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"("</span> <span style="color: #555555;">&lt;&lt;</span> entry.name <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">", "</span> 
+                                                        <span style="color: #555555;">&lt;&lt;</span> entry.number <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">")"</span>;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n\n</span><span style="color: #cc3300;">"</span>;
+}
+ 
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span>PhoneBookEntry<span style="color: #555555;">&gt;</span> phoneBook{ {<span style="color: #cc3300;">"Brown"</span>, <span style="color: #ff6600;">111</span>}, {<span style="color: #cc3300;">"Smith"</span>, <span style="color: #ff6600;">444</span>}, 
+    {<span style="color: #cc3300;">"Grimm"</span>, <span style="color: #ff6600;">666</span>}, {<span style="color: #cc3300;">"Butcher"</span>, <span style="color: #ff6600;">222</span>}, {<span style="color: #cc3300;">"Taylor"</span>, <span style="color: #ff6600;">555</span>}, {<span style="color: #cc3300;">"Wilson"</span>, <span style="color: #ff6600;">333</span>} };
+
+    std<span style="color: #555555;">::</span>ranges<span style="color: #555555;">::</span>sort(phoneBook, {}, <span style="color: #555555;">&amp;</span>PhoneBookEntry<span style="color: #555555;">::</span>name);                    <em> <span style="color: #0099ff;">// (1)</span></em>
+    printPhoneBook(phoneBook);
+
+    std<span style="color: #555555;">::</span>ranges<span style="color: #555555;">::</span>sort(phoneBook, {}, [](<span style="color: #006699; font-weight: bold;">auto</span> p){ <span style="color: #006699; font-weight: bold;">return</span> p.name; } );            <em><span style="color: #0099ff;"> // (2)</span></em>
+    printPhoneBook(phoneBook);
+
+    std<span style="color: #555555;">::</span>ranges<span style="color: #555555;">::</span>sort(phoneBook, {}, [](<span style="color: #006699; font-weight: bold;">auto</span> p) {                               <em><span style="color: #0099ff;"> // (3)</span></em>
+        <span style="color: #006699; font-weight: bold;">return</span> std<span style="color: #555555;">::</span>to_string(p.number) <span style="color: #555555;">+</span> p.name; 
+    });
+    printPhoneBook(phoneBook);
+
+    std<span style="color: #555555;">::</span>ranges<span style="color: #555555;">::</span>sort(phoneBook, [](<span style="color: #006699; font-weight: bold;">auto</span> p, <span style="color: #006699; font-weight: bold;">auto</span> p2) {                          <em><span style="color: #0099ff;"> // (4)</span></em>
+        <span style="color: #006699; font-weight: bold;">return</span> std<span style="color: #555555;">::</span>to_string(p.number) <span style="color: #555555;">+</span> p.name <span style="color: #555555;">&lt;</span> 
+               std<span style="color: #555555;">::</span>to_string(p2.number) <span style="color: #555555;">+</span> p2.name; 
+    });
+    printPhoneBook(phoneBook);
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<div>
+<div><code>std::ranges::sort</code> in line (1) uses the attribute <code>PhoneBookEntry::name</code> as projection. Line (2) shows the equivalent lambda expression<code> [](auto p){ return p.name; }</code> as projection. The projection in line (3) is more demanding. It uses the stringified number concatenated with the<code> p.name.</code> Of course, you can use the concatenated stringified number and the name directly as sorting criteria. In this case, the algorithm call in line (3) is easier to read than the one in line (4). I want to emphasize this. Line (3) uses a projection as sorting criteria, but line (4) is a parametrized<code> std::ranges::sort</code> with a binary predicate, given by the lambda expression.</div>
+<div>&nbsp;</div>
+<div>&nbsp;</div>
+<div><img src="https://www.modernescpp.com/images/blog/Cpp20/ProjectionWithRanges/rangeProjectionCallableNew.png" alt="rangeProjectionCallable" width="600" height="246" style="display: block; margin-left: auto; margin-right: auto;" /></div>
+<div>&nbsp;</div>
+<div>Most ranges algorithms support projections.</div>
+<h2>What's next?</h2>
+<p>In my next post, I will write about sentinels. They specify the end of a range and can be regarded as generalized end iterators.</p>
+<p>&nbsp;</p>
+<p>{loadmoduleid 153}</p>
+<div>&nbsp;</div>
+<div>&nbsp;</div>
+<div>&nbsp;</div>
+</div>
