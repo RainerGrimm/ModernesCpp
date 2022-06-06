@@ -1,0 +1,188 @@
+<p>The ranges library in C++20 supports sentinels. Sentinels stand for the end of a range and can be regarded as generalized end iterators.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/Cpp20/SentinelsWithRanges/TimelineCpp20.png" alt="TimelineCpp20" width="650" height="248" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>A range that is provided by a begin iterator and an end sentinel specifies a group of items that you can iterate over. The containers of the STL are ranges because their end iterator marks the end of the range.</p>
+<h2>Sentinel</h2>
+<div>
+<div>The following example uses sentinels for a C-string and a <code>std::vector&lt;int&gt;</code>.</div>
+<div>&nbsp;</div>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// sentinel.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;algorithm&gt;</span>
+<span style="color: #009999;">#include &lt;compare&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">struct</span> Space {                       <em><span style="color: #0099ff;"> // (1)</span></em>
+<span style="color: #007788; font-weight: bold;">bool</span> <span style="color: #006699; font-weight: bold;">operator</span><span style="color: #555555;">==</span> (<span style="color: #006699; font-weight: bold;">auto</span> pos) <span style="color: #006699; font-weight: bold;">const</span> {
+        <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #555555;">*</span>pos <span style="color: #555555;">==</span> <span style="color: #cc3300;">' '</span>; 
+    }
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> NegativeNumber {              <em><span style="color: #0099ff;"> // (2)</span></em>
+    <span style="color: #007788; font-weight: bold;">bool</span> <span style="color: #006699; font-weight: bold;">operator</span><span style="color: #555555;">==</span> (<span style="color: #006699; font-weight: bold;">auto</span> num) <span style="color: #006699; font-weight: bold;">const</span> {
+        <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #555555;">*</span>num <span style="color: #555555;">&lt;</span> <span style="color: #ff6600;">0</span>;   
+    }
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> Sum {                          <em><span style="color: #0099ff;">// (7)</span></em>
+    <span style="color: #007788; font-weight: bold;">void</span> <span style="color: #006699; font-weight: bold;">operator</span>()(<span style="color: #006699; font-weight: bold;">auto</span> n) { sum <span style="color: #555555;">+=</span> n; }
+    <span style="color: #007788; font-weight: bold;">int</span> sum{<span style="color: #ff6600;">0</span>};
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">char</span><span style="color: #555555;">*</span> rainerGrimm <span style="color: #555555;">=</span> <span style="color: #cc3300;">"Rainer Grimm"</span>;
+   
+    std<span style="color: #555555;">::</span>ranges<span style="color: #555555;">::</span>for_each(rainerGrimm, Space{}, [] (<span style="color: #007788; font-weight: bold;">char</span> c) { std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> c; });  <span style="color: #0099ff;">// (3)</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> c<span style="color: #555555;">:</span> std<span style="color: #555555;">::</span>ranges<span style="color: #555555;">::</span>subrange{rainerGrimm, Space{}}) std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> c;     <span style="color: #0099ff;"> // (4)</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    std<span style="color: #555555;">::</span>ranges<span style="color: #555555;">::</span>subrange rainer{rainerGrimm, Space{}};                           <span style="color: #0099ff;"> // (5)</span>
+    std<span style="color: #555555;">::</span>ranges<span style="color: #555555;">::</span>for_each(rainer, [] (<span style="color: #007788; font-weight: bold;">char</span> c) { std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> c <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">' '</span>; });        <span style="color: #0099ff;"> // (6)</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> c<span style="color: #555555;">:</span> rainer) std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> c <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">' '</span>;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span>;
+
+
+    std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> myVec{<span style="color: #ff6600;">5</span>, <span style="color: #ff6600;">10</span>, <span style="color: #ff6600;">33</span>, <span style="color: #555555;">-</span><span style="color: #ff6600;">5</span>, <span style="color: #ff6600;">10</span>};
+
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> v<span style="color: #555555;">:</span> myVec) std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> v <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span>;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    <span style="color: #006699; font-weight: bold;">auto</span> [tmp1, sum] <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>ranges<span style="color: #555555;">::</span>for_each(myVec, Sum{});
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Sum: "</span> <span style="color: #555555;">&lt;&lt;</span> sum.sum <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;                                   <em><span style="color: #0099ff;">// (8)</span>
+</em>
+    <span style="color: #006699; font-weight: bold;">auto</span> [tmp2, sum2] <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>ranges<span style="color: #555555;">::</span>for_each(std<span style="color: #555555;">::</span>begin(myVec), NegativeNumber{}, 
+                                              Sum{} );            
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Sum: "</span> <span style="color: #555555;">&lt;&lt;</span> sum2.sum <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;                                   <em><span style="color: #0099ff;">// (9)</span></em>
+
+    std<span style="color: #555555;">::</span>ranges<span style="color: #555555;">::</span>transform(std<span style="color: #555555;">::</span>begin(myVec), NegativeNumber{},              <em> <span style="color: #0099ff;">  // (10)</span></em>
+                           std<span style="color: #555555;">::</span>begin(myVec), [](<span style="color: #006699; font-weight: bold;">auto</span> num) { <span style="color: #006699; font-weight: bold;">return</span> num <span style="color: #555555;">*</span> num; });
+    std<span style="color: #555555;">::</span>ranges<span style="color: #555555;">::</span>for_each(std<span style="color: #555555;">::</span>begin(myVec), NegativeNumber{},                <em><span style="color: #0099ff;">  // (11)</span></em>
+                          [](<span style="color: #007788; font-weight: bold;">int</span> num) { std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> num <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span>; });
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> v<span style="color: #555555;">:</span> std<span style="color: #555555;">::</span>ranges<span style="color: #555555;">::</span>subrange{ std<span style="color: #555555;">::</span>begin(myVec), NegativeNumber{}}) { <em><span style="color: #0099ff;">// (12)</span></em>
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> v <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span>;
+    }
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n\n</span><span style="color: #cc3300;">"</span>;
+    
+}
+</pre>
+</div>
+</div>
+<p>&nbsp;</p>
+<div>
+<div>The program defines two sentinels: Space (line 1) and <code>NegativeNumber</code> (line 2). Both define the equal operator. Thanks to the <code>&lt;compare&gt;</code> header, the compiler auto-generates the non-equal operator. The non-equal operator is required when using algorithms such as <code>std::ranges_for_each</code> or <code>std::ranges::transform</code> with a sentinel. Let me start with the sentinel <code>Space</code>. &nbsp;</div>
+<br />
+<div>Line (3) applies the sentinel <code>Space{}</code> directly onto the string "<code>rainerGrimm</code>". Creating a <code>std::ranges::subrange</code> (line 4) allows it to use the sentinel in a range-based for-loop. You can also define a <code>std::ranges::subrange</code> and use it directly in the algorithm std::ranges::for_each (line 5) or in a range-based for-loop (line 6).</div>
+<br />
+<div>My second example uses a <code>std::vector&lt;int&gt;</code>, filled with the values <code>{5, 10, 33, -5, 10}</code>. The sentinel <code>NegativeNumber</code> checks if a number is negative. First, I sum up all values using the function object <code>Sum</code> (line 7). <code>std::ranges::for_each</code> returns a pair <code>(it, func)</code>.&nbsp; <code>it</code> is the successor of the sentinel and <code>func</code> the function object applied to the range. Thanks to structured binding, I can directly define the variables <code>sum </code>and <code>sum2 </code>and display their values (lines 8 and 9).<code> std::ranges::for_each</code> uses the sentinel <code>NegativeNumber</code>. Consequently, <code>sum2</code> has the sum up to the sentinel. The call <code>std::ranges::transform</code> (line 10) transforms each element to its square:<code> [](auto num){ return num * num}</code>. The transformation stops with the sentinel <code>NegativeNumber.</code> Line 11 and line 12 display the transformed values.</div>
+<br />
+<div>Finally, here is the output of the program.</div>
+<div><img src="https://www.modernescpp.com/images/blog/Cpp20/SentinelsWithRanges/sentinel.png" alt="sentinel" width="341" height="402" style="display: block; margin-left: auto; margin-right: auto;" /></div>
+</div>
+<p>You may ask yourself, should I use a classical algorithm of the STL or the ranges pendant on a container? Let me answer this question by comparing both.</p>
+<h2><code>std</code> Algorithms versus <code>std::ranges</code> Algorithms</h2>
+<p>Before I dive into the details in my comparison, I want to provide the big picture:</p>
+<p><img src="https://www.modernescpp.com/images/blog/Cpp20/SentinelsWithRanges/AlgorithmsComparison.jpg" alt="AlgorithmsComparison" width="600" height="228" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<h3>Range does not support numeric</h3>
+<p>The ranges does support the functions of the <a href="https://en.cppreference.com/w/cpp/header/functional"><code>functional</code></a>, and the <a href="https://en.cppreference.com/w/cpp/header/algorithm"><code>algorithm </code></a>header, but the function of the <a href="https://en.cppreference.com/w/cpp/header/numeric"><code>numeric</code> </a>header.&nbsp; <code>The&nbsp;<a href="https://en.cppreference.com/w/cpp/header/numeric"><code>numeric</code> </a>header includes </code>mathematical functions such as&nbsp; <code>std::gcd, std::midpoint, std::iota,</code> or <code>std::accumulate.</code></p>
+<p>Let me write about more interesting differences.</p>
+<h3>Concept support</h3>
+<p>The <code>std::ranges</code> algorithms are the poster child for concepts.</p>
+<div>
+<div>Let's start with a comparison of the classical <code>std::sort</code> and the new<code> std::ranges::sort</code>. <code>std::sort</code> and <code>std::ranges::sort</code> require a random-access iterator that can access each element of the range in constant time. Here are the two relevant overloads for <code>std::sort</code> and <code>std::ranges::sort</code>.</div>
+<div>&nbsp;</div>
+<ul>
+<li><code>std::sort</code></li>
+</ul>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span> <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">RandomIt</span> <span style="color: #555555;">&gt;</span>
+constexpr <span style="color: #007788; font-weight: bold;">void</span> sort( RandomIt first, RandomIt last );
+</pre>
+</div>
+<p>&nbsp;</p>
+<ul>
+<li><code>std:ranges::sort</code></li>
+</ul>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>random_access_iterator I, std<span style="color: #555555;">::</span>sentinel_for<span style="color: #555555;">&lt;</span>I<span style="color: #555555;">&gt;</span> S,
+         <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Comp</span> <span style="color: #555555;">=</span> ranges<span style="color: #555555;">::</span>less, <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Proj</span> <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>identity<span style="color: #555555;">&gt;</span>
+requires std<span style="color: #555555;">::</span>sortable<span style="color: #555555;">&lt;</span>I, Comp, Proj<span style="color: #555555;">&gt;</span>
+constexpr I sort(I first, S last, Comp comp <span style="color: #555555;">=</span> {}, Proj proj <span style="color: #555555;">=</span> {});
+</pre>
+</div>
+<div>&nbsp;</div>
+<div>
+<div>
+<div>What happens, when you invoke <code>std::sort</code> or <code>std::ranges::sort</code> with a container such as<code> std::list</code> only supporting a bidirectional iterator?</div>
+<h4><code>std::sort</code></h4>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// sortVector.cpp</span>
+
+<span style="color: #009999;">#include &lt;algorithm&gt;</span>
+<span style="color: #009999;">#include &lt;list&gt;</span>
+ 
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+   
+   std<span style="color: #555555;">::</span>list<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> myList{<span style="color: #ff6600;">1</span>, <span style="color: #555555;">-</span><span style="color: #ff6600;">5</span>, <span style="color: #ff6600;">10</span>, <span style="color: #ff6600;">20</span>, <span style="color: #ff6600;">0</span>};
+   std<span style="color: #555555;">::</span>sort(myList.begin(), myList.end());
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<div>
+<div>
+<div>Compiling the program <code>sortVector.cpp</code> with the GCC causes an epic error message of 1090 lines.</div>
+<div>&nbsp;</div>
+<div>&nbsp;<img src="https://www.modernescpp.com/images/blog/Cpp20/SentinelsWithRanges/sortVector.png" alt="sortVector" width="650" height="361" style="display: block; margin-left: auto; margin-right: auto;" /></div>
+<h4><code>std::ranges::sort</code></h4>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// sortRangesVector.cpp</span>
+
+<span style="color: #009999;">#include &lt;algorithm&gt;</span>
+<span style="color: #009999;">#include &lt;list&gt;</span>
+ 
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+   
+   std<span style="color: #555555;">::</span>list<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> myList{<span style="color: #ff6600;">1</span>, <span style="color: #555555;">-</span><span style="color: #ff6600;">5</span>, <span style="color: #ff6600;">10</span>, <span style="color: #ff6600;">20</span>, <span style="color: #ff6600;">0</span>};
+   std<span style="color: #555555;">::</span>ranges<span style="color: #555555;">::</span>sort(myList.begin(), myList.end());
+    
+}
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<p>&nbsp;</p>
+<div>
+<p>Using<code> std::ranges::sort</code> instead of<code> std::sort reduces</code> the error message drastically. Now, I get 57 error lines.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Cpp20/SentinelsWithRanges/sortRangesVectorError.png" alt="sortRangesVectorError" width="650" height="148" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+</div>
+<div>Honestly, the error message of GCC should be easier to read, but I don't blame them. We are still in the early process of supporting concepts. Here are the first 10 lines of the 57 lines. I marked the critical message in red.</div>
+<div>&nbsp;</div>
+<div><img src="https://www.modernescpp.com/images/blog/Cpp20/SentinelsWithRanges/sortRangesVectorErrorLines.png" alt="sortRangesVectorErrorLines" width="650" height="193" style="display: block; margin-left: auto; margin-right: auto;" /></div>
+<h2>Which mentoring program should I implement next?</h2>
+<p>I'm happy to say that the current mentoring program "Fundamentals for C++ Professionals" is a big success and has more than 35 participants. Now, I will implement an additional mentoring program. All of them are based on my C++ books, posts, and classes.</p>
+<p>Make your choice here: <a href="https://www.modernescpp.com/index.php/my-next-mentoring-program">https://www.modernescpp.com/index.php/my-next-mentoring-program</a></p>
+<h2>What's next?</h2>
+<p>I'm not done with my comparison of the <code>std</code> and <code>std::ranges</code> algorithms. In my next post, I will write about the unified lookup rules that <code>std::ranges</code> algorithms provide and additional safety guarantees.</p>
+<p>&nbsp;</p>
+<p>{loadmoduleid 153}</p>
