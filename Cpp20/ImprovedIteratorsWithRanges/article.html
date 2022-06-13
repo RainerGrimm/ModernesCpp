@@ -1,0 +1,180 @@
+<p>There are more reasons to prefer ranges library above the classical Standard Template Library. The ranges iterators support unified lookup rules and provide additional safety guarantees.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/Cpp20/ImprovedIteratorsWithRanges/TimelineCpp20.png" alt="TimelineCpp20" width="650" height="248" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<h2>Unified Lookup Rules</h2>
+<p>Assume you want to implement a generic function that calls <code>begin</code> on a given container. The question is if the function calling <code>begin</code> on a container should assume a free <code>begin</code> function or a member function <code>begin</code>?</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// begin.cpp</span>
+
+<span style="color: #009999;">#include &lt;cstddef&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;ranges&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">struct</span> ContainerFree {                                        <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    ContainerFree(std<span style="color: #555555;">::</span><span style="color: #007788; font-weight: bold;">size_t</span> len)<span style="color: #555555;">:</span> len_(len), data_(<span style="color: #006699; font-weight: bold;">new</span> <span style="color: #007788; font-weight: bold;">int</span>[len]){}
+    <span style="color: #007788; font-weight: bold;">size_t</span> len_;
+    <span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">*</span> data_;
+};
+<span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">*</span> <span style="color: #cc00ff;">begin</span>(<span style="color: #006699; font-weight: bold;">const</span> ContainerFree<span style="color: #555555;">&amp;</span> conFree) {                   <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    <span style="color: #006699; font-weight: bold;">return</span> conFree.data_;
+}
+
+<span style="color: #006699; font-weight: bold;">struct</span> ContainerMember {                                     <span style="color: #0099ff; font-style: italic;">// (3)</span>
+    ContainerMember(std<span style="color: #555555;">::</span><span style="color: #007788; font-weight: bold;">size_t</span> len)<span style="color: #555555;">:</span> len_(len), data_(<span style="color: #006699; font-weight: bold;">new</span> <span style="color: #007788; font-weight: bold;">int</span>[len]){}
+    <span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">*</span> begin() <span style="color: #006699; font-weight: bold;">const</span> {                                     <span style="color: #0099ff; font-style: italic;">// (4)</span>
+        <span style="color: #006699; font-weight: bold;">return</span> data_;
+    }
+    <span style="color: #007788; font-weight: bold;">size_t</span> len_;
+    <span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">*</span> data_;
+};
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">callBeginFree</span>(<span style="color: #006699; font-weight: bold;">const</span> <span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;</span> cont) {                        <span style="color: #0099ff; font-style: italic;">// (5)</span>
+    begin(cont);
+}
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">callBeginMember</span>(<span style="color: #006699; font-weight: bold;">const</span> <span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;</span> cont) {                      <span style="color: #0099ff; font-style: italic;">// (6)</span>
+    cont.begin();
+}
+ 
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    <span style="color: #006699; font-weight: bold;">const</span> ContainerFree contFree(<span style="color: #ff6600;">2020</span>);
+    <span style="color: #006699; font-weight: bold;">const</span> ContainerMember contMemb(<span style="color: #ff6600;">2023</span>);
+
+    callBeginFree(contFree);                                 
+    callBeginMember(contMemb);
+
+    callBeginFree(contMemb);                                  <span style="color: #0099ff; font-style: italic;">// (7)</span>
+    callBeginMember(contFree);                                <span style="color: #0099ff; font-style: italic;">// (8)</span>
+   
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<div>
+<div><code>ContainerFree</code> (line 1) has a free function <code>begin</code> (line 2), and <code>ContainerMember</code> (line 3) has a member function <code>begin</code> (line 4). Accordingly, <code>contFree</code> can use the generic function <code>callBeginFree</code> using the free function call <code>begin(cont)</code> (line 5), and <code>contMemb</code> can use the generic function <code>callBeginMember</code> using the member function call<code> cont.begin</code> (line 6). When I invoke <code>callBeginFree</code> and <code>callBeginMember</code> with the inappropriate containers in lines (7) and (8), the compilation fails.</div>
+<div><img src="https://www.modernescpp.com/images/blog/Cpp20/ImprovedIteratorsWithRanges/begin.png" alt="begin" width="650" height="238" style="display: block; margin-left: auto; margin-right: auto;" /></div>
+</div>
+<p>I can solve this issue by providing two different <code>begin</code> implementations in two ways: classical and range based.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// beginSolved.cpp</span>
+
+<span style="color: #009999;">#include &lt;cstddef&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;ranges&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">struct</span> ContainerFree {
+    ContainerFree(std<span style="color: #555555;">::</span><span style="color: #007788; font-weight: bold;">size_t</span> len)<span style="color: #555555;">:</span> len_(len), data_(<span style="color: #006699; font-weight: bold;">new</span> <span style="color: #007788; font-weight: bold;">int</span>[len]){}
+    <span style="color: #007788; font-weight: bold;">size_t</span> len_;
+    <span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">*</span> data_;
+};
+<span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">*</span> <span style="color: #cc00ff;">begin</span>(<span style="color: #006699; font-weight: bold;">const</span> ContainerFree<span style="color: #555555;">&amp;</span> conFree) {
+    <span style="color: #006699; font-weight: bold;">return</span> conFree.data_;
+}
+
+<span style="color: #006699; font-weight: bold;">struct</span> ContainerMember {
+    ContainerMember(std<span style="color: #555555;">::</span><span style="color: #007788; font-weight: bold;">size_t</span> len)<span style="color: #555555;">:</span> len_(len), data_(<span style="color: #006699; font-weight: bold;">new</span> <span style="color: #007788; font-weight: bold;">int</span>[len]){}
+    <span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">*</span> begin() <span style="color: #006699; font-weight: bold;">const</span> {
+        <span style="color: #006699; font-weight: bold;">return</span> data_;
+    }
+    <span style="color: #007788; font-weight: bold;">size_t</span> len_;
+    <span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">*</span> data_;
+};
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">callBeginClassical</span>(<span style="color: #006699; font-weight: bold;">const</span> <span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;</span> cont) {
+    <span style="color: #006699; font-weight: bold;">using</span> std<span style="color: #555555;">::</span>begin;                          <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    begin(cont);
+}
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">callBeginRanges</span>(<span style="color: #006699; font-weight: bold;">const</span> <span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;</span> cont) {
+    std<span style="color: #555555;">::</span>ranges<span style="color: #555555;">::</span>begin(cont);                  <span style="color: #0099ff; font-style: italic;">// (2)</span>
+}
+ 
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    <span style="color: #006699; font-weight: bold;">const</span> ContainerFree contFree(<span style="color: #ff6600;">2020</span>);
+    <span style="color: #006699; font-weight: bold;">const</span> ContainerMember contMemb(<span style="color: #ff6600;">2023</span>);
+
+    callBeginClassical(contFree);
+    callBeginRanges(contMemb);
+
+    callBeginClassical(contMemb);
+    callBeginRanges(contFree);
+   
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The classical way to solve this issue is to bring<code> std::begin</code> into the scope with a so-called using declaration (line 1). Thanks to ranges, you can directly use <code>std::ranges::begin</code> (line 2).<code> std::ranges::begin</code> considers both implementations of <code>begin</code>: the free version and the member function.</p>
+<p>Finally, let me write about safety.</p>
+<h2>Safety</h2>
+<p>Let me start with iterators.</p>
+<h3>Iterators</h3>
+<div>
+<div>The ranges library provides the expected operations to access the range.</div>
+<div>&nbsp;</div>
+<div>&nbsp;<img src="https://www.modernescpp.com/images/blog/Cpp20/ImprovedIteratorsWithRanges/iterators.jpg" alt="iterators" width="650" height="640" style="display: block; margin-left: auto; margin-right: auto;" /></div>
+</div>
+<p>&nbsp;</p>
+<p>When you use these operations for accessing the underlying range, there is a big difference. The compilation fails when you use the range access on the <code>std::ranges</code>'s variant if the argument is an rvalue. On the contrary, using the same operation from the classical <code>std</code> namespace is undefined behavior.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// rangesAccess.cpp</span>
+
+<span style="color: #009999;">#include &lt;iterator&gt;</span>
+<span style="color: #009999;">#include &lt;ranges&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    <span style="color: #006699; font-weight: bold;">auto</span> beginIt1 <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>begin(std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span>{<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>});
+    <span style="color: #006699; font-weight: bold;">auto</span> beginIt2 <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>ranges<span style="color: #555555;">::</span>begin(std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span>{<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>});
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p><code>std::ranges::begin</code> provides only overloads for lvalues. The temporary vector<code> std::vector{1, 2, 3}</code> is an rvalue. Consequentially, the compilation of the program fails.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Cpp20/ImprovedIteratorsWithRanges/rangeAccessError.png" alt="rangeAccessError" width="650" height="451" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>The abbreviations lvalue and rvalue stand for locatable value and readable value.</p>
+<ul>
+<li>lvalue (locatable value): A locatable value is an object that has a location in memory, and you can, therefore, determine its address. An lvalue has an identity.</li>
+<li>rvalue (readable value): A rvalue is a value you can only read from. It does not represent an object in memory, and you cannot determine its address.</li>
+</ul>
+<p>I have to admit to you that my short explanations of lvalues and rvalues is a simplification. If you want to know more details about value categories, read the following post<a href="https://devtut.github.io/cpp/value-categories.html"> Value Categories</a>.</p>
+<p>By the way, not only iterators but also views provide these additional safety guarantees.</p>
+<h3>Views</h3>
+<p>Views do not own data. Therefore, views do not extend the lifetime of their data. Consequently, views can only be created on lvalues. The compilation fails if you create a view on a temporary range.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// temporaryRange.cpp</span>
+
+<span style="color: #009999;">#include &lt;initializer_list&gt;</span>
+<span style="color: #009999;">#include &lt;ranges&gt;</span>
+
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #006699; font-weight: bold;">auto</span> numbers <span style="color: #555555;">=</span> {<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">5</span>};
+
+    <span style="color: #006699; font-weight: bold;">auto</span> firstThree <span style="color: #555555;">=</span> numbers <span style="color: #555555;">|</span> std<span style="color: #555555;">::</span>views<span style="color: #555555;">::</span>drop(<span style="color: #ff6600;">3</span>);           <em>  <span style="color: #0099ff;">// (1)</span></em>
+    <span style="color: #0099ff; font-style: italic;">// auto firstThree = {1, 2, 3, 4, 5} | std::views::drop(3);  // (2)</span>
+
+    std<span style="color: #555555;">::</span>ranges<span style="color: #555555;">::</span>drop_view firstFour{numbers, <span style="color: #ff6600;">4</span>};             <em>   <span style="color: #0099ff;">// (3)</span></em>
+   <span style="color: #0099ff; font-style: italic;">// std::ranges::drop_view firstFour{{1, 2, 3, 4, 5}, 4};      // (4)</span>
+   
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>When lines 1 and 3 are used with the lvalue numbers, all is fine. On the contrary, using the commented-out lines 2 and 4 on the rvalue<code> std::initializer_list&lt;int&gt; {1, 2, 3, 4, 5}</code>, causes the GCC compiler to complain verbosely:</p>
+<p><img src="https://www.modernescpp.com/images/blog/Cpp20/ImprovedIteratorsWithRanges/temporaryRange.png" alt="temporaryRange" width="650" height="288" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<h2>What's next?</h2>
+<p>In my next post, I do my first peek into the C++23 future. In particular, the ranges library will get many improvements. There is with <code>std::ranges::to</code> a convenient way to construct containers from ranges. Additionally, we will get almost twenty new algorithms. Here are a few of them:<code> std::views::chunk_by, std::views::slide, std::views::join_with, std::views::zip_transform,</code> and <code>std::views::adjacent_transform</code>.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>{loadmoduleid 153}</p>
