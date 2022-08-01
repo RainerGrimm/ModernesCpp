@@ -1,20 +1,20 @@
-<p>Until now I've used two strategies for the summation of a <span style="font-family: courier new,courier;">std::vector. </span>First I did the whole math in one thread (<a href="index.php/single-threaded-sum-of-the-elements-of-a-vector">Single Threaded: Summation of a vector</a>); second multiple threads shared the same variable for the result (<a href="index.php/multithreaded-summation-of-a-vector">Multithreaded: Summation of a vector</a>). In particular the second strategy was extremely naive. In this post I will apply my knowledge of both posts. My goal is it that the thread will perform their summation as independent form each other as possible and therefore reduce the synchronization overhead.&nbsp;</p>
+<p>Until now, I've used two strategies for the summation of a <span style="font-family: courier new,courier;">std::vector. </span>First, I did the whole math in one thread (<a href="https://www.modernescpp.com/index.php/single-threaded-sum-of-the-elements-of-a-vector">Single Threaded: Summation of a vector</a>); second multiple threads shared the same variable for the result (<a href="https://www.modernescpp.com/index.php/multithreaded-summation-of-a-vector">Multithreaded: Summation of a vector</a>). In particular, the second strategy was extremely naive. In this post, I will apply my knowledge of both posts. My goal is that the thread will perform their summation as independently from each other as possible and therefore reduce the synchronization overhead.&nbsp;</p>
 <hr id="system-readmore" />
 <p>&nbsp;</p>
-<p>To let the threads work independently and therefore minimize the synchronization I have a few ideas in my mind. Local variables,<a href="index.php/thread-local-data"> thread local data </a>but also<a href="index.php/tasks"> tasks</a> should work. Now I'm curious.</p>
+<p>To let the threads work independently and therefore minimize the synchronization, I have a few ideas in my mind. Local variables,<a href="https://www.modernescpp.com/index.php/thread-local-data"> thread-local data </a>but also<a href="https://www.modernescpp.com/index.php/tasks"> tasks</a> should work. Now I'm curious.</p>
 <h2>My strategy</h2>
-<p>My strategy keeps the same. As in my lasts post I use my desktop PC with 4 cores and GCC and my laptop with 2 cores and cl.exe. I provide the results without and with maximum optimization. For the details have a look here: <a href="index.php/thread-safe-initialization-of-a-singleton">Thread safe initialization of a singleton.</a>&nbsp;</p>
+<p>My strategy keeps the same. As in my last post, I use my desktop PC with four cores and GCC and my laptop with two cores and cl.exe. I provide the results without and with maximum optimization. For the details, have a look here: <a href="https://www.modernescpp.com/index.php/thread-safe-initialization-of-a-singleton">Thread-safe initialization of a singleton.</a>&nbsp;</p>
 <h2>Local variables</h2>
-<p>Since each thread has a local summation variable it can do its job without synchronization. It's only necessary to sum up the local summation variables. The addition of the local results is a critical section that must be protected. This can be done in various ways. A quick remark before. Since only four addition takes place it doesn't matter so much from a performance perspective which synchronization I will use. But instead of my remark I will use a <span style="font-family: courier new,courier;">std::lock_guard</span> and an atomic with sequential consistency and relaxed-semantic.</p>
+<p>Since each thread has a local summation variable, it can do its job without synchronization. It's only necessary, to sum up the local summation variables. The addition of the local results is a critical section that must be protected. This can be done in various ways. A quick remark before. Since only four addition takes place, it doesn't matter so much from a performance perspective which synchronization I will use. But instead of my remark, I will use a <span style="font-family: courier new,courier;">std::lock_guard</span> and an atomic with sequential consistency and relaxed semantics.</p>
 <h3>std::lock_guard</h3>
 <p>&nbsp;</p>
 <!-- HTML generated using hilite.me -->
 <div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
-	<table>
-		<tbody>
-			<tr>
-				<td>
-					<pre style="margin: 0; line-height: 125%;"> 1
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
  2
  3
  4
@@ -73,9 +73,9 @@
 57
 58
 59</pre>
-				</td>
-				<td>
-					<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// localVariable.cpp</span>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// localVariable.cpp</span>
 
 <span style="color: #0000ff;">#include &lt;mutex&gt;</span>
 <span style="color: #0000ff;">#include &lt;chrono&gt;</span>
@@ -135,26 +135,26 @@ std::mutex myMutex;
 
 }
 </pre>
-				</td>
-			</tr>
-		</tbody>
-	</table>
+</td>
+</tr>
+</tbody>
+</table>
 </div>
 <p>&nbsp;</p>
-<p>Line 25 and 26 are the important lines. Here the local summation results<span style="font-family: courier new,courier;"> tmpSum</span> will be added to the global&nbsp;<span style="font-family: comic sans ms,sans-serif;">sum.</span> That exactly is the spot at which the examples with the local variables will vary.</p>
+<p>Line 25 and 26 are the important lines. Here the local summation results<span style="font-family: courier new,courier;"> tmpSum</span> will be added to the global&nbsp;<span style="font-family: comic sans ms,sans-serif;">sum.</span> What exactly is the spot at which the examples with the local variables will vary?</p>
 <h3>Without optimization</h3>
-<p><img src="images/blog/Speichermodell/AdditionInMehrerenThreads/localVariable.png" alt="localVariable" width="400" height="182" style="margin: 15px;" /><img src="images/blog/Speichermodell/AdditionInMehrerenThreads/localVariablewin.png" alt="localVariablewin" width="450" height="145" /></p>
+<p><img src="https://www.modernescpp.com/images/blog/Speichermodell/AdditionInMehrerenThreads/localVariable.png" alt="localVariable" width="400" height="182" style="margin: 15px;" /><img src="https://www.modernescpp.com/images/blog/Speichermodell/AdditionInMehrerenThreads/localVariablewin.png" alt="localVariablewin" width="450" height="145" /></p>
 <h3>Maximum optimization</h3>
-<p><img src="images/blog/Speichermodell/AdditionInMehrerenThreads/localVariableOpt.png" alt="localVariableOpt" width="400" height="182" style="margin: 15px;" /><img src="images/blog/Speichermodell/AdditionInMehrerenThreads/localVariableOptwin.png" alt="localVariableOptwin" width="450" height="145" /></p>
+<p><img src="https://www.modernescpp.com/images/blog/Speichermodell/AdditionInMehrerenThreads/localVariableOpt.png" alt="localVariableOpt" width="400" height="182" style="margin: 15px;" /><img src="https://www.modernescpp.com/images/blog/Speichermodell/AdditionInMehrerenThreads/localVariableOptwin.png" alt="localVariableOptwin" width="450" height="145" /></p>
 <h2>Atomic operations with sequential consistency</h2>
 <p>My first optimization is it to replace the by a <span style="font-family: courier new,courier;">std::lock_guard</span> protected global summation <span style="font-family: courier new,courier;">sum</span> variable with an atomic.</p>
 <!-- HTML generated using hilite.me -->
 <div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
-	<table>
-		<tbody>
-			<tr>
-				<td>
-					<pre style="margin: 0; line-height: 125%;"> 1
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
  2
  3
  4
@@ -210,9 +210,9 @@ std::mutex myMutex;
 54
 55
 56</pre>
-				</td>
-				<td>
-					<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// localVariableAtomic.cpp</span>
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;"><span style="color: #008000;">// localVariableAtomic.cpp</span>
 
 <span style="color: #0000ff;">#include &lt;atomic&gt;</span>
 <span style="color: #0000ff;">#include &lt;chrono&gt;</span>
@@ -269,25 +269,25 @@ constexpr <span style="color: #2b91af;">long</span> <span style="color: #2b91af;
 
 }
 </pre>
-				</td>
-			</tr>
-		</tbody>
-	</table>
+</td>
+</tr>
+</tbody>
+</table>
 </div>
 <h3>Without optimization</h3>
-<p><img src="images/blog/Speichermodell/AdditionInMehrerenThreads/localVariableAtomic.png" alt="localVariableAtomic" width="400" height="182" style="margin: 15px;" /><img src="images/blog/Speichermodell/AdditionInMehrerenThreads/localVariableAtomicwin.png" alt="localVariableAtomicwin" width="500" height="161" /></p>
+<p><img src="https://www.modernescpp.com/images/blog/Speichermodell/AdditionInMehrerenThreads/localVariableAtomic.png" alt="localVariableAtomic" width="400" height="182" style="margin: 15px;" /><img src="https://www.modernescpp.com/images/blog/Speichermodell/AdditionInMehrerenThreads/localVariableAtomicwin.png" alt="localVariableAtomicwin" width="500" height="161" /></p>
 <h3>Maximum optimization</h3>
-<h2>&nbsp;<img src="images/blog/Speichermodell/AdditionInMehrerenThreads/localVariableAtomicOpt.png" alt="localVariableAtomicOpt" width="400" height="182" style="margin: 15px;" /><img src="images/blog/Speichermodell/AdditionInMehrerenThreads/localVariableAtomicOptwin.png" alt="localVariableAtomicOptwin" width="500" height="161" /></h2>
-<h2>Atomic operations with relaxed-semantic</h2>
-<p>We can do better. Instead of the default memory model sequential consistency I use relaxes-semantic. That's well defined because it doesn't matter in which order the additions in line 23 take place.</p>
+<h2>&nbsp;<img src="https://www.modernescpp.com/images/blog/Speichermodell/AdditionInMehrerenThreads/localVariableAtomicOpt.png" alt="localVariableAtomicOpt" width="400" height="182" style="margin: 15px;" /><img src="https://www.modernescpp.com/images/blog/Speichermodell/AdditionInMehrerenThreads/localVariableAtomicOptwin.png" alt="localVariableAtomicOptwin" width="500" height="161" /></h2>
+<h2>Atomic operations with relaxed semantic</h2>
+<p>We can do better. Instead of the default memory model of sequential consistency, I use relaxed semantics. That's well defined because it doesn't matter in which order the additions in line 23 take place.</p>
 <p>&nbsp;</p>
 <!-- HTML generated using hilite.me -->
 <div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
-	<table>
-		<tbody>
-			<tr>
-				<td>
-					<pre style="margin: 0; line-height: 125%;"> 1
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
  2
  3
  4
@@ -343,9 +343,9 @@ constexpr <span style="color: #2b91af;">long</span> <span style="color: #2b91af;
 54
 55
 56</pre>
-				</td>
-				<td>
-					<pre style="margin: 0; line-height: 125%;">// localVariableAtomicRelaxed.cpp
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;">// localVariableAtomicRelaxed.cpp
 
 <span style="color: #008000;">#include &lt;atomic&gt;</span>
 <span style="color: #008000;">#include &lt;chrono&gt;</span>
@@ -402,27 +402,27 @@ int main(){
 
 }
 </pre>
-				</td>
-			</tr>
-		</tbody>
-	</table>
+</td>
+</tr>
+</tbody>
+</table>
 </div>
 <p>&nbsp;</p>
 <h3>Without optimization</h3>
-<p><img src="images/blog/Speichermodell/AdditionInMehrerenThreads/localVariableAtomicRelaxed.png" alt="localVariableAtomicRelaxed" width="400" height="182" style="margin: 15px;" /><img src="images/blog/Speichermodell/AdditionInMehrerenThreads/localVariableAtomicRelaxedwin.png" alt="localVariableAtomicRelaxedwin" width="500" height="161" /></p>
+<p><img src="https://www.modernescpp.com/images/blog/Speichermodell/AdditionInMehrerenThreads/localVariableAtomicRelaxed.png" alt="localVariableAtomicRelaxed" width="400" height="182" style="margin: 15px;" /><img src="https://www.modernescpp.com/images/blog/Speichermodell/AdditionInMehrerenThreads/localVariableAtomicRelaxedwin.png" alt="localVariableAtomicRelaxedwin" width="500" height="161" /></p>
 <h3>Maximum optimization</h3>
-<p><img src="images/blog/Speichermodell/AdditionInMehrerenThreads/localVariableAtomicRelaxedOpt.png" alt="localVariableAtomicRelaxedOpt" width="400" height="182" style="margin: 15px;" /><img src="images/blog/Speichermodell/AdditionInMehrerenThreads/localVariableAtomicRelaxedOptwin.png" alt="localVariableAtomicRelaxedOptwin" width="500" height="161" /></p>
+<p><img src="https://www.modernescpp.com/images/blog/Speichermodell/AdditionInMehrerenThreads/localVariableAtomicRelaxedOpt.png" alt="localVariableAtomicRelaxedOpt" width="400" height="182" style="margin: 15px;" /><img src="https://www.modernescpp.com/images/blog/Speichermodell/AdditionInMehrerenThreads/localVariableAtomicRelaxedOptwin.png" alt="localVariableAtomicRelaxedOptwin" width="500" height="161" /></p>
 <p>The following strategy is similar. But now I use thread local data.</p>
 <h2>Thread local data</h2>
-<p><a href="index.php/thread-local-data">Thread local data</a> is data which each thread&nbsp;exclusively owns. They will be created when needed. Therefore, thread local data is a perfect fit for the local summation variable <span style="font-family: courier new,courier;">tmpSum</span>.</p>
+<p><a href="https://www.modernescpp.com/index.php/thread-local-data">Thread local data</a> is data that each thread&nbsp;exclusively owns. They will be created when needed. Therefore, thread local data perfectly fits the local summation variable <span style="font-family: courier new,courier;">tmpSum</span>.</p>
 <p>&nbsp;</p>
 <!-- HTML generated using hilite.me -->
 <div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
-	<table>
-		<tbody>
-			<tr>
-				<td>
-					<pre style="margin: 0; line-height: 125%;"> 1
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
  2
  3
  4
@@ -479,9 +479,9 @@ int main(){
 55
 56
 57</pre>
-				</td>
-				<td>
-					<pre style="margin: 0; line-height: 125%;">// threadLocal.cpp
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;">// threadLocal.cpp
 
 <span style="color: #008000;">#include &lt;atomic&gt;</span>
 <span style="color: #008000;">#include &lt;chrono&gt;</span>
@@ -539,28 +539,28 @@ int main(){
 
 }
 </pre>
-				</td>
-			</tr>
-		</tbody>
-	</table>
+</td>
+</tr>
+</tbody>
+</table>
 </div>
 <p>&nbsp;</p>
-<p>I declare in line 18 the thread local variable <span style="font-family: courier new,courier;">tmpSum</span> and use it for the addition in line 22 and 24. The small difference between the thread local variable and the local variable in the previous programs is that the lifetime of the thread local variable is bound to lifetime of its thread. The lifetime of the local variable depends on its scope.</p>
+<p>I declare in line 18 the thread-local variable <span style="font-family: courier new,courier;">tmpSum</span> and use it for the addition in lines 22 and 24. The small difference between the thread-local variable and the local variable in the previous programs is that the lifetime of the thread-local variable is bound to the lifetime of its thread. The lifetime of the local variable depends on its scope.</p>
 <h3>Without optimization</h3>
-<h3><img src="images/blog/Speichermodell/AdditionInMehrerenThreads/threadLocal.png" alt="threadLocal" width="400" height="182" style="margin: 15px;" /><img src="images/blog/Speichermodell/AdditionInMehrerenThreads/threadLocalwin.png" alt="threadLocalwin" width="500" height="162" /></h3>
+<h3><img src="https://www.modernescpp.com/images/blog/Speichermodell/AdditionInMehrerenThreads/threadLocal.png" alt="threadLocal" width="400" height="182" style="margin: 15px;" /><img src="https://www.modernescpp.com/images/blog/Speichermodell/AdditionInMehrerenThreads/threadLocalwin.png" alt="threadLocalwin" width="500" height="162" /></h3>
 <h3>Maximum optimization</h3>
-<p><img src="images/blog/Speichermodell/AdditionInMehrerenThreads/threadLocalOpt.png" alt="threadLocalOpt" width="400" height="182" style="margin: 15px;" /><img src="images/blog/Speichermodell/AdditionInMehrerenThreads/threadLocalOptwin.png" alt="threadLocalOptwin" width="500" height="162" /></p>
+<p><img src="https://www.modernescpp.com/images/blog/Speichermodell/AdditionInMehrerenThreads/threadLocalOpt.png" alt="threadLocalOpt" width="400" height="182" style="margin: 15px;" /><img src="https://www.modernescpp.com/images/blog/Speichermodell/AdditionInMehrerenThreads/threadLocalOptwin.png" alt="threadLocalOptwin" width="500" height="162" /></p>
 <p>The question is. Is it possible to calculate the sum in a fast way without synchronization? Yes.</p>
 <h2>Tasks</h2>
-<p>With <a href="index.php/tasks">task </a>we can do the whole job without synchronization. Each summation is performed in a separate thread and the final summation in a single thread. Here are the details to <a href="index.php/tasks">tasks.</a> In will use promise and future in the following program.</p>
+<p>With <a href="https://www.modernescpp.com/index.php/tasks">task, </a>we can do the whole job without synchronization. Each summation is performed in a separate thread, and the final summation in a single thread. Here are the details of <a href="https://www.modernescpp.com/index.php/tasks">tasks.</a> I will use promise and future in the following program.</p>
 <p>&nbsp;</p>
 <!-- HTML generated using hilite.me -->
 <div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
-	<table>
-		<tbody>
-			<tr>
-				<td>
-					<pre style="margin: 0; line-height: 125%;"> 1
+<table>
+<tbody>
+<tr>
+<td>
+<pre style="margin: 0; line-height: 125%;"> 1
  2
  3
  4
@@ -628,9 +628,9 @@ int main(){
 66
 67
 68</pre>
-				</td>
-				<td>
-					<pre style="margin: 0; line-height: 125%;">// tasks.cpp
+</td>
+<td>
+<pre style="margin: 0; line-height: 125%;">// tasks.cpp
 
 <span style="color: #008000;">#include &lt;chrono&gt;</span>
 <span style="color: #008000;">#include &lt;future&gt;</span>
@@ -699,26 +699,27 @@ int main(){
 
 }
 </pre>
-				</td>
-			</tr>
-		</tbody>
-	</table>
+</td>
+</tr>
+</tbody>
+</table>
 </div>
 <p>&nbsp;</p>
-<p>I define in line 37 - 45 the four promises and create from them the associated futures. Each promise is moved in line 50 - 52 in a separate threads. Promise can only be moved therefore I use <span style="font-family: courier new,courier;">std::move</span>. The work package of the thread is the function sumUp (line 18 - 24). sumUp takes as first argument a promise by rvalue reference. The futures ask in line 55 for the results. The<span style="font-family: courier new,courier;"> ge</span>t call is blocking.&nbsp;</p>
+<p>I define in lines 37 - 45 the four promises and create from them the associated futures. Each promise is moved in lines 50 - 52 in a separate thread. A promise can only be moved; therefore, I use <span style="font-family: courier new,courier;">std::move</span>. The work package of the thread is the function sumUp (lines 18 - 24). sumUp takes as the first argument a promise by rvalue reference. The futures ask in line 55 for the results. The<span style="font-family: courier new,courier;"> ge</span>t call is blocking.&nbsp;</p>
 <h3>Without optimization</h3>
-<p><img src="images/blog/Speichermodell/AdditionInMehrerenThreads/tasks.png" alt="tasks" width="400" height="182" style="margin: 15px;" /><img src="images/blog/Speichermodell/AdditionInMehrerenThreads/taskswin.png" alt="taskswin" width="450" height="145" /></p>
+<p><img src="https://www.modernescpp.com/images/blog/Speichermodell/AdditionInMehrerenThreads/tasks.png" alt="tasks" width="400" height="182" style="margin: 15px;" /><img src="https://www.modernescpp.com/images/blog/Speichermodell/AdditionInMehrerenThreads/taskswin.png" alt="taskswin" width="450" height="145" /></p>
 <h3>Maximum optimization</h3>
-<p><img src="images/blog/Speichermodell/AdditionInMehrerenThreads/tasksOpt.png" alt="tasksOpt" width="400" height="182" style="margin: 15px;" /><img src="images/blog/Speichermodell/AdditionInMehrerenThreads/tasksOptwin.png" alt="tasksOptwin" width="450" height="145" /></p>
+<p><img src="https://www.modernescpp.com/images/blog/Speichermodell/AdditionInMehrerenThreads/tasksOpt.png" alt="tasksOpt" width="400" height="182" style="margin: 15px;" /><img src="https://www.modernescpp.com/images/blog/Speichermodell/AdditionInMehrerenThreads/tasksOptwin.png" alt="tasksOptwin" width="450" height="145" /></p>
 <p>All numbers in the overview</p>
 <h2>The overview</h2>
-<p>As previously mentioned the numbers are quite similar for Linux. That's no surprise because I always use the same strategy: Calculate locally the partial sum without synchronization and add the local sums. The addition of the partial sums has to be synchronized. What astoni<span id="transmark"></span>shed me, was that the maximum optimization makes no big difference.&nbsp;</p>
-<p>On Windows the story is totally different. First it makes a big difference if I compile the program with maximum or without optimization, second Windows is a much slower than Linux. I'm not sure if that is due to the fact that Windows has only 2 cores but Linux 4.</p>
-<p>&nbsp;<img src="images/blog/Speichermodell/AdditionInMehrerenThreads/MultipleThreadsEng.png" alt="MultipleThreadsEng" width="700" height="189" style="margin: 15px;" /></p>
+<p>As previously mentioned, the numbers are quite similar for Linux. That's no surprise because I always use the same strategy: Calculate the partial sum locally without synchronization and add the local sums. The addition of the partial sums has to be synchronized. What astonished me was that the maximum optimization makes no big difference.&nbsp;</p>
+<p>On Windows, the story is totally different. First, it makes a big difference if I compile the program with maximum or without optimization; second Windows is much slower than Linux. I'm not sure if that is due to the fact that Windows has only 2 cores but Linux 4.</p>
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/Speichermodell/AdditionInMehrerenThreads/MultipleThreadsEng.png" alt="MultipleThreadsEng" width="700" height="196" style="margin: 15px;" /></p>
 <h2>What's next?</h2>
-<p>I will reason in the next post about the numbers for summing up a vector and the results that can be derived from it.</p>
+<p>I will reason in the<a href="https://www.modernescpp.com/index.php/my-conclusion-summation-of-a-vector-in-three-variants"> next post </a>about the numbers for summing up a vector and the results that can be derived from it.</p>
 <p>&nbsp;</p>
 <p>&nbsp;</p>
-<p>Do you want to get the source code? <a href="index.php/source-code-repository">Source code repository</a></p>
 <p>&nbsp;</p>
 <p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>{loadmoduleid 153}</p>

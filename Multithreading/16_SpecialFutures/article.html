@@ -1,8 +1,8 @@
-<p>The parent of a thread has to take care of their child. The parent can wait until his child is done or detach himself from his child. But that is not really new. But that will not hold for <span style="font-family: courier new,courier;">std::async</span>. The big charm of<span style="font-family: courier new,courier;"> std::async</span> is, that the parent has not taken care of his child.</p>
+<p>The parent of a thread has to take care of their child. The parent can wait until his child is done or detach himself from his child. But that is not really new. But that will not hold for <span style="font-family: courier new,courier;">std::async</span>. The big charm of<span style="font-family: courier new,courier;"> std::async</span> is that the parent has not taken care of his child.</p>
 <hr id="system-readmore" />
 <h2>Fire and forget</h2>
-<p><span style="font-family: courier new,courier;">std::async</span> creates special futures. These futures wait in their destructor until the work of the associated promise is done. That is the reason, why the creator has not to take care of their child. But it gets even better. You can execute a <span style="font-family: courier new,courier;">std::future</span> as a fire-and-forget job. The by <span style="font-family: courier new,courier;">std::async</span> created future will be executed just in place. Because the <span style="font-family: courier new,courier;">std::future fut</span> is in this case not bound to a variable, it's not possible to invoke<span style="font-family: courier new,courier;"> fut.get()</span> or <span style="font-family: courier new,courier;">fut.wait()</span> on the future to get the result of the promise.</p>
-<p>Maybe, my last sentences were a bit too confusing. So I'll compare an ordinary future with a fire-and-forget future. It is necessary for fire-and-forget futures, that the promise runs in a separate thread to start immediately with its work. This is done by the <span style="font-family: courier new,courier;">std::launch::async</span> policy. You can read the details of the launch policy in the post <a href="https://www.modernescpp.com/index.php/asynchronous-function-calls">asynchronous function calls</a>.</p>
+<p><span style="font-family: courier new,courier;">std::async</span> creates special futures. These futures wait in their destructor until the work of the associated promise is done. That is why the creator has not to take care of their child. But it gets even better. You can execute a <span style="font-family: courier new,courier;">std::future</span> as a fire-and-forget job. The by <span style="font-family: courier new,courier;">std::async</span> created future will be executed just in place. Because the <span style="font-family: courier new,courier;">std::future fut</span> is, in this case, not bound to a variable, it's not possible to invoke<span style="font-family: courier new,courier;"> fut.get()</span> or <span style="font-family: courier new,courier;">fut.wait()</span> on the future to get the result of the promise.</p>
+<p>Maybe, my last sentences were a bit too confusing. So I'll compare an ordinary future with a fire-and-forget future. It is necessary for fire-and-forget futures that the promise runs in a separate thread to start immediately with its work. This is done by the <span style="font-family: courier new,courier;">std::launch::async</span> policy. You can read the details of the launch policy in the post <a href="https://www.modernescpp.com/index.php/asynchronous-function-calls">asynchronous function calls</a>.</p>
 <!-- HTML generated using hilite.me -->
 <div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
 <pre style="margin: 0; line-height: 125%;"><span style="color: #0000ff;">auto</span> fut= std::async([]{<span style="color: #0000ff;">return</span> 2011;});
@@ -12,7 +12,7 @@ std::async(std::launch::async,[]{std::cout &lt;&lt; <span style="color: #a31515;
   
 </pre>
 </div>
-<p>The fire-and-forget futures have a bag charm. They will run in place and execute their work package, without the creator taking care of them. The simple example shows the described behavior.</p>
+<p>The fire-and-forget futures have a bag charm. They will run in place and execute their work package without the creator taking care of them. The simple example shows the described behavior.</p>
 <p>&nbsp;</p>
 <!-- HTML generated using hilite.me -->
 <div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
@@ -36,7 +36,7 @@ std::async(std::launch::async,[]{std::cout &lt;&lt; <span style="color: #a31515;
 <p>&nbsp;</p>
 <p>The praise for the behavior is high. Too high.</p>
 <h2>One after another</h2>
-<p>The future, that is created by <span style="font-family: courier new,courier;">std::async</span>, waits in its destructor until its work is done. Another word for waiting is blocking. The future blocks the progress of the program in its destructor. The becomes obvious, in case you use fire-and-forget futures.</p>
+<p>The future, that is created by <span style="font-family: courier new,courier;">std::async</span>, waits in its destructor until its work is done. Another word for waiting is blocking. The future blocks the progress of the program in its destructor. The becomes obvious in case you use fire-and-forget futures.</p>
 <p>&nbsp;</p>
 <!-- HTML generated using hilite.me -->
 <div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
@@ -101,11 +101,11 @@ std::async(std::launch::async,[]{std::cout &lt;&lt; <span style="color: #a31515;
 </table>
 </div>
 <p>&nbsp;</p>
-<p>The program executes two promises in its own thread. The resulting futures are fire-and-forget futures. These futures block in their destructor until the associated promise is done. The result is, that the promise will be executed with high probability in that sequence, in which you find them in the source code. That is exactly what you see in the output of the program.</p>
+<p>The program executes two promises in its own thread. The resulting futures are fire-and-forget futures. These futures block in their destructor until the associated promise is done. The result is that the promise will be executed with high probability in that sequence in which you find them in the source code. That is exactly what you see in the output of the program.</p>
 <p>&nbsp;</p>
 <p><img src="https://www.modernescpp.com/images/blog/Threads/DieBesonderenFutures/blocking.PNG" alt="blocking" width="500" height="137" /></p>
-<p>I want to stress this point once more. Although I create in the <span style="font-family: courier new,courier;">main</span>-thread two promises, which are executed in separate threads, the threads run in sequence one after the other. That is the reason, why the thread with the more time-consuming work package (line 12) finishes first. Wow, that was disappointing. Instead of three threads running concurrently, each thread will be executed after another.</p>
-<p>The key issue is, that the by <span style="font-family: courier new,courier;">std::async</span> created thread is waiting in its destructor until the associated promise is done, which can not be solved. The problem can only be mitigated. In case you bind the future to a variable, the blocking will take place at the time point when the variable goes out of scope. That is the behavior, you can observe in the next example.</p>
+<p>I want to stress this point once more. Although I create in the <span style="font-family: courier new,courier;">main</span>-thread two promises, which are executed in separate threads, the threads run in sequence one after the other. That is why the thread with the more time-consuming work package (line 12) finishes first. Wow, that was disappointing. Instead of three threads running concurrently, each thread will be executed after another.</p>
+<p>The key issue is that the by <span style="font-family: courier new,courier;">std::async</span> created thread is waiting in its destructor until the associated promise is done, which can not be solved. The problem can only be mitigated. In case you bind the future to a variable, the blocking will take place at the time point when the variable goes out of scope. That is the behavior you can observe in the next example.</p>
 <p>&nbsp;&nbsp;</p>
 <!-- HTML generated using hilite.me -->
 <div style="background: #ffffff; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
@@ -170,12 +170,12 @@ std::async(std::launch::async,[]{std::cout &lt;&lt; <span style="color: #a31515;
 </table>
 </div>
 <p>&nbsp;</p>
-<p>Now, the output of the program matches our intuition, because the three threads are executed in parallel. The future first (line 12) and second (line 17) are valid until the end of the <span style="font-family: courier new,courier;">main</span> function (line 24). So, the destructor will perhaps block at this time point. The result is, that the threads with the smallest work package are the fastest one.</p>
+<p>Now, the output of the program matches our intuition because the three threads are executed in parallel. The future first (line 12) and second (line 17) are valid until the end of the <span style="font-family: courier new,courier;">main</span> function (line 24). So, the destructor will perhaps block at this time point. The result is that the threads with the smallest work package are the fastest ones.</p>
 <p>&nbsp;</p>
 <p><img src="https://www.modernescpp.com/images/blog/Threads/DieBesonderenFutures/notBlocking.PNG" alt="notBlocking" width="500" height="137" />&nbsp;</p>
 <h2>It's not so bad</h2>
-<p>I have to admit, my usage of <span style="font-family: courier new,courier;">std::async</span> creates futures very contrived. At first, the futures were not bound to a variable. Second, I didn't use the future to pick up the result from the promise by a <span style="font-family: courier new,courier;">get</span> or <span style="font-family: courier new,courier;">wait</span> call. Exactly in that situation, we can observe the strange behavior, that the future blocks in its destructor.</p>
-<p>The key reason for these posts was, to show, that a fire-and-forget future, which is not bound to a variable, must be handled with great care. But this point doesn't hold for futures, which are created by <span style="font-family: courier new,courier;">std::packaged_task</span> or <span style="font-family: courier new,courier;">std::promise.</span></p>
+<p>I have to admit, my usage of <span style="font-family: courier new,courier;">std::async</span> creates futures very contrived. At first, the futures were not bound to a variable. Second, I didn't use the future to pick up the result from the promise by a <span style="font-family: courier new,courier;">get</span> or <span style="font-family: courier new,courier;">wait</span> call. Exactly in that situation, we can observe the strange behavior that the future blocks in its destructor.</p>
+<p>The key reason for these posts was to show that a fire-and-forget future, which is not bound to a variable, must be handled with great care. But this point doesn't hold for futures, which are created by <span style="font-family: courier new,courier;">std::packaged_task</span> or <span style="font-family: courier new,courier;">std::promise.</span></p>
 <h2>What's next?</h2>
 <p>I guess you know it. I'm not a big fan of <a href="https://www.modernescpp.com/index.php/condition-variables">condition variable</a>s. So I want to compare condition variables with tasks to synchronize threads. Because I believe, tasks are the most times the less error-prone and therefore the better choice. So, stay tuned for the <a href="https://www.modernescpp.com/index.php/thread-synchronization-with-condition-variables-or-tasks">next post. </a>(<strong>Proofreader Alexey Elymanov</strong>)</p>
 <p>&nbsp;</p>

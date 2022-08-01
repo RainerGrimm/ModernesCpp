@@ -1,10 +1,10 @@
-<p>If the<a href="https://www.modernescpp.com/index.php/the-risk-of-mutexes"> previous post </a>showed something, it's, that you should use mutexes with great care. That's why you should wrap them in a lock.</p>
+<p>If the<a href="https://www.modernescpp.com/index.php/the-risk-of-mutexes"> previous post </a>showed something, it's that you should use mutexes with great care. That's why you should wrap them in a lock.</p>
 <hr id="system-readmore" />
 <h2>Locks</h2>
-<p>Locks take care of their resource following the <a href="http://en.cppreference.com/w/cpp/language/raii">RAII</a> idiom. &nbsp;A lock automatically binds its mutex in the constructor and releases it in the destructor. This considerably reduces the risk of a deadlock, because the runtime takes care of the mutex.</p>
+<p>Locks take care of their resource following the <a href="http://en.cppreference.com/w/cpp/language/raii">RAII</a> idiom. &nbsp;A lock automatically binds its mutex in the constructor and releases it in the destructor. This considerably reduces the risk of a deadlock because the runtime takes care of the mutex.</p>
 <p>Locks are available in two flavors in C++11. <span style="font-family: courier new,courier;">std::lock_guard</span> for the simple, &nbsp;and&nbsp;<span style="font-family: courier new,courier;">std::unique-lock</span> for the advanced use case.</p>
 <h3><span style="font-family: courier new,courier;"><a id="lock_guard">std::lock_guard</a></span></h3>
-<p>First, the simple use case.</p>
+<p>First is the simple use case.</p>
 <!-- HTML generated using hilite.me -->
 <div style="background: #ffffff none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
 <pre style="margin: 0px; line-height: 125%;">mutex m;
@@ -14,7 +14,7 @@ m.unlock();
 </pre>
 </div>
 <p>&nbsp;</p>
-<p>With so little code mutex <span style="font-family: courier new,courier;">m</span> ensures access of the critical section&nbsp;<span style="font-family: courier new,courier;">sharedVariable= getVar()</span> is sequential. Sequential means &nbsp;- in this special case - &nbsp;that each thread gains access to the critical section in order. The code is simple but prone to deadlocks. Deadlock appears if the critical section throws an exception or if the programmer simply forgets to unlock the mutex. With <span style="font-family: courier new,courier;">std::lock_guard</span> we can do this more elegant:</p>
+<p>With so little code, mutex <span style="font-family: courier new,courier;">m</span> ensures access to the critical section&nbsp;<span style="font-family: courier new,courier;">sharedVariable= getVar()</span> is sequential. Sequential means &nbsp;- in this special case - &nbsp;that each thread gains access to the critical section in order. The code is simple but prone to deadlocks. Deadlock appears if the critical section throws an exception or if the programmer simply forgets to unlock the mutex. With <span style="font-family: courier new,courier;">std::lock_guard</span> we can do this more elegant:</p>
 <!-- HTML generated using hilite.me -->
 <div style="background: #ffffff none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
 <pre style="margin: 0px; line-height: 125%;">{
@@ -25,7 +25,7 @@ m.unlock();
 </pre>
 </div>
 <p>&nbsp;</p>
-<p>That was easy. But what's about the opening and closing brackets? The lifetime of <span style="font-family: courier new,courier;">std::lock_guard</span> is limited by the brackets (<a href="http://en.cppreference.com/w/cpp/language/scope#Block_scope">http://en.cppreference.com/w/cpp/language/scope#Block_scope</a>). That means, its lifetime ends when it leaves the critical section. Exactly at that time point, the destructor of<span style="font-family: courier new,courier;"> std::lock_guard i</span>s called, and - I guess, you know it - the mutex is released. It happens automatically, and, in addition, it &nbsp;happens if &nbsp;<span style="font-family: 'courier new', courier;">getVar()</span> in&nbsp;<span style="font-family: courier new,courier;">sharedVariable = getVar()</span> throws an exception. Of course, function body scope or loop scope also limit the lifetime of an object.</p>
+<p>That was easy. But what about the opening and closing brackets? The lifetime of <span style="font-family: courier new,courier;">std::lock_guard</span> is limited by the brackets (<a href="http://en.cppreference.com/w/cpp/language/scope#Block_scope">http://en.cppreference.com/w/cpp/language/scope#Block_scope</a>). That means its lifetime ends when it leaves the critical section. At that time, the destructor of<span style="font-family: courier new,courier;"> std::lock_guard i</span>s called, and - I guess, you know it - the mutex is released. It happens automatically, and, in addition, it &nbsp;happens if &nbsp;<span style="font-family: 'courier new', courier;">getVar()</span> in&nbsp;<span style="font-family: courier new,courier;">sharedVariable = getVar()</span> throws an exception. Of course, function body scope or loop scope also limits the lifetime of an object.</p>
 <h3><span style="font-family: courier new,courier;"><a id="unique_lock">std::unique_lock</a></span></h3>
 <p>std::unique_lock is mightier but more expansive than its small brother&nbsp;<span style="font-family: courier new,courier;">std::lock_guard</span>.</p>
 <p>A <span style="font-family: courier new,courier;">std::unique_lock </span>enables you<span style="font-family: courier new,courier;"></span>in addition to <span style="font-family: courier new,courier;">std::lock_guard </span></p>
@@ -226,7 +226,7 @@ m.unlock();
 </div>
 <p>&nbsp;</p>
 <p>In case you call the constructor of <span style="font-family: courier new,courier;">std::unique_lock</span> with the argument <span style="font-family: courier new,courier;">std::defer_lock<span style="font-family: arial,helvetica,sans-serif;">, the lock will not be locked <span style="font-family: arial, helvetica, sans-serif;">automatically</span>. It happens in lines 14 and 19. The lock operation is performed <span style="font-family: arial, helvetica, sans-serif;">atomically&nbsp;</span>in line 23 by using the variadic template <span style="font-family: courier new,courier;">std::lock</span>. A variadic template is a template that can accept an arbitrary number of arguments. Here, the arguments are locks. <span style="font-family: courier new,courier;">std::lock</span>&nbsp;tries to get all locks in an atomic step. So, he fails or gets all of them. <span style="font-family: courier new,courier;"></span><span style="font-family: courier new,courier;"></span></span> </span></p>
-<p>In this example, <span style="font-family: courier new,courier;">std::unique_lock</span> takes care of the lifetime of the resources, <span style="font-family: courier new,courier;">std::lock</span> locks the associated mutex. But, you can do it the other way around. In the first step, you lock the mutexes, in the second <span style="font-family: courier new,courier;">std::unique_lock</span> takes care of the lifetime of resources. Here is a sketch of the second approach.</p>
+<p>In this example, <span style="font-family: courier new,courier;">std::unique_lock</span> takes care of the lifetime of the resources, <span style="font-family: courier new,courier;">std::lock</span> locks the associated mutex. But, you can do it the other way around. In the first step, you lock the mutexes; in the second <span style="font-family: courier new,courier;">std::unique_lock</span> takes care of the lifetime of resources. Here is a sketch of the second approach.</p>
 <p>&nbsp;</p>
 <!-- HTML generated using hilite.me -->
 <div style="background: #ffffff none repeat scroll 0% 0%; overflow: auto; width: auto; border-width: 0.1em 0.1em 0.1em 0.8em;">
@@ -239,7 +239,7 @@ std::lock_guard&lt;std::mutex&gt; guard2(b.mut, std::adopt_lock);
 <p>Now, all is fine. The program runs without deadlock.</p>
 <p><img src="https://www.modernescpp.com/images/blog/Threads/LocksStattMutexen/deadlockResolved.png" alt="deadlockResolved" /><span style="color: #000000;"></span><br /><span style="color: #000000;"></span></p>
 <h3><span style="color: #000000;">A side note: Special deadlocks<br /></span></h3>
-<p>It's an illusion that only a mutex can produce a deadlock.<strong> Each time a thread has to wait for a resource, while it is holding a&nbsp;resource, a deadlock lurks near.</strong></p>
+<p>It's an illusion that only a mutex can produce a deadlock.<strong> Each time a thread has to wait for a resource, a deadlock lurks near while it is holding a resource.</strong></p>
 <p><span style="color: #000000;">Even a thread is a resource.<br /></span></p>
 <p><span style="color: #000000;"><!-- HTML generated using hilite.me --></span></p>
 <!-- HTML generated using hilite.me -->
@@ -307,8 +307,8 @@ std::mutex coutMutex;
 <p><span style="color: #000000;"></span></p>
 <p><span style="color: #000000;">The program immediately stands still.<br /></span></p>
 <p><span style="color: #000000;"><img src="https://www.modernescpp.com/images/blog/Threads/LocksStattMutexen/blockJoin.png" alt="blockJoin" /></span></p>
-<p>What's happening? The lock of output stream <span style="font-family: courier new,courier;">std::cout</span> and the waiting of the main thread for its child t are the cause for the deadlock. By observing the output, you can easily see, in which order the statements will be performed.</p>
-<p>In the first step, the main thread executes lines 19 - 21. It waits in line 21 by using the call <span style="font-family: courier new,courier;">t.join()</span> until its child t is done with its work package. The main thread is waiting, while it locks the output stream. But that's exactly the resource the child is&nbsp;waiting for. Two ways to solve this deadlock come to mind.</p>
+<p>What's happening? The lock of output stream <span style="font-family: courier new,courier;">std::cout</span> and the waiting of the main thread for its child t are the cause of the deadlock. By observing the output, you can easily see in which order the statements will be performed.</p>
+<p>In the first step, the main thread executes lines 19 - 21. It waits in line 21 by using the call <span style="font-family: courier new,courier;">t.join()</span> until its child t is done with its work package. The main thread is waiting while it locks the output stream. But that's exactly the resource the child is&nbsp;waiting for. Two ways to solve this deadlock come to mind.</p>
 <p style="color: #000000;">&nbsp;</p>
 <ul>
 <li><span style="color: #000000;">The <span style="font-family: courier new,courier;">main t</span>hread locks the output stream <span style="font-family: courier new,courier;">std::cout</span> after the call <span style="font-family: courier new,courier;">t.join()</span>.</span></li>
@@ -337,7 +337,7 @@ std::mutex coutMutex;
 </div>
 <p><span style="color: #3366ff;"><span style="color: #000000;"></span></span></p>
 <h2>What's next?</h2>
-<p>In the <a href="https://www.modernescpp.com/index.php/reader-writer-locks">next post</a>, I'll talk about reader-writer locks. Reader-writer locks empower you since C++14, to distinguish between reading and writing threads. So, the contention on the shared variable will be mitigated, because an arbitrary number of reading threads can access the shared variable at the same time. (<strong>Proofreader Alexey Elymanov</strong>)</p>
+<p>In the <a href="https://www.modernescpp.com/index.php/reader-writer-locks">next post</a>, I'll talk about reader-writer locks. Reader-writer locks empower you since C++14 to distinguish between reading and writing threads. So, the contention on the shared variable will be mitigated because an arbitrary number of reading threads can access the shared variable at the same time. (<strong>Proofreader Alexey Elymanov</strong>)</p>
 <p>&nbsp;</p>
 <p>&nbsp;</p>
 <p>&nbsp;</p>
