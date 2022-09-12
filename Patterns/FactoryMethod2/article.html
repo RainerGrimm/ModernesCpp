@@ -1,0 +1,281 @@
+<p>In the last installment of this blog, I introduced the Factory Method: Creational Patterns: Factory Method 1. My implementation had two serious issues: slicing and ownership semantics. Today, I fix these issues.</p>
+<hr id="system-readmore" />
+<h3><img src="https://www.modernescpp.com/images/blog/Patterns/FactoryMethod2/CreationalPatterns.png" alt="CreationalPatterns" width="650" height="330" style="display: block; margin-left: auto; margin-right: auto;" /></h3>
+<p>To remind you, here is a simplified and slightly modified implementation of the Factory Method in my last post. First, this implementation support only the member function <code>clone</code>; second, also the base class <code>Window</code> should be cloneable.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// factoryMethodWindowIssues.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #0099ff; font-style: italic;">// Product</span>
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Window</span>{ 
+ <span style="color: #006699; font-weight: bold;">public</span><span style="color: #555555;">:</span>                
+    <span style="color: #006699; font-weight: bold;">virtual</span> Window<span style="color: #555555;">*</span> clone() { 
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Clone Window"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+        <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #006699; font-weight: bold;">new</span> <span style="color: #cc00ff;">Window</span>(<span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">this</span>);
+    }                       
+    <span style="color: #006699; font-weight: bold;">virtual</span> <span style="color: #555555;">~</span>Window() {};
+};
+
+<span style="color: #0099ff; font-style: italic;">// Concrete Products </span>
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">DefaultWindow</span><span style="color: #555555;">:</span> <span style="color: #006699; font-weight: bold;">public</span> Window { 
+     DefaultWindow<span style="color: #555555;">*</span> clone() override { 
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Clone DefaultWindow"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+        <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #006699; font-weight: bold;">new</span> <span style="color: #cc00ff;">DefaultWindow</span>(<span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">this</span>);
+    } 
+};
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">FancyWindow</span><span style="color: #555555;">:</span> <span style="color: #006699; font-weight: bold;">public</span> Window { 
+    FancyWindow<span style="color: #555555;">*</span> clone() override { 
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Clone FancyWindow"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+        <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #006699; font-weight: bold;">new</span> <span style="color: #cc00ff;">FancyWindow</span>(<span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">this</span>);
+    } 
+};
+
+<span style="color: #0099ff; font-style: italic;">// Concrete Creator or Client                             </span>
+Window<span style="color: #555555;">*</span> <span style="color: #cc00ff;">cloneWindow</span>(Window<span style="color: #555555;">&amp;</span> oldWindow) {                    
+    <span style="color: #006699; font-weight: bold;">return</span> oldWindow.clone();
+}
+  
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    Window window;
+    DefaultWindow defaultWindow;
+    FancyWindow fancyWindow;
+
+    <span style="color: #006699; font-weight: bold;">const</span> Window<span style="color: #555555;">*</span> window1 <span style="color: #555555;">=</span> cloneWindow(window);
+    <span style="color: #006699; font-weight: bold;">const</span> Window<span style="color: #555555;">*</span> defaultWindow1 <span style="color: #555555;">=</span> cloneWindow(defaultWindow);
+    <span style="color: #006699; font-weight: bold;">const</span> Window<span style="color: #555555;">*</span> fancyWindow1 <span style="color: #555555;">=</span> cloneWindow(fancyWindow);
+  
+    <span style="color: #006699; font-weight: bold;">delete</span> window1;
+    <span style="color: #006699; font-weight: bold;">delete</span> defaultWindow1;
+    <span style="color: #006699; font-weight: bold;">delete</span> fancyWindow1;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The program produces the expected polymorphic behavior.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Patterns/FactoryMethod2/factoryMethodWindowIssues.png" alt="factoryMethodWindowIssues" width="441" height="175" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>{loadmoduleid 157}</p>
+<h3>Slicing</h3>
+<p>First: What is slicing?</p>
+<ul>
+<li><strong>Slicing</strong> means you want to copy an object during assignment or initialization, and you get only a part of the object.</li>
+</ul>
+<p>Slicing is one of the darkest corners of C++. Let me give you a simple example:</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// slice.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;typeinfo&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">struct</span> Base { };
+ 
+<span style="color: #006699; font-weight: bold;">struct</span> Derived <span style="color: #555555;">:</span> Base { };
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">displayTypeinfo</span>(<span style="color: #006699; font-weight: bold;">const</span> Base<span style="color: #555555;">&amp;</span> b) {
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #006699; font-weight: bold;">typeid</span>(b).name() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>; 
+}
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">needB</span>(Base b) {
+    displayTypeinfo(b);
+};
+ 
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    Derived d;
+  
+    Base b <span style="color: #555555;">=</span> d;          
+    displayTypeinfo(b);      <span style="color: #0099ff; font-style: italic;">// (1)</span>
+  
+    Base b2(d);        
+    displayTypeinfo(b2);     <span style="color: #0099ff; font-style: italic;">// (2)</span>
+  
+    needB(d);                <span style="color: #0099ff; font-style: italic;">// (3)</span>
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The expressions (1), (2), and (3) have all the same effect: The <code>Derived</code> part of <code>d</code> is removed. I assume that was not your intention.</p>
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/Patterns/FactoryMethod2/slice.png" alt="slice" width="300" height="121" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>&nbsp;</p>
+<p>You may ask yourself. Why is slicing an issue for the example<span style="color: #000000; font-family: courier new, courier;"> factoryMethodWindowIssues.cpp.</span> Let me quote the C++ Core Guidelines: <a href="https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#c67-a-polymorphic-class-should-suppress-public-copymove">C.67: A polymorphic class should suppress public copy/move</a>.</p>
+<p>Okay, there is a new question:&nbsp; What is a polymorphic class?</p>
+<ul>
+<li>A <strong>polymorphic class</strong> is a class that defines or inherits at least one virtual function.</li>
+</ul>
+<p>Here is the issue. <code>Window</code> in the program <span style="color: #000000; font-family: courier new, courier;">factoryMethodWindowIssues.cpp</span> is a polymorphic class, and it does not suppress public copy/move. A <code>Window</code> can be a victim of slicing. The following program exemplifies this. I just removed the reference from the function signature of the function <code>cloneWindow</code>:</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// Concrete Creator or Client                             </span>
+Window<span style="color: #555555;">*</span> <span style="color: #cc00ff;">cloneWindow</span>(Window oldWindow) {                    
+    <span style="color: #006699; font-weight: bold;">return</span> oldWindow.clone();
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Due to the fact that the factory function <code>cloneWindow</code> takes its argument by copy and not by reference anymore, slicing kicks in.</p>
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/Patterns/FactoryMethod2/factoryMethodWindowIssuesSlicing.png" alt="factoryMethodWindowIssuesSlicing" width="400" height="146" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>Let's see what happens when I follow rule&nbsp; <a href="https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#c67-a-polymorphic-class-should-suppress-public-copymove">C.67: A polymorphic class should suppress public copy/move</a>.</p>
+<p>Here is the fixed program:</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// factoryMethodWindowSlicingFixed.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #0099ff; font-style: italic;">// Product</span>
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Window</span>{ 
+ <span style="color: #006699; font-weight: bold;">public</span><span style="color: #555555;">:</span>      
+    Window() <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">default</span>;                          <span style="color: #0099ff; font-style: italic;">// (3)</span>
+    Window(<span style="color: #006699; font-weight: bold;">const</span> Window<span style="color: #555555;">&amp;</span>) <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">delete</span>;              <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    Window<span style="color: #555555;">&amp;</span> <span style="color: #006699; font-weight: bold;">operator</span> <span style="color: #555555;">=</span> (<span style="color: #006699; font-weight: bold;">const</span> Window<span style="color: #555555;">&amp;</span>) <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">delete</span>; <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    <span style="color: #006699; font-weight: bold;">virtual</span> Window<span style="color: #555555;">*</span> <span style="color: #cc00ff;">clone</span>() { 
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Clone Window"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+        <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #006699; font-weight: bold;">new</span> Window(<span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">this</span>);
+    }                       
+    <span style="color: #006699; font-weight: bold;">virtual</span> <span style="color: #555555;">~</span>Window() {};
+};
+
+<span style="color: #0099ff; font-style: italic;">// Concrete Products </span>
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">DefaultWindow</span><span style="color: #555555;">:</span> <span style="color: #006699; font-weight: bold;">public</span> Window { 
+     DefaultWindow<span style="color: #555555;">*</span> clone() override { 
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Clone DefaultWindow"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+        <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #006699; font-weight: bold;">new</span> <span style="color: #cc00ff;">DefaultWindow</span>(<span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">this</span>);
+    } 
+};
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">FancyWindow</span><span style="color: #555555;">:</span> <span style="color: #006699; font-weight: bold;">public</span> Window { 
+    FancyWindow<span style="color: #555555;">*</span> clone() override { 
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Clone FancyWindow"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+        <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #006699; font-weight: bold;">new</span> <span style="color: #cc00ff;">FancyWindow</span>(<span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">this</span>);
+    } 
+};
+
+<span style="color: #0099ff; font-style: italic;">// Concrete Creator or Client                             </span>
+Window<span style="color: #555555;">*</span> <span style="color: #cc00ff;">cloneWindow</span>(Window oldWindow) {           <span style="color: #0099ff; font-style: italic;">// (4)                 </span>
+    <span style="color: #006699; font-weight: bold;">return</span> oldWindow.clone();
+}
+  
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    Window window;
+    DefaultWindow defaultWindow;
+    FancyWindow fancyWindow;
+
+    <span style="color: #006699; font-weight: bold;">const</span> Window<span style="color: #555555;">*</span> window1 <span style="color: #555555;">=</span> cloneWindow(window);
+    <span style="color: #006699; font-weight: bold;">const</span> Window<span style="color: #555555;">*</span> defaultWindow1 <span style="color: #555555;">=</span> cloneWindow(defaultWindow);
+    <span style="color: #006699; font-weight: bold;">const</span> Window<span style="color: #555555;">*</span> fancyWindow1 <span style="color: #555555;">=</span> cloneWindow(fancyWindow);
+  
+    <span style="color: #006699; font-weight: bold;">delete</span> window1;
+    <span style="color: #006699; font-weight: bold;">delete</span> defaultWindow1;
+    <span style="color: #006699; font-weight: bold;">delete</span> fancyWindow1;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>I deleted the copy constructor (line 1) and copy assignment operator (line 2). Due to the declared copy constructor, the class <code>Window</code> supports no move semantics. Additionally, the default constructor is also not declared. Therefore, I have to default it (line 1).</p>
+<p>The error message of the Microsoft Visual C++ compiler comes directly to the point:</p>
+<p><img src="https://www.modernescpp.com/images/blog/Patterns/FactoryMethod2/factoryMethodWindowsSlicingFixed.png" alt="factoryMethodWindowsSlicingFixed" width="650" height="192" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>The necessary copy constructor is deleted.</p>
+<p>Okay. Let me write about the ownership issue of the program.</p>
+<h3>Ownership Semantics</h3>
+<p>In general, you don't know the implementation of the factory function <code>cloneWindow</code>. <code>cloneWindow</code> returns a pointer to <code>Window</code>. <strong>Pointers have, by design, a flaw. They model two completely different semantics: ownership and borrowing.</strong></p>
+<ul>
+<li><strong>Ownership</strong>: the caller is responsible for the Windows and must destroy it; this is the behavior that program <code>factoryMethodWindowsIssues.cpp</code> modeled</li>
+<li><strong>Borrowing</strong>: the callee is responsible for the Window and borrows it from the caller</li>
+</ul>
+<p>Let me emphasize this one more.</p>
+<ul>
+<li><strong>Owner</strong>: You are the owner of the <code>Window</code>. You have to take care of it and destroy it. If not, you have a memory leak.</li>
+<li><strong>Borrower</strong>: You are not the owner of the Window. You can not destroy it. If you destroy it, you have a double delete.</li>
+</ul>
+<p>How can we overcome this design flaw? The rescue has two parts. A weak one based on discipline and a strong one based on the type system.</p>
+<h4>The Weak Rescue</h4>
+<p>The weak rescue is based on discipline: In modern C++, we don't transfer ownership with a raw pointer.</p>
+<h4>The Strong Rescue</h4>
+<p>The strong rescue is based on the type system. When you want to transfer ownership, use a smart pointer. You have two choices:</p>
+<ul>
+<li><code>std::unique_ptr&lt;Widget&gt;</code>: Returning a <code>std::unique_ptr&lt;Widget&gt;</code> means that the caller is the owner. The <code>std::unique_ptr&lt;Widget&gt;</code> behaves such as a local. When it goes out of scope, it is automatically destroyed.</li>
+<li><code>std::shared_ptr&lt;Widget&gt;</code>: Returning a <code>std::shared_ptr&lt;Widget&gt;</code> means that the caller and the called share ownership. When neither the caller nor the callee needs the <code>std::shared_ptr&lt;Widget&gt;</code> anymore, it is automatically destroyed.</li>
+</ul>
+<p>The following program <code>factoryMethodUniquePtr.cpp</code> uses a <code>std::unique_ptr&lt;Window&gt;</code> to explicitly transfer ownership. Additionally, a<code> std::unique_ptr&nbsp;</code>can not be copied. Consequentially,&nbsp; the factory function creates a new <code>std::unique_ptr&lt;Widget&gt;</code>.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #009999;"><span style="color: #0099ff; font-style: italic;">// factoryMethodUniquePtr.cpp</span><br /><br />#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;memory&gt;</span>
+
+<span style="color: #0099ff; font-style: italic;">// Product</span>
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Window</span>{ 
+ <span style="color: #006699; font-weight: bold;">public</span><span style="color: #555555;">:</span> 
+    <span style="color: #006699; font-weight: bold;">virtual</span> std<span style="color: #555555;">::</span>unique_ptr<span style="color: #555555;">&lt;</span>Window<span style="color: #555555;">&gt;</span> create() { 
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Create Window"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+        <span style="color: #006699; font-weight: bold;">return</span> std<span style="color: #555555;">::</span>make_unique<span style="color: #555555;">&lt;</span>Window<span style="color: #555555;">&gt;</span>();
+    } 
+};
+
+<span style="color: #0099ff; font-style: italic;">// Concrete Products </span>
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">DefaultWindow</span><span style="color: #555555;">:</span> <span style="color: #006699; font-weight: bold;">public</span> Window {
+    std<span style="color: #555555;">::</span>unique_ptr<span style="color: #555555;">&lt;</span>Window<span style="color: #555555;">&gt;</span> create() override { 
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Create DefaultWindow"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+        <span style="color: #006699; font-weight: bold;">return</span> std<span style="color: #555555;">::</span>make_unique<span style="color: #555555;">&lt;</span>DefaultWindow<span style="color: #555555;">&gt;</span>();
+    } 
+};
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">FancyWindow</span><span style="color: #555555;">:</span> <span style="color: #006699; font-weight: bold;">public</span> Window {
+    std<span style="color: #555555;">::</span>unique_ptr<span style="color: #555555;">&lt;</span>Window<span style="color: #555555;">&gt;</span> create() override { 
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Create FancyWindow"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+        <span style="color: #006699; font-weight: bold;">return</span> std<span style="color: #555555;">::</span>make_unique<span style="color: #555555;">&lt;</span>FancyWindow<span style="color: #555555;">&gt;</span>();
+    } 
+};
+
+<span style="color: #0099ff; font-style: italic;">// Concrete Creator or Client</span>
+<span style="color: #006699; font-weight: bold;">auto</span> <span style="color: #cc00ff;">createWindow</span>(std<span style="color: #555555;">::</span>unique_ptr<span style="color: #555555;">&lt;</span>Window<span style="color: #555555;">&gt;&amp;</span> oldWindow) { 
+    <span style="color: #006699; font-weight: bold;">return</span> oldWindow<span style="color: #555555;">-&gt;</span>create();
+}
+  
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    std<span style="color: #555555;">::</span>unique_ptr<span style="color: #555555;">&lt;</span>Window<span style="color: #555555;">&gt;</span> window <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>make_unique<span style="color: #555555;">&lt;</span>Window<span style="color: #555555;">&gt;</span>();
+    std<span style="color: #555555;">::</span>unique_ptr<span style="color: #555555;">&lt;</span>Window<span style="color: #555555;">&gt;</span> defaultWindow <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>make_unique<span style="color: #555555;">&lt;</span>DefaultWindow<span style="color: #555555;">&gt;</span>();
+    std<span style="color: #555555;">::</span>unique_ptr<span style="color: #555555;">&lt;</span>Window<span style="color: #555555;">&gt;</span> fancyWindow <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>make_unique<span style="color: #555555;">&lt;</span>FancyWindow<span style="color: #555555;">&gt;</span>();
+  
+    <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #006699; font-weight: bold;">auto</span> window1 <span style="color: #555555;">=</span> createWindow(window);
+    <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #006699; font-weight: bold;">auto</span> defaultWindow1 <span style="color: #555555;">=</span> createWindow(defaultWindow);
+    <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #006699; font-weight: bold;">auto</span> fancyWindow1 <span style="color: #555555;">=</span> createWindow(fancyWindow);
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Finally, here is the output of the program.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Patterns/FactoryMethod2/factoryMethodUniquePtr.png" alt="factoryMethodUniquePtr" width="463" height="173" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>Each <code>create</code> member function returns a <code>std::unique_ptr&lt;Widget&gt;</code>, but creates under the hood a <code>std::unique_ptr&lt;Widget&gt;</code>, a <code>std::unique_ptr&lt;DefaultWindow&gt;</code>, or a <code>std::unique_ptr&lt;FancyWindow&gt;</code>. Therefore, the polymorphic behavior of the <code>createWindow</code> function is preserved.</p>
+<p>Additionally, this implementation based on<code> std::unique_ptr</code> solves the slicing issue because a <code>std::unique_ptr&lt;Widget&gt;</code> cannot be copied.</p>
+<h2>What's Next?</h2>
+<p>The final program <code>factoryMethodUniquePtr.cpp</code> is fine. It overcomes the slicing and ownership issues. Let me elaborate in my next post on the most controversial pattern of the Design Patterns book: the Singleton pattern.</p>
+<p>&nbsp;</p>
+<p>{loadmoduleid 153}</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
