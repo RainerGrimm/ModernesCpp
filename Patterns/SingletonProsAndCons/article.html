@@ -1,0 +1,93 @@
+<p>I introduced in my last post <a href="https://www.modernescpp.com/index.php/creational-patterns-singleton">"The Singleton</a>", the classical Singleton and the so-called Meyers Singleton. The Singleton Pattern is highly controversial. Let me, therefore, discuss in this post the pros and cons of the Singleton.</p>
+<hr id="system-readmore" />
+<p><img src="https://www.modernescpp.com/images/blog/Patterns/SingletonProsAndCons/CreationalPatterns.png" alt="CreationalPatterns" width="650" height="330" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>&nbsp;</p>
+<p>First of all, is Singleton a Pattern or an Anti-Pattern?</p>
+<h2>Singleton: A Pattern or an Anti-Pattern?</h2>
+<p>My most read post so far is my post "<a href="https://www.modernescpp.com/index.php/thread-safe-initialization-of-a-singleton">Thread-safe Initialization of a Singleton</a>".&nbsp; It was read more than 300'000 times, and I got many comments.</p>
+<p>Consequentially, I asked the community if they use the Singleton pattern: <a href="https://twitter.com/rainer_grimm/status/699717467770392576">https://twitter.com/rainer_grimm/status/699717467770392576</a>. About 150 people voted on Twitter, and the answer was not as clear as I expected. 59% use the Singleton, but 41% do not.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Patterns/SingletonProsAndCons/singletonPoll.png" alt="singletonPoll" width="500" height="279" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>The comment I got about the Singleton Pattern can be summed up in two answers:</p>
+<ol>
+<li>I don't use the Singleton because it is an anti-pattern.</li>
+<li>I only use the Singleton deliberately.</li>
+</ol>
+<p>However, I think one faction has not spoken up in this discussion. That is the fraction of developers who use the Singleton Pattern frequently. I know this faction from my daily work. If I include this silent fraction in the survey result, I assume that about 80% of the developers use the Singleton Pattern.</p>
+<p>Therefore, let's dive deeper and analyze the pros and cons of the Singleton Pattern.</p>
+<p>{loadmoduleid 157}</p>
+<h2>The Advantages and Disadvantages of the Singleton Pattern</h2>
+<p>I want to start positive:</p>
+<h3>Advantages</h3>
+<h4>Global Access Point</h4>
+<p>A Singleton is a global object in disguise, but it provides a global access point. As a global, a Singleton can be accessed from anywhere in the program, but it cannot be modified from anywhere. It can only be modified from within the Singleton. It is, therefore, a means to protect globals.</p>
+<h4>Unique Entity Model</h4>
+<p>It makes it easier to reason about your program when you model entities of reality. In reality, we often have Singletons such as registration offices, global timers, or factories for unique IDs. Consequentially, you achieve a very nice match between the program abstraction and the reality. This correspondence helps you and your client to better understand the program.</p>
+<h3>Disadvantages</h3>
+<h4>Static Initialization Order Fiasco</h4>
+<p>In my last post, "The Singleton," I already wrote about the static initialization order fiasco. It essentially means that you have no guarantee in which order statics in different translation units are initialized and destructed. The "<a href="https://en.wikipedia.org/wiki/Design_Patterns">Design Patterns: Elements of Reusable Object-Oriented Software"</a> based implementation of the Singleton Pattern has this issue, but the <a href="https://en.wikipedia.org/wiki/Scott_Meyers">Meyers </a>Singleton overcomes it.</p>
+<h4>Concurrency</h4>
+<p>The Meyers Singleton also overcomes the concurrency issue of the classical Singleton implementation. The Meyers Singleton is based on a local static. Since C++98, statics with local scope are lazily initialized, and with C++11, even thread-safe.&nbsp;</p>
+<h4>Too often used</h4>
+<p>The Singleton Pattern was often used when it was inappropriate, and a simple class instance could do a better job. This was mainly due to the fact that software developers want to prove that they understood the classical design pattern, and the Singleton often seems to be the long-hanging fruit. Honestly, we can not blame the Singleton Pattern for its misuse.&nbsp;</p>
+<h4>Hidden Dependency</h4>
+<p>You may assume it; this is my key point. A Singleton introduces a hidden dependency and breaks, therefore, testability. Let's consider the following code snippet:</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">func</span>() {
+   ...
+   DataBase<span style="color: #555555;">::</span>getInstance().update(<span style="color: #cc3300;">"something"</span>);
+   ...
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The call <code>DataBase::getInstance().update("something") </code>creates a hidden dependency. The caller of the function <code>func</code> has no idea that a database is called internally. What are the consequences? The code is no unit anymore and, therefore, not unit-testable. You cannot test this code in isolation. You can only make a system test including the operational database. You always end with two tests. You test the code of the function <code>func</code> and the database.</p>
+<p>Unit Tests should</p>
+<ul>
+<li>have no external dependency.</li>
+<li>be fast.</li>
+<li>have no side effects.</li>
+</ul>
+<p>Honestly, we can not blame the Singleton Pattern for the hidden dependency. This is just bad software design. Let me restructure the code.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">func(DataBaseSingleton<span style="color: #555555;">::</span>getInstance());
+
+...
+
+<span style="color: #007788; font-weight: bold;">void</span> func(DataBase<span style="color: #555555;">&amp;</span> db) {
+   ...
+   db.update(<span style="color: #cc3300;">"something"</span>);
+   ...
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Just make the <code>DataBase</code> part of the interface of the function. Now, there is no hidden dependency anymore. The function can be fast and without side effects. Now, it is a unit and, therefore, unit testable. Why?</p>
+<p>Make out of DataBase an interface and provide at least two implementations. One is the original Singleton <code>DataBaseSingleton</code> and the other is a <a href="https://en.wikipedia.org/wiki/Mock_object">mock object</a>: <code>DataBaseMock.</code> The <code>DataBaseMock</code> mimics the behavior of the <code>DataBaseSingleton</code> and can be used as a replacement for the real <code>DataBase</code>. The <code>DataBaseMock</code> is fully deterministic and introduces no dependency.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">func(DataBaseMock<span style="color: #555555;">::</span>getInstance());
+
+...
+
+<span style="color: #007788; font-weight: bold;">void</span> func(DataBase<span style="color: #555555;">&amp;</span> db) {
+   ...
+   db.update(<span style="color: #cc3300;">"something"</span>);
+   ...
+}
+</pre>
+</div>
+<h3>My Resume</h3>
+<p>I don't want to argue for or against the Singleton Pattern. Each pattern has its drawbacks, and this holds, in particular, true for the Singleton Pattern. Therefore, you should consider whether the advantages outweigh the disadvantages in the concrete case. Additionally, you should use the Meyers Singleton and make the Singleton a component of your function signature.</p>
+<p>To conclude my discussion about the pros and cons of the Singleton, here are two critical posts about the pattern from Arne Mertz and Jonathan Boccara:</p>
+<ul>
+<li>Simplify C++ by Arne Mertz:<a href="https://arne-mertz.de/2015/04/singletons-whats-the-deal/"> Singletons: What's the Deal? </a></li>
+<li>Fluent C++ by Jonathan Boccara: <a href="https://www.fluentcpp.com/2018/03/06/issues-singletons-signals/">The Issues With the Singletons and Hot to Fix Them</a></li>
+</ul>
+<h3>Your Resume</h3>
+<p>I'm happy to hear your resume. Please write me an e-mail to&nbsp;<a href="mailto:Rainer.Grimm@ModernesCpp.de">Rainer.Grimm@ModernesCpp.de</a>, and I will write an additional post if necessary.</p>
+<h2>What's Next?</h2>
+<p>So far, I haven't written about the singleton pattern alternatives. In my next post, I present two additional patterns: the Monostate Pattern (aka Borg Idiom) and Dependency Injection.</p>
+<p>&nbsp;</p>
+<p>{loadmoduleid 153}</p>
