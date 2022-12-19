@@ -1,0 +1,128 @@
+<p>An idiom is an architectural or design pattern implementation in a concrete programming language. Applying them is idiomatic for a programming language. Today. I write about the Copy-and-Swap Idiom in C++. This idiom gives you strong exception safety.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/Patterns/CopyAndSwap/GeneralIdioms.png" alt="GeneralIdioms" width="650" height="331" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>Before I write about the Copy-and-Swap Idiom, I should first clarify the strong exception safety guarantee. Here are a few general thoughts about error handling:</p>
+<h2>Error Handling</h2>
+<p>When you handle an error, the following aspects should be considered:</p>
+<ul>
+<li>Detect an error</li>
+<li>Transmit information about an error to some handler code</li>
+<li>Preserve the valid state of a program</li>
+<li>Avoid resource leaks</li>
+</ul>
+<p>You should use exceptions for error handling. In the document "<a href="https://www.boost.org/community/exception_safety.html">Exception-Safety in Generic Components</a>" <a href="https://en.wikipedia.org/wiki/David_Abrahams_(computer_programmer)">David Abrahams</a> formalized what exception-safety means.</p>
+<h3>Abrahams Guarantees</h3>
+<p>Abrahams Guarantees describe a contract that is fundamental if you think about exception safety. Here are the four levels of the contract:</p>
+<ol>
+<li><strong>No-throw guarantee</strong>, also known as<strong> failure transparency</strong>: Operations are guaranteed to succeed and satisfy all requirements, even in exceptional situations. If an exception occurs, it is handled internally and cannot be observed by clients.</li>
+<li><strong>Strong exception safety</strong>, also known as <strong>commit</strong> or <strong>rollback semantics</strong>: Operations can fail, but failed operations are guaranteed to have no side effects, so all data retain their original values.</li>
+<li><strong>Basic exception safety</strong>, also known as a <strong>no-leak guarantee:</strong> Partial execution of failed operations can cause side effects, but all invariants are preserved, and there are no resource leaks (including memory leaks). Any stored data contains valid values, even if they differ from what they were before the exception.</li>
+<li><strong>No exception safety</strong>: No guarantees are made.</li>
+</ol>
+<p>In general, you should at least aim for the basic exception safety guarantee. This means that you don't have resource leaks in case of an error, and your program is always in a well-defined state. If your program is not in a well-defined state after an error, there is only one option left: shut down your program.</p>
+<p>I stated that the Copy-and-Swap Idiom provides a strong exception safety guarantee. This is a stronger guarantee such as the basic exception safety guarantee.</p>
+<p>{loadmoduleid 157}</p>
+<h2>The Copy-and-Swap Idiom</h2>
+<p>Okay, I know what copy means. Therefore, let me write about swap:</p>
+<h3>The <code>swap</code> function</h3>
+<p>For a type to be a regular type, it has to support a <code>swap</code> function. A more informal definition of regular type is a value-like type that behaves like an <code>int</code>. I will write about regular types in an upcoming post. According to the rules "<a href="https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rc-swap">C.83: For value-like types, consider providing a noexcept swap function</a>" and "<a href="https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rc-swap-noexcept">C.85: Make swap noexcept</a>" of the C++ Core Guidelines, a <code>swap</code> function should not fail and be <code>noexcept</code>.</p>
+<p>The following data type Foo has a <code>swap</code> function.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Foo</span> {
+ <span style="color: #9999ff;">public:</span>
+    <span style="color: #007788; font-weight: bold;">void</span> swap(Foo<span style="color: #555555;">&amp;</span> rhs) noexcept {
+        m1.swap(rhs.m1);
+        std<span style="color: #555555;">::</span>swap(m2, rhs.m2);
+    }
+ <span style="color: #9999ff;">private:</span>
+    Bar m1;
+    <span style="color: #007788; font-weight: bold;">int</span> m2;
+};
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>For convenience reasons, you should consider supporting a non-member swap function based on the already implemented swap member function.<br /> <!-- HTML generated using hilite.me --></p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">swap</span>(Foo<span style="color: #555555;">&amp;</span> a, Foo<span style="color: #555555;">&amp;</span> b) noexcept {
+    a.swap(b);
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>If you do not provide a non-member <code>swap</code> function, then the standard library algorithms that require swapping (such as<code> std::sort</code> and <code>std::rotate</code>) will fall back to the<code> std::swap</code> template, which is defined in terms of move construction and move assignment.<br /><!-- HTML generated using hilite.me --></p>
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">void</span> std<span style="color: #555555;">::</span>swap(T<span style="color: #555555;">&amp;</span> a, T<span style="color: #555555;">&amp;</span> b) noexcept {
+    T tmp(std<span style="color: #555555;">::</span>move(a));
+    a <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>move(b);
+    b <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>move(tmp);
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The C++ standard offers more than 40 overloads of <a href="https://en.cppreference.com/w/cpp/algorithm/swap"><code>std::swap</code></a>. You can use the <code>swap</code> function as a building block for many idioms, such as copy construction or move assignment.</p>
+<p>This brings me to the Copy-and-Swap Idiom.</p>
+<h3>Copy-And-Swap</h3>
+<p>If you use the Copy-and-Swap Idiom to implement the copy assignment and the move assignment operator, you must define your own swap — either as a member function or as a friend. I added a <code>swap</code> function to the class <code>Cont</code> and used it in the copy assignment and move assignment operator.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Cont</span> {
+ <span style="color: #9999ff;">public:</span>
+    <span style="color: #0099ff; font-style: italic;">// ...</span>
+    Cont<span style="color: #555555;">&amp;</span> <span style="color: #006699; font-weight: bold;">operator</span> <span style="color: #555555;">=</span> (<span style="color: #006699; font-weight: bold;">const</span> Cont<span style="color: #555555;">&amp;</span> rhs);
+    Cont<span style="color: #555555;">&amp;</span> <span style="color: #006699; font-weight: bold;">operator</span> <span style="color: #555555;">=</span> (Cont<span style="color: #555555;">&amp;&amp;</span> rhs) noexcept;
+    <span style="color: #006699; font-weight: bold;">friend</span> <span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">swap</span>(Cont<span style="color: #555555;">&amp;</span> lhs, Cont<span style="color: #555555;">&amp;</span> rhs) noexcept {
+        swap(lhs.size, rhs.size);
+        swap(lhs.pdata, rhs.pdata);
+}
+ <span style="color: #9999ff;">private:</span>
+    <span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">*</span> pData;
+    std<span style="color: #555555;">::</span><span style="color: #007788; font-weight: bold;">size_t</span> size;
+};
+
+Cont<span style="color: #555555;">&amp;</span> Cont<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">operator</span> <span style="color: #555555;">=</span> (<span style="color: #006699; font-weight: bold;">const</span> Cont<span style="color: #555555;">&amp;</span> rhs) {
+    Cont tmp(rhs);              <span style="color: #0099ff; font-style: italic;">// (1)</span>
+    swap(<span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">this</span>, tmp);          <em><span style="color: #0099ff;"> // (3)</span></em>
+    <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">this</span>;
+}
+
+Cont<span style="color: #555555;">&amp;</span> Cont<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">operator</span> <span style="color: #555555;">=</span> (Cont<span style="color: #555555;">&amp;&amp;</span> rhs) {
+    Cont tmp(std<span style="color: #555555;">::</span>move(rhs));  <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    swap(<span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">this</span>, tmp);          <em><span style="color: #0099ff;">// (3)</span></em>
+    <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">this</span>;
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Both assignment operators make a temporary copy<code> tmp</code> of the source object (lines 1 and ) and then apply the <code>swap</code> function to it (lines 3 and 4). When the used <code>swap</code> functions are <code>noexcept</code>, the copy assignment operator and the move assignment operator support the strong exception safety guarantee. This means that both assignment operators guarantee that the operations call will be fully rolled back in case of an error such as the error never happened.</p>
+<p>Operations supporting the Copy-and-Swap Idiom allow you to program in a transaction-based style. You prepare an operation (working on the copy) and publish the operation (swap the result) when it is fine. The Copy-and-Swap Idiom is a very powerful idiom that is applied pretty often.</p>
+<ul>
+<li><strong>Concurrent programming</strong>: You make your modification on a local object. This is, by definition, thread-safe because the data is not shared. When you are done with your change, you overwrite the shared data with your local data in a protected way.</li>
+<li><strong>Version control system</strong>: First, you check out the data and get a local copy. When you are done with your change, you commit your change and have to handle merge conflicts eventually. In case you cannot solve the merge conflict, you throw away your local change and check out once more.</li>
+</ul>
+<p>When a <code>swap</code> function is based on copy semantics instead of move semantics, a <code>swap</code> function may fail because of memory exhaustion. The following implementation contradicts the C++ Core Guidelines rule "<a href="https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#Rc-swap-fail">C++94: A <code>swap</code> function must not fail</a>".This is the C++98 implementation of<code> std::swap</code>.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">void</span> std<span style="color: #555555;">::</span>swap(T<span style="color: #555555;">&amp;</span> a, T<span style="color: #555555;">&amp;</span> b) {
+    T tmp <span style="color: #555555;">=</span> a;
+    a <span style="color: #555555;">=</span> b;
+    b <span style="color: #555555;">=</span> tmp;
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>&nbsp;In this case, memory exhaustion may cause a <code>std::bad_alloc</code> exception.</p>
+<h2>What's Next?</h2>
+<p>Partial Function Application is a technique in which a function binds a few of its arguments and returns a function taking fewer arguments. This technique is related to a technique used in functional languages called currying.</p>
+<h2>A Short Break</h2>
+<p>I will make a short two weeks Christmas Break. My next post will be published on Monday, the 9th of January. Have a good time,</p>
+<p><img src="https://www.modernescpp.com/images/signatur/RainerGrimmDunkelBlauSmall.jpg" alt="RainerGrimmDunkelBlauSmall" width="222" height="67" style="float: left;" /></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>{loadmoduleid 153}</p>
