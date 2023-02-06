@@ -1,0 +1,133 @@
+<p>A value object is a small object whose equality is based on state, but not identity. Typical value objects are money, numbers, or strings.</p>
+<hr id="system-readmore" />
+<p><img src="https://www.modernescpp.com/images/blog/Patterns/ValueObject/ClassIdioms.png" alt="ClassIdioms" width="650" height="335" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>&nbsp;</p>
+<p>The term Value Object goes back to the seminal book <a href="https://www.oreilly.com/library/view/domain-driven-design-tackling/0321125215/" target="_blank" rel="noopener ugc nofollow" class="au lc">Domain-Driven Design</a> (DDD) by Eric Evans. But, what is a value object? Eric gave the answer in his book:</p>
+<p><em>An object that represents a descriptive aspect of the domain with no conceptual identity is called a Value Object. Value Objects are instantiated to represent elements of the design that we care about only for what they are, not who or which they are.</em></p>
+<p>If this is too formal for you, here is a nice example of the author:</p>
+<p><em>When a child is drawing, he cares about the color of the marker he chooses, and he may care about the sharpness of the tip. But if there are two markers of the same color and shape, he probably won’t care which one he uses. If a marker is lost and replaced by another of the same color from a new pack, he can resume his work unconcerned about the switch.</em></p>
+<p>The key term in the formal definition and the example about the Value Object is equality.</p>
+<h2>Identity</h2>
+<p>In general, we have two types of equality: reference equality and value equality. For simplicity reasons, I will ignore id-based equality.</p>
+<ul>
+<li><strong>Reference equality</strong>: two objects are considered to be equal if they reference the same entity in the memory.</li>
+<li><strong>Value equality</strong>: two objects are considered to be equal if all their member have the same value.</li>
+</ul>
+<p>Let me switch to Python because Python makes it easy to compare both kinds of equality.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Patterns/ValueObject/EqualityPythonNew.png" alt="EqualityPython" width="500" height="381" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>The short example in the Python shell should make the difference between reference equality and value equality clear.</p>
+<p>First, I define two lists <code>list1</code> and <code>list2</code> with the same elements. When I compare their identity (<code>list1 is list2</code>), they are different. When I compare their values, they are identical. Python uses for equality (and non-equality) comparison of the memory address of the compared objects. The <code>id</code> operator (<code>id(liste1)</code>) returns a decimal representation of its hexadecimal memory address.&nbsp; By assigning<code> list1</code> to<code> list3, </code>both lists refer to the same memory location. Consequentially,<code> id(list3)</code> is identical to <code>id(list1)</code>, and the call <code>list1</code> is <code>list3</code> returns T<code>rue</code>.</p>
+<p>What does this mean for modern C++20? In C++20, the compiler can generate the equality operator.</p>
+<h2>Compiler-Generated Equality Operator</h2>
+<p>&nbsp;For a user-defined type, you have to choose the appropriate equality semantics.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// equalityReferenceValue.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Date</span>{
+ <span style="color: #9999ff;">public:</span>
+    Date(<span style="color: #007788; font-weight: bold;">int</span> y, <span style="color: #007788; font-weight: bold;">int</span> m, <span style="color: #007788; font-weight: bold;">int</span> d)<span style="color: #555555;">:</span> year(y), month(m), day(d){}
+    <span style="color: #007788; font-weight: bold;">bool</span> <span style="color: #006699; font-weight: bold;">operator</span><span style="color: #555555;">==</span>(<span style="color: #006699; font-weight: bold;">const</span> Date<span style="color: #555555;">&amp;</span>) <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">default</span>;
+ <span style="color: #9999ff;">private:</span>
+    <span style="color: #007788; font-weight: bold;">int</span> year;
+    <span style="color: #007788; font-weight: bold;">int</span> month;
+    <span style="color: #007788; font-weight: bold;">int</span> day;
+};
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Man</span>{
+ <span style="color: #9999ff;">public:</span>
+    Man(<span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span>string n, <span style="color: #007788; font-weight: bold;">int</span> a)<span style="color: #555555;">:</span> name(n), age(a){}
+    <span style="color: #007788; font-weight: bold;">bool</span> <span style="color: #006699; font-weight: bold;">operator</span><span style="color: #555555;">==</span>(<span style="color: #006699; font-weight: bold;">const</span> Man<span style="color: #555555;">&amp;</span>) <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">default</span>;
+ <span style="color: #9999ff;">private:</span>
+    std<span style="color: #555555;">::</span>string name;
+    <span style="color: #007788; font-weight: bold;">int</span> age;
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>boolalpha <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    Date date1(<span style="color: #ff6600;">2022</span>, <span style="color: #ff6600;">10</span>, <span style="color: #ff6600;">31</span>);
+    Date date2(<span style="color: #ff6600;">2022</span>, <span style="color: #ff6600;">10</span>, <span style="color: #ff6600;">31</span>);
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"date1 == date2: "</span> <span style="color: #555555;">&lt;&lt;</span> (date1 <span style="color: #555555;">==</span> date2) <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"date1 != date2: "</span> <span style="color: #555555;">&lt;&lt;</span> (date1 <span style="color: #555555;">!=</span> date2) <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    Man man1(<span style="color: #cc3300;">"Rainer Grimm"</span>, <span style="color: #ff6600;">56</span>);
+    Man man2(<span style="color: #cc3300;">"Rainer Grimm"</span>, <span style="color: #ff6600;">56</span>);
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"man1 == man2: "</span> <span style="color: #555555;">&lt;&lt;</span> (man1 <span style="color: #555555;">==</span> man2) <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"man1 != man2: "</span> <span style="color: #555555;">&lt;&lt;</span> (man1 <span style="color: #555555;">!=</span> man2) <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>In C++20, the compiler can auto-generate the equality operator and use it as a fallback for the inequality operator. The auto-generated equality operator applies value equality. To be more precise, the compiler-generated equality operator performs a lexicographical comparison. Lexicographical comparison means that all base classes are compared left to right and all nonstatic members of the class in their declaration order.</p>
+<p>I have to add two important points:</p>
+<ul>
+<li>For strings or vectors, there is a shortcut: the compiler-generated == and != operators compare first their lengths and then their content if necessary.</li>
+<li>The compiler-generated three-way comparison operator (<code>&lt;=&gt;</code>) also applies value equality. You can read more about the three-way comparison operator in my previous posts:<br />
+<ul>
+<li><a href="https://bit.ly/ThreeWayComparison">The Three-Way Comparision Operator</a></li>
+<li><a href="https://bit.ly/MoreDetailsToSpaceship">More Details to the Spaceship Operator</a></li>
+<li><a href="https://bit.ly/OptimizedComparisonSpaceship">Optimized Comparision with the Spaceship Operator</a></li>
+</ul>
+</li>
+</ul>
+<p>Honestly, the example works as expected but does not seem right.</p>
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/Patterns/ValueObject/equalityReferenceValue.png" alt="equalityReferenceValue" width="400" height="273" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>Two dates with identical values should be regarded as equal but not two men. The equality of two men should be based on their identity and not on their name and age.</p>
+<p>{loadmoduleid 157}</p>
+<h2>Value Objects</h2>
+<p>Let me discuss the details about Value Objects.</p>
+<h3>Properties</h3>
+<h4>Value Equality</h4>
+<p>After the last chapter, this should be obvious. The equality of a Value Object should be based on its state and not on its identity.</p>
+<h4>Immutability</h4>
+<p>A Value Object should not be mutable. This makes Value Objects ideal candidates for concurrency. Changing a Value Object means creating a new one with the modified attributes. This property, that an operation on an immutable object returns a new object has two excellent properties. For conciseness, I use Python once more.</p>
+<p>In Python, a string is immutable:</p>
+<p><img src="https://www.modernescpp.com/images/blog/Patterns/ValueObject/immutable.png" alt="immutable" width="600" height="204" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<ol>
+<li>You simulate modification, by assigning the new value to the old name: s = s.upper()<code>. </code>The original <code>s</code> and the new<code> s</code> have different <code>addresses.</code></li>
+<li>An operation on the string returns a new string. Consequentially, you can chain string operations. In the function domain, this pattern is called a <a href="https://en.wikipedia.org/wiki/Fluent_interface">fluent interface</a>. By the way: arithmetic expressions such as <code>(5 +5) * 10 - 20</code> are based on the fluent interface. Each operation returns a temporary, on which you can apply the next operation. Of course, numbers are Value Objects.</li>
+</ol>
+<h4>Self-Validation</h4>
+<p>A Value Object should validate its attributes when created. For simplicity, I skipped this step in my previous <code>Date</code> class.</p>
+<p>What are the Pros and Cons of Value Objects:</p>
+<h3>Pros and Cons</h3>
+<p>The pros of Value Objects overweight their cons heavily.</p>
+<h4>Rich Types</h4>
+<p>You should use rich types instead of built-in types for dealing with primitive values. This has many implications. Let me compare the following two representations of a date:</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">Date <span style="color: #cc00ff;">date1</span>(<span style="color: #ff6600;">2022</span>, <span style="color: #ff6600;">10</span>, <span style="color: #ff6600;">5</span>);
+
+std<span style="color: #555555;">::</span>string date2 <span style="color: #555555;">=</span> <span style="color: #cc3300;">"2022 10 5";  </span>
+</pre>
+</div>
+<p>&nbsp;</p>
+<ul>
+<li>You cannot create an invalid date <code>Date(2022, 15, 5)</code>, because the constructor's job is it to validate the input. This does not hold for the string value "<code>2022 15 5"</code>, because someone mixed up the month and the day.</li>
+<li>Your program is easier to read. It is crystal clear from class <code>Date</code> documentation, what each component stands for.</li>
+<li>You can overload operators on <code>Date</code>. E.g.: subtracting two dates returns a time duration. A time duration should also be a Value Object.</li>
+<li>You can extend your Value Objects with user-defined literals for a day, a year, and a month. In this case, it is not necessary because we have them with C++20:&nbsp;<a href="https://en.cppreference.com/w/cpp/chrono/duration">std::chrono::duration on cppreference.com</a>.</li>
+</ul>
+<h4>Performance</h4>
+<p>Value Objects are immutable. Consequentially, they give the optimizer additional guarantees and can be shared between threads without synchronization.</p>
+<h4>Proliferation of Classes</h4>
+<p>Only for the sake of arguments: You may end with too many small classes representing Value Objects.</p>
+<h2>What's Next?</h2>
+<p>A Null Object encapsulates a do nothing behavior inside an object. Let me show you in my next post the advantages of Null Objects.</p>
+<p>&nbsp;</p>
+<p>&nbsp;{loadmoduleid 153}</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
