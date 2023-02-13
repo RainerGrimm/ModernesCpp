@@ -1,0 +1,323 @@
+<p>A Null Object encapsulates a do nothing behavior inside an object. It is often pretty comfortable to use a neutral object.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/Patterns/NullObject/ClassIdioms.png" alt="ClassIdioms" width="650" height="335" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>A Null Object</p>
+<ul>
+<li>encapsulates the do nothing behavior inside an object.</li>
+<li>supports the workflow without conditional logic.</li>
+<li>hides the special use cases from the client.</li>
+</ul>
+<p>Honestly, there is not much to write about the Null Object. Let me, therefore, give you an example, using a Null Object.</p>
+<h2>Strategized Locking</h2>
+<p>Assume you write code such as a library, which should be used in various domains, including concurrent ones. To be on the safe side, you protect the critical sections with a lock. If your library now runs in a single-threaded environment, you have a performance issue because you implemented an expensive synchronization mechanism that is unnecessary. Now, strategized locking comes to your rescue.</p>
+<p>Strategized locking is the idea of the <a href="https://en.wikipedia.org/wiki/Strategy_pattern">Strategy Pattern</a> applied to locking. This means putting your locking strategy into an object and making it into a pluggable component of your system.</p>
+<p>There are two typical ways to implement strategized locking: run-time polymorphism (object orientation) or compile-time polymorphism (templates).<br />Both ways improve the customization and extension of the locking strategy, ease the maintenance of the system, and support the reuse of components. Also, implementing the strategized locking at run-time or compile-time differ in various aspects.</p>
+<h3>Advantages</h3>
+<h4>Run-Time Polymorphism</h4>
+<ul>
+<li>Allows it to configure the locking strategy during run time</li>
+<li>Is easier to understand for developers who have an object-oriented background</li>
+</ul>
+<h4>Compile-Time Polymorphism</h4>
+<ul>
+<li>Has no abstraction penalty</li>
+<li>Has a flat hierarchy.</li>
+</ul>
+<h3>Disadvantages</h3>
+<h4>Run-Time Polymorphism</h4>
+<ul>
+<li>Needs an additional pointer or reference indirection</li>
+<li>It may have a deep derivation hierarchy</li>
+</ul>
+<h4>Compile-Time Polymorphism</h4>
+<ul>
+<li>It may generate very wordy error messages.</li>
+</ul>
+<p>{loadmoduleid 157}</p>
+<h3>Implementation based on Run-Time Polymorphism</h3>
+<p>&nbsp;The program <code>strategizedLockingRuntime.cpp</code> presents three different mutexes.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// strategizedLockingRuntime.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;mutex&gt;</span>
+<span style="color: #009999;">#include &lt;shared_mutex&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Lock</span> {
+<span style="color: #9999ff;">public:</span>
+    <span style="color: #006699; font-weight: bold;">virtual</span> <span style="color: #007788; font-weight: bold;">void</span> lock() <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>;
+    <span style="color: #006699; font-weight: bold;">virtual</span> <span style="color: #007788; font-weight: bold;">void</span> unlock() <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>;
+};
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">StrategizedLocking</span> {
+    Lock<span style="color: #555555;">&amp;</span> lock;                                  <em><span style="color: #0099ff;">// (1)</span></em>
+<span style="color: #9999ff;">public:</span>
+    StrategizedLocking(Lock<span style="color: #555555;">&amp;</span> l)<span style="color: #555555;">:</span> lock(l){
+        lock.lock();                             <em><span style="color: #0099ff;">// (2)</span></em>
+    }
+    <span style="color: #555555;">~</span>StrategizedLocking(){
+        lock.unlock();                           <em><span style="color: #0099ff;">// (3)</span></em>
+    }
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> NullObjectMutex{                          
+    <span style="color: #007788; font-weight: bold;">void</span> lock(){}
+    <span style="color: #007788; font-weight: bold;">void</span> unlock(){}
+};
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">NoLock</span> <span style="color: #555555;">:</span> <span style="color: #006699; font-weight: bold;">public</span> Lock {                     <em><span style="color: #0099ff;">// (4)</span></em>
+    <span style="color: #007788; font-weight: bold;">void</span> lock() <span style="color: #006699; font-weight: bold;">const</span> override {
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"NoLock::lock: "</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+        nullObjectMutex.lock();
+    }
+    <span style="color: #007788; font-weight: bold;">void</span> unlock() <span style="color: #006699; font-weight: bold;">const</span> override {
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"NoLock::unlock: "</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+         nullObjectMutex.unlock();
+    }
+    <span style="color: #006699; font-weight: bold;">mutable</span> NullObjectMutex nullObjectMutex;     <em><span style="color: #0099ff;">// (9)</span></em>
+};
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">ExclusiveLock</span> <span style="color: #555555;">:</span> <span style="color: #006699; font-weight: bold;">public</span> Lock {              <em><span style="color: #0099ff;">// (5)</span></em>
+    <span style="color: #007788; font-weight: bold;">void</span> lock() <span style="color: #006699; font-weight: bold;">const</span> override {
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"    ExclusiveLock::lock: "</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+        mutex.lock();
+    }
+    <span style="color: #007788; font-weight: bold;">void</span> unlock() <span style="color: #006699; font-weight: bold;">const</span> override {
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"    ExclusiveLock::unlock: "</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+        mutex.unlock();
+    }
+    <span style="color: #006699; font-weight: bold;">mutable</span> std<span style="color: #555555;">::</span>mutex mutex;                    <em><span style="color: #0099ff;">// (10)</span></em>
+};
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">SharedLock</span> <span style="color: #555555;">:</span> <span style="color: #006699; font-weight: bold;">public</span> Lock {                 <em><span style="color: #0099ff;">// (6)</span></em>
+    <span style="color: #007788; font-weight: bold;">void</span> lock() <span style="color: #006699; font-weight: bold;">const</span> override {
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"        SharedLock::lock_shared: "</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+        sharedMutex.lock_shared();                <em><span style="color: #0099ff;">// (7)</span></em>
+    }
+    <span style="color: #007788; font-weight: bold;">void</span> unlock() <span style="color: #006699; font-weight: bold;">const</span> override {
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"        SharedLock::unlock_shared: "</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+        sharedMutex.unlock_shared();              <em><span style="color: #0099ff;">// (8)</span></em>
+    }
+    <span style="color: #006699; font-weight: bold;">mutable</span> std<span style="color: #555555;">::</span>shared_mutex sharedMutex;        <em><span style="color: #0099ff;">// (11)</span></em>
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    
+    NoLock noLock;
+    StrategizedLocking stratLock1{noLock};
+    
+    {
+        ExclusiveLock exLock;
+        StrategizedLocking stratLock2{exLock};
+        {
+            SharedLock sharLock;
+            StrategizedLocking startLock3{sharLock};
+        }
+    }
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The class <code>StrategizedLocking</code> has a lock (line 1). <code>StrategizedLocking</code> models <a href="https://www.dre.vanderbilt.edu/~schmidt/PDF/ScopedLocking.pdf">scoped locking</a> and, therefore, locks the mutex in the constructor (line 2) and unlocks it in the destructor (line 3). <code>Lock</code> is an abstract class and defines all derived classes’ interfaces. These are the classes <code>NoLock</code> (line 4), <code>ExclusiveLock</code> (line 5), and <code>SharedLock </code>(line 6). <code>SharedLock</code> invokes <code>lock_shared</code> (line 7) and <code>unlock_shared</code> (line 8) on its <code>std::shared_mutex</code>. Each of these locks holds one of the mutexes <code>NullObjectMutex</code> (line 9),<code> std::mutex</code> (line 10), or <code>std::shared_mutex</code> (line 11). <code>NullObjectMutex</code> is a noop placeholder. The mutexes are declared as <code>mutable</code>. Therefore, they are usable in constant member functions such as <code>lock</code> and <code>unlock</code>.</p>
+<h3>Implementation based on Compile-Time Polymorphism</h3>
+<p>&nbsp;The template-based implementation is quite similar to the object-oriented-based implementation.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// strategizedLockingCompileTime.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;mutex&gt;</span>
+<span style="color: #009999;">#include &lt;shared_mutex&gt;</span>
+
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> Lock<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">StrategizedLocking</span> {
+    Lock<span style="color: #555555;">&amp;</span> lock;
+<span style="color: #9999ff;">public:</span>
+    StrategizedLocking(Lock<span style="color: #555555;">&amp;</span> l)<span style="color: #555555;">:</span> lock(l){
+        lock.lock();
+    }
+    <span style="color: #555555;">~</span>StrategizedLocking(){
+        lock.unlock();
+    }
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> NullObjectMutex {
+    <span style="color: #007788; font-weight: bold;">void</span> lock(){}
+    <span style="color: #007788; font-weight: bold;">void</span> unlock(){}
+};
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">NoLock</span>{                                         <em><span style="color: #0099ff;">// (1)</span></em>
+<span style="color: #9999ff;">public:</span>
+    <span style="color: #007788; font-weight: bold;">void</span> lock() <span style="color: #006699; font-weight: bold;">const</span> {
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"NoLock::lock: "</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+        nullObjectMutex.lock();
+    }
+    <span style="color: #007788; font-weight: bold;">void</span> unlock() <span style="color: #006699; font-weight: bold;">const</span> {
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"NoLock::unlock: "</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+         nullObjectMutex.lock();
+    }
+    <span style="color: #006699; font-weight: bold;">mutable</span> NullObjectMutex nullObjectMutex;
+};
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">ExclusiveLock</span> {                                  <em><span style="color: #0099ff;">// (2)</span></em>
+<span style="color: #9999ff;">public:</span>
+    <span style="color: #007788; font-weight: bold;">void</span> lock() <span style="color: #006699; font-weight: bold;">const</span> {
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"    ExclusiveLock::lock: "</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+        mutex.lock();
+    }
+    <span style="color: #007788; font-weight: bold;">void</span> unlock() <span style="color: #006699; font-weight: bold;">const</span> {
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"    ExclusiveLock::unlock: "</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+        mutex.unlock();
+    }
+    <span style="color: #006699; font-weight: bold;">mutable</span> std<span style="color: #555555;">::</span>mutex mutex;
+};
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">SharedLock</span> {                                     <em><span style="color: #0099ff;">// (3)</span></em>
+<span style="color: #9999ff;">public:</span>
+    <span style="color: #007788; font-weight: bold;">void</span> lock() <span style="color: #006699; font-weight: bold;">const</span> {
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"        SharedLock::lock_shared: "</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+        sharedMutex.lock_shared();
+    }
+    <span style="color: #007788; font-weight: bold;">void</span> unlock() <span style="color: #006699; font-weight: bold;">const</span> {
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"        SharedLock::unlock_shared: "</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+        sharedMutex.unlock_shared();
+    }
+    <span style="color: #006699; font-weight: bold;">mutable</span> std<span style="color: #555555;">::</span>shared_mutex sharedMutex;
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    
+    NoLock noLock;
+    StrategizedLocking<span style="color: #555555;">&lt;</span>NoLock<span style="color: #555555;">&gt;</span> stratLock1{noLock};
+    
+    {
+        ExclusiveLock exLock;
+        StrategizedLocking<span style="color: #555555;">&lt;</span>ExclusiveLock<span style="color: #555555;">&gt;</span> stratLock2{exLock};
+        {
+            SharedLock sharLock;
+            StrategizedLocking<span style="color: #555555;">&lt;</span>SharedLock<span style="color: #555555;">&gt;</span> startLock3{sharLock};
+        }
+    }
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The programs <code>strategizedLockingRuntime.cpp</code> and<code> strategizedLockingCompileTime.cpp</code> produce the same output:</p>
+<p><img src="https://www.modernescpp.com/images/blog/Patterns/NullObject/strategizedLocking.png" alt="strategizedLocking" width="510" height="457" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>The locks <code>NoLock</code> (line 1), <code>ExclusiveLock</code> (line 2), and <code>SharedLock</code> (line 3) have no abstract base class. The consequence is that <code>StrategizedLocking</code> can be instantiated with an object that does not support the right interface. This instantiation would end in a compile-time error. This loophole is closed with C++20.</p>
+<h4>The Concept BasicLockable</h4>
+<p>Instead of<code> template &lt;typename Lock&gt; class StrategizedLocking</code> you can use the<br />concept <code>BasicLockable</code>:<code> template &lt;BasicLockable Lock&gt; class StrategizedLocking.</code> This means that all used locks have to support the concept <code>BasicLockable</code>. A concept is a named requirement, and many concepts are already defined in the C++20 concepts library. The concept <code>BasicLockable</code> is only used in the text of the C++20 standard. Consequently, I define and use the concept <code>BasicLockable</code> in the following improved implementation of the strategized locking at compile time.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// strategizedLockingCompileTimeWithConcepts.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;mutex&gt;</span>
+<span style="color: #009999;">#include &lt;shared_mutex&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;                     <span style="color: #0099ff; font-style: italic;">// (1)</span></span>
+concept BasicLockable <span style="color: #555555;">=</span> requires(T lo) {
+    lo.lock();
+    lo.unlock();
+};
+    
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span>BasicLockable Lock<span style="color: #555555;">&gt;             <span style="color: #0099ff; font-style: italic;">// (2)</span></span>
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">StrategizedLocking</span> {
+    Lock<span style="color: #555555;">&amp;</span> lock;
+<span style="color: #9999ff;">public:</span>
+    StrategizedLocking(Lock<span style="color: #555555;">&amp;</span> l)<span style="color: #555555;">:</span> lock(l){
+        lock.lock();
+    }
+    <span style="color: #555555;">~</span>StrategizedLocking(){
+        lock.unlock();
+    }
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> NullObjectMutex {
+    <span style="color: #007788; font-weight: bold;">void</span> lock(){}
+    <span style="color: #007788; font-weight: bold;">void</span> unlock(){}
+};
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">NoLock</span>{
+<span style="color: #9999ff;">public:</span>
+    <span style="color: #007788; font-weight: bold;">void</span> lock() <span style="color: #006699; font-weight: bold;">const</span> {
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"NoLock::lock: "</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+        nullObjectMutex.lock();
+    }
+    <span style="color: #007788; font-weight: bold;">void</span> unlock() <span style="color: #006699; font-weight: bold;">const</span> {
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"NoLock::unlock: "</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+         nullObjectMutex.lock();
+    }
+    <span style="color: #006699; font-weight: bold;">mutable</span> NullObjectMutex nullObjectMutex;
+};
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">ExclusiveLock</span> {
+<span style="color: #9999ff;">public:</span>
+    <span style="color: #007788; font-weight: bold;">void</span> lock() <span style="color: #006699; font-weight: bold;">const</span> {
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"    ExclusiveLock::lock: "</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+        mutex.lock();
+    }
+    <span style="color: #007788; font-weight: bold;">void</span> unlock() <span style="color: #006699; font-weight: bold;">const</span> {
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"    ExclusiveLock::unlock: "</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+        mutex.unlock();
+    }
+    <span style="color: #006699; font-weight: bold;">mutable</span> std<span style="color: #555555;">::</span>mutex mutex;
+};
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">SharedLock</span> {
+<span style="color: #9999ff;">public:</span>
+    <span style="color: #007788; font-weight: bold;">void</span> lock() <span style="color: #006699; font-weight: bold;">const</span> {
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"        SharedLock::lock_shared: "</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+        sharedMutex.lock_shared();
+    }
+    <span style="color: #007788; font-weight: bold;">void</span> unlock() <span style="color: #006699; font-weight: bold;">const</span> {
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"        SharedLock::unlock_shared: "</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+        sharedMutex.unlock_shared();
+    }
+    <span style="color: #006699; font-weight: bold;">mutable</span> std<span style="color: #555555;">::</span>shared_mutex sharedMutex;
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    
+    NoLock noLock;
+    StrategizedLocking<span style="color: #555555;">&lt;</span>NoLock<span style="color: #555555;">&gt;</span> stratLock1{noLock};
+    
+    {
+        ExclusiveLock exLock;
+        StrategizedLocking<span style="color: #555555;">&lt;</span>ExclusiveLock<span style="color: #555555;">&gt;</span> stratLock2{exLock};
+        {
+            SharedLock sharLock;
+            StrategizedLocking<span style="color: #555555;">&lt;</span>SharedLock<span style="color: #555555;">&gt;</span> startLock3{sharLock};
+        }
+    }
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>BasicLockable in line (1) requires that an object lo of the type <code>T</code> that it has to support the member functions lock and unlock. The use of the concept is straightforward. Instead of <code>typename</code>, I use the concept <code>BasicLockable</code> in the template declaration of <code>StrategizedLocking</code> (line 2).</p>
+<h2>What's Next?</h2>
+<p>To use your user-defined type in a range-based for-loop, you have to implement the Iterator Protocol. Let me discuss the details in my next post.</p>
+<p>&nbsp;</p>
+<p>{loadmoduleid 153}</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
