@@ -1,0 +1,225 @@
+<p>When you want to use a user-defined type in a range-based for-loop, your user-defined type has to implement the Iterator Protocol.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/Patterns/IteratorProtocol/ClassIdioms.png" alt="ClassIdioms" width="650" height="335" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>Here is the question I want to answer: What interface must a user-defined type support to be usable in a range-based for-loop.</p>
+<h2>Requirements of a Range-Based for-Loop</h2>
+<p>Let me start with a simple experiment and use&nbsp;<code> std::array</code> in <a href="https://cppinsights.io/s/232581c8">C++ Insights</a>. Here is a simple example:</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// iteratorProtocol.cpp</span>
+
+<span style="color: #009999;">#include &lt;array&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+   
+    std<span style="color: #555555;">::</span>array<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>, <span style="color: #ff6600;">5</span><span style="color: #555555;">&gt;</span> myArr{<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">5</span>};
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> a<span style="color: #555555;">:</span> myArr) a;
+  
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p><a href="https://cppinsights.io/s/232581c8">C++ Insights</a> creates the following code out of it:</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #009999;">#include &lt;array&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>()
+{
+  std<span style="color: #555555;">::</span>array<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>, <span style="color: #ff6600;">5</span><span style="color: #555555;">&gt;</span> myArr <span style="color: #555555;">=</span> {{<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">2</span>, <span style="color: #ff6600;">3</span>, <span style="color: #ff6600;">4</span>, <span style="color: #ff6600;">5</span>}};
+  {
+    std<span style="color: #555555;">::</span>array<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>, <span style="color: #ff6600;">5</span><span style="color: #555555;">&gt;</span> <span style="color: #555555;">&amp;</span> __range1 <span style="color: #555555;">=</span> myArr;
+    <span style="color: #007788; font-weight: bold;">int</span> <span style="color: #555555;">*</span> __begin1 <span style="color: #555555;">=</span> __range1.begin();
+    <span style="color: #007788; font-weight: bold;">int</span> <span style="color: #555555;">*</span> __end1 <span style="color: #555555;">=</span> __range1.end();
+    <span style="color: #006699; font-weight: bold;">for</span>(; __begin1 <span style="color: #555555;">!=</span> __end1; <span style="color: #555555;">++</span>__begin1) {
+      <span style="color: #007788; font-weight: bold;">int</span> a <span style="color: #555555;">=</span> <span style="color: #555555;">*</span>__begin1;
+      a;
+    }
+    
+  }
+  <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #ff6600;">0</span>;
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Let me write it more generally: When you use a range-based for-loop (<code>for(range_declaration : range_expression)</code>), the compiler creates the following code:</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%;">{
+  auto &amp;&amp; __range = range_expression ;
+  auto __begin = <span style="color: #ff0000;">begin_expr;</span>      
+  auto __end = <span style="color: #ff0000;">end_expr;</span>          
+  for (;__begin <span style="color: #ff0000;">!=</span> __end; <span style="color: #ff0000;">++</span>__begin) {
+    range_declaration = <span style="color: #ff0000;">*</span>__begin;
+    loop_statement
+  }
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>I marked the essential parts in red:</p>
+<ul>
+<li>
+<p><code>begin_expr </code>and <code>end_expr</code>: return an iterator object</p>
+</li>
+<li>Iterator object
+<ul>
+<li><code>operator++</code>: incrementing the iterator</li>
+<li><code>operator*</code>: dereferencing the iterator and accessing the current element</li>
+<li><code>operator!=</code>: comparing the iterator with another iterator</li>
+</ul>
+</li>
+</ul>
+<p><code>begin_expr</code> and <code>end_expr</code> call the essential <code>begin</code> and <code>end</code> on the range_expression. begin and end could either be member functions or free functions on range_expression.</p>
+<p>Let me apply the theory and create a number generator.</p>
+<h2>A Generator</h2>
+<p>My first implementation supports the Iterator Protocol</p>
+<h3>The Iterator Protocol</h3>
+<p>The following class <code>Generator</code> supports the elementary Iterator Protocol.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// iterator.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Generator</span> {
+    <span style="color: #007788; font-weight: bold;">int</span> begin_{};
+    <span style="color: #007788; font-weight: bold;">int</span> end_{};
+
+<span style="color: #9999ff;">public:</span>
+    Generator(<span style="color: #007788; font-weight: bold;">int</span> begin, <span style="color: #007788; font-weight: bold;">int</span> end) <span style="color: #555555;">:</span> begin_{begin}, end_{end} {}
+
+    <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Iterator</span> {
+        <span style="color: #007788; font-weight: bold;">int</span> value_{};
+    <span style="color: #9999ff;">public:</span>
+        <span style="color: #006699; font-weight: bold;">explicit</span> Iterator(<span style="color: #007788; font-weight: bold;">int</span> pos) <span style="color: #555555;">:</span> value_{pos} {}
+
+        <span style="color: #007788; font-weight: bold;">int</span> <span style="color: #006699; font-weight: bold;">operator</span><span style="color: #555555;">*</span>() <span style="color: #006699; font-weight: bold;">const</span> { <span style="color: #006699; font-weight: bold;">return</span> value_; }           <em><span style="color: #0099ff;">// (3)</span></em>
+
+        Iterator<span style="color: #555555;">&amp;</span> <span style="color: #006699; font-weight: bold;">operator</span><span style="color: #555555;">++</span>() {                           <em><span style="color: #0099ff;">// (4)</span></em>
+            <span style="color: #555555;">++</span>value_;
+            <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">this</span>;
+        }
+
+        <span style="color: #007788; font-weight: bold;">bool</span> <span style="color: #006699; font-weight: bold;">operator</span><span style="color: #555555;">!=</span>(<span style="color: #006699; font-weight: bold;">const</span> Iterator<span style="color: #555555;">&amp;</span> other) <span style="color: #006699; font-weight: bold;">const</span> {      <em><span style="color: #0099ff;">// (5)</span></em>
+            <span style="color: #006699; font-weight: bold;">return</span> value_ <span style="color: #555555;">!=</span> other.value_;
+        }
+    };
+
+    Iterator begin() <span style="color: #006699; font-weight: bold;">const</span> { <span style="color: #006699; font-weight: bold;">return</span> Iterator{begin_}; }     <em><span style="color: #0099ff;">// (1)</span></em>
+    Iterator end() <span style="color: #006699; font-weight: bold;">const</span> { <span style="color: #006699; font-weight: bold;">return</span> Iterator{end_}; }         <em><span style="color: #0099ff;">// (2)</span></em>
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+   std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    
+   Generator gen{<span style="color: #ff6600;">100</span>, <span style="color: #ff6600;">110</span>};
+   <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> v <span style="color: #555555;">:</span> gen) std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> v <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span>;
+
+   std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"\n\n"</span>;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The class <code>Generator</code> has member functions <code>begin</code> and <code>end, </code>(lines 1 and 2)<code> </code>returning iterator objects, initialized with <code>begin_</code> and<code> end_. begin_</code> and <code>end_</code> stand for the range of created numbers. Let me analyze the inner class <code>Iterator</code> which keeps track of the generated numbers:<code> </code></p>
+<ul>
+<li><code>operator*</code> returns the current value</li>
+<li><code>operator++</code> increments the current value</li>
+<li><code>operator!=</code> compares the current value with the <code>end_</code> marker.</li>
+</ul>
+<p>Finally, here is the output of the program:</p>
+<p><img src="https://www.modernescpp.com/images/blog/Patterns/IteratorProtocol/iterator.png" alt="iterator" width="350" height="193" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>&nbsp;</p>
+<p>Let me generalize the iterator returned by<code> begin()</code> and <code>end()</code> and make it a forward iterator. Afterward, the class <code>Generator</code> can be used in most of the algorithms of the Standard Template Library. To put it differently, the <a href="https://en.cppreference.com/w/cpp/container">unordered associative containers </a>support a forward iterator.</p>
+<p>{loadmoduleid 157}</p>
+<h3>A Forward Iterator</h3>
+<p>The following improved <code>Generator</code> has an inner class Iterator that is a forward iterator.</p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// forwardIterator.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;numeric&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Generator</span> {
+    <span style="color: #007788; font-weight: bold;">int</span> begin_{};
+    <span style="color: #007788; font-weight: bold;">int</span> end_{};
+
+ <span style="color: #9999ff;">public:</span>
+    Generator(<span style="color: #007788; font-weight: bold;">int</span> begin, <span style="color: #007788; font-weight: bold;">int</span> end) <span style="color: #555555;">:</span> begin_{begin}, end_{end} {}
+
+    <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Iterator</span> {
+        <span style="color: #006699; font-weight: bold;">using</span> iterator_category <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>forward_iterator_tag;    <em><span style="color: #0099ff;">// (1)</span></em>
+        <span style="color: #006699; font-weight: bold;">using</span> difference_type   <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span><span style="color: #007788; font-weight: bold;">ptrdiff_t</span>;
+        <span style="color: #006699; font-weight: bold;">using</span> value_type        <span style="color: #555555;">=</span> <span style="color: #007788; font-weight: bold;">int</span>;
+        <span style="color: #006699; font-weight: bold;">using</span> pointer           <span style="color: #555555;">=</span> <span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">*</span>;
+        <span style="color: #006699; font-weight: bold;">using</span> reference         <span style="color: #555555;">=</span> <span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&amp;</span>;
+        <span style="color: #007788; font-weight: bold;">int</span> value_{};
+     <span style="color: #9999ff;">public:</span>
+        <span style="color: #006699; font-weight: bold;">explicit</span> Iterator(<span style="color: #007788; font-weight: bold;">int</span> pos) <span style="color: #555555;">:</span> value_{pos} {}
+
+        value_type <span style="color: #006699; font-weight: bold;">operator</span><span style="color: #555555;">*</span>() <span style="color: #006699; font-weight: bold;">const</span> { <span style="color: #006699; font-weight: bold;">return</span> value_; }
+        pointer <span style="color: #006699; font-weight: bold;">operator</span><span style="color: #555555;">-&gt;</span>() { <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #555555;">&amp;</span>value_; }                <em><span style="color: #0099ff;">// (2)</span></em>         
+
+        Iterator<span style="color: #555555;">&amp;</span> <span style="color: #006699; font-weight: bold;">operator</span><span style="color: #555555;">++</span>() {                           
+            <span style="color: #555555;">++</span>value_;
+            <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">this</span>;
+        }
+        Iterator <span style="color: #006699; font-weight: bold;">operator</span><span style="color: #555555;">++</span>(<span style="color: #007788; font-weight: bold;">int</span>) {                             <em><span style="color: #0099ff;"> // (3)</span></em>
+            Iterator tmp <span style="color: #555555;">=</span> <span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">this</span>; 
+            <span style="color: #555555;">++</span>(<span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">this</span>); 
+            <span style="color: #006699; font-weight: bold;">return</span> tmp; 
+        }
+                                                                <em><span style="color: #0099ff;">// (4)</span></em>
+        <span style="color: #006699; font-weight: bold;">friend</span> <span style="color: #007788; font-weight: bold;">bool</span> <span style="color: #006699; font-weight: bold;">operator</span><span style="color: #555555;">==</span>(<span style="color: #006699; font-weight: bold;">const</span> Iterator<span style="color: #555555;">&amp;</span> fir, <span style="color: #006699; font-weight: bold;">const</span> Iterator<span style="color: #555555;">&amp;</span> sec) {      
+            <span style="color: #006699; font-weight: bold;">return</span> fir.value_ <span style="color: #555555;">==</span> sec.value_;
+        }
+        <span style="color: #006699; font-weight: bold;">friend</span> <span style="color: #007788; font-weight: bold;">bool</span> <span style="color: #006699; font-weight: bold;">operator</span><span style="color: #555555;">!=</span>(<span style="color: #006699; font-weight: bold;">const</span> Iterator<span style="color: #555555;">&amp;</span> fir, <span style="color: #006699; font-weight: bold;">const</span> Iterator<span style="color: #555555;">&amp;</span> sec) {      
+            <span style="color: #006699; font-weight: bold;">return</span> fir.value_ <span style="color: #555555;">!=</span> sec.value_;
+        }
+    };
+
+    Iterator begin() <span style="color: #006699; font-weight: bold;">const</span> { <span style="color: #006699; font-weight: bold;">return</span> Iterator{begin_}; }     
+    Iterator end() <span style="color: #006699; font-weight: bold;">const</span> { <span style="color: #006699; font-weight: bold;">return</span> Iterator{end_}; }         
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    
+    Generator gen{<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">11</span>};
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> v <span style="color: #555555;">:</span> gen) std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> v <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span>;                 <em><span style="color: #0099ff;"> // (5)
+</span></em>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n\n</span><span style="color: #cc3300;">"</span>;
+                                                              <em><span style="color: #0099ff;"> // (6)</span></em>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"sum:  "</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>accumulate(std<span style="color: #555555;">::</span>begin(gen), std<span style="color: #555555;">::</span>end(gen), <span style="color: #ff6600;">0</span>);
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n\n</span><span style="color: #cc3300;">"</span>;
+                                                               <em><span style="color: #0099ff;"> // (7)</span></em>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"prod: "</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>accumulate(gen.begin(), gen.end(), <span style="color: #ff6600;">1</span>, 
+                                             [](<span style="color: #007788; font-weight: bold;">int</span> fir, <span style="color: #007788; font-weight: bold;">int</span> sec){ <span style="color: #006699; font-weight: bold;">return</span> fir <span style="color: #555555;">*</span> sec; });
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n\n</span><span style="color: #cc3300;">"</span>;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>First, <code>Iterator</code> needs several type aliases in the following member function declarations. Additionally, to the previous <code>Iterator</code> implementation in the program <code>iterator.cpp</code>, the current Iterator supports the following member functions: the arrow operator (<code>operator-&gt;</code> in line 2), the post-increment operator (<code>operator++(int)</code> in line 3), and the equal operator (<code>operator==</code> in line 4).</p>
+<p>That was it already. Now, I can use my improved <code>Generator</code> still in a range-based for-loop (line 5), but also in the STL algorithm <code>std::accumulate</code>. Line 6 calculates the sum of all numbers from 1 to 10; line 7 does a similar job by multiplying numbers from 1 to 11. In the first case, I choose the neutral element 0 for the summation, and in the second case the neutral element 1 for the multiplication.</p>
+<p>There is a subtle difference between the first and the second call of <code>std::accumulate</code>. The first call uses the non-member functions <code>std::begin</code> and <code>std::end </code>on the Generator: <code>std<span style="color: #555555;">::</span>accumulate(std<span style="color: #555555;">::</span>begin(gen), std<span style="color: #555555;">::</span>end(gen), <span style="color: #ff6600;">0</span>)</code>, but the second call the <code>Generator'</code>s member functions <code>begin()</code> and <code>end()</code> directly which I implemented.</p>
+<p>Finally, here is the output of the program:<img src="https://www.modernescpp.com/images/blog/Patterns/IteratorProtocol/forwardIterator.png" alt="forwardIterator" width="400" height="281" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<h2>What's Next?</h2>
+<p>In my next post, I will write about the Covariant Return Type. The Covariant Return Type of a member function allows an overriding member function to return a <em>narrower</em> type. This is particularly useful when you implement the creational design pattern <a href="https://en.wikipedia.org/wiki/Prototype">Prototype</a>.</p>
+<p>&nbsp;</p>
+<p>{loadmoduleid 153}</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
