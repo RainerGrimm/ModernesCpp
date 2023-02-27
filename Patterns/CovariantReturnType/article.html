@@ -1,0 +1,245 @@
+<p>The Covariant Return Type of a member function allows an overriding member function to return a <em>narrower</em> type. This is particularly useful when you implement the <a href="https://en.wikipedia.org/wiki/Prototype">Prototype Pattern</a>.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p><img src="https://www.modernescpp.com/images/blog/Patterns/CovariantReturnType/ClassIdioms.png" alt="ClassIdioms" width="650" height="335" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>I used the Covariant Return Type in my previous posts without explaining it. Let's change this.</p>
+<h2>Covariant Return Type</h2>
+<p>Let me start with the naive implementation.</p>
+<h3>The Naive Version</h3>
+<p>The following program<code> covariantReturnType.cpp</code> applies the <a href="https://en.wikipedia.org/wiki/Prototype">Prototype Pattern</a>.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// covariantReturnType.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;string&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Window</span>{                                  <em><span style="color: #0099ff;">// (1)</span></em>
+ <span style="color: #006699; font-weight: bold;">public</span><span style="color: #555555;">:</span>                
+    <span style="color: #006699; font-weight: bold;">virtual</span> Window<span style="color: #555555;">*</span> clone() { 
+        <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #006699; font-weight: bold;">new</span> Window(<span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">this</span>);
+    }
+    <span style="color: #006699; font-weight: bold;">virtual</span> std<span style="color: #555555;">::</span>string getName() <span style="color: #006699; font-weight: bold;">const</span> {
+        <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc3300;">"Window"</span>;
+    }                       
+    <span style="color: #006699; font-weight: bold;">virtual</span> <span style="color: #555555;">~</span>Window() {};
+};
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">DefaultWindow</span><span style="color: #555555;">:</span> <span style="color: #006699; font-weight: bold;">public</span> Window {          <em><span style="color: #0099ff;">// (2)</span></em>
+     DefaultWindow<span style="color: #555555;">*</span> clone() override { 
+        <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #006699; font-weight: bold;">new</span> DefaultWindow(<span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">this</span>);
+    } 
+    std<span style="color: #555555;">::</span>string getName() <span style="color: #006699; font-weight: bold;">const</span> override {
+        <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc3300;">"DefaultWindow"</span>;
+    }   
+};
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">FancyWindow</span><span style="color: #555555;">:</span> <span style="color: #006699; font-weight: bold;">public</span> Window {           <em><span style="color: #0099ff;">// (3)</span></em>
+    FancyWindow<span style="color: #555555;">*</span> clone() override { 
+        <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #006699; font-weight: bold;">new</span> FancyWindow(<span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">this</span>);
+    } 
+    std<span style="color: #555555;">::</span>string getName() <span style="color: #006699; font-weight: bold;">const</span> override {
+        <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc3300;">"FancyWindow"</span>;
+    }   
+};
+                
+Window<span style="color: #555555;">*</span> <span style="color: #cc00ff;">cloneWindow</span>(Window<span style="color: #555555;">&amp;</span> oldWindow) {    <em><span style="color: #0099ff;">// (4)</span></em>                
+    <span style="color: #006699; font-weight: bold;">return</span> oldWindow.clone();
+}
+  
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    Window window;
+    DefaultWindow defaultWindow;
+    FancyWindow fancyWindow;
+
+    <span style="color: #006699; font-weight: bold;">const</span> Window<span style="color: #555555;">*</span> window1 <span style="color: #555555;">=</span> cloneWindow(window);
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"window1-&gt;getName(): "</span> <span style="color: #555555;">&lt;&lt;</span> window1<span style="color: #555555;">-&gt;</span>getName() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    <span style="color: #006699; font-weight: bold;">const</span> Window<span style="color: #555555;">*</span> defaultWindow1 <span style="color: #555555;">=</span> cloneWindow(defaultWindow);
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"defaultWindow1-&gt;getName(): "</span> <span style="color: #555555;">&lt;&lt;</span> defaultWindow1<span style="color: #555555;">-&gt;</span>getName() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    <span style="color: #006699; font-weight: bold;">const</span> Window<span style="color: #555555;">*</span> fancyWindow1 <span style="color: #555555;">=</span> cloneWindow(fancyWindow);
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"fancywindow1-&gt;getName(): "</span> <span style="color: #555555;">&lt;&lt;</span> fancyWindow1<span style="color: #555555;">-&gt;</span>getName() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  
+    <span style="color: #006699; font-weight: bold;">delete</span> window1;
+    <span style="color: #006699; font-weight: bold;">delete</span> defaultWindow1;
+    <span style="color: #006699; font-weight: bold;">delete</span> fancyWindow1;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The interface-class <code>Window</code> (line 1) has a virtual <code>clone </code>function. The <code>clone</code> function returns a copy of itself. The derived classes such as <code>DefaultWindow</code> (line 2) and <code>FancyWindow</code> (line 3) also return a copy of itself. The function <code>cloneWindow</code> (line 4) uses the virtual member function and creates clones of the incoming windows. Additionally, I implemented a virtual <code>getName</code> function to visualize the virtual dispatch.</p>
+<p>The output of the program is as expected.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Patterns/CovariantReturnType/covariantReturnType.png" alt="covariantReturnType" width="493" height="255" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>Did you happen to notice the use of the Covariant Return Type in this example? <code>Window</code>'s virtual clone member function returns a <code>Window</code> pointer, but <code>DefaultWindow</code>'s virtual clone member function a <code>DefaultWindow</code> pointer, and <code>FancyWindow</code>*s virtual clone member function a <code>FancyWindow</code> pointer. This means the return type is covariant: <strong> If a derived class member function returns a more-derived type than its overridden base class member function, the derived class return type is called covariant. </strong></p>
+<p>Additionally, there is a small observation I want to share. Although <code>DeaultWindow</code>'s and <code>FancyWindows</code>'s virtual member functions <code>clone</code> are private, the function <code>cloneWindow</code> (line 4) can invoke them. The reason is simple: The member function cloneWindow uses the public interface of the interface-class <code>Window</code>.</p>
+<p>I called this implementation naive. Why?</p>
+<h3 id="h0-2-ownership-semantics">Ownership Semantics</h3>
+<p>In general, you don't know the implementation of the <code>clone</code> function. <code>clone</code> returns a pointer to a window<code></code>. <strong>Pointers have, by design, a flaw. They model two completely different semantics: ownership and borrowing.</strong></p>
+<ul>
+<li><strong>Ownership</strong>: the caller is responsible for the windows and must destroy them; this is the behavior that the program <code>covariantReturnType.cpp</code> modeled</li>
+<li><strong>Borrowing</strong>: the callee is responsible for the Window and borrows it from the caller</li>
+</ul>
+<p>Let me emphasize this one more.</p>
+<ul>
+<li><strong>Owner</strong>: You are the owner of the w<code>indow</code>. You have to take care of it and destroy it. If not, you have a memory leak.</li>
+<li><strong>Borrower</strong>: You are not the owner of the window. You can not destroy it. If you destroy it, you have a double delete.</li>
+</ul>
+<p>With C++11, it is easy to overcome this pointer flaw. Use a<code> std::unique_ptr&lt;Window&gt;</code> or a <code>std::shared_ptr&lt;Window&gt;.&nbsp; </code></p>
+<p>{loadmoduleid 157}</p>
+<h3><code>std::unique_ptr</code></h3>
+<p>Returning&nbsp;<code> std::unique_ptr&lt;Window&gt;</code> means that the caller is the owner. The<code> std::unique_ptr&lt;Window&gt;</code> behaves as a local. When it goes out of scope, it is automatically destroyed. Additionally, you can simulate the Covariant Return Type.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// covariantReturnTypeUniquePtr.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;memory&gt;</span>
+<span style="color: #009999;">#include &lt;string&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Window</span>{ 
+ <span style="color: #006699; font-weight: bold;">public</span><span style="color: #555555;">:</span>                
+    <span style="color: #006699; font-weight: bold;">virtual</span> std<span style="color: #555555;">::</span>unique_ptr<span style="color: #555555;">&lt;</span>Window<span style="color: #555555;">&gt;</span> clone() { 
+        <span style="color: #006699; font-weight: bold;">return</span> std<span style="color: #555555;">::</span>make_unique<span style="color: #555555;">&lt;</span>Window<span style="color: #555555;">&gt;</span>(<span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">this</span>);          <em><span style="color: #0099ff;">// (1)</span></em>
+    }
+    <span style="color: #006699; font-weight: bold;">virtual</span> std<span style="color: #555555;">::</span>string getName() <span style="color: #006699; font-weight: bold;">const</span> {
+        <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc3300;">"Window"</span>;
+    }                       
+    <span style="color: #006699; font-weight: bold;">virtual</span> <span style="color: #555555;">~</span>Window() {};
+};
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">DefaultWindow</span><span style="color: #555555;">:</span> <span style="color: #006699; font-weight: bold;">public</span> Window { 
+     std<span style="color: #555555;">::</span>unique_ptr<span style="color: #555555;">&lt;</span>Window<span style="color: #555555;">&gt;</span> clone() override { 
+        <span style="color: #006699; font-weight: bold;">return</span> std<span style="color: #555555;">::</span>make_unique<span style="color: #555555;">&lt;</span>DefaultWindow<span style="color: #555555;">&gt;</span>(<span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">this</span>);  <em><span style="color: #0099ff;">// (2)</span></em>
+    } 
+    std<span style="color: #555555;">::</span>string getName() <span style="color: #006699; font-weight: bold;">const</span> override {
+        <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc3300;">"DefaultWindow"</span>;
+    }   
+};
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">FancyWindow</span><span style="color: #555555;">:</span> <span style="color: #006699; font-weight: bold;">public</span> Window { 
+    std<span style="color: #555555;">::</span>unique_ptr<span style="color: #555555;">&lt;</span>Window<span style="color: #555555;">&gt;</span> clone() override { 
+        <span style="color: #006699; font-weight: bold;">return</span> std<span style="color: #555555;">::</span>make_unique<span style="color: #555555;">&lt;</span>FancyWindow<span style="color: #555555;">&gt;</span>(<span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">this</span>);  <em><span style="color: #0099ff;"> // (3)</span></em>
+    } 
+    std<span style="color: #555555;">::</span>string getName() <span style="color: #006699; font-weight: bold;">const</span> override {
+        <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc3300;">"FancyWindow"</span>;
+    }   
+};
+                
+<span style="color: #006699; font-weight: bold;">auto</span> <span style="color: #cc00ff;">cloneWindow</span>(std<span style="color: #555555;">::</span>unique_ptr<span style="color: #555555;">&lt;</span>Window<span style="color: #555555;">&gt;&amp;</span> oldWindow) {                    
+    <span style="color: #006699; font-weight: bold;">return</span> oldWindow<span style="color: #555555;">-&gt;</span>clone();
+}
+  
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    std<span style="color: #555555;">::</span>unique_ptr<span style="color: #555555;">&lt;</span>Window<span style="color: #555555;">&gt;</span> window <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>make_unique<span style="color: #555555;">&lt;</span>Window<span style="color: #555555;">&gt;</span>();
+    std<span style="color: #555555;">::</span>unique_ptr<span style="color: #555555;">&lt;</span>Window<span style="color: #555555;">&gt;</span> defaultWindow <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>make_unique<span style="color: #555555;">&lt;</span>DefaultWindow<span style="color: #555555;">&gt;</span>();
+    std<span style="color: #555555;">::</span>unique_ptr<span style="color: #555555;">&lt;</span>Window<span style="color: #555555;">&gt;</span> fancyWindow <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>make_unique<span style="color: #555555;">&lt;</span>FancyWindow<span style="color: #555555;">&gt;</span>();
+
+    <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #006699; font-weight: bold;">auto</span> window1 <span style="color: #555555;">=</span> cloneWindow(window);
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"window1-&gt;getName(): "</span> <span style="color: #555555;">&lt;&lt;</span> window1<span style="color: #555555;">-&gt;</span>getName() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #006699; font-weight: bold;">auto</span> defaultWindow1 <span style="color: #555555;">=</span> cloneWindow(defaultWindow);
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"defaultWindow1-&gt;getName(): "</span> <span style="color: #555555;">&lt;&lt;</span> defaultWindow1<span style="color: #555555;">-&gt;</span>getName() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #006699; font-weight: bold;">auto</span> fancyWindow1 <span style="color: #555555;">=</span> cloneWindow(fancyWindow);
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"fancyWindow1-&gt;getName(): "</span> <span style="color: #555555;">&lt;&lt;</span> fancyWindow1<span style="color: #555555;">-&gt;</span>getName() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The virtual <code>clone</code> member function's return type is a <code>std::unique_ptr&lt;Window&gt;</code>. Additionally,&nbsp; the returned object is a <code>std::make_unique&lt;Window&gt;(*this)</code> (line 1), a <code>std::make_unique&lt;DefaultWindow&gt;(*this)</code> (line 2), or a <code>std::make_unique&lt;FancyWindow&gt;(*this)</code> (line 3), respectively.</p>
+<p>The output of the program is identical to the previous one.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Patterns/CovariantReturnType/covariantReturnTypeUniquePtr.png" alt="covariantReturnTypeUniquePtr" width="520" height="254" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<div>
+<div>
+<div>
+<div>&nbsp;</div>
+<div>For completeness, let me implement this example using a <code>std::shared_ptr</code>.</div>
+</div>
+</div>
+</div>
+<h3><code>std::shared_ptr</code></h3>
+<p>Returning a<code> std::shared_ptr&lt;Window&gt;</code> means that the caller and the called share ownership. When neither the caller nor the callee needs the<code> std::shared_ptr&lt;Window&gt;</code> anymore, it is automatically destroyed.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// covariantReturnTypeSharedPtr.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;memory&gt;</span>
+<span style="color: #009999;">#include &lt;string&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Window</span>{ 
+ <span style="color: #006699; font-weight: bold;">public</span><span style="color: #555555;">:</span>                
+    <span style="color: #006699; font-weight: bold;">virtual</span> std<span style="color: #555555;">::</span>shared_ptr<span style="color: #555555;">&lt;</span>Window<span style="color: #555555;">&gt;</span> clone() { 
+        <span style="color: #006699; font-weight: bold;">return</span> std<span style="color: #555555;">::</span>make_shared<span style="color: #555555;">&lt;</span>Window<span style="color: #555555;">&gt;</span>(<span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">this</span>);
+    }
+    <span style="color: #006699; font-weight: bold;">virtual</span> std<span style="color: #555555;">::</span>string getName() <span style="color: #006699; font-weight: bold;">const</span> {
+        <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc3300;">"Window"</span>;
+    }                       
+    <span style="color: #006699; font-weight: bold;">virtual</span> <span style="color: #555555;">~</span>Window() {};
+};
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">DefaultWindow</span><span style="color: #555555;">:</span> <span style="color: #006699; font-weight: bold;">public</span> Window { 
+     std<span style="color: #555555;">::</span>shared_ptr<span style="color: #555555;">&lt;</span>Window<span style="color: #555555;">&gt;</span> clone() override { 
+        <span style="color: #006699; font-weight: bold;">return</span> std<span style="color: #555555;">::</span>make_shared<span style="color: #555555;">&lt;</span>DefaultWindow<span style="color: #555555;">&gt;</span>(<span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">this</span>);
+    } 
+    std<span style="color: #555555;">::</span>string getName() <span style="color: #006699; font-weight: bold;">const</span> override {
+        <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc3300;">"DefaultWindow"</span>;
+    }   
+};
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">FancyWindow</span><span style="color: #555555;">:</span> <span style="color: #006699; font-weight: bold;">public</span> Window { 
+    std<span style="color: #555555;">::</span>shared_ptr<span style="color: #555555;">&lt;</span>Window<span style="color: #555555;">&gt;</span> clone() override { 
+        <span style="color: #006699; font-weight: bold;">return</span> std<span style="color: #555555;">::</span>make_shared<span style="color: #555555;">&lt;</span>FancyWindow<span style="color: #555555;">&gt;</span>(<span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">this</span>);
+    } 
+    std<span style="color: #555555;">::</span>string getName() <span style="color: #006699; font-weight: bold;">const</span> override {
+        <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc3300;">"FancyWindow"</span>;
+    }   
+};
+                
+<span style="color: #006699; font-weight: bold;">auto</span> <span style="color: #cc00ff;">cloneWindow</span>(std<span style="color: #555555;">::</span>shared_ptr<span style="color: #555555;">&lt;</span>Window<span style="color: #555555;">&gt;&amp;</span> oldWindow) {                    
+    <span style="color: #006699; font-weight: bold;">return</span> oldWindow<span style="color: #555555;">-&gt;</span>clone();
+}
+  
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    std<span style="color: #555555;">::</span>shared_ptr<span style="color: #555555;">&lt;</span>Window<span style="color: #555555;">&gt;</span> window <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>make_shared<span style="color: #555555;">&lt;</span>Window<span style="color: #555555;">&gt;</span>();
+    std<span style="color: #555555;">::</span>shared_ptr<span style="color: #555555;">&lt;</span>Window<span style="color: #555555;">&gt;</span> defaultWindow <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>make_shared<span style="color: #555555;">&lt;</span>DefaultWindow<span style="color: #555555;">&gt;</span>();
+    std<span style="color: #555555;">::</span>shared_ptr<span style="color: #555555;">&lt;</span>Window<span style="color: #555555;">&gt;</span> fancyWindow <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>make_shared<span style="color: #555555;">&lt;</span>FancyWindow<span style="color: #555555;">&gt;</span>();
+
+    <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #006699; font-weight: bold;">auto</span> window1 <span style="color: #555555;">=</span> cloneWindow(window);
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"window1-&gt;getName(): "</span> <span style="color: #555555;">&lt;&lt;</span> window1<span style="color: #555555;">-&gt;</span>getName() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #006699; font-weight: bold;">auto</span> defaultWindow1 <span style="color: #555555;">=</span> cloneWindow(defaultWindow);
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"defaultWindow1-&gt;getName(): "</span> <span style="color: #555555;">&lt;&lt;</span> defaultWindow1<span style="color: #555555;">-&gt;</span>getName() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #006699; font-weight: bold;">auto</span> fancyWindow1 <span style="color: #555555;">=</span> cloneWindow(fancyWindow);
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"fancyWindow1-&gt;getName(): "</span> <span style="color: #555555;">&lt;&lt;</span> fancyWindow1<span style="color: #555555;">-&gt;</span>getName() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Porting the example <code>covariantReturnTypeUniquePtr.cpp</code> into <code>covariantReturnTypeSharedPtr.cpp</code> is a piece of cake: I replaced unique with shared. Without further ado, here is the output of the program:</p>
+<p><img src="https://www.modernescpp.com/images/blog/Patterns/CovariantReturnType/covariantReturnTypeSharedPtr.png" alt="covariantReturnTypeSharedPtr" width="520" height="254" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<h2>What's Next?</h2>
+<p>My next post is special. I will give an overview of posts I have written about idioms dealing with polymorphism and templates.</p>
+<p>&nbsp;</p>
+<p>{loadmoduleid 153}</p>
+<p>&nbsp;</p>
