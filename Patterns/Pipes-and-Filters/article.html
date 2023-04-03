@@ -1,42 +1,167 @@
-#include <ios>
-#include <iostream>
-#include <type_traits>
+<p>The Pipes-and-Filters architecture pattern describes the structure of systems that process data streams.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p><img src="https://www.modernescpp.com/images/blog/Patterns/PipesAndFilters/PipesAndFilter.png" alt="PipesAndFilter" width="650" height="324" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>The Pipes-and-Filters pattern is similar to the Layers Pattern. The idea of the Layers Pattern is to structure the system in layers so that higher layers are based on the services of lower layers. The Pipes-and-Filters naturally extend the Layers Pattern, using the layers as filters and the data flow as pipes.</p>
+<h2>Pipes-and-Filters</h2>
+<h3>Purpose</h3>
+<ul>
+<li>A system that processes data in several steps</li>
+<li>Each step processes its data independently from the other</li>
+</ul>
+<h3>Solution</h3>
+<ul>
+<li>Divide the task into several processing steps</li>
+<li>Each processing step is the input for the next processing step</li>
+<li>The processing step is called a filter; the data channel between the filters is called a pipe</li>
+<li>The data comes from the data source and ends up in the data sink</li>
+</ul>
+<h3>Structure</h3>
+<p><img src="https://www.modernescpp.com/images/blog/Patterns/PipesAndFilters/PipesAndFilterFlow.png" alt="PipesAndFilterFlow" width="650" height="189" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p><img src="https://www.modernescpp.com/images/blog/Patterns/PipesAndFilters/PipesAndFiltersStructure.png" alt="PipesAndFiltersStructure" width="650" height="373" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<pre><code><b>Filter</b></code></pre>
+<ul>
+<li>Gets input data</li>
+<li>Performs its operation on the input data</li>
+<li>Produces output data</li>
+</ul>
+<pre><code><b>Pipe</b></code></pre>
+<ul>
+<li>Transmits data</li>
+<li>Buffers data in a queue</li>
+<li>Synchronizes neighbors</li>
+</ul>
+<pre><code><b>Data Source</b></code></pre>
+<ul>
+<li>Produces input to the processing pipeline</li>
+</ul>
+<pre><code><b>Data Sink</b></code></pre>
+<ul>
+<li>Consumes data</li>
+</ul>
+<p>The most interesting part of the Pipes-and-Filter is the data flow.</p>
+<h3>Data Flow</h3>
+<p>There are several ways to control the data flow.</p>
+<h4>Push Principle</h4>
+<ul>
+<li>The filter is started by passing the data of the previous filter</li>
+<li>The (n-1)-th filter sends (write operation) data to the n-th filter</li>
+<li>The data source starts the data flow</li>
+</ul>
+<h4>Pull Principle</h4>
+<ul>
+<li>The filter is started by requesting data from the previous filter</li>
+<li>The n-th filter requests data from the (n-1)-th filter</li>
+<li>The data sink starts the data flow</li>
+</ul>
+<h4>Mixed Push/Pull Principle</h4>
+<ul>
+<li>The n-th filter requests data from the (n-1)-th filter and explicitly passes it to the (n+1)-th filter</li>
+<li>The n-th filter is the only active filter in the processing chain&nbsp;&nbsp;&nbsp;&nbsp;</li>
+<li>The n-th filter starts the data flow</li>
+</ul>
+<h4>Active Filters as Independent Processes</h4>
+<ul>
+<li>Each filter is an independent process that reads data from the previous queue or writes data to the following queue</li>
+<li>The n-th filter can read data only after the (n-1)-th filter has written data to the connecting queue</li>
+<li>The n-th filter can write its data only after the (n+1)-th filter has read the connecting queue</li>
+<li>This structure is known as the Producer/Consumer</li>
+<li>Each filter can start the data flow</li>
+</ul>
+<p>{loadmoduleid 157}</p>
+<h3>Example</h3>
+<p>The most prominent example of the Pipes-and-Filters Pattern is the UNIX Command Shell.</p>
+<h4>Unix Command Shell</h4>
+<ul>
+<li>
+<p>Find the five python files in my python3.6 installation that have the most lines:</p>
+</li>
+</ul>
+<p><img src="https://www.modernescpp.com/images/blog/Patterns/PipesAndFilters/UnixPipe.png" alt="UnixPipe" width="650" height="162" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>Here are the steps of the pipeline:</p>
+<ul>
+<li>Find all files ending with py:<code> find -name "*.py"</code></li>
+<li>Get from each file its number of lines: <code>xargs wc -l</code></li>
+<li>Sort numerical: <code>sort -g</code></li>
+<li>Remove the last two lines having irrelevant statistical information: <code>head -n -2</code></li>
+<li>Get the five last lines:<code> tail -5</code></li>
+</ul>
+<p>Finally, here is the classic of command line processing using pipes from <a href="https://de.wikipedia.org/wiki/Douglas_McIlroy" moz-do-not-send="true">Douglas Mcllroy</a>.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">tr -cs A-Za-z <span style="color: #cc3300;">'\n'</span> |
+tr A-Z a-z |
+sort |
+uniq -c |
+sort -rn |
+sed <span style="color: #006699; font-weight: bold;">${</span><span style="color: #003333;">1</span><span style="color: #006699; font-weight: bold;">}</span>q
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>If you want to know what this pipeline does, read the full story behind it in the article "<a href="http://www.leancrew.com/all-this/2011/12/more-shell-less-egg/" moz-do-not-send="true">More shell, less egg</a>".</p>
+<p>Thanks to the ranges library in C++20, the Pipes-and-Filters Pattern is directly supported in C++.</p>
+<h4>Ranges</h4>
+<p>The following program<code> firstTenPrimes.cpp</code> displays the first ten primes starting with 1000.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// firstTenPrimes.cpp</span>
 
-struct Test {
-    template <typename Self>
-    void function(this Self&& self, const std::string& text) {
-        std::cout << text << ": ";
-        std::forward<Self>(self).functionOld();
-        std::cout << '\n';
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;ranges&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">bool</span> <span style="color: #cc00ff;">isPrime</span>(<span style="color: #007788; font-weight: bold;">int</span> i) {
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #007788; font-weight: bold;">int</span> j <span style="color: #555555;">=</span> <span style="color: #ff6600;">2</span>; j <span style="color: #555555;">*</span> j <span style="color: #555555;">&lt;=</span> i; <span style="color: #555555;">++</span>j){
+        <span style="color: #006699; font-weight: bold;">if</span> (i <span style="color: #555555;">%</span> j <span style="color: #555555;">==</span> <span style="color: #ff6600;">0</span>) <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #336666;">false</span>;
     }
+    <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #336666;">true</span>;
+}
 
-    void functionOld() & {
-        std::cout << "non const lvalue";
-    }
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
 
-    void functionOld() const& {
-        std::cout << "const lvalue";
-    }
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    
+    <span style="color: #006699; font-weight: bold;">auto</span> odd <span style="color: #555555;">=</span> [](<span style="color: #007788; font-weight: bold;">int</span> i){ <span style="color: #006699; font-weight: bold;">return</span> i <span style="color: #555555;">%</span> <span style="color: #ff6600;">2</span> <span style="color: #555555;">==</span> <span style="color: #ff6600;">1</span>; };
 
-    void functionOld() && {
-        std::cout << "non const rvalue";
-    }
+    <span style="color: #006699; font-weight: bold;">auto</span> vec <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>views<span style="color: #555555;">::</span>iota(<span style="color: #ff6600;">1</span><span style="color: #aa0000; background-color: #ffaaaa;">'</span><span style="color: #ff6600;">000</span>) <span style="color: #555555;">|</span> std<span style="color: #555555;">::</span>views<span style="color: #555555;">::</span>filter(odd)           <span style="color: #0099ff; font-style: italic;">// (1)</span>
+                                       <span style="color: #555555;">|</span> std<span style="color: #555555;">::</span>views<span style="color: #555555;">::</span>filter(isPrime)       <span style="color: #0099ff; font-style: italic;">// (2)</span>
+                                       <span style="color: #555555;">|</span> std<span style="color: #555555;">::</span>views<span style="color: #555555;">::</span>take(<span style="color: #ff6600;">10</span>)              <span style="color: #0099ff; font-style: italic;">// (3)</span>
+                                       <span style="color: #555555;">|</span> std<span style="color: #555555;">::</span>ranges<span style="color: #555555;">::</span>to<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&gt;</span>();   <span style="color: #0099ff; font-style: italic;">// (4)</span>
 
-    void functionOld() const&& {
-        std::cout << "const rvalue";
-    }
-
-
-};
-
-int main() {
-
-    Test test;
-    const Test constTest;
-
-    test.function("test");
-    constTest.function("constTest");
-    std::move(test).function("std::move(test)");
-    std::move(constTest).function("std::move(consTest)");
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> v<span style="color: #555555;">:</span> vec) std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> v <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span>;
 
 }
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The data source (<code>std::views::iota(1'000)</code>)&nbsp; creates the natural number, starting with 1000. First, the odd numbers are filtered out (line 1), and then the prime numbers (line 2). This pipeline stops after ten values (line 3) and pushes the elements onto the<code> std::vector</code> (line 4). The convenient function<code> std::ranges::to</code> creates a new range (line 4). This function is new with C++23. Therefore, I can only execute the code with the newest windows compiler on the <a href="https://godbolt.org/z/dWaM6EvK4">compiler explorer</a>.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Patterns/PipesAndFilters/firstTenPrimes.png" alt="firstTenPrimes" width="400" height="53" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<h3>Pros and Cons</h3>
+<p>I use in my following comparison the term universal interface. This means all filters speak the same language, such as xml or jason.</p>
+<h3>Pros</h3>
+<ul>
+<li>When one filter pushes or pulls the data directly from its neighbor, no intermediate buffering of data is necessary</li>
+<li>An n-th filter implements the Layers Pattern and can, therefore, easily be replaced</li>
+<li>Filters, implementing the universal interface, can be reordered</li>
+<li>Each filter can work independently of the other and has not had to wait until the neighbored filter is done. This enables the optimal distribution of work between the filters.</li>
+<li>Filters can run in a distributed architecture. The pipes connect the remote entities. The pipes can also split or synchronize the data flow. Pipes-and-Filters are heavily used in distributed or concurrent architectures and provide excellent performance and scalability opportunities.</li>
+</ul>
+<h3>Cons</h3>
+<ul>
+<li>The parallel processing of data may be inefficient due to communication, serialization, and synchronization overhead</li>
+<li>A filter such as a sort needs the entire data</li>
+<li>If the processing power of the filters is not homogenous, you need big queues between them</li>
+<li>To support the universal interface, that data must be formatted between the filters</li>
+<li>The most complicated part of this pattern is error handling. When the Pipes-and-Filters architecture crashes during the data processing, you have data that is not partially and fully processed. Now, you have a few options:
+<ul>
+<li>Start the process once more if you have the original data.</li>
+<li>Use only the fully processed data.</li>
+<li>Introduce markers in your input data. You start the process based on the markers when your system crashes.</li>
+</ul>
+</li>
+</ul>
+<h2>What's Next?</h2>
+<p>The Broker structures distributed software systems that interact with remote service invocations. It is responsible for coordinating the communication, its results, and exceptions. In my next post, I will dive deeper into the architectural pattern Broker.</p>
+<p>&nbsp;</p>
+<p>{loadmoduleid 153}</p>
+<p>&nbsp;</p>
