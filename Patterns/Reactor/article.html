@@ -1,0 +1,231 @@
+<p>Event-driven applications, such as GUIs or servers, often apply the architecture pattern Reactor. A Reactor can accept multiple requests simultaneously and distribute them to different handlers.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/Patterns/Reactor/Reactor.png" alt="Reactor" width="650" height="338" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>The Reactor Pattern is an event-driven framework to concurrently demultiplex and dispatch service requests to various service providers. The requests are processed synchronously.</p>
+<h2>Reactor</h2>
+<h3>Also known as</h3>
+<ul>
+<li>Dispatcher</li>
+<li>Notifier</li>
+</ul>
+<h3>Problem</h3>
+<ul>
+<li>A server should
+<ul>
+<li>answer several client requests simultaneously</li>
+<li>be performant, stable, and scalable</li>
+<li>be extendable to support new or improved services</li>
+</ul>
+</li>
+<li>The application should be hidden from multi-threading and synchronization challenges<br /><br /></li>
+</ul>
+<h3>&nbsp;Solution</h3>
+<ul>
+<li>Each supported service is encapsulated in a handler</li>
+<li>The handlers are registered within the Reactor</li>
+<li>The Reactor uses an event demultiplexer to wait synchronously on all incoming events</li>
+<li>When the Reactor is notified, it dispatches the service request to the specific handler</li>
+</ul>
+<h3>Structure</h3>
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/Patterns/Reactor/reactorUML.png" alt="reactorUML" width="650" height="229" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>&nbsp;</p>
+<p><img src="https://www.modernescpp.com/images/blog/Patterns/Reactor/reactorCRCUpdate.png" alt="reactorCRCUpdate" width="650" height="516" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p><strong><code>Handles</code></strong></p>
+<ul>
+<li>The handles identify different event sources, such as network connections, open files, or GUI events.</li>
+<li>The event source generates events such as connect, read, or write queued on the associated handle.</li>
+</ul>
+<p><strong><code>Synchronous event demultiplexer</code></strong></p>
+<ul>
+<li>The synchronous event demultiplexer waits for one or more indication events and blocks until the associated handle can process the event.</li>
+<li>The system calls <a href="https://en.wikipedia.org/wiki/Select_(Unix)">select</a>, <a href="https://man7.org/linux/man-pages/man2/poll.2.html">poll</a>, <a href="https://en.wikipedia.org/wiki/Epoll">epoll</a>, <a href="https://en.wikipedia.org/wiki/Kqueue">kqueue</a>, or <a href="https://learn.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-waitformultipleobjects">WaitForMultipleObjects </a>enable it to wait for indication events.</li>
+</ul>
+<p><strong><code>Event handler</code></strong></p>
+<ul>
+<li>The event handler defines the interface for processing the indication events.</li>
+<li>The event handler defines the supported services of the application.</li>
+</ul>
+<p><strong><code>Concrete event handler</code></strong></p>
+<ul>
+<li>The concrete event handler implements the interface of the application defined by the event handler.</li>
+</ul>
+<p><strong><code>Reactor</code></strong></p>
+<ul>
+<li>The Reactor supports an interface to register and deregister the concrete event handler using file descriptors.</li>
+<li>The Reactor uses a synchronous event demultiplexer to wait for indication events. An indication event can be a reading event, a writing event, or an error event.</li>
+<li>The Reactor maps the events to their concrete event handler.</li>
+<li>The Reactor manages the lifetime of the event loop.</li>
+</ul>
+<p>The Reactor (not the application) waits for the indication events to demultiplex and dispatch the event. The concrete event handlers are registered within the Reactor. The Reactor inverts the flow of control. This inversion of control is often called <a href="https://en.wikipedia.org/wiki/Inversion_of_control">Hollywood principle</a>.</p>
+<p>The dynamic behavior of a Reactor is pretty interesting.</p>
+<h3>Dynamic Behavior</h3>
+<p>The following points illustrate the control flow between the Reactor and the event handler.</p>
+<ul>
+<li>The application registers an event handler for specific events in the Reactor.</li>
+<li>Each event handler provides its specific handler to the Reactor.</li>
+<li>The application starts the event loop. The event loop waits for indication events.</li>
+<li>The event demultiplexer returns to the Reactor when an event source becomes ready.</li>
+<li>The Reactor dispatches the handles to the corresponding event handler.</li>
+<li>The event handler processes the event.</li>
+</ul>
+<p>Let's study the Reactor in action.</p>
+<p>{loadmoduleid 157}</p>
+<h3>Example</h3>
+<p>This example uses the<a href="https://pocoproject.org/"> POCO framework</a>. "<em>The POCO C++ Libraries are powerful cross-platform C++ libraries for building network- and internet-based applications that run on desktop, server, mobile, IoT, and embedded systems</em>."</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// reactor.cpp</span>
+
+<span style="color: #009999;">#include &lt;fstream&gt;</span>
+<span style="color: #009999;">#include &lt;string&gt;</span>
+
+<span style="color: #009999;">#include "Poco/Net/SocketReactor.h"</span>
+<span style="color: #009999;">#include "Poco/Net/SocketAcceptor.h"</span>
+<span style="color: #009999;">#include "Poco/Net/SocketNotification.h"</span>
+<span style="color: #009999;">#include "Poco/Net/StreamSocket.h"</span>
+<span style="color: #009999;">#include "Poco/Net/ServerSocket.h"</span>
+<span style="color: #009999;">#include "Poco/Observer.h"</span>
+<span style="color: #009999;">#include "Poco/Thread.h"</span>
+<span style="color: #009999;">#include "Poco/Util/ServerApplication.h"</span>
+
+<span style="color: #006699; font-weight: bold;">using</span> Poco<span style="color: #555555;">::</span>Observer;
+<span style="color: #006699; font-weight: bold;">using</span> Poco<span style="color: #555555;">::</span>Thread;
+
+<span style="color: #006699; font-weight: bold;">using</span> Poco<span style="color: #555555;">::</span>Net<span style="color: #555555;">::</span>ReadableNotification;
+<span style="color: #006699; font-weight: bold;">using</span> Poco<span style="color: #555555;">::</span>Net<span style="color: #555555;">::</span>ServerSocket;
+<span style="color: #006699; font-weight: bold;">using</span> Poco<span style="color: #555555;">::</span>Net<span style="color: #555555;">::</span>ShutdownNotification;
+<span style="color: #006699; font-weight: bold;">using</span> Poco<span style="color: #555555;">::</span>Net<span style="color: #555555;">::</span>SocketAcceptor;
+<span style="color: #006699; font-weight: bold;">using</span> Poco<span style="color: #555555;">::</span>Net<span style="color: #555555;">::</span>SocketReactor;
+<span style="color: #006699; font-weight: bold;">using</span> Poco<span style="color: #555555;">::</span>Net<span style="color: #555555;">::</span>StreamSocket;
+
+<span style="color: #006699; font-weight: bold;">using</span> Poco<span style="color: #555555;">::</span>Util<span style="color: #555555;">::</span>Application;
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">EchoHandler</span> {
+ <span style="color: #9999ff;">public:</span>
+  EchoHandler(<span style="color: #006699; font-weight: bold;">const</span> StreamSocket<span style="color: #555555;">&amp;</span> s, SocketReactor<span style="color: #555555;">&amp;</span> r)<span style="color: #555555;">:</span> socket(s), reactor(r) {          <em><span style="color: #0099ff;"> // (11)</span></em>
+    reactor.addEventHandler(socket, 
+      Observer<span style="color: #555555;">&lt;</span>EchoHandler, ReadableNotification<span style="color: #555555;">&gt;</span>(<span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">this</span>, <span style="color: #555555;">&amp;</span>EchoHandler<span style="color: #555555;">::</span>socketReadable));
+  }
+
+  <span style="color: #007788; font-weight: bold;">void</span> socketReadable(ReadableNotification<span style="color: #555555;">*</span>) {
+    <span style="color: #007788; font-weight: bold;">char</span> buffer[<span style="color: #ff6600;">8</span>];
+    <span style="color: #007788; font-weight: bold;">int</span> n <span style="color: #555555;">=</span> socket.receiveBytes(buffer, <span style="color: #006699; font-weight: bold;">sizeof</span>(buffer));
+    <span style="color: #006699; font-weight: bold;">if</span> (n <span style="color: #555555;">&gt;</span> <span style="color: #ff6600;">0</span>) {
+      socket.sendBytes(buffer, n);                                                      <em><strong><span style="color: #0099ff;"> // (13)</span> </strong> </em>                                                  
+    }
+    <span style="color: #006699; font-weight: bold;">else</span> {
+      reactor.removeEventHandler(socket,                                                 <em><span style="color: #0099ff;">// (12)</span></em>
+	      Observer<span style="color: #555555;">&lt;</span>EchoHandler, ReadableNotification<span style="color: #555555;">&gt;</span>(<span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">this</span>, <span style="color: #555555;">&amp;</span>EchoHandler<span style="color: #555555;">::</span>socketReadable));
+      <span style="color: #006699; font-weight: bold;">delete</span> <span style="color: #006699; font-weight: bold;">this</span>;
+    }
+  }
+
+ <span style="color: #9999ff;">private:</span>
+  StreamSocket socket;
+  SocketReactor<span style="color: #555555;">&amp;</span> reactor;
+};
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">DataHandler</span> {
+ <span style="color: #9999ff;">public:</span>
+
+  DataHandler(StreamSocket<span style="color: #555555;">&amp;</span> s, SocketReactor<span style="color: #555555;">&amp;</span> r)<span style="color: #555555;">:</span> socket(s), reactor(r), 
+                                                  outFile(<span style="color: #cc3300;">"reactorOutput.txt"</span>) {
+    reactor.addEventHandler(socket,                                                   <em><span style="color: #0099ff;">// (14)</span> </em>
+      Observer<span style="color: #555555;">&lt;</span>DataHandler, ReadableNotification<span style="color: #555555;">&gt;</span>(<span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">this</span>, <span style="color: #555555;">&amp;</span>DataHandler<span style="color: #555555;">::</span>socketReadable));
+    reactor.addEventHandler(socket,                                                   <em><span style="color: #0099ff;">// (15)</span></em>
+      Observer<span style="color: #555555;">&lt;</span>DataHandler, ShutdownNotification<span style="color: #555555;">&gt;</span>(<span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">this</span>, <span style="color: #555555;">&amp;</span>DataHandler<span style="color: #555555;">::</span>socketShutdown));
+    socket.setBlocking(<span style="color: #336666;">false</span>);
+  }
+
+  <span style="color: #555555;">~</span>DataHandler() {                                                                   <em><span style="color: #0099ff;"> // (16)</span></em>
+    reactor.removeEventHandler(socket, 
+      Observer<span style="color: #555555;">&lt;</span>DataHandler, ReadableNotification<span style="color: #555555;">&gt;</span>(<span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">this</span>, <span style="color: #555555;">&amp;</span>DataHandler<span style="color: #555555;">::</span>socketReadable));
+    reactor.removeEventHandler(socket, 
+      Observer<span style="color: #555555;">&lt;</span>DataHandler, ShutdownNotification<span style="color: #555555;">&gt;</span>(<span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">this</span>, <span style="color: #555555;">&amp;</span>DataHandler<span style="color: #555555;">::</span>socketShutdown));
+  }
+
+  <span style="color: #007788; font-weight: bold;">void</span> socketReadable(ReadableNotification<span style="color: #555555;">*</span>) {
+    <span style="color: #007788; font-weight: bold;">char</span> buffer[<span style="color: #ff6600;">64</span>];
+    <span style="color: #007788; font-weight: bold;">int</span> n <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>;
+    <span style="color: #006699; font-weight: bold;">do</span> {
+      n <span style="color: #555555;">=</span> socket.receiveBytes(<span style="color: #555555;">&amp;</span>buffer[<span style="color: #ff6600;">0</span>], <span style="color: #006699; font-weight: bold;">sizeof</span>(buffer));
+      <span style="color: #006699; font-weight: bold;">if</span> (n <span style="color: #555555;">&gt;</span> <span style="color: #ff6600;">0</span>) {
+        std<span style="color: #555555;">::</span>string s(buffer, n);
+        outFile <span style="color: #555555;">&lt;&lt;</span> s <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>flush;                                                <em><span style="color: #0099ff;"> // (17)</span></em>
+      }
+      <span style="color: #006699; font-weight: bold;">else</span> <span style="color: #006699; font-weight: bold;">break</span>;
+    } <span style="color: #006699; font-weight: bold;">while</span> (<span style="color: #336666;">true</span>);
+  }
+
+  <span style="color: #007788; font-weight: bold;">void</span> socketShutdown(ShutdownNotification<span style="color: #555555;">*</span>) {
+    <span style="color: #006699; font-weight: bold;">delete</span> <span style="color: #006699; font-weight: bold;">this</span>;
+  }
+
+ <span style="color: #9999ff;">private:</span>
+  StreamSocket socket;
+  SocketReactor<span style="color: #555555;">&amp;</span> reactor;
+  std<span style="color: #555555;">::</span>ofstream outFile;
+};
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Server</span><span style="color: #555555;">:</span> <span style="color: #006699; font-weight: bold;">public</span> Poco<span style="color: #555555;">::</span>Util<span style="color: #555555;">::</span>ServerApplication {
+
+ <span style="color: #9999ff;">protected:</span>
+  <span style="color: #007788; font-weight: bold;">void</span> initialize(Application<span style="color: #555555;">&amp;</span> self) {                                   <em><span style="color: #0099ff;">// (3)</span></em>
+    ServerApplication<span style="color: #555555;">::</span>initialize(self);
+  }
+		
+  <span style="color: #007788; font-weight: bold;">void</span> uninitialize() {                                                  <em><span style="color: #0099ff;">// (4)</span></em>
+    ServerApplication<span style="color: #555555;">::</span>uninitialize();
+  }
+
+  <span style="color: #007788; font-weight: bold;">int</span> main(<span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>string<span style="color: #555555;">&gt;&amp;</span>) {                            <em><span style="color: #0099ff;">// (2)</span></em>
+		
+    ServerSocket serverSocketEcho(<span style="color: #ff6600;">4711</span>);                                <em><span style="color: #0099ff;"> // (5)</span></em>
+    ServerSocket <span style="color: #cc00ff;">serverSocketData</span>(<span style="color: #ff6600;">4712</span>);                                 <em><span style="color: #0099ff;">// (6)</span></em>
+    SocketReactor reactor;
+    SocketAcceptor<span style="color: #555555;">&lt;</span>EchoHandler<span style="color: #555555;">&gt;</span> acceptorEcho(serverSocketEcho, reactor); <em><span style="color: #0099ff;">// (7)</span></em>
+    SocketAcceptor<span style="color: #555555;">&lt;</span>DataHandler<span style="color: #555555;">&gt;</span> acceptorData(serverSocketData, reactor); <em><span style="color: #0099ff;">// (8)</span></em>
+    Thread <span style="color: #006699; font-weight: bold;">thread</span>;
+    <span style="color: #006699; font-weight: bold;">thread</span>.start(reactor);                                               <em><span style="color: #0099ff;">// (9)</span></em>
+    waitForTerminationRequest();
+    reactor.stop();                                                      <em><span style="color: #0099ff;">// (10)</span></em>
+    <span style="color: #006699; font-weight: bold;">thread</span>.join();
+        
+    <span style="color: #006699; font-weight: bold;">return</span> Application<span style="color: #555555;">::</span>EXIT_OK;
+
+  }
+
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(<span style="color: #007788; font-weight: bold;">int</span> argc, <span style="color: #007788; font-weight: bold;">char</span><span style="color: #555555;">**</span> argv) {
+
+  Server app;                                                             <em><span style="color: #0099ff;">// (1)</span></em>
+  <span style="color: #006699; font-weight: bold;">return</span> app.run(argc, argv);
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Line (1) generates the TCP server. The server performs the <code>main</code> function (line 2) and is initialized in line (3) and uninitialized in line (4). The <code>main</code> function of the TCP server creates two server sockets, listening on port 4711 (line 5) and port 4712 (line 6). Lines (7) and (5) generate the server sockets using the <code>EchoHandler</code> and the <code>DataHandler</code>. The <code>SocketAcceptor</code> models the Acceptor component of the <a href="http://software-pattern.org/Book/29">Accepter-Connector design pattern</a>. The <code>reactor</code> runs in a separate thread (line 9) until it gets its termination request (line 10). The <code>EchoHandler</code> registers its read handle in the constructor (line 11), and it unregisters its read handle in the member function <code>socketReadable</code> (line 12). The echo service sends the client's message back (line 13). On the contrary, the <code>DataHandler</code> enables a client to transfer data to the server. The handler registers in its constructor its action for reading events (line 14) and shutdown events (line 15). Both handlers are unregistered in the destructor of <code>DataHandler</code> (line 16). The result of the data transfer is directly written to the file handle <code>outFile</code> (line 17).</p>
+<p>The following output shows on the left the server and on the right both clients. A telnet session serves as a client. The first client connects to port 4711: <code>telnet 127.0.0.1 4711</code>. This client connects with the echo server and displays its request. The second client connects to port 4712:<code> telnet 127.0.0.1 4712</code>. The server's output shows that the client data is transferred to the server.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Patterns/Reactor/reactorRun.png" alt="reactorRun" width="650" height="340" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>What are the pros and cons of the Reactor?</p>
+<h3>Pros and Cons</h3>
+<h4>Pros</h4>
+<ul>
+<li>A clear separation of framework and application logic.</li>
+<li>The modularity of various concrete event handlers.</li>
+<li>The Reactor can be ported to various platforms because the underlying event demultiplexing functions such as <a href="https://en.wikipedia.org/wiki/Select_(Unix)">select</a>, <a href="https://man7.org/linux/man-pages/man2/poll.2.html">poll</a>, <a href="https://en.wikipedia.org/wiki/Epoll">epoll</a>, <a href="https://en.wikipedia.org/wiki/Kqueue">kqueue</a>, or <a href="https://learn.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-waitformultipleobjects">WaitForMultipleObjects</a> is available on Unix (select, epoll), and Windows platforms (WaitForMultipleObjects).</li>
+<li>The separation of interface and implementation enables easy adaption or extension of the services.</li>
+<li>Overall structure supports the concurrent execution.</li>
+</ul>
+<h4>Cons</h4>
+<ul>
+<li>Requires an event demultiplexing system call.</li>
+<li>A long-running event handler can block the Reactor.</li>
+<li>The inversion of control makes testing and debugging more difficult.</li>
+</ul>
+<h2>What's Next?</h2>
+<p>There are many well-established patterns used in the concurrency domain. They deal with synchronization challenges such as sharing and mutation but also with concurrent architectures. In my next post, I will start with the patterns focusing on data sharing.</p>
+<p>&nbsp;</p>
+<p>{loadmoduleid 153}</p>
