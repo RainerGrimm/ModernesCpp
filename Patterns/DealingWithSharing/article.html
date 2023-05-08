@@ -1,0 +1,241 @@
+<p>If you don’t share, no data races can happen. Not sharing means that your thread works on local variables. This can be achieved by copying the value, using thread-specific storage, or transferring the result of a thread to its associated future via a protected data channel.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p><img src="https://www.modernescpp.com/images/blog/Patterns/DealingWithSharing/Sharing.png" alt="Sharing" width="650" height="324" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>The patterns in this section are quite obvious, but I will present them with a short explanation for completeness. Let me start with Copied Value.</p>
+<h2>Copied Value</h2>
+<p>If a thread gets its arguments by copy and not by reference, there is no need to synchronize access to any data. No data races and no lifetime issues are possible.</p>
+<h3>Data Races with References</h3>
+<p>The following program creates three threads. One thread gets its argument by copy, the other by reference, and the last by constant reference.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// copiedValueDataRace.cpp</span>
+
+<span style="color: #009999;">#include &lt;functional&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;string&gt;</span>
+<span style="color: #009999;">#include &lt;thread&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">using</span> <span style="color: #006699; font-weight: bold;">namespace</span> std<span style="color: #555555;">::</span>chrono_literals;
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">byCopy</span>(<span style="color: #007788; font-weight: bold;">bool</span> b){
+    std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>sleep_for(<span style="color: #ff6600;">1</span>ms);             <em><span style="color: #0099ff;">// (1)</span></em>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"byCopy: "</span> <span style="color: #555555;">&lt;&lt;</span> b <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+}
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">byReference</span>(<span style="color: #007788; font-weight: bold;">bool</span><span style="color: #555555;">&amp;</span> b){
+    std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>sleep_for(<span style="color: #ff6600;">1</span>ms);            <em><span style="color: #0099ff;">// (2)</span></em>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"byReference: "</span> <span style="color: #555555;">&lt;&lt;</span> b <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+}
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">byConstReference</span>(<span style="color: #006699; font-weight: bold;">const</span> <span style="color: #007788; font-weight: bold;">bool</span><span style="color: #555555;">&amp;</span> b){
+    std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>sleep_for(<span style="color: #ff6600;">1</span>ms);            <em><span style="color: #0099ff;">// (3)</span></em>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"byConstReference: "</span> <span style="color: #555555;">&lt;&lt;</span> b <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>boolalpha <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    <span style="color: #007788; font-weight: bold;">bool</span> shared{<span style="color: #336666;">false</span>};
+    
+    std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t1(byCopy, shared);
+    std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t2(byReference, std<span style="color: #555555;">::</span>ref(shared));
+    std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t3(byConstReference, std<span style="color: #555555;">::</span>cref(shared));
+    
+    shared <span style="color: #555555;">=</span> <span style="color: #336666;">true</span>;
+    
+    t1.join();
+    t2.join();
+    t3.join();
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Each thread sleeps for one millisecond (lines 1, 2, and 3) before displaying the boolean value. Only the thread <code>t1</code> has a local copy of the boolean and has, therefore, no data race. The program’s output shows that the boolean values of threads <code>t2</code> and<code> t3</code> are modified without synchronization.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Patterns/DealingWithSharing/copiedValueDataRace.png" alt="copiedValueDataRace" width="500" height="369" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>You may think that the thread t3 in the previous example<code> copiedValueDataRace.cpp</code> can just be replaced with<code> std::thread t3(byConstReference, shared</code>). The program compiles and runs, but what seems like a reference is a copy. The reason is that the type traits function <a href="https://en.cppreference.com/w/cpp/types/decay">std::decay</a> is applied to each thread argument. <code>std::decay</code> performs lvalue-to-rvalue, array-to-pointer, and function-to-pointer implicit conversions to its type<code> T</code>. In particular, it invokes, in this case, the type traits function <a href="https://en.cppreference.com/w/cpp/types/decay"><code>std::remove_reference</code></a> on the type <code>T</code>.</p>
+<p>The following program <code>perConstReference.cpp</code> uses a non-copyable type <code>NonCopyableClass</code>.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// perConstReference.cpp</span>
+
+<span style="color: #009999;">#include &lt;thread&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">NonCopyableClass</span>{
+    <span style="color: #9999ff;">public:</span>
+
+    <span style="color: #0099ff; font-style: italic;">// the compiler generated default constructor</span>
+    NonCopyableClass() <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">default</span>;
+
+    <span style="color: #0099ff; font-style: italic;">// disallow copying</span>
+    NonCopyableClass<span style="color: #555555;">&amp;</span> <span style="color: #006699; font-weight: bold;">operator</span> <span style="color: #555555;">=</span> (<span style="color: #006699; font-weight: bold;">const</span> NonCopyableClass<span style="color: #555555;">&amp;</span>) <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">delete</span>;
+    NonCopyableClass (<span style="color: #006699; font-weight: bold;">const</span> NonCopyableClass<span style="color: #555555;">&amp;</span>) <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">delete</span>;
+  
+};
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">perConstReference</span>(<span style="color: #006699; font-weight: bold;">const</span> NonCopyableClass<span style="color: #555555;">&amp;</span> nonCopy){}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+
+    NonCopyableClass nonCopy;                      <em><span style="color: #0099ff;">// (1)</span></em>
+
+    perConstReference(nonCopy);                    <em><span style="color: #0099ff;">// (2)</span></em>
+    
+    std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t(perConstReference, nonCopy);    <em><span style="color: #0099ff;"> // (3)</span></em>
+    t.join();
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The object <code>nonCopy</code> (line 1) is not copyable. This is fine if I invoke the function<code> perConstReference</code> with the argument <code>nonCopy</code> (line 2) because the function accepts its argument per constant reference. Using the same function in the thread <code>t</code> (line 3) causes GCC to generate a verbose compiler error with more than 300 lines:</p>
+<p><img src="https://www.modernescpp.com/images/blog/Patterns/DealingWithSharing/numberOfLinesPerConstReference.png" alt="numberOfLinesPerConstReference" width="650" height="116" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>The error message’s essential part is in the middle of the screenshot in red rounded rectangle: “<code>error: use of deleted function</code>”. The copy-constructor of the class <code>NonCopyableClass</code> is not available.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Patterns/DealingWithSharing/perConstReference.png" alt="perConstReference" width="650" height="332" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>When you borrow something, you have to ensure that the underlying value is still available when you use it.</p>
+<p>{loadmoduleid 157}</p>
+<h3>Lifetime Issues with References</h3>
+<p>If a thread uses its argument by reference and you detach the thread, you have to be extremely careful. The small program <code>copiedValueLifetimeIssues.cpp</code> has undefined behavior.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// copiedValueLifetimeIssues.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;string&gt;</span>
+<span style="color: #009999;">#include &lt;thread&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">executeTwoThreads</span>(){                                   <em><span style="color: #0099ff;">// (1)</span></em>
+    
+    <span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span>string localString(<span style="color: #cc3300;">"local string"</span>);         <em> <span style="color: #0099ff;">// (4)</span></em>
+    
+    std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t1([localString]{
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Per Copy: "</span> <span style="color: #555555;">&lt;&lt;</span> localString <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    });
+    
+     std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t2([<span style="color: #555555;">&amp;</span>localString]{
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Per Reference: "</span> <span style="color: #555555;">&lt;&lt;</span> localString <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    });
+    
+    t1.detach();                                          <em> <span style="color: #0099ff;">// (2)</span></em>
+    t2.detach();                                           <em><span style="color: #0099ff;">// (3)</span></em>
+}
+    
+<span style="color: #006699; font-weight: bold;">using</span> <span style="color: #006699; font-weight: bold;">namespace</span> std<span style="color: #555555;">::</span>chrono_literals;
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    
+    executeTwoThreads();
+    
+    std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>sleep_for(<span style="color: #ff6600;">1</span>s);
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p><code>executeTwoThreads</code> (lines 1) starts two threads. Both threads are detached (lines 2 and 3) and print the local variable <code>localString</code> (line 4). The first thread captures the local variable by copy, and the second the local variable by reference. For simplicity reasons, I used a lambda expression in both cases to bind the arguments. Because the <code>executeTwoThreads</code> function doesn’t wait until the two threads have finished, the thread<code> t2</code> refers to the local string, which is bound to the lifetime of the invoking function. This causes undefined behavior. Curiously, with GCC the maximum optimized executable<code> -O3</code> seems to work, and the non-optimized executable crashes.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Patterns/DealingWithSharing/copiedValueLifetimeIssues.png" alt="copiedValueLifetimeIssues" width="600" height="205" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>Thanks to thread-local storage, a thread can easily work on its data.</p>
+<h2>Thread-Specific Storage</h2>
+<p>Thread-specific or thread-local storage allows multiple threads to use local storage via a global access point. By using the storage specifier <code>thread_local</code>, a variable becomes a thread-local variable. This means you can use the thread-local variable without synchronization.<br />Assume you want to calculate the sum of all elements of a vector randValues. Doing it with a range-based for-loop is straightforward.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">unsigned</span> <span style="color: #007788; font-weight: bold;">long</span> <span style="color: #007788; font-weight: bold;">long</span> sum{};
+<span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> n<span style="color: #555555;">:</span> randValues) sum <span style="color: #555555;">+=</span> n;
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>But your PC has four cores. Therefore, you make a concurrent program out of the sequential program:</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// threadLocallSummation.cpp</span>
+
+<span style="color: #009999;">#include &lt;atomic&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;random&gt;</span>
+<span style="color: #009999;">#include &lt;thread&gt;</span>
+<span style="color: #009999;">#include &lt;utility&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+
+constexpr <span style="color: #007788; font-weight: bold;">long</span> <span style="color: #007788; font-weight: bold;">long</span> size <span style="color: #555555;">=</span> <span style="color: #ff6600;">10000000</span>;   
+
+constexpr <span style="color: #007788; font-weight: bold;">long</span> <span style="color: #007788; font-weight: bold;">long</span> fir <span style="color: #555555;">=</span>  <span style="color: #ff6600;">2500000</span>;
+constexpr <span style="color: #007788; font-weight: bold;">long</span> <span style="color: #007788; font-weight: bold;">long</span> sec <span style="color: #555555;">=</span>  <span style="color: #ff6600;">5000000</span>;
+constexpr <span style="color: #007788; font-weight: bold;">long</span> <span style="color: #007788; font-weight: bold;">long</span> thi <span style="color: #555555;">=</span>  <span style="color: #ff6600;">7500000</span>;
+constexpr <span style="color: #007788; font-weight: bold;">long</span> <span style="color: #007788; font-weight: bold;">long</span> fou <span style="color: #555555;">=</span> <span style="color: #ff6600;">10000000</span>;
+
+thread_local <span style="color: #007788; font-weight: bold;">unsigned</span> <span style="color: #007788; font-weight: bold;">long</span> <span style="color: #007788; font-weight: bold;">long</span> tmpSum <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>;
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">sumUp</span>(std<span style="color: #555555;">::</span>atomic<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">unsigned</span> <span style="color: #007788; font-weight: bold;">long</span> <span style="color: #007788; font-weight: bold;">long</span><span style="color: #555555;">&gt;&amp;</span> sum, <span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;&amp;</span> val, 
+           <span style="color: #007788; font-weight: bold;">unsigned</span> <span style="color: #007788; font-weight: bold;">long</span> <span style="color: #007788; font-weight: bold;">long</span> beg, <span style="color: #007788; font-weight: bold;">unsigned</span> <span style="color: #007788; font-weight: bold;">long</span> <span style="color: #007788; font-weight: bold;">long</span> end) {
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> i <span style="color: #555555;">=</span> beg; i <span style="color: #555555;">&lt;</span> end; <span style="color: #555555;">++</span>i){
+        tmpSum <span style="color: #555555;">+=</span> val[i];
+    }
+    sum.fetch_add(tmpSum);
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+  std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> randValues;
+  randValues.reserve(size);
+
+  std<span style="color: #555555;">::</span>mt19937 engine;
+  std<span style="color: #555555;">::</span>uniform_int_distribution<span style="color: #555555;">&lt;&gt;</span> uniformDist(<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">10</span>);
+  <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #007788; font-weight: bold;">long</span> <span style="color: #007788; font-weight: bold;">long</span> i <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>; i <span style="color: #555555;">&lt;</span> size; <span style="color: #555555;">++</span>i) 
+      randValues.push_back(uniformDist(engine));
+ 
+  std<span style="color: #555555;">::</span>atomic<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">unsigned</span> <span style="color: #007788; font-weight: bold;">long</span> <span style="color: #007788; font-weight: bold;">long</span><span style="color: #555555;">&gt;</span> sum{}; 
+  
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t1(sumUp, std<span style="color: #555555;">::</span>ref(sum), std<span style="color: #555555;">::</span>ref(randValues), <span style="color: #ff6600;">0</span>, fir);
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t2(sumUp, std<span style="color: #555555;">::</span>ref(sum), std<span style="color: #555555;">::</span>ref(randValues), fir, sec);
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t3(sumUp, std<span style="color: #555555;">::</span>ref(sum), std<span style="color: #555555;">::</span>ref(randValues), sec, thi);
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t4(sumUp, std<span style="color: #555555;">::</span>ref(sum), std<span style="color: #555555;">::</span>ref(randValues), thi, fou);   
+  
+  t1.join();
+  t2.join();
+  t3.join();
+  t4.join();
+
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Result: "</span> <span style="color: #555555;">&lt;&lt;</span> sum <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>You put the range-based for-loop into a function and let each thread calculate a fourth of the sum in the<code> thread_local</code> variable <code>tmpSum</code>. The line <code>sum.fetch_add(tmpSum)</code> (line 1) finally sums up all values in the atomic <code>sum</code>. You can read more about thread_local storage in my previous post "<a href="https://www.modernescpp.com/index.php/thread-local-data">Thread-Local Data</a>".</p>
+<p>Promises and futures share a protected data channel.</p>
+<h2>Future</h2>
+<p>C++11 provides futures and promise in three flavors:<code> std::async</code>,<code> std::packaged_tas</code>k, and the pair <code>std::promise</code> and<code> std::future</code>. The future is a read-only placeholder for the value that a promise sets. From the synchronization perspective, a promise/future pair’s critical property is that a protected data channel connects both. There are a few decisions to make when implementing a future.</p>
+<ul>
+<li>A future can ask for its value implicitly or explicitly with the <code>get</code> call, such as in C++.</li>
+<li>A future can eagerly or lazily start the computation. Only the promise <code>std::async</code> supports lazy evaluation via launch policies.</li>
+</ul>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">auto</span> lazyOrEager <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>async([]{ <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc3300;">"LazyOrEager"</span>; });
+<span style="color: #006699; font-weight: bold;">auto</span> lazy <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>async(std<span style="color: #555555;">::</span>launch<span style="color: #555555;">::</span>deferred, []{ <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc3300;">"Lazy"</span>; });
+<span style="color: #006699; font-weight: bold;">auto</span> eager <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>async(std<span style="color: #555555;">::</span>launch<span style="color: #555555;">::</span>async, []{ <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #cc3300;">"Eager"</span>; });<br />
+lazyOrEager.get();
+lazy.get();
+eager.get();
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>If I don’t specify a launch policy, it’s up to the system to start the job eager or lazy. Using the launch policy <code>std::launch::async</code>, a new thread is created, and the promise immediately starts its job. This<br />is in contrast to the launch policy<code> std::launch::deferre</code>d. The call <code>eager.get()</code> starts the promise. Additionally, the promise is executed in the thread requesting the result with <code>get</code>.</p>
+<p>If you want to read more about futures in C++, read the following post: "<a href="https://www.modernescpp.com/index.php/asynchronous-function-calls">Asynchronous Function Calls</a>".</p>
+<h2>What's Next?</h2>
+<p>&nbsp;No data race can happen if you don’t write and read data concurrently. In my next, I will write about patterns that help you to protect against mutation.</p>
+<p>&nbsp;</p>
+<p>{module title="Marketing"}</p>
+<p>&nbsp;</p>
