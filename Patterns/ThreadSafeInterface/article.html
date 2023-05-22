@@ -1,0 +1,232 @@
+<p>I continue my journey with concurrency patterns in today's post, dealing with mutation. The Thread-Safe Interface fits very well when the critical sections are just objects.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/Patterns/ThreadSafeInterface/DealingWithMutation.png" alt="DealingWithMutation" width="650" height="330" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>The naive idea to protect all member functions of a class with a lock causes, in the best case, a performance issue and, in the worst case, a deadlock.</p>
+<h2>A Deadlock</h2>
+<p>The small code snippet has a deadlock.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">struct</span> Critical{
+    <span style="color: #007788; font-weight: bold;">void</span> memberFunction1(){
+        lock(mut);
+        memberFunction2();
+    ...
+}
+
+<span style="color: #007788; font-weight: bold;">void</span> memberFunction2(){
+        lock(mut);
+        ...
+    }
+
+    mutex mut;
+};
+
+Critical crit;
+crit.memberFunction1();
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Calling<code> crit.memberFunction1</code> causes the mutex <code>mut</code> to be locked twice. For simplicity reasons, the lock is a scoped lock. Here are the two issues:</p>
+<ul>
+<li>When <code>lock</code> is a recursive lock, the second<code> lock(mut)</code> in <code>memberFunction2</code> is redundant.</li>
+<li>When <code>lock</code> is a non-recursive lock, the second<code> lock(mut)</code> in<code> memberFunction2</code> leads to undefined behavior. Most of the time, you get a deadlock.</li>
+</ul>
+<p>The thread-safe interface overcomes both issues.</p>
+<h2>The Thread-Safe Interface</h2>
+<p>Here is the straightforward idea of the Thread-Safe Interface.</p>
+<ul>
+<li>All interface member functions (<code>public</code>) use a lock.</li>
+<li>All implementation member functions (<code>protected</code> and <code>private</code>) must not use a lock.</li>
+<li>The interface member functions call only protected or private member functions but no public member functions.</li>
+</ul>
+<p>The following program shows the usage of the Thread-Safe Interface.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// threadSafeInterface.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;mutex&gt;</span>
+<span style="color: #009999;">#include &lt;thread&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Critical</span>{
+
+<span style="color: #9999ff;">public:</span>
+    <span style="color: #007788; font-weight: bold;">void</span> interface1() <span style="color: #006699; font-weight: bold;">const</span> {
+        std<span style="color: #555555;">::</span>lock_guard<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span> lockGuard(mut);
+        implementation1();
+    }
+  
+    <span style="color: #007788; font-weight: bold;">void</span> interface2(){
+        std<span style="color: #555555;">::</span>lock_guard<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span> lockGuard(mut);
+        implementation2();
+        implementation3();
+        implementation1();
+    }
+   
+<span style="color: #9999ff;">private:</span> 
+    <span style="color: #007788; font-weight: bold;">void</span> implementation1() <span style="color: #006699; font-weight: bold;">const</span> {
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"implementation1: "</span> 
+                  <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>get_id() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    }
+    <span style="color: #007788; font-weight: bold;">void</span> implementation2(){
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"    implementation2: "</span> 
+                  <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>get_id() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    }
+    <span style="color: #007788; font-weight: bold;">void</span> implementation3(){    
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"        implementation3: "</span> 
+                  <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>get_id() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    }
+  
+
+    <span style="color: #006699; font-weight: bold;">mutable</span> std<span style="color: #555555;">::</span>mutex mut;                            <em><span style="color: #0099ff;">// (1)
+</span></em>
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    
+    std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t1([]{ 
+        <span style="color: #006699; font-weight: bold;">const</span> Critical crit;
+        crit.interface1();
+    });
+    
+    std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> t2([]{
+        Critical crit;
+        crit.interface2();
+        crit.interface1();
+    });
+    
+    Critical crit;
+    crit.interface1();
+    crit.interface2();
+    
+    t1.join();
+    t2.join();    
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Three threads, including the main thread, use instances of <code>Critical</code>. Thanks to the Thread-Safe Interface, all calls to the public API are synchronized. The mutex <code>mut</code> in line (1) is mutable and can be used in the constant member function <code>interface1</code>.</p>
+<p>The advantages of the thread-safe interface are threefold.</p>
+<ol>
+<li>A recursive call of a mutex is not possible. Recursive calls on a non-recursive mutex are undefined behavior in C++ and usually end in a deadlock.</li>
+<li>The program uses minimal locking and, therefore, minimal synchronization. Using just a <code>std::recursive_mutex</code> in each member function of the class <code>Critical</code> would end in more expensive synchronization.</li>
+<li>From the user's perspective, <code>Critical</code> is straightforward to use because synchronization is only an implementation detail.</li>
+</ol>
+<p>&nbsp;</p>
+<p>Each interface member function delegates its work to the corresponding implementation member function. The indirection overhead is a typical disadvantage of the Thread-Safe Interface.</p>
+<p>The output of the program shows the interleaving of the three threads.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Patterns/ThreadSafeInterface/threadSafeInterface.png" alt="threadSafeInterface" width="450" height="317" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>Although the Thread-Safe Interface seems easy to implement, there are two grave perils you have to keep in mind.</p>
+<p>{loadmoduleid 157}</p>
+<h3>Perils</h3>
+<p>Using a static member in your class or having virtual interfaces requires special care.</p>
+<h4>Static members</h4>
+<p>When your class has a static member that is not constant, you must synchronize all member function calls on the class instances.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Critical</span>{
+    
+<span style="color: #9999ff;">public:</span>
+    <span style="color: #007788; font-weight: bold;">void</span> interface1() <span style="color: #006699; font-weight: bold;">const</span> {
+        std<span style="color: #555555;">::</span>lock_guard<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span> lockGuard(mut);
+        implementation1();
+    }
+    <span style="color: #007788; font-weight: bold;">void</span> interface2(){
+        std<span style="color: #555555;">::</span>lock_guard<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span> lockGuard(mut);
+        implementation2();
+        implementation3();
+        implementation1();
+    }
+    
+<span style="color: #9999ff;">private:</span> 
+    <span style="color: #007788; font-weight: bold;">void</span> implementation1() <span style="color: #006699; font-weight: bold;">const</span> {
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"implementation1: "</span> 
+                  <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>get_id() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+        <span style="color: #555555;">++</span>called;
+    }
+    <span style="color: #007788; font-weight: bold;">void</span> implementation2(){
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"    implementation2: "</span> 
+                  <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>get_id() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+        <span style="color: #555555;">++</span>called;
+    }
+    <span style="color: #007788; font-weight: bold;">void</span> implementation3(){    
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"        implementation3: "</span> 
+                  <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>get_id() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+        <span style="color: #555555;">++</span>called;
+    }
+    
+    <span style="color: #006699; font-weight: bold;">inline</span> <span style="color: #006699; font-weight: bold;">static</span> <span style="color: #007788; font-weight: bold;">int</span> called{<span style="color: #ff6600;">0</span>};         <em><span style="color: #0099ff;">// (1)</span></em>
+    <span style="color: #006699; font-weight: bold;">inline</span> <span style="color: #006699; font-weight: bold;">static</span> std<span style="color: #555555;">::</span>mutex mut;
+
+};
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Now, the class <code>Critical</code> has a static member <code>called</code> (line 32) to count how often the implementation functions were called. All instances of <code>Critical</code> use the same static member and have, therefore, to be synchronized. Since C++17, static data members can be declared inline. An inline static data member can be defined and initialized in the class definition.</p>
+<h4>Virtuality</h4>
+<p>When you override a virtual interface function, the overriding function should have a lock even if the function is private.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// threadSafeInterfaceVirtual.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;mutex&gt;</span>
+<span style="color: #009999;">#include &lt;thread&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Base</span>{
+    
+<span style="color: #9999ff;">public:</span>
+    <span style="color: #006699; font-weight: bold;">virtual</span> <span style="color: #007788; font-weight: bold;">void</span> interface() {
+        std<span style="color: #555555;">::</span>lock_guard<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span> lockGuard(mut);
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Base with lock"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    }
+    <span style="color: #006699; font-weight: bold;">virtual</span> <span style="color: #555555;">~</span>Base() <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">default</span>;
+<span style="color: #9999ff;">private:</span>
+    std<span style="color: #555555;">::</span>mutex mut;
+};
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Derived</span><span style="color: #555555;">:</span> <span style="color: #006699; font-weight: bold;">public</span> Base{
+
+    <span style="color: #007788; font-weight: bold;">void</span> interface() override {
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Derived without lock"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    }
+
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    Base<span style="color: #555555;">*</span> base1 <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">new</span> Derived;
+    base1<span style="color: #555555;">-&gt;</span>interface();
+
+    Derived der;
+    Base<span style="color: #555555;">&amp;</span> base2 <span style="color: #555555;">=</span> der;
+    base2.interface();
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>In the calls, <code>base1-&gt;interface</code> and <code>base2.interface</code> the static type of <code>base1</code> and <code>base2</code> is <code>Base,</code> and, therefore, the <code>interface</code> is accessible. Because the interface member function is virtual, the call happens at run time using the dynamic type <code>Derived</code>. At last, the private member function <code>interface</code> of the class <code>Derived</code> is invoked.</p>
+<p>The program's output shows the unsynchronized invocation of Derived's interface function.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Patterns/ThreadSafeInterface/threadSafeInterfaceVirtual.png" alt="threadSafeInterfaceVirtual" width="500" height="230" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>There are two typical ways to overcome this issue.</p>
+<ol>
+<li>Make the member function interface a non-virtual member function. This technique is called NVI (Non-Virtual Interface). The non-virtual member function guarantees that the interface function of the base class <code>Base</code> is used. Additionally, overriding the interface function using <code>override</code> causes a compile-time error because there is nothing to override.</li>
+<li>Declare the member function interface as <code>final</code>: <code>virtual void interface() final</code>. Thanks to <code>final</code>, overriding an as <code>final</code> declared virtual member function causes a compile-time error.</li>
+</ol>
+<p>Although I presented two ways to overcome the challenges of virtuality, I strongly suggest using the NVI idiom. Use early binding if you don’t need late binding (virtuality). You can read more about NVI in my post:<a href="https://www.modernescpp.com/index.php/the-template-method">The Template Method</a>.</p>
+<h2>What's Next?</h2>
+<p>Guarded Suspension applies a different strategy to deal with mutation. It signals when it is done with its mutation. In my next post, I will write about Guarded Suspension.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>{loadmoduleid 153}</p>
+<p>&nbsp;</p>
