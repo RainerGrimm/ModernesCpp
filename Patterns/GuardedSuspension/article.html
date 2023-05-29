@@ -1,0 +1,214 @@
+<p>Guarded Suspension applies a special strategy to deal with mutation. It signals when it is done with its mutation.</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/Patterns/GuardedSuspension/DealingWithMutation.png" alt="" width="650" height="330" style="display: block; margin-left: auto; margin-right: auto;" data-alt="DealingWithMutation" /></p>
+<p>The guarded suspension basic variant combines a lock and a precondition that must be satisfied. If the precondition is not fulfilled, that checking thread puts itself to sleep. The checking thread uses a lock to avoid a race condition that may result in a data race or a deadlock.</p>
+<p>Various variants of the Guarded Suspension exist:</p>
+<ul>
+<li>The waiting thread can passively be notified about the state change or actively ask for the state change. In short, I call this push versus pull principle.</li>
+<li>The waiting can be done with or without a time boundary.</li>
+<li>The notification can be sent to one or all waiting threads.</li>
+</ul>
+<p>I present in this post only the rough idea. For further information, I refer to posts I have already written.</p>
+<h2>Push versus Pull Principle</h2>
+<p>Let me start with the push principle.</p>
+<h3>Push Principle</h3>
+<p>You often synchronize threads with a <a href="https://www.modernescpp.com/index.php/tag/condition-variable">condition variable</a> or a <a href="https://www.modernescpp.com/index.php/tag/tasks">future/promise </a>pair. The condition variable or the promise sends the notification to the waiting thread. A promise has no <code>notify_one</code> or <code>notify_all</code> member function. Typically, a valueless <code>set_value</code> call is used to signal a notification. The following program snippets show the thread sending the notification and the waiting thread.</p>
+<ul>
+<li>Condition Variable</li>
+</ul>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">waitingForWork</span>(){
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Worker: Waiting for work."</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    std<span style="color: #555555;">::</span>unique_lock<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span> lck(mutex_);
+    condVar.wait(lck, []{ <span style="color: #006699; font-weight: bold;">return</span> dataReady; });
+    doTheWork();
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Work done."</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+}
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">setDataReady</span>(){
+    {
+      std<span style="color: #555555;">::</span>lock_guard<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span> lck(mutex_);
+      dataReady <span style="color: #555555;">=</span> <span style="color: #336666;">true</span>;
+    }
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Sender: Data is ready."</span>  <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    condVar.notify_one();
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<ul>
+<li>Future/Promise Pair</li>
+</ul>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">waitingForWork</span>(std<span style="color: #555555;">::</span>future<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">void</span><span style="color: #555555;">&gt;&amp;&amp;</span> fut){
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Worker: Waiting for work."</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    fut.wait();
+    doTheWork();
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Work done."</span> <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+
+}
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">setDataReady</span>(std<span style="color: #555555;">::</span>promise<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">void</span><span style="color: #555555;">&gt;&amp;&amp;</span> prom){
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Sender: Data is ready."</span>  <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>endl;
+    prom.set_value();
+
+}
+</pre>
+</div>
+<h3>Pull Principle</h3>
+<p>Instead of passively waiting for the state change, you can actively ask for it. This pull principle is not natively supported in C++ but can be, for example, implemented with <a href="https://www.modernescpp.com/index.php/atomics">atomics</a>.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;">std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> mySharedWork;
+std<span style="color: #555555;">::</span>atomic<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">bool</span><span style="color: #555555;">&gt;</span> dataReady(<span style="color: #336666;">false</span>);
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">waitingForWork</span>(){
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Waiting "</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    <span style="color: #006699; font-weight: bold;">while</span> (<span style="color: #555555;">!</span>dataReady.load()){                
+        std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>sleep_for(std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>milliseconds(<span style="color: #ff6600;">5</span>));
+    }
+    mySharedWork[<span style="color: #ff6600;">1</span>] <span style="color: #555555;">=</span> <span style="color: #ff6600;">2</span>;                     
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Work done "</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+}
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">setDataReady</span>(){
+    mySharedWork <span style="color: #555555;">=</span> {<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">0</span>, <span style="color: #ff6600;">3</span>};                  
+    dataReady <span style="color: #555555;">=</span> <span style="color: #336666;">true</span>;                          
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Data prepared"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>{loadmoduleid 157}</p>
+<h2>Waiting with and without Time Boundary</h2>
+<p>A condition variable and a future have three member functions for waiting: <code>wait,</code> <code>wait_for</code>, and <code>wait_until</code>. The <code>wait_for</code> variant requires a time duration, and the <code>wait_until</code> variant a time point.</p>
+<p>The consumer thread waits for the time duration <code>steady_clock::now() + dur. T</code>he future asks for the value; if the promise is not done, it displays its id: t<code>his_thread::get_it()</code>.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">producer</span>(promise<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;&amp;&amp;</span> prom){
+    cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"PRODUCING THE VALUE 2011</span><span style="color: #cc3300; font-weight: bold;">\n\n</span><span style="color: #cc3300;">"</span>; 
+    this_thread<span style="color: #555555;">::</span>sleep_for(seconds(<span style="color: #ff6600;">5</span>));
+    prom.set_value(<span style="color: #ff6600;">2011</span>);
+}
+
+<span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">consumer</span>(shared_future<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> fut,
+              steady_clock<span style="color: #555555;">::</span>duration dur){
+    <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #006699; font-weight: bold;">auto</span> start <span style="color: #555555;">=</span> steady_clock<span style="color: #555555;">::</span>now();
+    future_status status<span style="color: #555555;">=</span> fut.wait_until(steady_clock<span style="color: #555555;">::</span>now() <span style="color: #555555;">+</span> dur);
+    <span style="color: #006699; font-weight: bold;">if</span> ( status <span style="color: #555555;">==</span> future_status<span style="color: #555555;">::</span>ready ){
+        lock_guard<span style="color: #555555;">&lt;</span>mutex<span style="color: #555555;">&gt;</span> lockCout(coutMutex);
+        cout <span style="color: #555555;">&lt;&lt;</span> this_thread<span style="color: #555555;">::</span>get_id() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" ready =&gt; Result: "</span> <span style="color: #555555;">&lt;&lt;</span> fut.get() 
+             <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    }
+    <span style="color: #006699; font-weight: bold;">else</span>{
+        lock_guard<span style="color: #555555;">&lt;</span>mutex<span style="color: #555555;">&gt;</span> lockCout(coutMutex);
+        cout <span style="color: #555555;">&lt;&lt;</span> this_thread<span style="color: #555555;">::</span>get_id() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" stopped waiting."</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    }
+    <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #006699; font-weight: bold;">auto</span> end<span style="color: #555555;">=</span> steady_clock<span style="color: #555555;">::</span>now();
+    lock_guard<span style="color: #555555;">&lt;</span>mutex<span style="color: #555555;">&gt;</span> lockCout(coutMutex);
+    cout <span style="color: #555555;">&lt;&lt;</span> this_thread<span style="color: #555555;">::</span>get_id() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" waiting time: "</span> 
+         <span style="color: #555555;">&lt;&lt;</span> getDifference(start,end) <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" ms"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+}
+</pre>
+</div>
+<h2>Notifying one or all waiting Threads</h2>
+<p><code>notify_one</code> awakes one of the waiting threads, <code>notify_all</code> awakes all the waiting threads. With <code>notify_one</code>, you have no guarantee which one will be awakened. The other threads do stay in the wait state. This could not happen with a <code>std::future</code>, because there is a one-to-one association between the future and the promise. If you want to simulate a one-to-many association, use a <code>std::shared_future</code> instead of a <code>std::future</code> because a <code>std::shared_future</code> can be copied.</p>
+<p>The following program shows a simple workflow with one-to-one and one-to-many associations between promises and futures.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// bossWorker.cpp</span>
+
+<span style="color: #009999;">#include &lt;future&gt;</span>
+<span style="color: #009999;">#include &lt;chrono&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;random&gt;</span>
+<span style="color: #009999;">#include &lt;string&gt;</span>
+<span style="color: #009999;">#include &lt;thread&gt;</span>
+<span style="color: #009999;">#include &lt;utility&gt;</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">getRandomTime</span>(<span style="color: #007788; font-weight: bold;">int</span> start, <span style="color: #007788; font-weight: bold;">int</span> end){
+  
+  std<span style="color: #555555;">::</span>random_device seed;
+  std<span style="color: #555555;">::</span>mt19937 engine(seed());
+  std<span style="color: #555555;">::</span>uniform_int_distribution<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> dist(start,end);
+  
+  <span style="color: #006699; font-weight: bold;">return</span> dist(engine);
+};
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Worker</span>{
+<span style="color: #9999ff;">public:</span>
+  <span style="color: #006699; font-weight: bold;">explicit</span> Worker(<span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span>string<span style="color: #555555;">&amp;</span> n)<span style="color: #555555;">:</span>name(n){};
+  
+  <span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">operator</span>() (std<span style="color: #555555;">::</span>promise<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">void</span><span style="color: #555555;">&gt;&amp;&amp;</span> preparedWork, 
+                   std<span style="color: #555555;">::</span>shared_future<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">void</span><span style="color: #555555;">&gt;</span> boss2Worker){
+      
+    <span style="color: #0099ff; font-style: italic;">// prepare the work and notfiy the boss</span>
+    <span style="color: #007788; font-weight: bold;">int</span> prepareTime<span style="color: #555555;">=</span> getRandomTime(<span style="color: #ff6600;">500</span>, <span style="color: #ff6600;">2000</span>);
+    std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>sleep_for(std<span style="color: #555555;">::</span>chrono<span style="color: #555555;">::</span>milliseconds(prepareTime));
+    preparedWork.set_value();                                 <em><span style="color: #0099ff;"> // (5)</span> </em>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> name <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">": "</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Work prepared after "</span> 
+              <span style="color: #555555;">&lt;&lt;</span> prepareTime <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" milliseconds."</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    <span style="color: #0099ff; font-style: italic;">// still waiting for the permission to start working</span>
+    boss2Worker.wait();
+  }    
+<span style="color: #9999ff;">private:</span>
+  std<span style="color: #555555;">::</span>string name;
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  
+  <span style="color: #0099ff; font-style: italic;">// define the std::promise =&gt; Instruction from the boss</span>
+  std<span style="color: #555555;">::</span>promise<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">void</span><span style="color: #555555;">&gt;</span> startWorkPromise;
+
+  <span style="color: #0099ff; font-style: italic;">// get the std::shared_future's from the std::promise</span>
+  std<span style="color: #555555;">::</span>shared_future<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">void</span><span style="color: #555555;">&gt;</span> startWorkFuture<span style="color: #555555;">=</span> startWorkPromise.get_future();
+
+  std<span style="color: #555555;">::</span>promise<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">void</span><span style="color: #555555;">&gt;</span> herbPrepared;
+  std<span style="color: #555555;">::</span>future<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">void</span><span style="color: #555555;">&gt;</span> waitForHerb <span style="color: #555555;">=</span> herbPrepared.get_future();
+  Worker herb(<span style="color: #cc3300;">"  Herb"</span>);                                           <em><span style="color: #0099ff;">// (1)</span> </em>
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> herbWork(herb, std<span style="color: #555555;">::</span>move(herbPrepared), startWorkFuture);
+  
+  std<span style="color: #555555;">::</span>promise<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">void</span><span style="color: #555555;">&gt;</span> scottPrepared;
+  std<span style="color: #555555;">::</span>future<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">void</span><span style="color: #555555;">&gt;</span> waitForScott <span style="color: #555555;">=</span> scottPrepared.get_future();
+  Worker scott(<span style="color: #cc3300;">"    Scott"</span>);                                      <em><span style="color: #0099ff;">// (2)</span> </em>
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> scottWork(scott, std<span style="color: #555555;">::</span>move(scottPrepared), startWorkFuture);
+  
+  std<span style="color: #555555;">::</span>promise<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">void</span><span style="color: #555555;">&gt;</span> bjarnePrepared;
+  std<span style="color: #555555;">::</span>future<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">void</span><span style="color: #555555;">&gt;</span> waitForBjarne <span style="color: #555555;">=</span> bjarnePrepared.get_future();
+  Worker bjarne(<span style="color: #cc3300;">"      Bjarne"</span>);                                  <em><span style="color: #0099ff;">// (3)</span></em>
+  std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span> bjarneWork(bjarne, std<span style="color: #555555;">::</span>move(bjarnePrepared), startWorkFuture);
+  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"BOSS: PREPARE YOUR WORK.</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;"> "</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  
+  <span style="color: #0099ff; font-style: italic;">// waiting for the worker </span>
+  waitForHerb.wait(), waitForScott.wait(), waitForBjarne.wait();  <em><span style="color: #0099ff;">// (4)
+ </span> </em>
+  <span style="color: #0099ff; font-style: italic;">// notify the workers that they should begin to work</span>
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">BOSS: START YOUR WORK. </span><span style="color: #cc3300; font-weight: bold;">\n</span><span style="color: #cc3300;">"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  startWorkPromise.set_value();                                   <em><span style="color: #0099ff;">// (6)</span></em>
+  
+  herbWork.join();
+  scottWork.join();
+  bjarneWork.join();
+   
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The key idea of the program is that the <code>boss</code> (main-thread) has three workers: <code>herb</code> (line 1), <code>scott</code> (line 3), and <code>bjarne</code> (line 3). A thread represents each worker. In line (4), the boss waits until all workers complete their work package preparation. This means each worker sends, after an arbitrary time, the notification to the boss that he is done. The worker-to-the-boss notification is a one-to-one relation because it uses a <code>std::future</code> (line 5). In contrast, the instruction to start the work is a one-to-many notification (line 6) from the boss to its workers. For this one-to-many notification, a <code>std::shared_future</code> is necessary.</p>
+<p><img src="https://www.modernescpp.com/images/blog/Patterns/GuardedSuspension/bossWorker.png" alt="bossWorker" width="400" height="206" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<h2>What's Next?</h2>
+<p>In my next post, I will focus on concurrent architecture and write about the Active Object.</p>
+<h2>A Short Break</h2>
+<p>I will take a short two weeks holiday break. My next post will be published on Monday, the 19th of June.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>{loadmoduleid 153}</p>
