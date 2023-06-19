@@ -1,0 +1,261 @@
+<p><em>The <b>active object</b> design pattern decouples method execution from method invocation for objects that each reside in their own thread of control.The goal is to introduce concurrency, by using asynchronous method invocation and a scheduler for handling requests</em>. (<a href="https://en.wikipedia.org/wiki/Active_object">Wikipedia:Active Objec</a>t)</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/Patterns/ActiveObject/ConcurrencyPatterns.png" alt="ConcurrencyPatterns" width="650" height="328" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>The Active Object decouples method invocation from method execution. The method invocation is performed on the client thread, but the method execution is on the Active Object. The Active Object has its thread and a list of method request objects (short request) to be executed. The client’s method invocation enqueues the requests on the Active Object’s list. The requests are dispatched to the servant.</p>
+<h3>Also known as</h3>
+<ul>
+<li>Concurrent object</li>
+</ul>
+<h3>Problem</h3>
+<p>When many threads access a shared object synchronized, the following challenges must be solved:</p>
+<ul>
+<li>A thread invoking a processing-intensive member function should not block the other threads invoking the same object for too long.</li>
+<li>It should be easy to synchronize access to a shared object.</li>
+<li>The concurrency characteristics of the executed requests should be adaptable to the concrete hardware and software.</li>
+</ul>
+<h3>Solution</h3>
+<ul>
+<li>The client’s method invocation goes to a proxy, which represents the interface of the Active Object.</li>
+<li>The servant implements these member functions and runs in the Active Object’s thread. At run time, the proxy transforms the invocation into a method invocation on the servant. This request is enqueued in an activation list by the scheduler.</li>
+<li>A scheduler’s event loop runs in the same thread as the servant, deques the requests from the activation list, removes them and dispatches them to the servant.</li>
+<li>The client obtains the method invocation result via a <a href="https://en.wikipedia.org/wiki/Futures_and_promises">future </a>from the <a href="https://www.modernescpp.com/index.php/the-proxy-pattern">proxy</a>.</li>
+</ul>
+<h3>Components</h3>
+<div>
+<div>The Active Object pattern consists of six components:</div>
+<br /><ol>
+<li>The <strong>proxy</strong> provides an interface for the accessible member functions on the Active Object. The proxy triggers the construction of a request into the activation list. The proxy runs in the client thread.</li>
+<li>The<strong> method request</strong> class defines the interface for the method executing on an Active Object. This interface also contains guard methods, indicating if the job is ready to run. The request includes all context information to be executed later.</li>
+<li>The&nbsp;<strong>activation list</strong> maintains the pending requests. The activation list decouples the client's thread from the Active Object thread. The proxy inserts the request object, and the scheduler removes them. Consequently, the access to the activation list must be serialized.</li>
+<li>The&nbsp;<strong>scheduler</strong> runs in the thread of the Active Object and decides which request from the activation list is executed next. The scheduler evaluates the guards of the request to determine if the request can run.</li>
+<li>The&nbsp;<strong>servan</strong>t implements the Active Object and runs in the active object's thread. The servant implements the interface of the method request, and the scheduler invokes its member functions.</li>
+<li>The proxy creates the<strong> future </strong>and s only necessary if the request returns a result. Therefore, the client receives the future and can obtain the method invocation result on the Active Object. The client can wait for the outcome or poll for it.</li>
+</ol>
+<p>{loadmoduleid 157}</p>
+<h3>Dynamic Behavior</h3>
+</div>
+<div>
+<div>The dynamic behavior of the Active Object consists of three phases:</div>
+<br /><ol>
+<li><strong>Request construction and scheduling</strong>: The client invokes a method on the proxy. The proxy creates a request and passes it to the scheduler. The scheduler enqueues the request on the activation list. Additionally, the proxy returns a future to the client if the request returns a result.</li>
+<li><strong>Member function execution</strong>: The scheduler determines which request becomes runnable by evaluating the guard method of the request. It removes the request from the activation list and dispatches it to the servant.&nbsp;</li>
+<li><strong>Completion</strong>: When the request returns something, it is stored in the future. The client can ask for the result. When the client has the result, the request and the future can be deleted.</li>
+</ol>
+<div>The following picture shows the sequence of messages.</div>
+</div>
+<p>&nbsp;</p>
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/Patterns/ActiveObject/ActiveObject.jpg" alt="ActiveObject" width="650" height="701" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>&nbsp;</p>
+<h3>Pros and Cons</h3>
+<div>
+<div>Before I present a minimal example of the Active Object, here are its pros and cons.</div>
+<h4>Pros</h4>
+</div>
+<ul>
+<li>Synchronization is only required on the Active Object's thread but not on the client's threads.</li>
+<li>Clear separation between the client (user) and the server (implementer). The synchronization challenges are on the implementer's side.&nbsp;</li>
+<li>Enhanced throughput of the system because of the asynchronous execution of the requests. Invoking processing-intensive member functions do not block the entire system.</li>
+<li>The scheduler can implement various strategies to execute the pending requests. If so, the jobs can be executed in a different order they are enqueued.</li>
+</ul>
+<h4>Cons</h4>
+<ul>
+<li>If the requests are too fine-grained, the Active Object pattern's performance overhead, such as the proxy, the activation list, and the scheduler, may be excessive.</li>
+<li>Due to the scheduler's scheduling strategy and the operating system's scheduling, debugging the Active Object is often tricky. In particular, if the jobs are executed in a different order, they are enqueued.</li>
+</ul>
+<h3>Example</h3>
+<div><br />
+<div>The following example presents a simplified implementation of the Active Object. In particular, I don't define an interface for the method requests on the Active Object, which the proxy and the servant should implement. Further, the scheduler executes the next job when asked for it, and the <code>run</code> member function of the Active Object creates the threads.</div>
+<br />
+<div>The involved types<code> future&lt;vector&lt;future&lt;pair&lt;bool, int&gt;&gt;&gt;&gt;</code> are often quite verbose. To improve the readability, I heavily applied using declarations (line 1). This example requires a solid knowledge of promises and futures in C++. My posts about <a href="https://www.modernescpp.com/index.php/tag/tasks">tasks </a>provide more details.</div>
+<div>&nbsp;</div>
+</div>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// activeObject.cpp</span>
+
+<span style="color: #009999;">#include &lt;algorithm&gt;</span>
+<span style="color: #009999;">#include &lt;deque&gt;</span>
+<span style="color: #009999;">#include &lt;functional&gt;</span>
+<span style="color: #009999;">#include &lt;future&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;memory&gt;</span>
+<span style="color: #009999;">#include &lt;mutex&gt;</span>
+<span style="color: #009999;">#include &lt;numeric&gt;</span>
+<span style="color: #009999;">#include &lt;random&gt;</span>
+<span style="color: #009999;">#include &lt;thread&gt;</span>
+<span style="color: #009999;">#include &lt;utility&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">using</span> std<span style="color: #555555;">::</span>async;
+<span style="color: #006699; font-weight: bold;">using</span> std<span style="color: #555555;">::</span>boolalpha;
+<span style="color: #006699; font-weight: bold;">using</span> std<span style="color: #555555;">::</span>cout;
+<span style="color: #006699; font-weight: bold;">using</span> std<span style="color: #555555;">::</span>deque;
+<span style="color: #006699; font-weight: bold;">using</span> std<span style="color: #555555;">::</span>distance;
+<span style="color: #006699; font-weight: bold;">using</span> std<span style="color: #555555;">::</span>for_each;
+<span style="color: #006699; font-weight: bold;">using</span> std<span style="color: #555555;">::</span>find_if;
+<span style="color: #006699; font-weight: bold;">using</span> std<span style="color: #555555;">::</span>future;
+<span style="color: #006699; font-weight: bold;">using</span> std<span style="color: #555555;">::</span>lock_guard;
+<span style="color: #006699; font-weight: bold;">using</span> std<span style="color: #555555;">::</span>make_move_iterator;
+<span style="color: #006699; font-weight: bold;">using</span> std<span style="color: #555555;">::</span>make_pair;
+<span style="color: #006699; font-weight: bold;">using</span> std<span style="color: #555555;">::</span>move;
+<span style="color: #006699; font-weight: bold;">using</span> std<span style="color: #555555;">::</span>mt19937;
+<span style="color: #006699; font-weight: bold;">using</span> std<span style="color: #555555;">::</span>mutex;
+<span style="color: #006699; font-weight: bold;">using</span> std<span style="color: #555555;">::</span>packaged_task;
+<span style="color: #006699; font-weight: bold;">using</span> std<span style="color: #555555;">::</span>pair;
+<span style="color: #006699; font-weight: bold;">using</span> std<span style="color: #555555;">::</span>random_device;
+<span style="color: #006699; font-weight: bold;">using</span> std<span style="color: #555555;">::</span>sort;
+<span style="color: #006699; font-weight: bold;">using</span> std<span style="color: #555555;">::</span>jthread;
+<span style="color: #006699; font-weight: bold;">using</span> std<span style="color: #555555;">::</span>uniform_int_distribution;
+<span style="color: #006699; font-weight: bold;">using</span> std<span style="color: #555555;">::</span>vector;
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">IsPrime</span> {                                                 <span style="color: #0099ff; font-style: italic;">// (8)</span>
+ <span style="color: #9999ff;">public:</span>
+    IsPrime(<span style="color: #007788; font-weight: bold;">int</span> num)<span style="color: #555555;">:</span> numb{num} {} 
+    pair<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">bool</span>, <span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> <span style="color: #006699; font-weight: bold;">operator</span>()() {
+        <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #007788; font-weight: bold;">int</span> j <span style="color: #555555;">=</span> <span style="color: #ff6600;">2</span>; j <span style="color: #555555;">*</span> j <span style="color: #555555;">&lt;=</span> numb; <span style="color: #555555;">++</span>j){
+            <span style="color: #006699; font-weight: bold;">if</span> (numb <span style="color: #555555;">%</span> j <span style="color: #555555;">==</span> <span style="color: #ff6600;">0</span>) <span style="color: #006699; font-weight: bold;">return</span> make_pair(<span style="color: #336666;">false</span>, numb);
+        }
+        <span style="color: #006699; font-weight: bold;">return</span> make_pair(<span style="color: #336666;">true</span>, numb);
+    }
+ <span style="color: #9999ff;">private:</span>
+    <span style="color: #007788; font-weight: bold;">int</span> numb;       
+};
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">ActiveObject</span> {
+ <span style="color: #9999ff;">public:</span>
+    
+    future<span style="color: #555555;">&lt;</span>pair<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">bool</span>, <span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;&gt;</span> enqueueTask(<span style="color: #007788; font-weight: bold;">int</span> i) {
+        IsPrime isPrime(i);
+        packaged_task<span style="color: #555555;">&lt;</span>pair<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">bool</span>, <span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span>()<span style="color: #555555;">&gt;</span> newJob(isPrime);
+        <span style="color: #006699; font-weight: bold;">auto</span> isPrimeFuture <span style="color: #555555;">=</span> newJob.get_future();
+        {
+            lock_guard<span style="color: #555555;">&lt;</span>mutex<span style="color: #555555;">&gt;</span> lockGuard(activationListMutex);
+            activationList.push_back(move(newJob));            <span style="color: #0099ff; font-style: italic;">// (6)</span>
+        }
+        <span style="color: #006699; font-weight: bold;">return</span> isPrimeFuture;
+    }
+
+    <span style="color: #007788; font-weight: bold;">void</span> run() {
+        std<span style="color: #555555;">::</span>jthread j([<span style="color: #006699; font-weight: bold;">this</span>] {                                 <span style="color: #0099ff; font-style: italic;">// (12)</span>
+            <span style="color: #006699; font-weight: bold;">while</span> ( <span style="color: #555555;">!</span>runNextTask() );                           <span style="color: #0099ff; font-style: italic;">// (13)</span>
+        });
+    }
+
+ <span style="color: #9999ff;">private:</span>
+
+    <span style="color: #007788; font-weight: bold;">bool</span> runNextTask() {                                        <span style="color: #0099ff; font-style: italic;">// (14)</span>
+        lock_guard<span style="color: #555555;">&lt;</span>mutex<span style="color: #555555;">&gt;</span> lockGuard(activationListMutex);
+        <span style="color: #006699; font-weight: bold;">auto</span> empty <span style="color: #555555;">=</span> activationList.empty();
+        <span style="color: #006699; font-weight: bold;">if</span> (<span style="color: #555555;">!</span>empty) {                                           <span style="color: #0099ff; font-style: italic;">// (15)</span>
+            <span style="color: #006699; font-weight: bold;">auto</span> myTask<span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>move(activationList.front());
+            activationList.pop_front();
+            myTask();
+        }
+        <span style="color: #006699; font-weight: bold;">return</span> empty;
+    }
+
+    deque<span style="color: #555555;">&lt;</span>packaged_task<span style="color: #555555;">&lt;</span>pair<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">bool</span>, <span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span>()<span style="color: #555555;">&gt;&gt;</span> activationList;      <span style="color: #0099ff; font-style: italic;">//(7)</span>
+    mutex activationListMutex;
+};
+
+vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> getRandNumbers(<span style="color: #007788; font-weight: bold;">int</span> number) {
+    random_device seed;
+    mt19937 <span style="color: #cc00ff;">engine</span>(seed());
+    uniform_int_distribution<span style="color: #555555;">&lt;&gt;</span> dist(<span style="color: #ff6600;">1</span><span style="color: #aa0000; background-color: #ffaaaa;">'</span><span style="color: #ff6600;">000</span><span style="color: #aa0000; background-color: #ffaaaa;">'</span><span style="color: #ff6600;">000</span>, <span style="color: #ff6600;">1</span><span style="color: #aa0000; background-color: #ffaaaa;">'</span><span style="color: #ff6600;">000</span><span style="color: #aa0000; background-color: #ffaaaa;">'</span><span style="color: #ff6600;">000</span><span style="color: #aa0000; background-color: #ffaaaa;">'</span><span style="color: #ff6600;">000</span>);  <span style="color: #0099ff; font-style: italic;">// (4)</span>
+    vector<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> numbers;
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #007788; font-weight: bold;">long</span> <span style="color: #007788; font-weight: bold;">long</span> i <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span> ; i <span style="color: #555555;">&lt;</span> number; <span style="color: #555555;">++</span>i) numbers.push_back(dist(engine)); 
+    <span style="color: #006699; font-weight: bold;">return</span> numbers;
+}
+
+future<span style="color: #555555;">&lt;</span>vector<span style="color: #555555;">&lt;</span>future<span style="color: #555555;">&lt;</span>pair<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">bool</span>, <span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;&gt;&gt;&gt;</span> getFutures(ActiveObject<span style="color: #555555;">&amp;</span> activeObject, 
+                                                   <span style="color: #007788; font-weight: bold;">int</span> numberPrimes) {
+    <span style="color: #006699; font-weight: bold;">return</span> async([<span style="color: #555555;">&amp;</span>activeObject, numberPrimes] {
+        vector<span style="color: #555555;">&lt;</span>future<span style="color: #555555;">&lt;</span>pair<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">bool</span>, <span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;&gt;&gt;</span> futures;
+        <span style="color: #006699; font-weight: bold;">auto</span> randNumbers <span style="color: #555555;">=</span> getRandNumbers(numberPrimes);        <span style="color: #0099ff; font-style: italic;">// (3)</span>
+        <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> numb<span style="color: #555555;">:</span> randNumbers){
+            futures.push_back(activeObject.enqueueTask(numb));  <span style="color: #0099ff; font-style: italic;">// (5)</span>
+        }
+        <span style="color: #006699; font-weight: bold;">return</span> futures;
+    });
+}
+    
+
+<span style="color: #007788; font-weight: bold;">int</span> main() {
+    
+    cout <span style="color: #555555;">&lt;&lt;</span> boolalpha <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    
+     ActiveObject activeObject;
+        
+    <span style="color: #0099ff; font-style: italic;">// a few clients enqueue work concurrently                  // (2)</span>
+    <span style="color: #006699; font-weight: bold;">auto</span> client1 <span style="color: #555555;">=</span> getFutures(activeObject, <span style="color: #ff6600;">1998</span>);
+    <span style="color: #006699; font-weight: bold;">auto</span> client2 <span style="color: #555555;">=</span> getFutures(activeObject, <span style="color: #ff6600;">2003</span>);
+    <span style="color: #006699; font-weight: bold;">auto</span> client3 <span style="color: #555555;">=</span> getFutures(activeObject, <span style="color: #ff6600;">2011</span>);
+    <span style="color: #006699; font-weight: bold;">auto</span> client4 <span style="color: #555555;">=</span> getFutures(activeObject, <span style="color: #ff6600;">2014</span>);
+    <span style="color: #006699; font-weight: bold;">auto</span> client5 <span style="color: #555555;">=</span> getFutures(activeObject, <span style="color: #ff6600;">2017</span>);
+    
+    <span style="color: #0099ff; font-style: italic;">// give me the futures                                      // (9)</span>
+    <span style="color: #006699; font-weight: bold;">auto</span> futures <span style="color: #555555;">=</span> client1.get();
+    <span style="color: #006699; font-weight: bold;">auto</span> futures2 <span style="color: #555555;">=</span> client2.get();
+    <span style="color: #006699; font-weight: bold;">auto</span> futures3 <span style="color: #555555;">=</span> client3.get();
+    <span style="color: #006699; font-weight: bold;">auto</span> futures4 <span style="color: #555555;">=</span> client4.get();
+    <span style="color: #006699; font-weight: bold;">auto</span> futures5 <span style="color: #555555;">=</span> client5.get();
+    
+    <span style="color: #0099ff; font-style: italic;">// put all futures together                                 // (10)</span>
+    futures.insert(futures.end(),make_move_iterator(futures2.begin()), 
+                                 make_move_iterator(futures2.end()));
+    
+    futures.insert(futures.end(),make_move_iterator(futures3.begin()), 
+                                 make_move_iterator(futures3.end()));
+    
+    futures.insert(futures.end(),make_move_iterator(futures4.begin()), 
+                                 make_move_iterator(futures4.end()));
+    
+    futures.insert(futures.end(),make_move_iterator(futures5.begin()), 
+                                 make_move_iterator(futures5.end()));
+        
+    <span style="color: #0099ff; font-style: italic;">// run the promises                                         // (11)</span>
+    activeObject.run();
+    
+    <span style="color: #0099ff; font-style: italic;">// get the results from the futures</span>
+    vector<span style="color: #555555;">&lt;</span>pair<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">bool</span>, <span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;&gt;</span> futResults;
+    futResults.reserve(futures.size());
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;</span> fut<span style="color: #555555;">:</span> futures) futResults.push_back(fut.get());   <span style="color: #0099ff; font-style: italic;">// (16)</span>
+    
+    sort(futResults.begin(), futResults.end());                 <span style="color: #0099ff; font-style: italic;">// (17)</span>
+    
+    <span style="color: #0099ff; font-style: italic;">// separate the primes from the non-primes</span>
+    <span style="color: #006699; font-weight: bold;">auto</span> prIt <span style="color: #555555;">=</span> find_if(futResults.begin(), futResults.end(), 
+                        [](pair<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">bool</span>, <span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> pa){ <span style="color: #006699; font-weight: bold;">return</span> pa.first <span style="color: #555555;">==</span> <span style="color: #336666;">true</span>; });
+ 
+    cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Number primes: "</span> <span style="color: #555555;">&lt;&lt;</span> distance(prIt, futResults.end()) <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;       <span style="color: #0099ff; font-style: italic;">// (19)</span>
+    cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Primes:"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    for_each(prIt, futResults.end(), [](<span style="color: #006699; font-weight: bold;">auto</span> p){ cout <span style="color: #555555;">&lt;&lt;</span> p.second <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span>;} );    <span style="color: #0099ff; font-style: italic;">// (20)</span>
+    
+    cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n\n</span><span style="color: #cc3300;">"</span>;
+    
+    cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Number no primes: "</span> <span style="color: #555555;">&lt;&lt;</span> distance(futResults.begin(), prIt) <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;  <span style="color: #0099ff; font-style: italic;">// (18)</span>
+    cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"No primes:"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    for_each(futResults.begin(), prIt, [](<span style="color: #006699; font-weight: bold;">auto</span> p){ cout <span style="color: #555555;">&lt;&lt;</span> p.second <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span>;} );
+    
+    cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    
+}
+</pre>
+</div>
+<div>
+<div>&nbsp;</div>
+<div>First, the example's general idea is that clients can enqueue jobs concurrently on the activation list. The servant determines which numbers are prime, and the activation list is part of the Active Object. The Active Object runs the jobs enqueued in the activation list on a separate thread, and the clients can ask for the results. &nbsp;</div>
+<br />
+<div>Here are the details.</div>
+<div>The five clients enqueue the work (line 2) on the <code>activeObject</code> via the <code>getFutures</code> function. <code>getFutures</code> takes the <code>activeObject</code> and a number <code>numberPrimes</code>. <code>numberPrimes</code> random numbers are generated (line 3) between 1'000'000 and 1'000'000'000 (line 4) and pushed on the return value: <code>vector&lt;future&lt;pair&lt;bool, int&gt;&gt;</code>. <code>future&lt;pair&lt;bool, int&gt;</code> holds a <code>bool</code> and an <code>int</code>. The bool indicates if the <code>int</code> is a prime. Let's have a closer look at line (5): <code>futures.push_back(activeObject.enqueueTask(numb))</code>. This call triggers that a new job is enqueued on the activation list (line 6). All calls on the activation list have to be protected. The activation list is a deque of promises (line 7): <code>deque&lt;packaged_task&lt;pair&lt;bool, int&gt;()&gt;&gt;</code>. Each promise performs the function object <code>IsPrime</code> (line 8) when called. The return value is a pair of a <code>bool</code> and an <code>int</code>. The&nbsp;bool indicates if the number <code>int</code> is prime.</div>
+<br />
+<div>Now, the work packages are prepared. Let's start the calculation. All clients return in line (9)&nbsp; their handles to the associated futures. Putting all futures together (line 10) makes my job easier. The call <code>activeObject.run()</code> in line (11) starts the execution. The member function <code>run</code> (line 12) creates the thread to execute the member function <code>runNextTask</code> (line 13). <code>runNextTask</code> (line 14) determines if the deque is not empty (line 15) and creates the new task. By calling <code>futResults.push_back(fut.get())</code> (line 16) on each future, all results are requested and pushed on <code>futResults</code>. Line (17) sorts the vector of pairs: <code>vector&lt;pair&lt;bool, int&gt;&gt;</code>. The remaining lines present the calculation. The iterator&nbsp;<code>prIt</code> in line 18 holds the first iterator to a pair that has a prime number. &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;</div>
+<div>The screenshot shows the number of primes <code>distance(prIt, futResults.end())</code> (line 19) and the primes (line 20). Only the first non-primes are displayed.</div>
+<div>&nbsp;</div>
+<div><img src="https://www.modernescpp.com/images/blog/Patterns/ActiveObject/activeObject.png" alt="activeObject" width="650" height="508" style="display: block; margin-left: auto; margin-right: auto;" /></div>
+<h2>What's Next?</h2>
+<p>The Active Object and Monitor Object synchronize and schedule member function invocation. The main difference is that the Active Object executes its member function in a different thread, but the Monitor Object is in the same thread as the client. In my next post, I will present the Monitor Object.</p>
+<p>&nbsp;</p>
+<p>{loadmoduleid 153}</p>
+<div>&nbsp;</div>
+</div>
