@@ -1,0 +1,237 @@
+<p><em>The<strong> monitor object design pattern</strong> synchronizes concurrent member function execution to ensure that only one member function at a time runs within an object. It also allows object’s member functions to schedule their execution sequences cooperatively.</em> (<a href="https://www.dre.vanderbilt.edu/~schmidt/POSA/POSA2/">Pattern-Oriented Software Architecture: Patterns for Concurrent and Networked Objects</a>)</p>
+<hr id="system-readmore" />
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/Patterns/MonitorObject/ConcurrencyPatterns.png" alt="ConcurrencyPatterns" width="650" height="328" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<div>
+<div>The Monitor Object design pattern synchronizes concurrent member function execution to ensure that only one member function runs within an object at a time. It also allows an object's member functions to schedule their execution sequences cooperatively.</div>
+<h3>Also know as</h3>
+<ul>
+<li>Thread-Safe Passive Object</li>
+</ul>
+<h3>Problem</h3>
+<div>
+<div>If many threads access a shared object concurrently, the following challenges exist.</div>
+</div>
+<div>&nbsp;</div>
+<ul>
+<li>Due to the concurrent access, the shared object must be protected from non-synchronized read and write operations to avoid data races.</li>
+<li>The necessary synchronization should be part of the implementation, not the interface.</li>
+<li>When a thread is done with the shared object, a notification should be triggered so the next thread can use the shared object. This mechanism helps avoid and improves the system's overall performance.</li>
+<li>After the execution of a member function, the invariants of the shared object must hold.</li>
+</ul>
+<h3>Solution</h3>
+<div>A client (thread) can access the Monitor Object's synchronized member functions, and due to the monitor lock, only one synchronized member function can run at any given time. Each Monitor Object has a monitor condition that notifies the waiting clients.</div>
+<h3>Components</h3>
+<p><img src="https://www.modernescpp.com/images/blog/Patterns/MonitorObject/MonitorObject.jpg" alt="MonitorObject" width="500" height="282" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<div>
+<ul>
+<li><strong><span style="color: #000000;">Monitor Object</span></strong>: The Monitor Object supports one or more member functions. Each client must access the object through these member functions, and each member function runs in the client's thread.</li>
+<li><strong>Synchronized member functions</strong>: The Monitor Object supports the synchronized member functions. Only one member function can execute at any given point in time. The <a href="https://www.modernescpp.com/index.php/dealing-with-mutation-thread-safe-interface">Thread-Safe Interface </a>helps to distinguish between the interface member functions (synchronized member functions) and the implementation member functions of the Monitor Object.</li>
+<li><strong>Monitor lock</strong>: Each Monitor Object has one monitor lock, which ensures that at most one client can access the Monitor Object at any given time.</li>
+<li><strong>Monitor condition</strong>: The monitor condition allows separate threads to schedule their member function invocations on the Monitor Object. When the current client is done with its invocation of the synchronized member functions, the next waiting client is awakened to invoke the Monitor Object's synchronized member functions.</li>
+</ul>
+<div>While the monitor lock ensures the synchronized member functions' exclusive access, the monitor condition guarantees minimal waiting for the clients. Essentially, the monitor lock protects from data races and the condition monitor from deadlocks.</div>
+<div>&nbsp;</div>
+<div>{loadmoduleid 157}</div>
+<h3>Dynamic Behavior</h3>
+</div>
+<div>
+<div>The interaction between the Monitor Object and its components has different phases.</div>
+<br /><ol>
+<li>When a client invokes a synchronized member function on a Monitor Object, it must first lock the global monitor lock. If the client successfully locks, it executes the synchronized member function and unlocks the monitor lock. If the client is not successful, the client is blocked. &nbsp;</li>
+<li>When the client is blocked because it cannot progress, it waits until the monitor condition sends a notification. This notification happens when the monitor is unlocked. The notification can be sent to one or all the waiting clients. Typically, waiting means resource-friendly sleeping in contrast to busy waiting.</li>
+<li>When a client gets the notification to resume, it locks the monitor lock and executes the synchronized member function. The monitor lock is unlocked at the end of the synchronized member function. The monitor sends a notification to signal that the next client can execute its synchronized member function.</li>
+</ol>
+<h3>Pros and Cons</h3>
+<div>
+<div>What are the advantages and disadvantages of the Monitor Object?</div>
+<h4>Pros</h4>
+<ul>
+<li>The client is not aware of the implicit synchronization of the Monitor Object, and the synchronization is fully encapsulated in the implementation.</li>
+<li>The invoked synchronized member functions will eventually be automatically scheduled. The notification/waiting mechanism of the monitor condition behaves as a simple scheduler.</li>
+</ul>
+<h4>Cons</h4>
+<div>
+<div>
+<ul>
+<li>It is often quite challenging to change the synchronization mechanism of the synchronization member functions because the functionality and the synchronization are strongly coupled.</li>
+<li>When a synchronized member function invokes directly or indirectly the same Monitor Object, a deadlock may occur.</li>
+</ul>
+<h3>Example</h3>
+<div>
+<div>The following example defines a <code>ThreadSafeQueue</code>.</div>
+<div>&nbsp;</div>
+</div>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// monitorObject.cpp</span>
+
+<span style="color: #009999;">#include &lt;condition_variable&gt;</span>
+<span style="color: #009999;">#include &lt;functional&gt;</span>
+<span style="color: #009999;">#include &lt;queue&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;mutex&gt;</span>
+<span style="color: #009999;">#include &lt;random&gt;</span>
+<span style="color: #009999;">#include &lt;thread&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Monitor</span> {
+<span style="color: #9999ff;">public:</span>
+    <span style="color: #007788; font-weight: bold;">void</span> lock() <span style="color: #006699; font-weight: bold;">const</span> {
+        monitMutex.lock();
+    }
+
+    <span style="color: #007788; font-weight: bold;">void</span> unlock() <span style="color: #006699; font-weight: bold;">const</span> {
+        monitMutex.unlock();
+    }
+
+    <span style="color: #007788; font-weight: bold;">void</span> notify_one() <span style="color: #006699; font-weight: bold;">const</span> noexcept {
+        monitCond.notify_one();
+    }
+
+    <span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> Predicate<span style="color: #555555;">&gt;</span>
+    <span style="color: #007788; font-weight: bold;">void</span> wait(Predicate pred) <span style="color: #006699; font-weight: bold;">const</span> {                <em><span style="color: #0099ff;"> // (10)</span></em>
+        std<span style="color: #555555;">::</span>unique_lock<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span> monitLock(monitMutex);
+        monitCond.wait(monitLock, pred);
+    }
+    
+<span style="color: #9999ff;">private:</span>
+    <span style="color: #006699; font-weight: bold;">mutable</span> std<span style="color: #555555;">::</span>mutex monitMutex;
+    <span style="color: #006699; font-weight: bold;">mutable</span> std<span style="color: #555555;">::</span>condition_variable monitCond;
+};
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;                                  <span style="color: #0099ff; font-style: italic;">// (1)</span></span>
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">ThreadSafeQueue</span><span style="color: #555555;">:</span> <span style="color: #006699; font-weight: bold;">public</span> Monitor {
+ <span style="color: #9999ff;">public:</span>
+    <span style="color: #007788; font-weight: bold;">void</span> add(T val){ 
+        lock();
+        myQueue.push(val);                             <span style="color: #0099ff;">// (6)</span>
+        unlock();
+        notify_one();
+    }
+    
+    T get(){ 
+        wait( [<span style="color: #006699; font-weight: bold;">this</span>] { <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #555555;">!</span> myQueue.empty(); } ); <em><span style="color: #0099ff;"> // (2)</span></em>
+        lock();
+        <span style="color: #006699; font-weight: bold;">auto</span> val <span style="color: #555555;">=</span> myQueue.front();                   <em> <span style="color: #0099ff;">// (4)</span></em>
+        myQueue.pop();                               <em><span style="color: #0099ff;">  // (5)</span></em>
+        unlock();
+        <span style="color: #006699; font-weight: bold;">return</span> val;
+    }
+
+<span style="color: #9999ff;">private:</span>
+    std<span style="color: #555555;">::</span>queue<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span> myQueue;                            <em><strong><span style="color: #0099ff;">// (3)</span></strong></em>
+};
+
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Dice</span> {
+<span style="color: #9999ff;">public:</span>
+    <span style="color: #007788; font-weight: bold;">int</span> <span style="color: #006699; font-weight: bold;">operator</span>()(){ <span style="color: #006699; font-weight: bold;">return</span> rand(); }
+<span style="color: #9999ff;">private:</span>
+    std<span style="color: #555555;">::</span>function<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>()<span style="color: #555555;">&gt;</span> rand <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>bind(std<span style="color: #555555;">::</span>uniform_int_distribution<span style="color: #555555;">&lt;&gt;</span>(<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">6</span>), 
+                                          std<span style="color: #555555;">::</span>default_random_engine());
+};
+
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    
+    constexpr <span style="color: #006699; font-weight: bold;">auto</span> NumberThreads <span style="color: #555555;">=</span> <span style="color: #ff6600;">10</span>;
+    
+    ThreadSafeQueue<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> safeQueue;                      <em><span style="color: #0099ff;">// (7)</span></em>
+
+    <span style="color: #006699; font-weight: bold;">auto</span> addLambda <span style="color: #555555;">=</span> [<span style="color: #555555;">&amp;</span>safeQueue](<span style="color: #007788; font-weight: bold;">int</span> val){ safeQueue.add(val);          <em><span style="color: #0099ff;">// (8)</span></em>
+                                            std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> val <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span>
+                                            <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>get_id() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"; "</span>; 
+                                          }; 
+    <span style="color: #006699; font-weight: bold;">auto</span> getLambda <span style="color: #555555;">=</span> [<span style="color: #555555;">&amp;</span>safeQueue]{ safeQueue.get(); };<em><span style="color: #0099ff;">  // (9)</span></em>
+
+    std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span><span style="color: #555555;">&gt;</span> addThreads(NumberThreads);
+    Dice dice;
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;</span> thr<span style="color: #555555;">:</span> addThreads) thr <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span>(addLambda, dice() );
+
+    std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span><span style="color: #555555;">&gt;</span> getThreads(NumberThreads);
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;</span> thr<span style="color: #555555;">:</span> getThreads) thr <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span>(getLambda);
+
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;</span> thr<span style="color: #555555;">:</span> addThreads) thr.join();
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;</span> thr<span style="color: #555555;">:</span> getThreads) thr.join();
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n\n</span><span style="color: #cc3300;">"</span>;
+     
+}
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div>&nbsp;</div>
+<div>
+<div>
+<div>The key idea of the example is that the Monitor Object is encapsulated in a class and can, therefore, be reused. The class&nbsp;<code>Monitor</code> uses a <code>std::mutex</code> as monitor lock and <a href="https://www.modernescpp.com/index.php/tag/condition-variable"><code>std::condition_variable</code></a> as monitor condition. The class&nbsp;<code>Monitor</code> provides the minimal interface that a Monitor Object should support.</div>
+<br />
+<div><code>ThreadSafeQueue</code> in line (1) extends&nbsp; <code>std::queue</code> in line 56 with a thread-safe interface. <code>ThreadSafeQueue</code> derives from the class <code>Monitor</code> and uses its member functions to support the synchronized member functions <code>add</code> and get. The member functions <code>add</code> and <code>get</code> use the monitor lock to protect the Monitor Object, particularly the non-thread-safe <code>myQueue</code>. <code>add</code> notifies the waiting thread when a new item was added to <code>myQueue</code>. This notification is thread-safe. The member function <code>get</code> (line (3)) deserves more attention. First, the <code>wait </code>member function of the underlying condition variable is called. This <code>wait</code> call needs an additional predicate to protect against spurious and lost wakeups (<a href="https://www.modernescpp.com/index.php/c-core-guidelines-be-aware-of-the-traps-of-condition-variables">C++ Core Guidelines: Be Aware of the Traps of Condition Variables</a>). The operations modifying&nbsp; <code>myQueue</code> (lines 4 and 5) must also be protected because they can interleave with the call <code>myQueue.push(val)</code> (line 6). The Monitor Object <code>safeQueue</code> line (7) uses the lambda functions in lines (8) and (9) to add or remove a number from the synchronized <code>safeQueue</code>. <code>ThreadSafeQueue</code> itself is a class template and can hold values from an arbitrary type. One hundred clients add 100 random numbers between 1 - 6 to&nbsp; <code>safeQueue</code> (line 7), while one hundred clients remove these 100 numbers concurrently from the <code>safeQueue</code>. The output of the program shows the numbers and the thread ids.</div>
+<div>&nbsp;</div>
+<div><img src="https://www.modernescpp.com/images/blog/Patterns/MonitorObject/monitorObject.png" alt="monitorObject" width="650" height="411" style="display: block; margin-left: auto; margin-right: auto;" /></div>
+<div>&nbsp;
+<div>
+<div>With C++20, the program <code>monitorObject.cp</code>p can be further improved. First, I include the header <code>&lt;concepts&gt;</code> and use the concept <code>std::predicate</code> as a restricted type parameter in the function template&nbsp;<code>wait</code> (line 10). The concept<code> std::predicate</code> ensures that the function template <code>wait</code> can only be instantiated with a predicate.&nbsp;Predicates are callables that return a boolean as a result.</div>
+<div>&nbsp;</div>
+</div>
+</div>
+<div>&nbsp;</div>
+</div>
+</div>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>predicate Predicate<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">void</span> wait(Predicate pred) <span style="color: #006699; font-weight: bold;">const</span> {
+    std<span style="color: #555555;">::</span>unique_lock<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span> monitLock(monitMutex);
+    monitCond.wait(monitLock, pred);
+}
+</pre>
+</div>
+</div>
+<p>&nbsp;</p>
+<div>
+<div>Second, I use <a href="https://www.modernescpp.com/index.php/an-improved-thread-with-c-20"><code>std::jthread</code></a> instead of<code> std::thread</code>. <code>std::jthread</code> s an improved&nbsp;<code>std::thread</code> in C++20 that automatically joins in its destructor if necessary.</div>
+<div>&nbsp;</div>
+</div>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    
+    constexpr <span style="color: #006699; font-weight: bold;">auto</span> NumberThreads <span style="color: #555555;">=</span> <span style="color: #ff6600;">100</span>;
+    
+    ThreadSafeQueue<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> safeQueue;
+
+    <span style="color: #006699; font-weight: bold;">auto</span> addLambda <span style="color: #555555;">=</span> [<span style="color: #555555;">&amp;</span>safeQueue](<span style="color: #007788; font-weight: bold;">int</span> val){ safeQueue.add(val);
+                                            std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> val <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span>
+                                            <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>get_id() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"; "</span>; 
+                                          }; 
+    <span style="color: #006699; font-weight: bold;">auto</span> getLambda <span style="color: #555555;">=</span> [<span style="color: #555555;">&amp;</span>safeQueue]{ safeQueue.get(); };
+
+    std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>jthread<span style="color: #555555;">&gt;</span> addThreads(NumberThreads);
+    Dice dice;
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;</span> thr<span style="color: #555555;">:</span> addThreads) thr <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>jthread(addLambda, dice());
+
+    std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>jthread<span style="color: #555555;">&gt;</span> getThreads(NumberThreads);
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;</span> thr<span style="color: #555555;">:</span> getThreads) thr <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>jthread(getLambda);
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n\n</span><span style="color: #cc3300;">"</span>;
+     
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<div>
+<div>The <a href="https://www.modernescpp.com/index.php/active-object">Active Object</a> and the Monitor Object are similar but distinct in a few important points. Both architectural patterns synchronize access to a shared object. The member functions of an Active Object are executed in a different thread, but the Monitor Object member functions in the same thread. The Active Object decouples its member function invocation better from its member function execution and is, therefore, easier to maintain.</div>
+<div>&nbsp;</div>
+<h2>What's Next?</h2>
+<p><strong>DONE!</strong>&nbsp; I have written around 50 posts about <a href="https://www.modernescpp.com/index.php/category/patterns">patterns</a>. In my next posts, I will write about unknown features in C++17, dive deeper into C++20, and present the upcoming new C++23 standard. I will start this journey with C++23.</p>
+<div>&nbsp;</div>
+<div>&nbsp;</div>
+<div>{loadmoduleid 153}</div>
+<div>&nbsp;</div>
+</div>
