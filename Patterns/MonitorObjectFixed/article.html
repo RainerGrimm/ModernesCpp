@@ -1,0 +1,490 @@
+<p>In my last post "<a href="https://www.modernescpp.com/index.php/monitor-object">Monitor Object</a>"&nbsp; I implemented a thread-safe queue. I made two serious errors. Sorry. Today, I will fix these issues.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p><img src="https://www.modernescpp.com/images/blog/Patterns/MonitorObjectFix/ConcurrencyPatterns.png" alt="ConcurrencyPatterns" width="650" height="328" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>First, I want to show you again the erroneous implementation from my last post to understand the context.</p>
+<div><!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// monitorObject.cpp</span>
+
+<span style="color: #009999;">#include &lt;condition_variable&gt;</span>
+<span style="color: #009999;">#include &lt;functional&gt;</span>
+<span style="color: #009999;">#include &lt;queue&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;mutex&gt;</span>
+<span style="color: #009999;">#include &lt;random&gt;</span>
+<span style="color: #009999;">#include &lt;thread&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Monitor</span> {
+<span style="color: #9999ff;">public:</span>
+    <span style="color: #007788; font-weight: bold;">void</span> lock() <span style="color: #006699; font-weight: bold;">const</span> {
+        monitMutex.lock();
+    }
+
+    <span style="color: #007788; font-weight: bold;">void</span> unlock() <span style="color: #006699; font-weight: bold;">const</span> {
+        monitMutex.unlock();
+    }
+
+    <span style="color: #007788; font-weight: bold;">void</span> notify_one() <span style="color: #006699; font-weight: bold;">const</span> noexcept {
+        monitCond.notify_one();
+    }
+
+    <span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> Predicate<span style="color: #555555;">&gt;</span>
+    <span style="color: #007788; font-weight: bold;">void</span> wait(Predicate pred) <span style="color: #006699; font-weight: bold;">const</span> {                 <span style="color: #0099ff; font-style: italic;">// (10)</span>
+        std<span style="color: #555555;">::</span>unique_lock<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span> monitLock(monitMutex);
+        monitCond.wait(monitLock, pred);
+    }
+    
+<span style="color: #9999ff;">private:</span>
+    <span style="color: #006699; font-weight: bold;">mutable</span> std<span style="color: #555555;">::</span>mutex monitMutex;
+    <span style="color: #006699; font-weight: bold;">mutable</span> std<span style="color: #555555;">::</span>condition_variable monitCond;
+};
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>                                  <span style="color: #0099ff; font-style: italic;">// (1)</span>
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">ThreadSafeQueue</span><span style="color: #555555;">:</span> <span style="color: #006699; font-weight: bold;">public</span> Monitor {
+ <span style="color: #9999ff;">public:</span>
+    <span style="color: #007788; font-weight: bold;">void</span> add(T val){ 
+        lock();
+        myQueue.push(val);                             <span style="color: #0099ff; font-style: italic;">// (6)</span>
+        unlock();
+        notify_one();
+    }
+    
+    T get(){ 
+        wait( [<span style="color: #006699; font-weight: bold;">this</span>] { <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #555555;">!</span> myQueue.empty(); } );  <span style="color: #0099ff; font-style: italic;">// (2)</span>
+        lock();
+        <span style="color: #006699; font-weight: bold;">auto</span> val <span style="color: #555555;">=</span> myQueue.front();                    <span style="color: #0099ff; font-style: italic;">// (4)</span>
+        myQueue.pop();                                 <span style="color: #0099ff; font-style: italic;">// (5)</span>
+        unlock();
+        <span style="color: #006699; font-weight: bold;">return</span> val;
+    }
+
+<span style="color: #9999ff;">private:</span>
+    std<span style="color: #555555;">::</span>queue<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span> myQueue;                            <span style="color: #0099ff; font-style: italic;">// (3)</span>
+};
+
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Dice</span> {
+<span style="color: #9999ff;">public:</span>
+    <span style="color: #007788; font-weight: bold;">int</span> <span style="color: #006699; font-weight: bold;">operator</span>()(){ <span style="color: #006699; font-weight: bold;">return</span> rand(); }
+<span style="color: #9999ff;">private:</span>
+    std<span style="color: #555555;">::</span>function<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>()<span style="color: #555555;">&gt;</span> rand <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>bind(std<span style="color: #555555;">::</span>uniform_int_distribution<span style="color: #555555;">&lt;&gt;</span>(<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">6</span>), 
+                                          std<span style="color: #555555;">::</span>default_random_engine());
+};
+
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    
+    constexpr <span style="color: #006699; font-weight: bold;">auto</span> NumberThreads <span style="color: #555555;">=</span> <span style="color: #ff6600;">100</span>;
+    
+    ThreadSafeQueue<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> safeQueue;                      <span style="color: #0099ff; font-style: italic;">// (7)</span>
+
+    <span style="color: #006699; font-weight: bold;">auto</span> addLambda <span style="color: #555555;">=</span> [<span style="color: #555555;">&amp;</span>safeQueue](<span style="color: #007788; font-weight: bold;">int</span> val){ safeQueue.add(val);          <span style="color: #0099ff; font-style: italic;">// (8)</span>
+                                            std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> val <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span>
+                                            <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>get_id() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"; "</span>; 
+                                          }; 
+    <span style="color: #006699; font-weight: bold;">auto</span> getLambda <span style="color: #555555;">=</span> [<span style="color: #555555;">&amp;</span>safeQueue]{ safeQueue.get(); };  <span style="color: #0099ff; font-style: italic;">// (9)</span>
+
+    std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span><span style="color: #555555;">&gt;</span> addThreads(NumberThreads);
+    Dice dice;
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;</span> thr<span style="color: #555555;">:</span> addThreads) thr <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span>(addLambda, dice());
+
+    std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span><span style="color: #555555;">&gt;</span> getThreads(NumberThreads);
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;</span> thr<span style="color: #555555;">:</span> getThreads) thr <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span>(getLambda);
+
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;</span> thr<span style="color: #555555;">:</span> addThreads) thr.join();
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;</span> thr<span style="color: #555555;">:</span> getThreads) thr.join();
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n\n</span><span style="color: #cc3300;">"</span>;
+     
+}
+</pre>
+</div>
+<div>&nbsp;</div>
+<div>The key idea of the example is that the Monitor Object is encapsulated in a class and can, therefore, be reused. The class&nbsp;<code>Monitor</code> uses a <code>std::mutex</code> as monitor lock and a <a href="https://www.modernescpp.com/index.php/tag/condition-variable"><code>std::condition_variable</code></a> as monitor condition. The class&nbsp;<code>Monitor</code> provides the minimal interface that a Monitor Object should support.</div>
+<p>&nbsp;</p>
+<div><code>ThreadSafeQueue</code> in line (1) extends&nbsp; <code>std::queue</code> in line (3) with a thread-safe interface. <code>ThreadSafeQueue</code> derives from the class <code>Monitor</code> and uses its member functions to support the synchronized member functions <code>add</code> and get. The member functions <code>add</code> and <code>get</code> use the monitor lock to protect the Monitor Object, particularly the non-thread-safe <code>myQueue</code>. <code>add</code> notifies the waiting thread when a new item was added to <code>myQueue</code>. This notification is thread-safe. The member function <code>get</code> (line (3)) deserves more attention. First, the <code>wait </code>member function of the underlying condition variable is called. This <code>wait</code> call needs an additional predicate to protect against spurious and lost wakeups (<a href="https://www.modernescpp.com/index.php/c-core-guidelines-be-aware-of-the-traps-of-condition-variables">C++ Core Guidelines: Be Aware of the Traps of Condition Variables</a>). The operations modifying&nbsp; <code>myQueue</code> (lines 4 and 5) must also be protected because they can interleave with the call <code>myQueue.push(val)</code> (line 6). The Monitor Object <code>safeQueue</code> line (7) uses the lambda functions in lines (8) and (9) to add or remove a number from the synchronized <code>safeQueue</code>. <code>ThreadSafeQueue</code> itself is a class template and can hold values from an arbitrary type. One hundred clients add 100 random numbers between 1 - 6 to&nbsp; <code>safeQueue</code> (line 7), while hundred clients remove these 100 numbers concurrently from the <code>safeQueue</code>. The output of the program shows the numbers and the thread ids.</div>
+<div>&nbsp;</div>
+<div><img src="https://www.modernescpp.com/images/blog/Patterns/MonitorObject/monitorObject.png" alt="monitorObject" width="650" height="411" /></div>
+<div>This program has two serious issues. <strong>Dietmar Kühl</strong> and <strong>Frank Birbacher</strong> wrote me an e-mail about it. These are their words, which I translated into English. <strong><em>My additions are cursive and bold.</em></strong></div>
+<div>&nbsp;</div>
+<ol>
+<li>In <code>ThreadSafeQueue::get()</code> it is tested by<code> Monitor::wait()</code> whether <code>myQueue</code> contains an element or waits for an element to be contained. However, the lock is only held inside <code>wait()</code>, i.e. in <code>get()</code> you cannot be sure that the element is still in <code>myQueue</code>: another thread may get the lock and remove the element, resulting in undefined behavior on the call to <code>myQueue.front()</code>.</li>
+<li>If the copy/move constructor of<code> T</code> throws an exception, the <code>ThreadSafeQueue</code> is in an inconsistent state: no member function is active, but the mutex is locked</li>
+</ol>
+<p>&nbsp;</p>
+<p>The fix is that<code> Monitor::wait()</code> can only be called if a<code> unique_lock</code> is held. This can be achieved, for example, by having <code>Monitor</code> provide an appropriate (protected?) function that returns a suitable object and requests a reference to it in<code> wait()</code>:</p>
+<div>&nbsp;</div>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">struct</span> Monitor {
+   <span style="color: #006699; font-weight: bold;">using</span> Lock <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>unique_lock<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span>; <span style="color: #0099ff; font-style: italic;">// could be wrapper if you prefer</span>
+   [[nodiscard]] Lock receiveGuard() { <span style="color: #006699; font-weight: bold;">return</span> Lock(monitMutex); }
+   <span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> Predicate<span style="color: #555555;">&gt;</span>
+   <span style="color: #007788; font-weight: bold;">void</span> wait(Lock<span style="color: #555555;">&amp;</span> kerberos, Predicate pred) { monitCond.wait(kerberos, pred); }
+   <span style="color: #0099ff; font-style: italic;">// …</span>
+};
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+T ThreadSafeQueue<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;::</span>get() {
+   <span style="color: #006699; font-weight: bold;">auto</span> kerberos <span style="color: #555555;">=</span> receiveGuard();
+   wait(kerberos, [<span style="color: #006699; font-weight: bold;">this</span>]{ <span style="color: #006699; font-weight: bold;">return</span> not myQueue.empty(); });
+   T rc <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>move(myQueue.front());
+   myqueue.pop();
+   <span style="color: #006699; font-weight: bold;">return</span> rc;
+}
+</pre>
+</div>
+</div>
+<div>&nbsp;</div>
+<div>This version corrects the exception problem for <code>get()</code>. For <code>add()</code> you can simply use the monitor object with a <code>lock_guard</code>:<br />&nbsp; <br /> <!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">void</span> add(T val) {
+   {
+        std<span style="color: #555555;">::</span>lock_guard<span style="color: #555555;">&lt;</span>Monitor<span style="color: #555555;">&gt;</span> kerberos(<span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">this</span>);
+        myqueue.push(std<span style="color: #555555;">::</span>move(val));
+    }
+    notify_one();
+}
+</pre>
+</div>
+</div>
+<div>&nbsp;</div>
+<div>I would probably wrap the notification in a "<code>SendGuard</code>" that contains a <code>lock_guard</code> and a reference to the <code>condition_variable</code> and sends the notification upon destruction:<br /> <br /> <!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;"><!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">SendGuard</span> {
+    <span style="color: #006699; font-weight: bold;">friend</span> <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Monitor</span>;
+    <span style="color: #006699; font-weight: bold;">using</span> deleter <span style="color: #555555;">=</span> decltype([](<span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;</span> cond){ cond<span style="color: #555555;">-&gt;</span>notify_one(); });
+    std<span style="color: #555555;">::</span>unique_ptr<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>condition_variable, deleter<span style="color: #555555;">&gt;</span> notifier;
+    std<span style="color: #555555;">::</span>lock_guard<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span> kerberos;
+    SendGuard(<span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;</span> mutex, <span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;</span> cond)<span style="color: #555555;">:</span> notifier(<span style="color: #555555;">&amp;</span>cond), kerberos(mutex) {}
+};
+</pre>
+</div>
+</div>
+</div>
+<div>&nbsp;</div>
+<div><em><strong>The move constructor and destructor should still be public and represent the whole interface! This would also make it much easier to use in</strong> <code>add()</code>:</em><br /> <br /> <!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">void</span> add(T val) {
+   <span style="color: #006699; font-weight: bold;">auto</span> kerberos <span style="color: #555555;">=</span> sendGuard();
+   myqueue.push(val);
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p><strong><em>Finally, here is the full implementation of Dietmar. The numbers correspond to the numbers in my monitorObjec.cpp example.</em></strong></p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// threadsafequeue1.cpp</span>
+
+<span style="color: #009999;">#include &lt;condition_variable&gt;</span>
+<span style="color: #009999;">#include &lt;functional&gt;</span>
+<span style="color: #009999;">#include &lt;queue&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;mutex&gt;</span>
+<span style="color: #009999;">#include &lt;random&gt;</span>
+<span style="color: #009999;">#include &lt;thread&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Monitor</span> {
+<span style="color: #9999ff;">public:</span>
+    <span style="color: #006699; font-weight: bold;">using</span> Lock <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>unique_lock<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span>;
+    [[nodiscard]] Lock receiveGuard() {
+        <span style="color: #006699; font-weight: bold;">return</span> Lock(monitMutex);
+    }
+
+    <span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> Predicate<span style="color: #555555;">&gt;</span>
+    <span style="color: #007788; font-weight: bold;">void</span> wait(Lock<span style="color: #555555;">&amp;</span> kerberos, Predicate pred) {
+        monitCond.wait(kerberos, pred);
+    }
+
+    <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">SendGuard</span> {
+        <span style="color: #006699; font-weight: bold;">friend</span> <span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Monitor</span>;
+        <span style="color: #006699; font-weight: bold;">using</span> deleter <span style="color: #555555;">=</span> decltype([](<span style="color: #006699; font-weight: bold;">auto</span>* cond){ cond<span style="color: #555555;">-&gt;</span>notify_one(); });
+        std<span style="color: #555555;">::</span>unique_ptr<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>condition_variable, deleter<span style="color: #555555;">&gt;</span> notifier;
+        std<span style="color: #555555;">::</span>lock_guard<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span> kerberos;
+        SendGuard(<span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;</span> mutex, <span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;</span> cond)<span style="color: #555555;">:</span> notifier(<span style="color: #555555;">&amp;</span>cond), kerberos(mutex) {}
+    };
+
+    SendGuard <span style="color: #cc00ff;">sendGuard</span>() { <span style="color: #006699; font-weight: bold;">return</span> {monitMutex, monitCond}; }
+    
+<span style="color: #9999ff;">private:</span>
+    <span style="color: #006699; font-weight: bold;">mutable</span> std<span style="color: #555555;">::</span>mutex monitMutex;
+    <span style="color: #006699; font-weight: bold;">mutable</span> std<span style="color: #555555;">::</span>condition_variable monitCond;
+};
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>                                  <span style="color: #0099ff; font-style: italic;">// (1)</span>
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">ThreadSafeQueue</span><span style="color: #555555;">:</span> <span style="color: #006699; font-weight: bold;">public</span> Monitor {
+ <span style="color: #9999ff;">public:</span>
+    <span style="color: #007788; font-weight: bold;">void</span> add(T val){ 
+        <span style="color: #006699; font-weight: bold;">auto</span> kerberos <span style="color: #555555;">=</span> sendGuard();
+        myQueue.push(val);                             <span style="color: #0099ff; font-style: italic;">// (6)</span>
+    }
+    
+    T get(){ 
+        <span style="color: #006699; font-weight: bold;">auto</span> kerberos <span style="color: #555555;">=</span> receiveGuard();
+        wait(kerberos, [<span style="color: #006699; font-weight: bold;">this</span>] { <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #555555;">!</span> myQueue.empty(); } );  <span style="color: #0099ff; font-style: italic;">// (2)</span>
+        <span style="color: #006699; font-weight: bold;">auto</span> val <span style="color: #555555;">=</span> myQueue.front();                    <span style="color: #0099ff; font-style: italic;">// (4)</span>
+        myQueue.pop();                                 <span style="color: #0099ff; font-style: italic;">// (5)</span>
+        <span style="color: #006699; font-weight: bold;">return</span> val;
+    }
+
+<span style="color: #9999ff;">private:</span>
+    std<span style="color: #555555;">::</span>queue<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;</span> myQueue;                            <span style="color: #0099ff; font-style: italic;">// (3)</span>
+};
+
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Dice</span> {
+<span style="color: #9999ff;">public:</span>
+    <span style="color: #007788; font-weight: bold;">int</span> <span style="color: #006699; font-weight: bold;">operator</span>()(){ <span style="color: #006699; font-weight: bold;">return</span> rand(); }
+<span style="color: #9999ff;">private:</span>
+    std<span style="color: #555555;">::</span>function<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>()<span style="color: #555555;">&gt;</span> rand <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>bind(std<span style="color: #555555;">::</span>uniform_int_distribution<span style="color: #555555;">&lt;&gt;</span>(<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">6</span>), 
+                                          std<span style="color: #555555;">::</span>default_random_engine());
+};
+
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    
+    constexpr <span style="color: #006699; font-weight: bold;">auto</span> NumberThreads <span style="color: #555555;">=</span> <span style="color: #ff6600;">100</span>;
+    
+    ThreadSafeQueue<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> safeQueue;                      <span style="color: #0099ff; font-style: italic;">// (7)</span>
+
+    <span style="color: #006699; font-weight: bold;">auto</span> addLambda <span style="color: #555555;">=</span> [<span style="color: #555555;">&amp;</span>safeQueue](<span style="color: #007788; font-weight: bold;">int</span> val){ safeQueue.add(val);          <span style="color: #0099ff; font-style: italic;">// (8)</span>
+                                            std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> val <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span>
+                                            <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>get_id() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"; "</span>; 
+                                          }; 
+    <span style="color: #006699; font-weight: bold;">auto</span> getLambda <span style="color: #555555;">=</span> [<span style="color: #555555;">&amp;</span>safeQueue]{ safeQueue.get(); };  <span style="color: #0099ff; font-style: italic;">// (9)</span>
+
+    std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span><span style="color: #555555;">&gt;</span> addThreads(NumberThreads);
+    Dice dice;
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;</span> thr<span style="color: #555555;">:</span> addThreads) thr <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span>(addLambda, dice());
+
+    std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span><span style="color: #555555;">&gt;</span> getThreads(NumberThreads);
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;</span> thr<span style="color: #555555;">:</span> getThreads) thr <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span>(getLambda);
+
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;</span> thr<span style="color: #555555;">:</span> addThreads) thr.join();
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;</span> thr<span style="color: #555555;">:</span> getThreads) thr.join();
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n\n</span><span style="color: #cc3300;">"</span>;
+     
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>As a result of the discussion above, Frank has proposed the following version below, which has a consistent and easy-to-use interface for Monitor.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// threadSafeQueue.cpp</span>
+
+<span style="color: #009999;">#ifndef INCLUDED_PATTERNS_MONITOR2_MONITOR_HPP</span>
+<span style="color: #009999;">#define INCLUDED_PATTERNS_MONITOR2_MONITOR_HPP</span>
+
+<span style="color: #009999;">#include &lt;atomic&gt;</span>
+<span style="color: #009999;">#include &lt;algorithm&gt;</span>
+<span style="color: #009999;">#include &lt;condition_variable&gt;</span>
+<span style="color: #009999;">#include &lt;deque&gt;</span>
+<span style="color: #009999;">#include &lt;iterator&gt;</span>
+<span style="color: #009999;">#include &lt;mutex&gt;</span>
+<span style="color: #009999;">#include &lt;stdexcept&gt;</span>
+<span style="color: #009999;">#include &lt;thread&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Monitor</span> {
+<span style="color: #9999ff;">public:</span>
+    <span style="color: #006699; font-weight: bold;">struct</span> UnlockAndNotify {
+        std<span style="color: #555555;">::</span>mutex d_mutex;
+        std<span style="color: #555555;">::</span>condition_variable d_condition;
+
+        <span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">lock</span>() { d_mutex.lock(); }
+        <span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">unlock</span>() { d_mutex.unlock(); d_condition.notify_one(); }
+    };
+
+<span style="color: #9999ff;">private:</span>
+    UnlockAndNotify d_combined;
+
+<span style="color: #9999ff;">public:</span>
+    std<span style="color: #555555;">::</span>unique_lock<span style="color: #555555;">&lt;</span>UnlockAndNotify<span style="color: #555555;">&gt;</span> makeLockWithNotify() {
+        <span style="color: #006699; font-weight: bold;">return</span> std<span style="color: #555555;">::</span>unique_lock{d_combined};
+    }
+
+    <span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> PRED<span style="color: #555555;">&gt;</span>
+    std<span style="color: #555555;">::</span>unique_lock<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;</span> makeLockWithWait(PRED waitForCondition) {
+        std<span style="color: #555555;">::</span>unique_lock lock{d_combined.d_mutex};
+        d_combined.d_condition.wait(lock, waitForCondition);
+        <span style="color: #006699; font-weight: bold;">return</span> lock;
+    }
+};
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">ThreadQueue</span> {
+    Monitor d_monitor;
+    std<span style="color: #555555;">::</span>deque<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> d_numberQueue;
+
+    <span style="color: #006699; font-weight: bold;">auto</span> <span style="color: #cc00ff;">makeLockWhenNotEmpty</span>() {
+        <span style="color: #006699; font-weight: bold;">return</span> d_monitor.makeLockWithWait([<span style="color: #006699; font-weight: bold;">this</span>] { <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #555555;">!</span>d_numberQueue.empty(); });
+    }
+
+<span style="color: #9999ff;">public:</span>
+    <span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">addNumber</span>(<span style="color: #007788; font-weight: bold;">int</span> number) {
+        <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #006699; font-weight: bold;">auto</span> lock <span style="color: #555555;">=</span> d_monitor.makeLockWithNotify();
+        d_numberQueue.push_back(number);
+    }
+
+    <span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">removeNumber</span>() {
+        <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #006699; font-weight: bold;">auto</span> lock <span style="color: #555555;">=</span> makeLockWhenNotEmpty();
+        <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #006699; font-weight: bold;">auto</span> number <span style="color: #555555;">=</span> d_numberQueue.front();
+        d_numberQueue.pop_front();
+        <span style="color: #006699; font-weight: bold;">return</span> number;
+    }
+};
+
+<span style="color: #009999;">#endif</span>
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+   ThreadQueue queue;
+   std<span style="color: #555555;">::</span>atomic<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> sharedSum{};
+   std<span style="color: #555555;">::</span>atomic<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> sharedCounter{};
+
+   std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>jthread<span style="color: #555555;">&gt;</span> threads;
+   threads.reserve(<span style="color: #ff6600;">200</span>);
+   std<span style="color: #555555;">::</span>generate_n(std<span style="color: #555555;">::</span>back_inserter(threads), <span style="color: #ff6600;">100</span>, [<span style="color: #555555;">&amp;</span>] {
+       <span style="color: #006699; font-weight: bold;">return</span> std<span style="color: #555555;">::</span>jthread{[<span style="color: #555555;">&amp;</span>] { sharedSum <span style="color: #555555;">+=</span> queue.removeNumber(); }};
+   });
+   std<span style="color: #555555;">::</span>generate_n(std<span style="color: #555555;">::</span>back_inserter(threads), <span style="color: #ff6600;">100</span>, [<span style="color: #555555;">&amp;</span>] {
+       <span style="color: #006699; font-weight: bold;">return</span> std<span style="color: #555555;">::</span>jthread{[<span style="color: #555555;">&amp;</span>] { queue.addNumber(<span style="color: #555555;">++</span>sharedCounter); }};
+   });
+
+   threads.clear(); <span style="color: #0099ff; font-style: italic;">// wait for all threads to finish</span>
+   <span style="color: #006699; font-weight: bold;">if</span> (sharedSum.load() <span style="color: #555555;">!=</span> <span style="color: #ff6600;">5050</span>) {
+       <span style="color: #006699; font-weight: bold;">throw</span> std<span style="color: #555555;">::</span>logic_error(<span style="color: #cc3300;">"Wrong result for sum of 1..100"</span>);
+   }
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The implementation of the monitor pattern here is based on the flexibility of <code>std::unique_lock</code> through its template parameter. &nbsp;All of the std RAII lock&nbsp;guards can be used with any class that has <code>lock()</code> and <code>unlock()</code> methods. &nbsp;The <code>UnlockAndNotify</code> class implements this interface and notifies its&nbsp;condition variable from within the <code>unlock()</code> method. &nbsp;On top of that, the <code>Monitor</code> class provides a reduced public interface to create two different kinds&nbsp;of locks, one with notification and one without, by creating a <code>std::unique_lock</code> on either the whole <code>UnlockAndNotify</code> instance or just the contained&nbsp;<code>std::mutex</code>.<br class="" /><br class="" />On the choice of <code>std::unique_lock</code> versus <code>std::lock_guard</code> I (<strong><em>Frank</em></strong>) prefer the <code>unique_lock</code> in the interface. &nbsp;This choice allows the user of the <code>Monitor</code> class&nbsp;more flexibility. &nbsp;I value this flexibility higher than a possible performance difference to<code> lock_guard</code> which anyway needs to be measured first. &nbsp;I&nbsp;acknowledge that the given examples don't make use of this extra flexibility.</p>
+<p><strong><em>Afterward, Dietmar further developed Frank's idea: here, the protected data is kept in the Monitor, making it harder to access it unprotected.</em></strong></p>
+<p>&nbsp;</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// threadsafequeue2.cpp</span>
+
+<span style="color: #009999;">#ifndef INCLUDED_PATTERNS_MONITOR3_MONITOR_HPP</span>
+<span style="color: #009999;">#define INCLUDED_PATTERNS_MONITOR3_MONITOR_HPP</span>
+
+<span style="color: #009999;">#include &lt;algorithm&gt;</span>
+<span style="color: #009999;">#include &lt;atomic&gt;</span>
+<span style="color: #009999;">#include &lt;condition_variable&gt;</span>
+<span style="color: #009999;">#include &lt;deque&gt;</span>
+<span style="color: #009999;">#include &lt;functional&gt;</span>
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;iterator&gt;</span>
+<span style="color: #009999;">#include &lt;mutex&gt;</span>
+<span style="color: #009999;">#include &lt;random&gt;</span>
+<span style="color: #009999;">#include &lt;stdexcept&gt;</span>
+<span style="color: #009999;">#include &lt;thread&gt;</span>
+<span style="color: #009999;">#include &lt;tuple&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">namespace</span> patterns<span style="color: #555555;">::</span>monitor3 {
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Monitor</span> {
+<span style="color: #9999ff;">public:</span>
+   <span style="color: #006699; font-weight: bold;">struct</span> UnlockAndNotify {
+       std<span style="color: #555555;">::</span>mutex d_mutex;
+       std<span style="color: #555555;">::</span>condition_variable d_condition;
+   
+       <span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">lock</span>() { d_mutex.lock(); }
+       <span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">unlock</span>() { d_mutex.unlock(); d_condition.notify_one(); }
+   };
+
+<span style="color: #9999ff;">private:</span>
+   <span style="color: #006699; font-weight: bold;">mutable</span> UnlockAndNotify d_combined;
+   <span style="color: #006699; font-weight: bold;">mutable</span> T               d_data;
+
+<span style="color: #9999ff;">public:</span>
+   std<span style="color: #555555;">::</span>tuple<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&amp;</span>, std<span style="color: #555555;">::</span>unique_lock<span style="color: #555555;">&lt;</span>UnlockAndNotify<span style="color: #555555;">&gt;&gt;</span> makeProducerLock() <span style="color: #006699; font-weight: bold;">const</span> {
+       <span style="color: #006699; font-weight: bold;">return</span> { d_data, std<span style="color: #555555;">::</span>unique_lock{d_combined} };
+   }
+
+   <span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> PRED<span style="color: #555555;">&gt;</span>
+   std<span style="color: #555555;">::</span>tuple<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&amp;</span>, std<span style="color: #555555;">::</span>unique_lock<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>mutex<span style="color: #555555;">&gt;&gt;</span> makeConsumerLockWhen(PRED predicate) <span style="color: #006699; font-weight: bold;">const</span> {
+       std<span style="color: #555555;">::</span>unique_lock lock{d_combined.d_mutex};
+       d_combined.d_condition.wait(lock, [<span style="color: #006699; font-weight: bold;">this</span>, predicate]{ <span style="color: #006699; font-weight: bold;">return</span> predicate(d_data); });
+       <span style="color: #006699; font-weight: bold;">return</span> { d_data, std<span style="color: #555555;">::</span>move(lock) };
+   }
+};
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">ThreadQueue</span> {
+   Monitor<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span>deque<span style="color: #555555;">&lt;</span>T<span style="color: #555555;">&gt;&gt;</span> d_monitor;
+
+<span style="color: #9999ff;">public:</span>
+   <span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">add</span>(T number) {
+       <span style="color: #006699; font-weight: bold;">auto</span>[numberQueue, lock] <span style="color: #555555;">=</span> d_monitor.makeProducerLock();
+       numberQueue.push_back(number);
+   }
+
+   T <span style="color: #cc00ff;">remove</span>() {
+       <span style="color: #006699; font-weight: bold;">auto</span>[numberQueue, lock] <span style="color: #555555;">=</span> d_monitor.makeConsumerLockWhen([](<span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;</span> numberQueue) { <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #555555;">!</span>numberQueue.empty(); });
+       <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #006699; font-weight: bold;">auto</span> number <span style="color: #555555;">=</span> numberQueue.front();
+       numberQueue.pop_front();
+       <span style="color: #006699; font-weight: bold;">return</span> number;
+   }
+};
+}
+
+<span style="color: #009999;">#endif</span>
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Dice</span> {
+<span style="color: #9999ff;">public:</span>
+    <span style="color: #007788; font-weight: bold;">int</span> <span style="color: #006699; font-weight: bold;">operator</span>()(){ <span style="color: #006699; font-weight: bold;">return</span> rand(); }
+<span style="color: #9999ff;">private:</span>
+    std<span style="color: #555555;">::</span>function<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span>()<span style="color: #555555;">&gt;</span> rand <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>bind(std<span style="color: #555555;">::</span>uniform_int_distribution<span style="color: #555555;">&lt;&gt;</span>(<span style="color: #ff6600;">1</span>, <span style="color: #ff6600;">6</span>), 
+                                          std<span style="color: #555555;">::</span>default_random_engine());
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    
+    constexpr <span style="color: #006699; font-weight: bold;">auto</span> NumberThreads <span style="color: #555555;">=</span> <span style="color: #ff6600;">100</span>;
+    
+    patterns<span style="color: #555555;">::</span>monitor3<span style="color: #555555;">::</span>ThreadQueue<span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">int</span><span style="color: #555555;">&gt;</span> safeQueue;                     
+
+    <span style="color: #006699; font-weight: bold;">auto</span> addLambda <span style="color: #555555;">=</span> [<span style="color: #555555;">&amp;</span>safeQueue](<span style="color: #007788; font-weight: bold;">int</span> val){ safeQueue.add(val);         
+                                            std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> val <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" "</span>
+                                            <span style="color: #555555;">&lt;&lt;</span> std<span style="color: #555555;">::</span>this_thread<span style="color: #555555;">::</span>get_id() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"; "</span>; 
+                                          }; 
+    <span style="color: #006699; font-weight: bold;">auto</span> getLambda <span style="color: #555555;">=</span> [<span style="color: #555555;">&amp;</span>safeQueue]{ safeQueue.remove(); };  
+
+    std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span><span style="color: #555555;">&gt;</span> addThreads(NumberThreads);
+    Dice dice;
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;</span> thr<span style="color: #555555;">:</span> addThreads) thr <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span>(addLambda, dice());
+
+    std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span>std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span><span style="color: #555555;">&gt;</span> getThreads(NumberThreads);
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;</span> thr<span style="color: #555555;">:</span> getThreads) thr <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">thread</span>(getLambda);
+
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;</span> thr<span style="color: #555555;">:</span> addThreads) thr.join();
+    <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;</span> thr<span style="color: #555555;">:</span> getThreads) thr.join();
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"</span><span style="color: #cc3300; font-weight: bold;">\n\n</span><span style="color: #cc3300;">"</span>;
+     
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p><span data-preserver-spaces="true">Once more, thanks a lot to&nbsp;</span><strong><span data-preserver-spaces="true">Frank</span></strong><span data-preserver-spaces="true">&nbsp;and&nbsp;</span><strong><span data-preserver-spaces="true">Dietmar</span></strong><span data-preserver-spaces="true">. I didn't want to prove, with my erroneous implementation of a thread-safe queue in my previous post, that concurrency is hard to get right. I'm particularly annoyed that I don't put the mutex inside a lock (error 2). I teach this in my C++ classes: NNM (No Naked Mutex).</span></p>
+<h2>What's next?</h2>
+<p>In my next post, I dive into the future of C++: C++23.</p>
+<p>&nbsp;</p>
+<p><a href="mailto:dietmar.kuehl@gmail.com">dietmar.kuehl@gmail.com</a></p>
+</div>
