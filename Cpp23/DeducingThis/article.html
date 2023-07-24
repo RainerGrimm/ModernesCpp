@@ -1,0 +1,353 @@
+<div>
+<div>Anyone who thinks a small C++ standard follows a significant C++ standard is wrong. C++23 provides powerful extensions to C++20. These extensions include the core language, particularly the standard library. Today, I present a small but very impactful feature of the core language: deducing this.</div>
+<hr id="system-readmore" />
+<p>&nbsp;<img src="https://www.modernescpp.com/images/blog/Cpp23/DeducingThis/DeducingThis.png" alt="" width="650" height="366" style="display: block; margin-left: auto; margin-right: auto;" data-alt="DeducingThis" /></p>
+</div>
+<div>
+<div>Deducing this, sometimes also called explicit object parameter, allows it to make the implicit <code>this</code> pointer of a member function explicit. Like Python, the explicit object parameter must be the first function parameter and is called in C++, by convention, <code>Self</code> and <code>self</code>.</div>
+<div>&nbsp;</div>
+</div>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">struct</span> Test {
+    <span style="color: #007788; font-weight: bold;">void</span> implicitParameter();               <span style="color: #0099ff; font-style: italic;">// implicit this pointer</span>
+    <span style="color: #007788; font-weight: bold;">void</span> <span style="color: #cc00ff;">explictParameter</span>(<span style="color: #006699; font-weight: bold;">this</span> Self<span style="color: #555555;">&amp;</span> self); <span style="color: #0099ff; font-style: italic;">// explicit this pointer</span>
+};
+</pre>
+</div>
+<p>&nbsp;</p>
+<div>
+<div>Deducing this enables new programming techniques in C++23: deduplication of function overloading based on the object's lvalue/rvalue value category and constness. Additionally, you can reference a lambda and invoke it recursively. Furthermore, deducing this simplifies the implementation of [<a href="https://www.modernescpp.com/index.php/c-is-still-lazy">CRTP</a>](<a href="https://www.modernescpp.com/index.php/c-is-still-lazy">https://www.modernescpp.com/index.php/c-is-still-lazy</a>).</div>
+<div>
+<div>
+<h2>Deduplicating Function Overloading</h2>
+<div>
+<div>Assume you want to overload a member function based on the lvalue/rvalue value category and constness of the calling object. This means you have to overload your member function four times.</div>
+<div>&nbsp;</div>
+</div>
+</div>
+</div>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0px; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// deducingThis.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">struct</span> Test {
+    <span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> Self<span style="color: #555555;">&gt;</span>
+    <span style="color: #007788; font-weight: bold;">void</span> explicitCall(<span style="color: #006699; font-weight: bold;">this</span> Self<span style="color: #555555;">&amp;&amp;</span> self, <span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span>string<span style="color: #555555;">&amp;</span> text) {  <em><span style="color: #0099ff;">// (9)</span></em>
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> text <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">": "</span>;
+        std<span style="color: #555555;">::</span>forward<span style="color: #555555;">&lt;</span>Self<span style="color: #555555;">&gt;</span>(self).implicitCall();                    <em><span style="color: #0099ff;">// (10)</span></em>
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    }
+
+    <span style="color: #007788; font-weight: bold;">void</span> implicitCall() <span style="color: #555555;">&amp;</span> {                          <span style="color: #0099ff; font-style: italic;">// (1)</span>
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"non const lvalue"</span>;
+    }
+
+    <span style="color: #007788; font-weight: bold;">void</span> implicitCall() <span style="color: #006699; font-weight: bold;">const</span><span style="color: #555555;">&amp;</span> {                     <span style="color: #0099ff; font-style: italic;">// (2)</span>
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"const lvalue"</span>;
+    }
+
+    <span style="color: #007788; font-weight: bold;">void</span> implicitCall() <span style="color: #555555;">&amp;&amp;</span> {                         <span style="color: #0099ff; font-style: italic;">// (3)</span>
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"non const rvalue"</span>;
+    }
+
+    <span style="color: #007788; font-weight: bold;">void</span> implicitCall() <span style="color: #006699; font-weight: bold;">const</span><span style="color: #555555;">&amp;&amp;</span> {                    <span style="color: #0099ff; font-style: italic;">// (4)</span>
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"const rvalue"</span>;
+    }
+
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {<br /><br />    std::cout &lt;&lt; '\n';
+
+    Test test;
+    <span style="color: #006699; font-weight: bold;">const</span> Test constTest;
+
+    test.explicitCall(<span style="color: #cc3300;">"test"</span>);                                  <span style="color: #0099ff; font-style: italic;">// (5)</span>
+    constTest.explicitCall(<span style="color: #cc3300;">"constTest"</span>);                        <span style="color: #0099ff; font-style: italic;">// (6)</span>
+    std<span style="color: #555555;">::</span>move(test).explicitCall(<span style="color: #cc3300;">"std::move(test)"</span>);            <span style="color: #0099ff; font-style: italic;">// (7)</span>
+    std<span style="color: #555555;">::</span>move(constTest).explicitCall(<span style="color: #cc3300;">"std::move(consTest)"</span>);   <span style="color: #0099ff; font-style: italic;">// (8)<br /><br />    </span>std::cout &lt;&lt; '\n';<br /><br />}
+</pre>
+</div>
+<div>&nbsp;</div>
+<div>
+<div>
+<div>Lines (1), (2), (3), and (4) are the required function overloads. Lines (1) and (2) take a non-const and const lvalue object, and lines (3) and (4) a non-const and const rvalue objects.&nbsp;To simplify, a lvalue is a value from which the address can be determined, and a rvalue is an only readable value. The lines (5) to (8) represent the corresponding objects. Deducing this in line (9) enables it to deduplicate the four overloads in one member function that perfectly forwards <code>self</code> (line 10) and calls <code>implicitCall</code>. This article goes into the intricacies of perfect forwarding: <a href="https://www.modernescpp.com/index.php/perfect-forwarding">perfect forwarding</a>.</div>
+<div>&nbsp;</div>
+<div>Currently (July 2023), neither the brand new GCC nor Clang C++ Compiler supports this feature, but the Microsoft Visual C++ compiler partially. The following screenshot shows that the four function calls in the main function use the four different overloads of the member function <code>implicitCall</code>.</div>
+<div>&nbsp;</div>
+<div><img src="https://www.modernescpp.com/images/blog/Cpp23/DeducingThis/deducingThisFix.png" alt="deducingThisFix" width="466" height="248" style="display: block; margin-left: auto; margin-right: auto;" /></div>
+<div>&nbsp;</div>
+<div>&nbsp;</div>
+<div>&nbsp;</div>
+<div>As I promised, deducing this is a pretty small future, but ...</div>
+<h2>Reference a Lambda</h2>
+<div>
+<div>The crucial idea of the <a href="https://www.modernescpp.com/index.php/the-visitor-pattern">Visitor Pattern</a> is to perform operations on an object hierarchy. The object hierarchy is stable in this classical pattern, but the operations may change frequently.</div>
+<h3>The Visitor Pattern</h3>
+<div>The following program <code>visitor.cpp</code> exemplifies this pattern.</div>
+<div>&nbsp;</div>
+</div>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// visitor.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;string&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">CarElementVisitor</span>;
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">CarElement</span> {                                     <span style="color: #0099ff; font-style: italic;">// (5)</span>
+ <span style="color: #9999ff;">public:</span>
+    <span style="color: #006699; font-weight: bold;">virtual</span> <span style="color: #007788; font-weight: bold;">void</span> accept(CarElementVisitor<span style="color: #555555;">&amp;</span> visitor) <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>;
+    <span style="color: #006699; font-weight: bold;">virtual</span> <span style="color: #555555;">~</span>CarElement() <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">default</span>;
+};
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Body</span>;
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Car</span>;
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Engine</span>;
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Wheel</span>;
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">CarElementVisitor</span> {                              <span style="color: #0099ff; font-style: italic;">// (6)</span>
+ <span style="color: #9999ff;">public:</span>
+    <span style="color: #006699; font-weight: bold;">virtual</span> <span style="color: #007788; font-weight: bold;">void</span> visit(Body body) <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>;
+    <span style="color: #006699; font-weight: bold;">virtual</span> <span style="color: #007788; font-weight: bold;">void</span> visit(Car car) <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>;
+    <span style="color: #006699; font-weight: bold;">virtual</span> <span style="color: #007788; font-weight: bold;">void</span> visit(Engine engine) <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>;
+    <span style="color: #006699; font-weight: bold;">virtual</span> <span style="color: #007788; font-weight: bold;">void</span> visit(Wheel wheel) <span style="color: #006699; font-weight: bold;">const</span> <span style="color: #555555;">=</span> <span style="color: #ff6600;">0</span>;
+    <span style="color: #006699; font-weight: bold;">virtual</span> <span style="color: #555555;">~</span>CarElementVisitor() <span style="color: #555555;">=</span> <span style="color: #006699; font-weight: bold;">default</span>;
+};
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Wheel</span><span style="color: #555555;">:</span> <span style="color: #006699; font-weight: bold;">public</span> CarElement {
+ <span style="color: #9999ff;">public:</span>
+    Wheel(<span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span>string<span style="color: #555555;">&amp;</span> n)<span style="color: #555555;">:</span> name(n) { }
+
+    <span style="color: #007788; font-weight: bold;">void</span> accept(CarElementVisitor<span style="color: #555555;">&amp;</span> visitor) <span style="color: #006699; font-weight: bold;">const</span> override {
+        visitor.visit(<span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">this</span>);
+    }
+
+    std<span style="color: #555555;">::</span>string getName() <span style="color: #006699; font-weight: bold;">const</span> {
+        <span style="color: #006699; font-weight: bold;">return</span> name;
+    }
+ <span style="color: #9999ff;">private:</span>
+    std<span style="color: #555555;">::</span>string name;
+};
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Body</span><span style="color: #555555;">:</span> <span style="color: #006699; font-weight: bold;">public</span> CarElement {
+ <span style="color: #9999ff;">public:</span>
+    <span style="color: #007788; font-weight: bold;">void</span> accept(CarElementVisitor<span style="color: #555555;">&amp;</span> visitor) <span style="color: #006699; font-weight: bold;">const</span> override {
+        visitor.visit(<span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">this</span>);
+    }
+};
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Engine</span><span style="color: #555555;">:</span> <span style="color: #006699; font-weight: bold;">public</span> CarElement {
+ <span style="color: #9999ff;">public:</span>
+    <span style="color: #007788; font-weight: bold;">void</span> accept(CarElementVisitor<span style="color: #555555;">&amp;</span> visitor) <span style="color: #006699; font-weight: bold;">const</span> override {
+        visitor.visit(<span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">this</span>);
+    }
+};
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Car</span><span style="color: #555555;">:</span> <span style="color: #006699; font-weight: bold;">public</span> CarElement {
+ <span style="color: #9999ff;">public:</span>
+    Car(std<span style="color: #555555;">::</span>initializer_list<span style="color: #555555;">&lt;</span>CarElement<span style="color: #555555;">*&gt;</span> carElements )<span style="color: #555555;">:</span>
+      elements{carElements} {}
+   
+    <span style="color: #007788; font-weight: bold;">void</span> accept(CarElementVisitor<span style="color: #555555;">&amp;</span> visitor) <span style="color: #006699; font-weight: bold;">const</span> override {
+        <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> elem <span style="color: #555555;">:</span> elements) {
+            elem<span style="color: #555555;">-&gt;</span>accept(visitor);
+        }
+        visitor.visit(<span style="color: #555555;">*</span><span style="color: #006699; font-weight: bold;">this</span>);
+    }
+ <span style="color: #9999ff;">private:</span>
+    std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span>CarElement<span style="color: #555555;">*&gt;</span> elements;                   <span style="color: #0099ff; font-style: italic;">// (7)</span>
+};
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">CarElementDoVisitor</span><span style="color: #555555;">:</span> <span style="color: #006699; font-weight: bold;">public</span> CarElementVisitor {
+   
+    <span style="color: #007788; font-weight: bold;">void</span> visit(Body body) <span style="color: #006699; font-weight: bold;">const</span> override {
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Moving my body"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    }
+
+     <span style="color: #007788; font-weight: bold;">void</span> visit(Car car) <span style="color: #006699; font-weight: bold;">const</span> override {
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Starting my car"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    }
+
+    <span style="color: #007788; font-weight: bold;">void</span> visit(Wheel wheel) <span style="color: #006699; font-weight: bold;">const</span> override {
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Kicking my "</span> <span style="color: #555555;">&lt;&lt;</span> wheel.getName() 
+          <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" wheel"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    }
+
+    <span style="color: #007788; font-weight: bold;">void</span> visit(Engine engine) <span style="color: #006699; font-weight: bold;">const</span> override {
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Starting my engine"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    }
+};
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">CarElementPrintVisitor</span><span style="color: #555555;">:</span> <span style="color: #006699; font-weight: bold;">public</span> CarElementVisitor {
+   
+    <span style="color: #007788; font-weight: bold;">void</span> visit(Body body) <span style="color: #006699; font-weight: bold;">const</span> override {
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Visiting body"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    }
+
+     <span style="color: #007788; font-weight: bold;">void</span> visit(Car car) <span style="color: #006699; font-weight: bold;">const</span> override {
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Visiting car"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    }
+
+    <span style="color: #007788; font-weight: bold;">void</span> visit(Wheel wheel) <span style="color: #006699; font-weight: bold;">const</span> override {
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Visiting "</span> <span style="color: #555555;">&lt;&lt;</span> wheel.getName() 
+          <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" wheel"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    }
+
+    <span style="color: #007788; font-weight: bold;">void</span> visit(Engine engine) <span style="color: #006699; font-weight: bold;">const</span> override {
+        std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Visiting engine"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    }
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    Wheel wheelFrontLeft(<span style="color: #cc3300;">"front left"</span>);        
+    Wheel wheelFrontRight(<span style="color: #cc3300;">"front right"</span>);
+    Wheel wheelBackLeft(<span style="color: #cc3300;">"back left"</span>);
+    Wheel wheelBackRight(<span style="color: #cc3300;">"back right"</span>);
+    Body body;
+    Engine engine;
+    Car car {<span style="color: #555555;">&amp;</span>wheelFrontLeft, <span style="color: #555555;">&amp;</span>wheelFrontRight, 
+             <span style="color: #555555;">&amp;</span>wheelBackLeft, <span style="color: #555555;">&amp;</span>wheelBackRight,
+             <span style="color: #555555;">&amp;</span>body, <span style="color: #555555;">&amp;</span>engine};
+
+    CarElementPrintVisitor carElementPrintVisitor; 
+
+    engine.accept(carElementPrintVisitor);       <span style="color: #0099ff; font-style: italic;">// (1)      </span>
+    car.accept(carElementPrintVisitor);          <span style="color: #0099ff; font-style: italic;">// (2)</span>
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    CarElementDoVisitor carElementDoVisitor;
+
+    engine.accept(carElementDoVisitor);          <span style="color: #0099ff; font-style: italic;">// (3)</span>
+    car.accept(carElementDoVisitor);             <span style="color: #0099ff; font-style: italic;">// (4)</span>
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+}
+</pre>
+</div>
+</div>
+<div>&nbsp;</div>
+<div>All the <code>car</code>'s components are created at the beginning of the main function. After that, the <code>engine</code> and the <code>car</code> take the <code>carElementPrintVisitor</code> (1 and 2). In lines (3) and (4), both objects are accepted by <code>carElementDoVisitor</code>. <code>CarElement</code> (5) and <code>CarElementVisitor</code> (6) are the abstract base classes of the object and operation hierarchies. The <code>car</code> is the most interesting component because it holds its components in a <code>std::vector&lt;element*&gt;</code> (7). The crucial observation of the visitor pattern is that it depends on two objects, which operation is performed: the visitor and the visited object.</div>
+<div>&nbsp;</div>
+<div>Here is the output of the program:</div>
+<div>&nbsp;</div>
+<div><img src="https://www.modernescpp.com/images/blog/Cpp23/DeducingThis/visitor.png" alt="visitor" width="367" height="537" style="display: block; margin-left: auto; margin-right: auto;" /></div>
+<div>You will find more information on the Visitor Pattern in my previous post: <a href="https://www.modernescpp.com/index.php/the-visitor-pattern">The Visitor Pattern</a>. Admittedly, the Visitor Pattern is very resistant to understanding. Thanks to the overload pattern, this changes with C++23.</div>
+<div>&nbsp;</div>
+<div>{loadmoduleid 157}</div>
+<h3>The Overload Pattern</h3>
+<p>The <a href="https://www.modernescpp.com/index.php/visiting-a-std-variant-with-the-overload-pattern">Overload Pattern</a> is the modern C++ version of the Visitor Pattern. It combines variadic templates with <code><a href="https://en.cppreference.com/w/cpp/utility/variant">std:variant </a></code>and its function <code>std::visit</code>.</p>
+<p>Thanks to deducing this in C++23, a lambda expression can explicitly refer to its implicit lambda object.</p>
+</div>
+</div>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// visitOverload.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+<span style="color: #009999;">#include &lt;string&gt;</span>
+<span style="color: #009999;">#include &lt;vector&gt;</span>
+<span style="color: #009999;">#include &lt;variant&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span>class... Ts<span style="color: #555555;">&gt;</span> <span style="color: #006699; font-weight: bold;">struct</span> overloaded <span style="color: #555555;">:</span> Ts... { 
+    <span style="color: #006699; font-weight: bold;">using</span> Ts<span style="color: #555555;">::</span><span style="color: #006699; font-weight: bold;">operator</span>()...; 
+};
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Wheel</span> {
+ <span style="color: #9999ff;">public:</span>
+    Wheel(<span style="color: #006699; font-weight: bold;">const</span> std<span style="color: #555555;">::</span>string<span style="color: #555555;">&amp;</span> n)<span style="color: #555555;">:</span> name(n) { }
+    std<span style="color: #555555;">::</span>string getName() <span style="color: #006699; font-weight: bold;">const</span> {
+        <span style="color: #006699; font-weight: bold;">return</span> name;
+    }
+ <span style="color: #9999ff;">private:</span>
+    std<span style="color: #555555;">::</span>string name;
+};
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Body</span> {};
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Engine</span> {};
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Car</span>;
+
+<span style="color: #006699; font-weight: bold;">using</span> CarElement <span style="color: #555555;">=</span> std<span style="color: #555555;">::</span>variant<span style="color: #555555;">&lt;</span>Wheel, Body, Engine, Car<span style="color: #555555;">&gt;</span>;
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Car</span> {
+ <span style="color: #9999ff;">public:</span>
+    Car(std<span style="color: #555555;">::</span>initializer_list<span style="color: #555555;">&lt;</span>CarElement<span style="color: #555555;">*&gt;</span> carElements )<span style="color: #555555;">:</span>
+      elements{carElements} {}
+   
+   <span style="color: #006699; font-weight: bold;">template</span><span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span> 
+   <span style="color: #007788; font-weight: bold;">void</span> visitCarElements(T<span style="color: #555555;">&amp;&amp;</span> visitor) <span style="color: #006699; font-weight: bold;">const</span> {
+       <span style="color: #006699; font-weight: bold;">for</span> (<span style="color: #006699; font-weight: bold;">auto</span> elem <span style="color: #555555;">:</span> elements) {
+           std<span style="color: #555555;">::</span>visit(visitor, <span style="color: #555555;">*</span>elem);
+       }
+   }
+ <span style="color: #9999ff;">private:</span>
+    std<span style="color: #555555;">::</span>vector<span style="color: #555555;">&lt;</span>CarElement<span style="color: #555555;">*&gt;</span> elements;
+};
+
+overloaded carElementPrintVisitor {                                            <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    [](<span style="color: #006699; font-weight: bold;">const</span> Body<span style="color: #555555;">&amp;</span> body)     {  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Visiting body"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>; },      
+    [](<span style="color: #006699; font-weight: bold;">this</span> <span style="color: #006699; font-weight: bold;">auto</span> <span style="color: #006699; font-weight: bold;">const</span><span style="color: #555555;">&amp;</span> self, <span style="color: #006699; font-weight: bold;">const</span> Car<span style="color: #555555;">&amp;</span> car)  {  car.visitCarElements(self);  <span style="color: #0099ff; font-style: italic;">// (4)</span>
+                                                  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Visiting car"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>; },
+    [](<span style="color: #006699; font-weight: bold;">const</span> Wheel<span style="color: #555555;">&amp;</span> wheel)   {  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Visiting "</span> 
+                                          <span style="color: #555555;">&lt;&lt;</span> wheel.getName() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" wheel"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>; },
+    [](<span style="color: #006699; font-weight: bold;">const</span> Engine<span style="color: #555555;">&amp;</span> engine) {  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Visiting engine"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;}
+};
+
+overloaded carElementDoVisitor {                                               <span style="color: #0099ff; font-style: italic;">// (3)</span>
+    [](<span style="color: #006699; font-weight: bold;">const</span> Body<span style="color: #555555;">&amp;</span> body)     {  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Moving my body"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>; },
+    [](<span style="color: #006699; font-weight: bold;">this</span> <span style="color: #006699; font-weight: bold;">auto</span> <span style="color: #006699; font-weight: bold;">const</span><span style="color: #555555;">&amp;</span> self, <span style="color: #006699; font-weight: bold;">const</span> Car<span style="color: #555555;">&amp;</span> car) {  car.visitCarElements(self);   <span style="color: #0099ff; font-style: italic;">// (5)</span>
+                                                std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Starting my car"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>; },
+    [](<span style="color: #006699; font-weight: bold;">const</span> Wheel<span style="color: #555555;">&amp;</span> wheel)   {  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Kicking my "</span> 
+                                          <span style="color: #555555;">&lt;&lt;</span> wheel.getName()  <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">" wheel"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>; },
+    [](<span style="color: #006699; font-weight: bold;">const</span> Engine<span style="color: #555555;">&amp;</span> engine) {  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Starting my engine"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;}
+};
+ 
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>() {
+
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    CarElement wheelFrontLeft  <span style="color: #555555;">=</span> Wheel(<span style="color: #cc3300;">"front left"</span>);        
+    CarElement wheelFrontRight <span style="color: #555555;">=</span> Wheel(<span style="color: #cc3300;">"front right"</span>);
+    CarElement wheelBackLeft   <span style="color: #555555;">=</span> Wheel(<span style="color: #cc3300;">"back left"</span>);
+    CarElement wheelBackRight  <span style="color: #555555;">=</span> Wheel(<span style="color: #cc3300;">"back right"</span>);
+    CarElement body            <span style="color: #555555;">=</span> Body{};
+    CarElement engine          <span style="color: #555555;">=</span> Engine{};
+ 
+    CarElement car  <span style="color: #555555;">=</span> Car{<span style="color: #555555;">&amp;</span>wheelFrontLeft, <span style="color: #555555;">&amp;</span>wheelFrontRight,                    <span style="color: #0099ff; font-style: italic;">// (1)</span>
+             <span style="color: #555555;">&amp;</span>wheelBackLeft, <span style="color: #555555;">&amp;</span>wheelBackRight,
+             <span style="color: #555555;">&amp;</span>body, <span style="color: #555555;">&amp;</span>engine};
+
+    std<span style="color: #555555;">::</span>visit(carElementPrintVisitor, engine);
+    std<span style="color: #555555;">::</span>visit(carElementPrintVisitor, car);
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+    std<span style="color: #555555;">::</span>visit(carElementDoVisitor, engine);
+    std<span style="color: #555555;">::</span>visit(carElementDoVisitor, car);
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<div>
+<div>The <code>Car</code> (1) represents the object hierarchy, and the two operations <code>carElementPrintVisitor</code> (2) and <code>carElementDoVistor</code> (3) represent the visitors.&nbsp;The lambda expressions in lines (4) and (5) that visit the <code>car</code> can reference the implicit lambda object and thus visit the concrete components of the car: <code>car.visitCarElement(self)</code>. The output of the previous program<code> vistitor.cpp</code> and this program are identical.</div>
+<div>&nbsp;</div>
+<div><img src="https://www.modernescpp.com/images/blog/Cpp23/DeducingThis/visitOverload.png" alt="visitOverload" width="466" height="476" style="display: block; margin-left: auto; margin-right: auto;" /></div>
+<div>&nbsp;</div>
+</div>
+<h2>What's Next?</h2>
+<p>The <strong>C</strong>uriously<strong> R</strong>ecurring <strong>T</strong>emplate <strong>P</strong>attern (CRTP) is a heavily used idiom in C++. It is similarly resistant to understanding as the classic design pattern visitor. Thanks to deducing this, we can remove the C and R from the abbreviation.</p>
+<p>&nbsp;</p>
+<p>{loadmoduleid 153}</p>

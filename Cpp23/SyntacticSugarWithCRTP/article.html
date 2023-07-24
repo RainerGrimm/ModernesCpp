@@ -1,0 +1,298 @@
+<p>The <strong>C</strong>uriously<strong> R</strong>ecurring <strong>T</strong>emplate <strong>P</strong>attern is a heavily used idiom in C++. It is similarly resistant to understanding as the classic design pattern visitor I presented in my last post: "<a href="https://www.modernescpp.com/index.php/c-23-deducing-this">C++23: Deducing This</a>".&nbsp; Thanks to deducing this, we can remove the C and R from the abbreviation.</p>
+<hr id="system-readmore" />
+<p>&nbsp;</p>
+<p><img src="https://www.modernescpp.com/images/blog/Cpp23/SyntacticSugarWithCRTP/DeducingThis.png" alt="DeducingThis" width="650" height="366" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<h2>CRTP</h2>
+<p>The acronym CRTP stands for the C++ idiom <strong>C</strong>uriously<strong> R</strong>ecurring <strong>T</strong>emplate <strong>P</strong>attern and denotes a technique in C++ in which a class <code>Derived</code> is derived from a class template <code>Base</code>. The critical point is that <code>Base</code> has <code>Derived</code> as a template argument.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Base</span>{
+    ...
+};
+
+<span style="color: #006699; font-weight: bold;">class</span> <span style="color: #00aa88; font-weight: bold;">Derived</span> <span style="color: #555555;">:</span> <span style="color: #006699; font-weight: bold;">public</span> Base<span style="color: #555555;">&lt;</span>Derived<span style="color: #555555;">&gt;</span>{
+    ...
+};
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>CRTP is typically used to implement static polymorphism. Unlike dynamic polymorphism, static polymorphism happens at compile time and does not require an <em>expensive</em> run-time pointer indirection.</p>
+<h3>C++98</h3>
+<p>The following program<code> crtp.cpp</code> shows an idiomatic C++98-based implementation of CRTP.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// crtp.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> Derived<span style="color: #555555;">&gt;</span>
+<span style="color: #006699; font-weight: bold;">struct</span> Base{                                        
+  <span style="color: #007788; font-weight: bold;">void</span> interface(){                                 <span style="color: #0099ff; font-style: italic;">// (2)</span>
+    <span style="color: #006699; font-weight: bold;">static_cast</span><span style="color: #555555;">&lt;</span>Derived<span style="color: #555555;">*&gt;</span>(<span style="color: #006699; font-weight: bold;">this</span>)<span style="color: #555555;">-&gt;</span>implementation();
+  }
+  <span style="color: #007788; font-weight: bold;">void</span> implementation(){                            <span style="color: #0099ff; font-style: italic;">// (3)</span>
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Implementation Base"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  }
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> Derived1<span style="color: #555555;">:</span> Base<span style="color: #555555;">&lt;</span>Derived1<span style="color: #555555;">&gt;</span>{
+  <span style="color: #007788; font-weight: bold;">void</span> implementation(){
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Implementation Derived1"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  }
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> Derived2<span style="color: #555555;">:</span> Base<span style="color: #555555;">&lt;</span>Derived2<span style="color: #555555;">&gt;</span>{
+  <span style="color: #007788; font-weight: bold;">void</span> implementation(){
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Implementation Derived2"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  }
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> Derived3<span style="color: #555555;">:</span> Base<span style="color: #555555;">&lt;</span>Derived3<span style="color: #555555;">&gt;</span>{};                <span style="color: #0099ff; font-style: italic;">// (4)</span>
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>                             <span style="color: #0099ff; font-style: italic;">// (1)</span>
+<span style="color: #007788; font-weight: bold;">void</span> execute(T<span style="color: #555555;">&amp;</span> base){
+    base.interface();                              
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main(){
+  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  
+  Derived1 d1;
+  execute(d1);
+    
+  Derived2 d2;
+  execute(d2);
+  
+  Derived3 d3;
+  execute(d3);
+  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<div>
+<div>The function template <code>execute</code> (1) uses static polymorphism. The member function<code> base::interface</code> (2) is the key to the CRTP idiom. The member function forwards to the implementation of the derived class:<code> static_cast&lt;derived*&gt;(this)-&gt;implementation</code>. This is possible because the function is not instantiated until it is called. The derived classes <code>Derived1</code>, <code>Derived2</code> and <code>Derived3</code> are defined at this point. Therefore, the function <code>Base::interface</code> can use the implementation of the derived classes. The member function <code>Base::implementation</code> (3) plays the role of a default implementation for the static polymorphism of the class <code>Derived3</code> (4).&nbsp;</div>
+<div>The following screenshot shows the static polymorphism in action.</div>
+<div>&nbsp;</div>
+<div><img src="https://www.modernescpp.com/images/blog/Cpp23/SyntacticSugarWithCRTP/crtp.png" alt="crtp" width="400" height="191" style="display: block; margin-left: auto; margin-right: auto;" /></div>
+</div>
+<p>&nbsp;</p>
+<h3>C++23</h3>
+<p>Thanks to the explicit object parameter (deducing this), the C and the R can be removed from the CRTP acronym:<strong><span style="color: #000000;"> <img src="https://www.modernescpp.com/images/blog/Cpp23/SyntacticSugarWithCRTP/CRTP_TP.png" alt="CRTP TP" width="150" height="24" style="display: block; margin-left: auto; margin-right: auto;" /><span style="text-decoration: line-through;"><br /></span></span></strong></p>
+<p>The program <code>deducingThisCRTP.cpp</code> shows the C++23-based implementation of <span style="text-decoration: line-through;">CR</span>TP.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// deducingThisCRTP.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">struct</span> Base{                                            <span style="color: #0099ff; font-style: italic;">// (1)</span>
+  <span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> Self<span style="color: #555555;">&gt;</span>
+  <span style="color: #007788; font-weight: bold;">void</span> interface(<span style="color: #006699; font-weight: bold;">this</span> Self<span style="color: #555555;">&amp;&amp;</span> self){
+    self.implementation();
+  }
+  <span style="color: #007788; font-weight: bold;">void</span> implementation(){
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Implementation Base"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  }
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> Derived1<span style="color: #555555;">:</span> Base{
+  <span style="color: #007788; font-weight: bold;">void</span> implementation(){
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Implementation Derived1"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  }
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> Derived2<span style="color: #555555;">:</span> Base{
+  <span style="color: #007788; font-weight: bold;">void</span> implementation(){
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Implementation Derived2"</span> <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  }
+};
+
+<span style="color: #006699; font-weight: bold;">struct</span> Derived3<span style="color: #555555;">:</span> Base{};
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #006699; font-weight: bold;">typename</span> T<span style="color: #555555;">&gt;</span>
+<span style="color: #007788; font-weight: bold;">void</span> execute(T<span style="color: #555555;">&amp;</span> base){
+    base.interface();                                 <span style="color: #0099ff; font-style: italic;">// (2)</span>
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main(){
+  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  
+  Derived1 d1;                                        <span style="color: #0099ff; font-style: italic;">// (3)</span>
+  execute(d1);
+    
+  Derived2 d2;                                        <span style="color: #0099ff; font-style: italic;">// (4)</span>
+  execute(d2);
+  
+  Derived3 d3;                                        <span style="color: #0099ff; font-style: italic;">// (5)</span>
+  execute(d3);
+  
+  std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+  
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Thanks to the explicit object parameter (line 1), the type of the explicit object parameter can be deduced to the derived type and perfectly forwarded. For the concrete type in (2), <code>Derived1</code> (3), <code>Derived2</code> (4), and <code>Derived3</code> (5) are used. Consequently, the corresponding <em>virtual </em>function implementation is called: <code>std::forward&lt;Self&gt;(self).implementation()</code>. With the current Microsoft compiler, the program can already be executed:</p>
+<p><img src="https://www.modernescpp.com/images/blog/Cpp23/SyntacticSugarWithCRTP/deducingThisCRTP.png" alt="deducingThisCRTP" width="493" height="248" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>{loadmoduleid 157}</p>
+<h2>Recursive Lambdas</h2>
+<p>I got a comment on my last German post (<a href="https://www.heise.de/forum/heise-online/Kommentare/C-23-Deducing-This-erstellt-explizite-Zeiger/rekursive-lambdas/thread-7392252/">https://www.heise.de/forum/heise-online/Kommentare/C-23-Deducing-This-erstellt-explizite-Zeiger/rekursive-lambdas/thread-7392252/</a>) that I forgot the most descriptive applications of Deducing This: recursive lambdas. Honestly, I'm not so sure because most programmers have issues with recursion. Second, I'm not a fan of sophisticated lambdas. Lambdas should be concise and self-documenting.</p>
+<p>Let me show you various implementations of a recursively defined factorial function. Afterward, you can decide which version you prefer.</p>
+<p>Each factorial function calculates the factorial of 10: <span id="cwos" class="qv3Wpe">3628800</span>.</p>
+<h3>C++98</h3>
+<p>In C++98, you have two options. Either you use template metaprogramming with recursive instantiation or just a function call. The template metaprogram runs at compile time.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// factorial_cpp98.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">unsigned</span> <span style="color: #007788; font-weight: bold;">int</span> N<span style="color: #555555;">&gt;</span>                                                                 
+<span style="color: #006699; font-weight: bold;">struct</span> Factorial{
+    <span style="color: #006699; font-weight: bold;">static</span> <span style="color: #007788; font-weight: bold;">int</span> <span style="color: #006699; font-weight: bold;">const</span> value <span style="color: #555555;">=</span> N <span style="color: #555555;">*</span> Factorial<span style="color: #555555;">&lt;</span>N<span style="color: #555555;">-</span><span style="color: #ff6600;">1</span><span style="color: #555555;">&gt;::</span>value;
+};
+
+
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;&gt;</span>                                                                     
+<span style="color: #006699; font-weight: bold;">struct</span> Factorial<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">0</span><span style="color: #555555;">&gt;</span>{
+    <span style="color: #006699; font-weight: bold;">static</span> <span style="color: #007788; font-weight: bold;">int</span> <span style="color: #006699; font-weight: bold;">const</span> value <span style="color: #555555;">=</span> <span style="color: #ff6600;">1</span>;
+};
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">factorial</span>(<span style="color: #007788; font-weight: bold;">unsigned</span> <span style="color: #007788; font-weight: bold;">int</span> n){
+    <span style="color: #006699; font-weight: bold;">return</span> n <span style="color: #555555;">&gt;</span> <span style="color: #ff6600;">0</span> <span style="color: #555555;">?</span> n <span style="color: #555555;">*</span> factorial(n <span style="color: #555555;">-</span> <span style="color: #ff6600;">1</span>)<span style="color: #555555;">:</span> <span style="color: #ff6600;">1</span>;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"Factorial&lt;10&gt;::value: "</span> <span style="color: #555555;">&lt;&lt;</span> Factorial<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">10</span><span style="color: #555555;">&gt;::</span>value <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>; 
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"factorial(10)         "</span> <span style="color: #555555;">&lt;&lt;</span> factorial(<span style="color: #ff6600;">10</span>) <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>&nbsp;In the case of the template metaprogram, a full template specialization for the values 2 to 10 is created:&nbsp;<a href="https://cppinsights.io/s/b7a2cbd6">https://cppinsights.io/s/b7a2cbd6</a>,</p>
+<h3>C++11</h3>
+<p>In C++11, the factorial function can be <code>constexpr</code> and has the potential to run at compile time.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// factorial_cpp11.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+constexpr <span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">factorial</span>(<span style="color: #007788; font-weight: bold;">unsigned</span> <span style="color: #007788; font-weight: bold;">int</span> n){
+    <span style="color: #006699; font-weight: bold;">return</span> n <span style="color: #555555;">&gt;</span> <span style="color: #ff6600;">0</span> <span style="color: #555555;">?</span> n <span style="color: #555555;">*</span> factorial(n <span style="color: #555555;">-</span> <span style="color: #ff6600;">1</span>)<span style="color: #555555;">:</span> <span style="color: #ff6600;">1</span>;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"factorial(10)         "</span> <span style="color: #555555;">&lt;&lt;</span> factorial(<span style="color: #ff6600;">10</span>) <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+}
+</pre>
+</div>
+<h3>C++17</h3>
+<p>Thanks to <code>constexp if</code>, a different code is generated if N &gt; 0 or not. Like the template metaprogram in C++11, the compiler generated fully specialized templates for the values 2 to 10: <a href="https://cppinsights.io/s/650b62f0">https://cppinsights.io/s/650b62f0</a>.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// factorial_cpp17.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">template</span> <span style="color: #555555;">&lt;</span><span style="color: #007788; font-weight: bold;">unsigned</span> <span style="color: #007788; font-weight: bold;">int</span> N<span style="color: #555555;">&gt;</span>                                             
+constexpr <span style="color: #007788; font-weight: bold;">int</span> factorial() {
+    <span style="color: #006699; font-weight: bold;">if</span> constexpr (N <span style="color: #555555;">&gt;</span> <span style="color: #ff6600;">0</span>) 
+        <span style="color: #006699; font-weight: bold;">return</span> N <span style="color: #555555;">*</span> factorial<span style="color: #555555;">&lt;</span>N <span style="color: #555555;">-</span> <span style="color: #ff6600;">1</span><span style="color: #555555;">&gt;</span>();
+    <span style="color: #006699; font-weight: bold;">else</span> 
+        <span style="color: #006699; font-weight: bold;">return</span> <span style="color: #ff6600;">1</span>;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> main(){
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"factorial&lt;10&gt;() "</span> <span style="color: #555555;">&lt;&lt;</span> factorial<span style="color: #555555;">&lt;</span><span style="color: #ff6600;">10</span><span style="color: #555555;">&gt;</span>() <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+}
+</pre>
+</div>
+<h3>C++20</h3>
+<p>A <code>constexpr</code> function (C++11) has the potential at compiler time, but a <code>consteval</code> function (C++20) must run at compile time.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// factorial_cpp20.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+consteval <span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">factorial</span>(<span style="color: #007788; font-weight: bold;">unsigned</span> <span style="color: #007788; font-weight: bold;">int</span> n){
+    <span style="color: #006699; font-weight: bold;">return</span> n <span style="color: #555555;">&gt;</span> <span style="color: #ff6600;">0</span> <span style="color: #555555;">?</span> n <span style="color: #555555;">*</span> factorial(n <span style="color: #555555;">-</span> <span style="color: #ff6600;">1</span>)<span style="color: #555555;">:</span> <span style="color: #ff6600;">1</span>;
+}
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"factorial(10)         "</span> <span style="color: #555555;">&lt;&lt;</span> factorial(<span style="color: #ff6600;">10</span>) <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+}
+</pre>
+</div>
+<h3>C++23</h3>
+<p>Finally, I'm in C++23. In C++23, a lambda can reference itself. This allows me to create recursive lambdas.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #0099ff; font-style: italic;">// factorial_cpp23.cpp</span>
+
+<span style="color: #009999;">#include &lt;iostream&gt;</span>
+
+<span style="color: #006699; font-weight: bold;">auto</span> factorial <span style="color: #555555;">=</span> [](<span style="color: #006699; font-weight: bold;">this</span> <span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;&amp;</span> self, <span style="color: #007788; font-weight: bold;">unsigned</span> <span style="color: #007788; font-weight: bold;">int</span> n) <span style="color: #555555;">-&gt;</span> <span style="color: #007788; font-weight: bold;">int</span> { 
+                     <span style="color: #006699; font-weight: bold;">return</span> n <span style="color: #555555;">&gt;</span> <span style="color: #ff6600;">0</span> <span style="color: #555555;">?</span> n <span style="color: #555555;">*</span> self(n <span style="color: #555555;">-</span> <span style="color: #ff6600;">1</span>)<span style="color: #555555;">:</span> <span style="color: #ff6600;">1</span>;
+                 };
+
+<span style="color: #007788; font-weight: bold;">int</span> <span style="color: #cc00ff;">main</span>(){
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">"factorial(10)         "</span> <span style="color: #555555;">&lt;&lt;</span> factorial(<span style="color: #ff6600;">10</span>) <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+    
+    std<span style="color: #555555;">::</span>cout <span style="color: #555555;">&lt;&lt;</span> <span style="color: #cc3300;">'\n'</span>;
+
+}
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>The MSVC compiler does not fully support deducing this. I must specify the recursive lambda's return type <code>(-&gt; int</code>). According to the proposal <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p0847r7.html">P0847R7</a>, this is not necessary.</p>
+<!-- HTML generated using hilite.me -->
+<div style="background: #f0f3f3; overflow: auto; width: auto; gray;border-width: .1em .1em .1em .8em;">
+<pre style="margin: 0; line-height: 125%;"><span style="color: #006699; font-weight: bold;">auto</span> factorial <span style="color: #555555;">=</span> [](<span style="color: #006699; font-weight: bold;">this</span> <span style="color: #006699; font-weight: bold;">auto</span><span style="color: #555555;">&amp;&amp;</span> self, <span style="color: #007788; font-weight: bold;">unsigned</span> <span style="color: #007788; font-weight: bold;">int</span> n) { 
+                     <span style="color: #006699; font-weight: bold;">return</span> n <span style="color: #555555;">&gt;</span> <span style="color: #ff6600;">0</span> <span style="color: #555555;">?</span> n <span style="color: #555555;">*</span> self(n <span style="color: #555555;">-</span> <span style="color: #ff6600;">1</span>)<span style="color: #555555;">:</span> <span style="color: #ff6600;">1</span>;
+                 };
+</pre>
+</div>
+<p>&nbsp;</p>
+<p>Here is the output of the program:</p>
+<p><img src="https://www.modernescpp.com/images/blog/Cpp23/SyntacticSugarWithCRTP/factorial_cpp23.png" alt="factorial cpp23" width="400" height="148" style="display: block; margin-left: auto; margin-right: auto;" /></p>
+<p>I'm not sure with which version of factorial you would prefer. I probably use the C++20 version based on <code>consteval</code>.</p>
+<h2>What's next?</h2>
+<p>The core language of C++23 has more features to offer than deducing this. They will be the topic of my next post.</p>
+<p>&nbsp;</p>
+<p>{loadmoduleid 153}</p>
